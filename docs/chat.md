@@ -6,7 +6,7 @@ The **Assistant** drafts a post or an article from something you give it, and yo
 
 ## Using it
 
-1. Click the **sparkle button** in the header to open the Assistant. It is a drawer on the right that stays beside the card, so you can talk to it while watching the design; Esc or the close button hides it. Writing and editing yourself stays in the sidebar tabs (Design, Text, Post, Profile), and the conversation lives here. The button shows a number when proposals are waiting for you.
+1. Click the **sparkle button** in the header to open the Assistant. It is a drawer on the right that stays beside the card, so you can talk to it while watching the design; Drag the grip on its left edge to make it wider or narrower (double-click the grip to reset, or focus it and use the arrow keys); the width is remembered. Esc or the close button hides it. Writing and editing yourself stays in the sidebar tabs (Design, Text, Post, Profile), and the conversation lives here. The button shows a number when proposals are waiting for you.
    Then Give it a **web address** or **paste the text** (one or the other, at least 40 characters), and press **Draft from this**.
 2. It replies and shows a **proposal card**: the kind (post or article), a title for the card, the text, hashtags, alt text, and a note on why.
 3. Choose:

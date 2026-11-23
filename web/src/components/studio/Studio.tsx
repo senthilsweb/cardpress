@@ -344,7 +344,7 @@ function Workspace({ initial }: { initial: Loaded }) {
         </div>
       </div>
       <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title="Assistant">
+      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title="Assistant" resizeKey="assistant">
         <ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => { setTab("post"); if (sidebarHidden) toggleSidebar(); setAssistantOpen(false); }} />
       </Drawer>
      </LayoutContext.Provider>
