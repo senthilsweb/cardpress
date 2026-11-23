@@ -6,7 +6,7 @@
 The system SHALL encrypt every credential field before it is written to the database.
 
 #### Scenario: Key required
-- **WHEN** `SCS_SECRET_KEY` is unset in a non-local mode
+- **WHEN** `CARDPRESS_SECRET_KEY` is unset in a non-local mode
 - **THEN** saving a credential is rejected with an explanatory error
 - **WHEN** it is unset in local mode
 - **THEN** a key file is generated beside the database with mode 0600

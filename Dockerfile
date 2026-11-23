@@ -26,9 +26,9 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=bin /out/cardpress /cardpress
 ARG BASE_PATH=/
 COPY --from=bin --chown=nonroot:nonroot /out/data /data
-# The container listens on every interface, so the server insists on SCS_API_TOKEN (or SCS_INSECURE=1 when something
+# The container listens on every interface, so the server insists on CARDPRESS_API_TOKEN (or CARDPRESS_INSECURE=1 when something
 # else, such as a loopback-only port mapping, protects it).
-ENV ADDR=:8080 BASE_PATH=${BASE_PATH} SCS_DB_URL=file:/data/scs.db
+ENV ADDR=:8080 BASE_PATH=${BASE_PATH} CARDPRESS_DB_URL=file:/data/cardpress.db
 VOLUME /data
 EXPOSE 8080
 USER nonroot:nonroot

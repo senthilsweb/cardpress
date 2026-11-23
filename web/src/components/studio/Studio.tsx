@@ -32,7 +32,7 @@ function Logo() {
   return (
     <div className="flex items-center gap-2">
       <svg width="14" height="14" viewBox="0 0 10 10"><path d="M5 0.6 9.4 5 5 9.4 0.6 5Z" className="fill-brand" /></svg>
-      <span className="font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]">Social Card Studio</span>
+      <span className="font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]">CardPress</span>
     </div>
   );
 }

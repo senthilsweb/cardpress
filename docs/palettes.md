@@ -14,4 +14,4 @@ Aubergine is not the default. New designs start on Ink.
 
 ## Saved profiles
 
-Profiles are stored in the browser (`scs.profiles.v1`). On load, `withStandardPalettes` appends any standard palette whose id is missing and leaves existing and edited palettes alone. To add a palette for everyone, add it to `standardPalettes`.
+Profiles are stored in the database. On load, `withStandardPalettes` appends any standard palette whose id is missing and leaves existing and edited palettes alone. To add a palette for everyone, add it to `standardPalettes`.

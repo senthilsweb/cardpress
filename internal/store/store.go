@@ -70,7 +70,7 @@ func Open(ctx context.Context, rawURL, token string) (*DB, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unsupported database URL %q: use file:./data/scs.db or libsql://...", redact(rawURL))
+		return nil, fmt.Errorf("unsupported database URL %q: use file:./data/cardpress.db or libsql://...", redact(rawURL))
 	}
 	pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

@@ -46,7 +46,7 @@ A failed post is **never retried by the server**. You fix the cause (a new token
 
 A scheduler inside the Go process checks every 20 seconds. Each due post is claimed with a single atomic database update, so it runs at most once even if two servers share a database. Every time it runs:
 
-- a post **within the grace window** (default 15 minutes, `SCS_MISSED_GRACE`) of its time is sent;
+- a post **within the grace window** (default 15 minutes, `CARDPRESS_MISSED_GRACE`) of its time is sent;
 - a post **later than that** is marked Missed and waits for you, rather than appearing hours late;
 - a publish that never finished (over 10 minutes) is flagged Check LinkedIn.
 
@@ -58,9 +58,9 @@ On start, any post left "publishing" by a previous run becomes **Check LinkedIn*
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SCS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
-| `SCS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header. LinkedIn retires versions after about a year, so keep it current. |
-| `SCS_LINKEDIN_API_BASE` | LinkedIn's API | For tests or a proxy only. It must be https (plain http only for localhost), because the access token is sent there. |
+| `CARDPRESS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
+| `CARDPRESS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header. LinkedIn retires versions after about a year, so keep it current. |
+| `CARDPRESS_LINKEDIN_API_BASE` | LinkedIn's API | For tests or a proxy only. It must be https (plain http only for localhost), because the access token is sent there. |
 
 ## API
 

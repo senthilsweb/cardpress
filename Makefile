@@ -1,4 +1,4 @@
-# Social Card Studio
+# CardPress
 APP      := cardpress
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BASE_PATH ?= /
@@ -8,11 +8,11 @@ PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
 .PHONY: dev api web build run release test docker docker-run clean
 
 api:            ## Go API only, on http://127.0.0.1:8080 (no embedded web app)
-	SCS_SERVE_WEB=false go run . -addr 127.0.0.1:8080
+	CARDPRESS_SERVE_WEB=false go run . -addr 127.0.0.1:8080
 
 dev:            ## API + Astro dev server with hot reload (http://localhost:4321, /api proxied to :8080)
 	@trap 'kill 0' INT TERM EXIT; \
-	SCS_SERVE_WEB=false go run . -addr 127.0.0.1:8080 & \
+	CARDPRESS_SERVE_WEB=false go run . -addr 127.0.0.1:8080 & \
 	cd web && npm run dev & \
 	wait
 
@@ -41,7 +41,7 @@ docker:         ## Build the Docker image
 
 docker-run:     ## Run the Docker image on http://localhost:8080 (published on loopback only), data in ./data
 	@mkdir -p data
-	docker run --rm -p 127.0.0.1:8080:8080 -e SCS_INSECURE=1 -v $(PWD)/data:/data $(APP):latest
+	docker run --rm -p 127.0.0.1:8080:8080 -e CARDPRESS_INSECURE=1 -v $(PWD)/data:/data $(APP):latest
 
 clean:
 	rm -rf bin dist web/dist web/.astro   # data/ (your database) is left alone

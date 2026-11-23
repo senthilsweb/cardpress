@@ -246,7 +246,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
           <div className="mx-4 mt-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
             <p>
-              Credentials cannot be saved: the server has no encryption key. Set <code className="font-mono">SCS_SECRET_KEY</code> to a long random value
+              Credentials cannot be saved: the server has no encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> to a long random value
               (for example <code className="font-mono">openssl rand -hex 32</code>) and restart. Values set through environment variables still work.
             </p>
           </div>

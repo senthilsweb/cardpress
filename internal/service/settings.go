@@ -70,7 +70,7 @@ func NewSettings(db *sql.DB, box *secrets.Box, getenv func(string) string) *Sett
 }
 
 func envName(network string, f FieldSpec) string {
-	return "SCS_" + strings.ToUpper(network) + "_" + f.Env
+	return "CARDPRESS_" + strings.ToUpper(network) + "_" + f.Env
 }
 
 func mask(v string) string {
@@ -215,7 +215,7 @@ func (s *Settings) Put(ctx context.Context, id string, changes map[string]*strin
 		ops = append(ops, op{k, v})
 	}
 	if needKey && s.box == nil {
-		return NetworkView{}, fmt.Errorf("%w: set SCS_SECRET_KEY (at least %d characters) to store credentials", ErrSecretsUnavailable, secrets.MinSecretLen)
+		return NetworkView{}, fmt.Errorf("%w: set CARDPRESS_SECRET_KEY (at least %d characters) to store credentials", ErrSecretsUnavailable, secrets.MinSecretLen)
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -265,7 +265,7 @@ func (s *Settings) Resolve(ctx context.Context, id string) (map[string]string, e
 		} else if v, ok := vals[f.Key]; ok {
 			out[f.Key] = v
 		} else if bad[f.Key] {
-			return nil, fmt.Errorf("the stored %s %s cannot be decrypted: was SCS_SECRET_KEY changed? Enter it again", spec.Name, f.Label)
+			return nil, fmt.Errorf("the stored %s %s cannot be decrypted: was CARDPRESS_SECRET_KEY changed? Enter it again", spec.Name, f.Label)
 		}
 	}
 	return out, nil

@@ -20,14 +20,14 @@ You paste the values in. There is no sign-in flow in the studio yet, and tokens 
 
 - Each value is encrypted with AES-256-GCM before it is written to the database. The key is derived from a secret with HKDF-SHA256, every value has its own random nonce, and the network and field name are bound in, so a value cannot be copied into another field.
 - **The key:**
-  - `SCS_SECRET_KEY` (at least 32 characters, e.g. `openssl rand -hex 32`) is used if set. This is required with a hosted database (Turso) or when the server listens on an address other than loopback.
+  - `CARDPRESS_SECRET_KEY` (at least 32 characters, e.g. `openssl rand -hex 32`) is used if set. This is required with a hosted database (Turso) or when the server listens on an address other than loopback.
   - Otherwise, for a local setup (a database file and a loopback address), the server creates `data/secret.key` (mode 0600) on first start and uses that. **Back it up together with the database**: without the key the stored credentials cannot be read, and the card will say "Cannot be read – enter it again".
   - With no key at all the server still runs, but refuses to store credentials and says why. Values from environment variables still work.
 - Changing the key makes existing stored credentials unreadable. They are not deleted; entering a value again replaces it.
 - Responses from the API never contain a secret. They are also marked `no-store`.
 - LinkedIn is called at a fixed address and redirects are never followed, so credentials are only sent where intended.
 
-There are no user accounts yet, so anyone who can reach the server can open this screen and use the stored credentials to publish. Keep it on loopback, or set `SCS_API_TOKEN` (see [Deployment](deployment.md)).
+There are no user accounts yet, so anyone who can reach the server can open this screen and use the stored credentials to publish. Keep it on loopback, or set `CARDPRESS_API_TOKEN` (see [Deployment](deployment.md)).
 
 ## Environment variables
 
@@ -35,10 +35,10 @@ A credential can come from the environment instead. An environment value overrid
 
 | LinkedIn | X | Instagram |
 |---|---|---|
-| `SCS_LINKEDIN_CLIENT_ID` | `SCS_X_API_KEY` | `SCS_INSTAGRAM_APP_ID` |
-| `SCS_LINKEDIN_CLIENT_SECRET` | `SCS_X_API_SECRET` | `SCS_INSTAGRAM_APP_SECRET` |
-| `SCS_LINKEDIN_ACCESS_TOKEN` | `SCS_X_ACCESS_TOKEN` | `SCS_INSTAGRAM_ACCESS_TOKEN` |
-| `SCS_LINKEDIN_AUTHOR_URN` | `SCS_X_ACCESS_TOKEN_SECRET` | `SCS_INSTAGRAM_BUSINESS_ACCOUNT_ID` |
+| `CARDPRESS_LINKEDIN_CLIENT_ID` | `CARDPRESS_X_API_KEY` | `CARDPRESS_INSTAGRAM_APP_ID` |
+| `CARDPRESS_LINKEDIN_CLIENT_SECRET` | `CARDPRESS_X_API_SECRET` | `CARDPRESS_INSTAGRAM_APP_SECRET` |
+| `CARDPRESS_LINKEDIN_ACCESS_TOKEN` | `CARDPRESS_X_ACCESS_TOKEN` | `CARDPRESS_INSTAGRAM_ACCESS_TOKEN` |
+| `CARDPRESS_LINKEDIN_AUTHOR_URN` | `CARDPRESS_X_ACCESS_TOKEN_SECRET` | `CARDPRESS_INSTAGRAM_BUSINESS_ACCOUNT_ID` |
 
 ## API
 

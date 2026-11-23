@@ -5,7 +5,7 @@ type FieldSpec struct {
 	Key    string
 	Label  string
 	Hint   string
-	Env    string // environment variable suffix: SCS_<NETWORK>_<Env>
+	Env    string // environment variable suffix: CARDPRESS_<NETWORK>_<Env>
 	Secret bool   // shown masked; identifiers (IDs, URNs) are shown in full
 }
 

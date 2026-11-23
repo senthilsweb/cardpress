@@ -5,7 +5,7 @@ export const API_BASE = (env.PUBLIC_API_BASE || "/api/v1").replace(/\/+$/, "");
 
 // A token typed into the prompt is kept for this tab only. A build-time PUBLIC_API_TOKEN is visible to anyone who
 // can load the app, so use it only on a private network.
-const TOKEN_KEY = "scs.apiToken";
+const TOKEN_KEY = "cardpress.apiToken";
 export const getToken = (): string => {
   try { return sessionStorage.getItem(TOKEN_KEY) || env.PUBLIC_API_TOKEN || ""; } catch { return env.PUBLIC_API_TOKEN || ""; }
 };

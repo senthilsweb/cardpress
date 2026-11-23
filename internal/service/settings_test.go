@@ -140,10 +140,10 @@ func TestPutSemantics(t *testing.T) {
 }
 
 func TestEnvironmentOverridesAndLocks(t *testing.T) {
-	env := map[string]string{"SCS_LINKEDIN_ACCESS_TOKEN": "env-token-env-token-9999"}
+	env := map[string]string{"CARDPRESS_LINKEDIN_ACCESS_TOKEN": "env-token-env-token-9999"}
 	s, _ := newSettings(t, keyA, env)
 	ctx := context.Background()
-	if _, err := s.Put(ctx, "linkedin", map[string]*string{"accessToken": ptr("typed-in-ui")}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "SCS_LINKEDIN_ACCESS_TOKEN") {
+	if _, err := s.Put(ctx, "linkedin", map[string]*string{"accessToken": ptr("typed-in-ui")}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "CARDPRESS_LINKEDIN_ACCESS_TOKEN") {
 		t.Fatalf("changing an environment field must be refused and name the variable: %v", err)
 	}
 	if _, err := s.Put(ctx, "linkedin", map[string]*string{"clientId": ptr("c1")}); err != nil {
@@ -162,7 +162,7 @@ func TestEnvironmentOverridesAndLocks(t *testing.T) {
 }
 
 func TestEnvironmentWorksWithoutAKey(t *testing.T) {
-	env := map[string]string{"SCS_X_API_KEY": "k", "SCS_X_API_SECRET": "s", "SCS_X_ACCESS_TOKEN": "a", "SCS_X_ACCESS_TOKEN_SECRET": "b"}
+	env := map[string]string{"CARDPRESS_X_API_KEY": "k", "CARDPRESS_X_API_SECRET": "s", "CARDPRESS_X_ACCESS_TOKEN": "a", "CARDPRESS_X_ACCESS_TOKEN_SECRET": "b"}
 	s, _ := newSettings(t, "", env)
 	v, err := s.Network(context.Background(), "x")
 	if err != nil || !v.Complete {
@@ -203,7 +203,7 @@ func TestWrongKeyIsReportedNotCrashed(t *testing.T) {
 			t.Fatalf("%s should be flagged unreadable", f.Key)
 		}
 	}
-	if _, err := other.Resolve(ctx, "linkedin"); err == nil || !strings.Contains(err.Error(), "SCS_SECRET_KEY") {
+	if _, err := other.Resolve(ctx, "linkedin"); err == nil || !strings.Contains(err.Error(), "CARDPRESS_SECRET_KEY") {
 		t.Fatalf("%v", err)
 	}
 	// entering the value again replaces the unreadable one

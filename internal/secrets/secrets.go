@@ -1,6 +1,6 @@
 // Package secrets encrypts credentials before they are stored.
 //
-// Values are sealed with AES-256-GCM. The key is derived from a secret string (SCS_SECRET_KEY, or a generated key
+// Values are sealed with AES-256-GCM. The key is derived from a secret string (CARDPRESS_SECRET_KEY, or a generated key
 // file for local use) with HKDF-SHA256. Each value gets its own random nonce, and the field it belongs to is bound
 // in as additional data, so a ciphertext copied into another field fails to open.
 package secrets

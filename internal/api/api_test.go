@@ -220,7 +220,7 @@ func TestSettingsErrors(t *testing.T) {
 	if r := do(noKey, "GET", "/api/v1/settings", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"canStore":false`) {
 		t.Fatalf("%d %s", r.Code, r.Body)
 	}
-	h := settingsHandler(t, "", true, map[string]string{"SCS_LINKEDIN_CLIENT_ID": "from-env"})
+	h := settingsHandler(t, "", true, map[string]string{"CARDPRESS_LINKEDIN_CLIENT_ID": "from-env"})
 	for _, c := range []struct {
 		method, path, body string
 		want               int

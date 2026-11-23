@@ -18,7 +18,7 @@ The picker lists 3 bundled fonts (always available offline) and 18 Google famili
 
 ### Add a family while using the app
 
-Profile tab, **Add a Google font**: type the family exactly as it appears on fonts.google.com (for example `Lexend`) and press Add. The app checks that Google serves it, then remembers it in this browser (`scs.customFonts.v1`).
+Profile tab, **Add a Google font**: type the family exactly as it appears on fonts.google.com (for example `Lexend`) and press Add. The app checks that Google serves it, then remembers it on the server, so it is there in any browser that uses the same server.
 
 ### Add a family permanently
 

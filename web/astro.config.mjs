@@ -9,6 +9,6 @@ export default defineConfig({
   output: "static",
   integrations: [react()],
   // in dev, forward /api to the Go server so the browser sees one origin
-  vite: { plugins: [tailwindcss()], server: { proxy: { "/api": process.env.SCS_API_PROXY || "http://127.0.0.1:8080" } } },
+  vite: { plugins: [tailwindcss()], server: { proxy: { "/api": process.env.CARDPRESS_API_PROXY || "http://127.0.0.1:8080" } } },
   devToolbar: { enabled: false },
 });

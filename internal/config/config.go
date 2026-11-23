@@ -16,20 +16,20 @@ import (
 type Config struct {
 	Addr            string        // listen address
 	Base            string        // URL prefix the embedded web app is served under
-	DBURL           string        // file:./data/scs.db or libsql://host
+	DBURL           string        // file:./data/cardpress.db or libsql://host
 	DBToken         string        // auth token for libsql
 	APIToken        string        // optional bearer token for /api/v1
-	SecretKey       string        // encrypts stored social credentials (SCS_SECRET_KEY)
-	MissedGrace     time.Duration // how late a scheduled post may still go out (SCS_MISSED_GRACE)
-	LinkedInVersion string        // LinkedIn-Version header (SCS_LINKEDIN_VERSION)
-	LinkedInAPIBase string        // API address; only for tests and proxies (SCS_LINKEDIN_API_BASE)
+	SecretKey       string        // encrypts stored social credentials (CARDPRESS_SECRET_KEY)
+	MissedGrace     time.Duration // how late a scheduled post may still go out (CARDPRESS_MISSED_GRACE)
+	LinkedInVersion string        // LinkedIn-Version header (CARDPRESS_LINKEDIN_VERSION)
+	LinkedInAPIBase string        // API address; only for tests and proxies (CARDPRESS_LINKEDIN_API_BASE)
 	CORSOrigins     []string      // allowed browser origins for a separately hosted web app
 	ServeWeb        bool          // serve the embedded web app
 	Insecure        bool          // allow a non-loopback address without a token
 	ShowVersion     bool
 }
 
-const defaultDB = "file:./data/scs.db"
+const defaultDB = "file:./data/cardpress.db"
 
 // Load parses args, using getenv for defaults.
 func Load(args []string, getenv func(string) string) (Config, error) {
@@ -55,11 +55,11 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	if defAddr == "" {
 		defAddr = "127.0.0.1:" + env("PORT", "8080")
 	}
-	serveWeb, err := flagBool("SCS_SERVE_WEB", true)
+	serveWeb, err := flagBool("CARDPRESS_SERVE_WEB", true)
 	if err != nil {
 		return Config{}, err
 	}
-	insecure, err := flagBool("SCS_INSECURE", false)
+	insecure, err := flagBool("CARDPRESS_INSECURE", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -68,27 +68,27 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs := flag.NewFlagSet("cardpress", flag.ContinueOnError)
 	fs.StringVar(&c.Addr, "addr", defAddr, "listen address (default is loopback only)")
 	fs.StringVar(&c.Base, "base", env("BASE_PATH", "/"), "URL prefix the app is served under (must match the Astro build)")
-	fs.StringVar(&c.DBURL, "db", env("SCS_DB_URL", defaultDB), "database URL: file:./data/scs.db or libsql://...")
+	fs.StringVar(&c.DBURL, "db", env("CARDPRESS_DB_URL", defaultDB), "database URL: file:./data/cardpress.db or libsql://...")
 	fs.BoolVar(&c.ServeWeb, "serve-web", serveWeb, "serve the embedded web app")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
 	c.Insecure = insecure
-	c.DBToken = env("SCS_DB_TOKEN", "")
-	c.APIToken = env("SCS_API_TOKEN", "")
-	c.SecretKey = env("SCS_SECRET_KEY", "")
-	c.LinkedInVersion = env("SCS_LINKEDIN_VERSION", "")
-	c.LinkedInAPIBase = env("SCS_LINKEDIN_API_BASE", "")
+	c.DBToken = env("CARDPRESS_DB_TOKEN", "")
+	c.APIToken = env("CARDPRESS_API_TOKEN", "")
+	c.SecretKey = env("CARDPRESS_SECRET_KEY", "")
+	c.LinkedInVersion = env("CARDPRESS_LINKEDIN_VERSION", "")
+	c.LinkedInAPIBase = env("CARDPRESS_LINKEDIN_API_BASE", "")
 	c.MissedGrace = 15 * time.Minute
-	if v := env("SCS_MISSED_GRACE", ""); v != "" {
+	if v := env("CARDPRESS_MISSED_GRACE", ""); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil || d < time.Minute || d > 24*time.Hour {
-			return Config{}, fmt.Errorf("SCS_MISSED_GRACE must be a duration between 1m and 24h, got %q", v)
+			return Config{}, fmt.Errorf("CARDPRESS_MISSED_GRACE must be a duration between 1m and 24h, got %q", v)
 		}
 		c.MissedGrace = d
 	}
-	for _, o := range strings.Split(env("SCS_CORS_ORIGINS", ""), ",") {
+	for _, o := range strings.Split(env("CARDPRESS_CORS_ORIGINS", ""), ",") {
 		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
 			c.CORSOrigins = append(c.CORSOrigins, o)
 		}
@@ -100,19 +100,19 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 func (c Config) Validate() error {
 	if c.APIToken == "" && !c.Insecure && !IsLoopback(c.Addr) {
 		return fmt.Errorf("refusing to listen on %q without a token: the API can read settings and publish. "+
-			"Set SCS_API_TOKEN to a long random value, bind to 127.0.0.1, or set SCS_INSECURE=1 if something else protects it", c.Addr)
+			"Set CARDPRESS_API_TOKEN to a long random value, bind to 127.0.0.1, or set CARDPRESS_INSECURE=1 if something else protects it", c.Addr)
 	}
 	if c.LinkedInAPIBase != "" {
 		u, err := url.Parse(c.LinkedInAPIBase)
 		if err != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && IsLoopback(net.JoinHostPort(u.Hostname(), "0")))) {
-			return errors.New("SCS_LINKEDIN_API_BASE must be an https address (plain http only for localhost): your access token is sent there")
+			return errors.New("CARDPRESS_LINKEDIN_API_BASE must be an https address (plain http only for localhost): your access token is sent there")
 		}
 	}
 	if c.SecretKey != "" && len(c.SecretKey) < 32 {
-		return errors.New("SCS_SECRET_KEY is too short: use at least 32 characters (for example `openssl rand -hex 32`)")
+		return errors.New("CARDPRESS_SECRET_KEY is too short: use at least 32 characters (for example `openssl rand -hex 32`)")
 	}
 	if c.APIToken != "" && len(c.APIToken) < 16 {
-		return errors.New("SCS_API_TOKEN is too short: use at least 16 characters")
+		return errors.New("CARDPRESS_API_TOKEN is too short: use at least 16 characters")
 	}
 	return nil
 }

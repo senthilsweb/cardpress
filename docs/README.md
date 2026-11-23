@@ -1,4 +1,4 @@
-# Social Card Studio docs
+# CardPress docs
 
 | Page | What it covers |
 |---|---|

@@ -12,7 +12,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 10 10"><path d="M5 0.6 9.4 5 5 9.4 0.6 5Z" className="fill-brand" /></svg>
-          <span className="font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]">Social Card Studio</span>
+          <span className="font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]">CardPress</span>
         </div>
         <h1 className="mb-3 text-base font-semibold">{title}</h1>
         {children}
@@ -50,7 +50,7 @@ export function BootScreen(props: {
             <Label htmlFor="tok">Access token</Label>
             <Input id="tok" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} autoFocus />
             {boot.error && <p className="text-xs text-destructive">{boot.error}</p>}
-            <p className="text-xs text-muted-foreground">It is set on the server as SCS_API_TOKEN. It is kept for this browser tab only.</p>
+            <p className="text-xs text-muted-foreground">It is set on the server as CARDPRESS_API_TOKEN. It is kept for this browser tab only.</p>
           </div>
           <Button type="submit" variant="brand" size="sm" disabled={!token.trim()}>Continue</Button>
         </form>

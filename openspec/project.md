@@ -1,4 +1,4 @@
-# Social Card Studio
+# CardPress
 
 Self-hosted studio for LinkedIn and blog social cards in my brand colours and fonts, with an authoring chat, a rich-text composer, direct LinkedIn publishing and a lightweight scheduler.
 

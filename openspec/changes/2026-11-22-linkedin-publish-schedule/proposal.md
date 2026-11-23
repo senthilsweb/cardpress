@@ -13,7 +13,7 @@ Posts should go out from the app with the composed text and the chosen design, n
 
 ## Decisions
 - LinkedIn gives no idempotency key, so a crash during `publishing` is never retried automatically; the job becomes `needs_review`.
-- A scheduled job within a grace window (default 15 minutes, `SCS_MISSED_GRACE`) of its time is sent; a later one becomes `missed` for a human decision. This is checked at every scheduler tick, not only at start-up, so a server that was asleep never posts hours late.
+- A scheduled job within a grace window (default 15 minutes, `CARDPRESS_MISSED_GRACE`) of its time is sent; a later one becomes `missed` for a human decision. This is checked at every scheduler tick, not only at start-up, so a server that was asleep never posts hours late.
 - **`failed` and `needs_review` differ.** `failed` means LinkedIn or the network refused and the post is known not to exist. `needs_review` means it may exist: the create call's answer was lost or was a server error, the id was missing, or the server stopped or hung mid-publish. Repeating a `needs_review` job needs an explicit confirmation that a duplicate is possible.
 - **Publishing is human-driven and deterministic.** A person confirms every publish or schedule; no LLM or agent is in this path.
 - **No automatic retries.** Any failure sets the job to `failed` with LinkedIn's message, and a person corrects it and publishes again, reschedules or cancels.

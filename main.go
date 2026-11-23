@@ -1,4 +1,4 @@
-// Social Card Studio – a single binary that serves the built Astro app.
+// CardPress – a single binary that serves the built Astro app.
 //
 //	go build -o cardpress . && ./cardpress
 package main
@@ -67,7 +67,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if box == nil {
-		log.Printf("credentials cannot be stored: set SCS_SECRET_KEY (at least 32 characters) to enable the social settings")
+		log.Printf("credentials cannot be stored: set CARDPRESS_SECRET_KEY (at least 32 characters) to enable the social settings")
 	}
 
 	prefix := "/" + strings.Trim(cfg.Base, "/")
@@ -166,7 +166,7 @@ func displayAddr(a string) string {
 	return "http://" + a
 }
 
-// openSecretBox returns the key used to encrypt stored credentials: SCS_SECRET_KEY if set, otherwise (local,
+// openSecretBox returns the key used to encrypt stored credentials: CARDPRESS_SECRET_KEY if set, otherwise (local,
 // single-user setups only) a key file created next to the database. It is nil when neither applies.
 func openSecretBox(cfg config.Config) (*secrets.Box, error) {
 	if cfg.SecretKey != "" {

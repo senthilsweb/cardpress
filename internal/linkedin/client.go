@@ -15,7 +15,7 @@ import (
 )
 
 // DefaultVersion is the LinkedIn-Version header sent with every call. LinkedIn retires versions about a year after
-// release, so this must be kept current (or overridden with SCS_LINKEDIN_VERSION).
+// release, so this must be kept current (or overridden with CARDPRESS_LINKEDIN_VERSION).
 const DefaultVersion = "202610"
 
 // Doer is the part of http.Client used here.
