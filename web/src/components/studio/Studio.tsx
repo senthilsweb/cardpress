@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Moon, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Sun, Type, User, MessageSquareText, PanelLeftClose, PanelLeftOpen, Settings as SettingsIcon } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Moon, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Sun, Type, User, MessageSquareText, Sparkles, PanelLeftClose, PanelLeftOpen, Settings as SettingsIcon } from "lucide-react";
 import { Card } from "@/card/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ContentPanel, DesignPanel, ProfilePanel } from "./panels";
 import { Composer } from "./Composer";
 import { SocialSettings } from "./SocialSettings";
+import { ChatPanel } from "./ChatPanel";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
 import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
@@ -18,6 +19,8 @@ import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
 import { useDrafts } from "@/lib/useDrafts";
 import { useJobs } from "@/lib/useJobs";
+import { useChat } from "@/lib/useChat";
+import { docFromAgentText, type ProposalEdit } from "@/lib/chat";
 import { serializeDraft } from "@/lib/linkedin";
 import { api } from "@/lib/api";
 import { useBoot, type Loaded } from "@/lib/boot";
@@ -84,6 +87,8 @@ function Workspace({ initial }: { initial: Loaded }) {
   }, [designs, profile]);
   const store = useDrafts(profile.id, initial.drafts);
   const jobs = useJobs(profile.id);
+  const chat = useChat(profile.id);
+  const [tab, setTab] = useState("design");
   const [layout, setLayout] = useSyncedState<Layout>(initial.layout, (v) => api.putPreference("layout", v));
   const layoutCtx = useMemo(() => ({
     isCollapsed: (id: string) => layout.collapsed[id] === true,
@@ -103,6 +108,21 @@ function Workspace({ initial }: { initial: Loaded }) {
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
+  /**
+   * Copy an approved proposal into a draft. An empty current draft is filled in; if it already has text, a new draft is
+   * made instead, so the person's own writing is never overwritten. Returns the draft's id.
+   */
+  const applyProposal = async (c: ProposalEdit, opts: { useTitle: boolean }): Promise<string> => {
+    const content = { kind: c.kind, doc: docFromAgentText(c.body, c.kind), hashtags: c.kind === "post" ? c.hashtags : [], altText: c.altText };
+    const cur = store.current;
+    let id: string;
+    if (cur && !serializeDraft(cur).text.trim()) { store.update(content); id = cur.id; }
+    else id = await store.createFrom(content);
+    if (opts.useTitle && c.title) set({ title: c.title });
+    flash(cur && id === cur.id ? "Copied into your draft" : "Copied into a new draft");
+    return id;
+  };
+
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
 
@@ -208,18 +228,20 @@ function Workspace({ initial }: { initial: Loaded }) {
             )}
           >
            <div className="flex min-h-0 flex-1 flex-col lg:w-[380px]">
-            <Tabs defaultValue="design" onValueChange={(v) => { if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
+            <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
               <div className="border-b border-border px-3 py-2.5">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="design"><PaletteIcon /> Design</TabsTrigger>
-                  <TabsTrigger value="content"><Type /> Text</TabsTrigger>
-                  <TabsTrigger value="post"><MessageSquareText /> Post</TabsTrigger>
-                  <TabsTrigger value="profile"><User /> Profile</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
+                  <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
+                  <TabsTrigger value="chat" className="gap-1 px-1 text-[12.5px]"><Sparkles /> Chat</TabsTrigger>
+                  <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Post</TabsTrigger>
+                  <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Profile</TabsTrigger>
                 </TabsList>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
+                <TabsContent value="chat" className="mt-0 h-full"><ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => setTab("post")} /></TabsContent>
                 <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel

@@ -60,6 +60,19 @@ export function useDrafts(profileId: string, initial: Draft[]) {
     setCurrentId(d.id);
   }, [flush, profileId]);
 
+  /**
+   * Create a draft that already has content and switch to it. The editing target is switched at once (not after the next
+   * render), so a change made straight afterwards cannot land in the draft that was open before.
+   */
+  const createFrom = useCallback(async (content: Pick<DraftInput, "kind" | "doc" | "hashtags" | "altText">): Promise<string> => {
+    await flush();
+    const d = await api.createDraft({ profileId, unicodeStyles: false, ...content });
+    commit([d, ...ref.current]);
+    idRef.current = d.id;
+    setCurrentId(d.id);
+    return d.id;
+  }, [flush, profileId]);
+
   const remove = useCallback(async (id: string) => {
     await flush();
     await api.deleteDraft(id);
@@ -77,7 +90,7 @@ export function useDrafts(profileId: string, initial: Draft[]) {
   }, [update]);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, saveState, update, select, create, remove, setKind, retry: flush };
+  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

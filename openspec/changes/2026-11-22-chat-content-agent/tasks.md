@@ -1,7 +1,11 @@
 # Tasks
-- [ ] Tables: conversations, messages, proposals
-- [ ] `AgentClient` interface, mock agent, proposal schema validation
-- [ ] URL fetcher with SSRF guard and readable-text extraction; tests
-- [ ] Endpoints and SSE stream
-- [ ] Chat panel, proposal card, approve/edit/reject, history
-- [ ] Docs: `docs/chat.md`
+- [x] Tables: conversations, messages, proposals
+- [x] `AgentClient` interface (`internal/agent`), demo agent, proposal validation (content fields only)
+- [x] URL fetcher with the safety checks (checked at connect time, per redirect) and readable-text extraction; tests
+- [x] Chat service: one reply at a time, invalid output never stored, approval rules, edits keep the original
+- [x] Endpoints, with replies streamed as server-sent events
+- [x] Chat tab, proposal card (approve, edit, reject), history, reload; approving never overwrites the person's draft
+- [x] Run in a browser: refused addresses, a pasted article, a revision, approval into an empty draft, approval protecting a draft with text, reload, article mode, edit view; a real https page fetched
+- [x] Docs: `docs/chat.md`
+- [ ] Replace the demo agent with the Claude Managed Agent (`agent-cma-adapter`)
+- [ ] Try the fetcher on more real sites (pages needing JavaScript return a clear "no readable text" message)

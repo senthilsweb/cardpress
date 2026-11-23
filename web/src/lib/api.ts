@@ -43,8 +43,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 import type { Draft, DraftInput } from "./draft";
 import type { Job, NewJob } from "./jobs";
+import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
 
-export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean }
+export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo }
 /** One credential field as the server lets the browser see it: a secret is only ever its last four characters. */
 export interface SettingsField {
   key: string; label: string; hint?: string; secret: boolean; set: boolean;
@@ -61,6 +62,60 @@ export interface ApiState {
   profiles: unknown[];
   designs: Record<string, unknown>;
   preferences: Record<string, unknown>;
+}
+
+/** Events of a streamed chat reply, in the order they arrive. */
+export interface ChatStreamHandlers {
+  onUser?: (m: ChatMessage) => void;
+  onDelta?: (text: string) => void;
+  onProposal?: (p: Proposal) => void;
+  onMessage?: (m: ChatMessage) => void;
+}
+
+/**
+ * Send a chat message and read the reply as it is written (server-sent events over a POST, so the token can go in a
+ * header, which EventSource cannot do). Resolves when the reply is complete; throws with the reason if it fails.
+ */
+async function streamMessage(id: string, content: string, h: ChatStreamHandlers, signal?: AbortSignal): Promise<void> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "text/event-stream" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/chat/conversations/${encodeURIComponent(id)}/messages`, { method: "POST", headers, body: JSON.stringify({ content }), signal });
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw e;
+    throw new ApiError(0, "network", `Cannot reach the API at ${API_BASE}`);
+  }
+  if (!res.ok || !res.body) {
+    const j = (await res.json().catch(() => undefined)) as { error?: { code?: string; message?: string }; requestId?: string } | undefined;
+    throw new ApiError(res.status, j?.error?.code ?? "http", j?.error?.message ?? `Request failed (${res.status})`, j?.requestId);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const dispatch = (block: string) => {
+    let name = "", data = "";
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event: ")) name = line.slice(7);
+      else if (line.startsWith("data: ")) data += line.slice(6);
+    }
+    if (!name) return;
+    const v = data ? JSON.parse(data) : {};
+    if (name === "user") h.onUser?.(v);
+    else if (name === "delta") h.onDelta?.(v.text ?? "");
+    else if (name === "proposal") h.onProposal?.(v);
+    else if (name === "message") h.onMessage?.(v);
+    else if (name === "error") throw new ApiError(502, v.code ?? "agent_error", v.message ?? "The reply failed");
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    buf += decoder.decode(value, { stream: !done });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) { dispatch(buf.slice(0, i)); buf = buf.slice(i + 2); }
+    if (done) break;
+  }
+  if (buf.trim()) dispatch(buf);
 }
 
 export const api = {
@@ -96,6 +151,14 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
     return res.blob();
   },
+  listConversations: (profileId: string) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}`),
+  startConversation: (profileId: string, input: { url?: string; text?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
+  getConversation: (id: string) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`),
+  deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
+  streamMessage,
+  /** Record a person's answer. Approving does not save or publish anything: the browser applies the content to a draft. */
+  decideProposal: (id: string, body: { status: "approved" | "rejected"; draftId?: string; edited?: ProposalEdit }) =>
+    call<Proposal>("POST", `/chat/proposals/${encodeURIComponent(id)}/decision`, body),
   importLegacy: (body: { profiles: unknown[]; designs: Record<string, unknown>; preferences: Record<string, unknown> }) =>
     call<void>("POST", "/import/legacy", body),
 };

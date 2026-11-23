@@ -21,11 +21,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/api"
 	"github.com/senthilsweb/cardpress/internal/config"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
+	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
 )
 
@@ -84,8 +86,9 @@ func main() {
 	publisher := service.NewPublisher(db.DB, settings, linkedin.New(cfg.LinkedInAPIBase, cfg.LinkedInVersion), cfg.MissedGrace)
 	schedulerDone := make(chan struct{})
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
+	chat := service.NewChat(db.DB, &agent.Mock{Delay: 25 * time.Millisecond}, source.New())
 	mux.Handle("/api/v1/", api.New(api.Options{
-		Studio: service.New(db.DB), Settings: settings, Publishing: publisher, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins, Version: version, DBDriver: db.Driver,
+		Studio: service.New(db.DB), Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins, Version: version, DBDriver: db.Driver,
 	}))
 	if cfg.ServeWeb {
 		site, err := fs.Sub(dist, "web/dist")

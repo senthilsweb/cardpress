@@ -13,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
+	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
 )
 
@@ -479,4 +481,190 @@ func TestPublishingNeedsTheToken(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	_ = li
+}
+
+/* ---------------------------------------------------------------- chat */
+
+type stubFetcher struct{ src source.Source }
+
+func (f stubFetcher) Fetch(context.Context, string) (source.Source, error) { return f.src, nil }
+
+const article = "Databases are everywhere in modern software. Teams choose Postgres because it handles many workloads well. " +
+	"Migrations take planning and patience across several weeks. Backups and restores should be tested regularly by every team."
+
+func chatHandler(t *testing.T, token string, f service.SourceFetcher) http.Handler {
+	t.Helper()
+	ctx := context.Background()
+	db, err := store.Open(ctx, "file:"+filepath.Join(t.TempDir(), "t.db"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return New(Options{Studio: service.New(db.DB), Chat: service.NewChat(db.DB, &agent.Mock{}, f), Token: token, Version: "t", DBDriver: db.Driver})
+}
+
+type sse struct{ Name, Data string }
+
+func parseSSE(body string) []sse {
+	var out []sse
+	for _, block := range strings.Split(strings.TrimSpace(body), "\n\n") {
+		var e sse
+		for _, line := range strings.Split(block, "\n") {
+			switch {
+			case strings.HasPrefix(line, "event: "):
+				e.Name = strings.TrimPrefix(line, "event: ")
+			case strings.HasPrefix(line, "data: "):
+				e.Data = strings.TrimPrefix(line, "data: ")
+			}
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+func startChat(t *testing.T, h http.Handler) service.Conversation {
+	t.Helper()
+	r := do(h, "POST", "/api/v1/chat/conversations", `{"profileId":"p","text":"`+article+`"}`, nil)
+	if r.Code != 201 {
+		t.Fatalf("start: %d %s", r.Code, r.Body)
+	}
+	var c service.Conversation
+	if err := json.Unmarshal(r.Body.Bytes(), &c); err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestChatFromStartToApproval(t *testing.T) {
+	h := chatHandler(t, "", stubFetcher{})
+	conv := startChat(t, h)
+	if conv.Agent.AI || conv.Agent.Name != "Demo agent" {
+		t.Fatalf("the screen must be able to tell this is a demo: %+v", conv.Agent)
+	}
+
+	r := do(h, "POST", "/api/v1/chat/conversations/"+conv.ID+"/messages", `{"content":""}`, nil)
+	if r.Code != 200 || r.Header().Get("Content-Type") != "text/event-stream" || r.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("%d %v", r.Code, r.Header())
+	}
+	events := parseSSE(r.Body.String())
+	var order []string
+	var deltas, reply string
+	var proposalID string
+	for _, e := range events {
+		if len(order) == 0 || order[len(order)-1] != e.Name {
+			order = append(order, e.Name)
+		}
+		switch e.Name {
+		case "delta":
+			var d struct{ Text string }
+			_ = json.Unmarshal([]byte(e.Data), &d)
+			deltas += d.Text
+		case "proposal":
+			var p service.ProposalView
+			_ = json.Unmarshal([]byte(e.Data), &p)
+			proposalID = p.ID
+			if p.Status != "pending" || p.Kind != "post" || p.Body == "" {
+				t.Fatalf("%+v", p)
+			}
+		case "message":
+			var m service.ChatMessage
+			_ = json.Unmarshal([]byte(e.Data), &m)
+			reply = m.Content
+		}
+	}
+	if strings.Join(order, ",") != "user,delta,proposal,message,done" {
+		t.Fatalf("event order: %v", order)
+	}
+	if deltas != reply || proposalID == "" {
+		t.Fatalf("the streamed text must equal the stored reply: %q vs %q", deltas, reply)
+	}
+
+	// reload: everything is restored
+	g := do(h, "GET", "/api/v1/chat/conversations/"+conv.ID, "", nil)
+	var got service.Conversation
+	_ = json.Unmarshal(g.Body.Bytes(), &got)
+	if g.Code != 200 || len(got.Messages) != 2 || len(got.Proposals) != 1 {
+		t.Fatalf("%d %s", g.Code, g.Body)
+	}
+	if l := do(h, "GET", "/api/v1/chat/conversations?profileId=p", "", nil); l.Code != 200 || !strings.Contains(l.Body.String(), conv.ID) || !strings.Contains(l.Body.String(), `"ai":false`) {
+		t.Fatalf("%d %s", l.Code, l.Body)
+	}
+
+	// the person approves (with an edit); nothing is published or saved by the server
+	d := do(h, "POST", "/api/v1/chat/proposals/"+proposalID+"/decision", `{"status":"approved","draftId":"d1","edited":{"kind":"post","title":"Mine","body":"Edited text.","hashtags":["#Go"],"altText":"x"}}`, nil)
+	if d.Code != 200 || !strings.Contains(d.Body.String(), `"status":"approved"`) || !strings.Contains(d.Body.String(), `"edited":true`) {
+		t.Fatalf("%d %s", d.Code, d.Body)
+	}
+	if again := do(h, "POST", "/api/v1/chat/proposals/"+proposalID+"/decision", `{"status":"rejected"}`, nil); again.Code != 409 {
+		t.Fatalf("deciding twice: %d", again.Code)
+	}
+	if del := do(h, "DELETE", "/api/v1/chat/conversations/"+conv.ID, "", nil); del.Code != 204 {
+		t.Fatalf("delete: %d", del.Code)
+	}
+	if gone := do(h, "GET", "/api/v1/chat/conversations/"+conv.ID, "", nil); gone.Code != 404 {
+		t.Fatalf("after delete: %d", gone.Code)
+	}
+}
+
+func TestChatErrorsAreNormalJSONBeforeAnythingStreams(t *testing.T) {
+	h := chatHandler(t, "", stubFetcher{})
+	conv := startChat(t, h)
+	for _, c := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{"POST", "/api/v1/chat/conversations", `{"profileId":"p"}`, 400},
+		{"POST", "/api/v1/chat/conversations", `{"profileId":"p","url":"https://a.io","text":"` + article + `"}`, 400},
+		{"POST", "/api/v1/chat/conversations", `{"profileId":"p","text":"tiny"}`, 400},
+		{"POST", "/api/v1/chat/conversations", `not json`, 400},
+		{"POST", "/api/v1/chat/conversations/nope/messages", `{"content":"x"}`, 404},
+		{"GET", "/api/v1/chat/conversations/nope", ``, 404},
+		{"GET", "/api/v1/chat/conversations", ``, 400},
+		{"POST", "/api/v1/chat/conversations/" + conv.ID + "/messages", `{"content":"` + strings.Repeat("a", 20001) + `"}`, 400},
+		{"POST", "/api/v1/chat/proposals/nope/decision", `{"status":"approved"}`, 404},
+		{"POST", "/api/v1/chat/proposals/nope/decision", `{"status":"maybe"}`, 400},
+	} {
+		r := do(h, c.method, c.path, c.body, nil)
+		if r.Code != c.want {
+			t.Errorf("%s %s: %d, want %d (%s)", c.method, c.path, r.Code, c.want, r.Body)
+		}
+		if c.want >= 400 && r.Header().Get("Content-Type") == "text/event-stream" {
+			t.Errorf("%s %s: an early error must not be a stream", c.method, c.path)
+		}
+	}
+}
+
+func TestAnAddressOnThisMachineIsRefusedByTheRealFetcher(t *testing.T) {
+	h := chatHandler(t, "", source.New())
+	for _, u := range []string{"http://127.0.0.1/", "http://localhost/", "http://169.254.169.254/latest/meta-data/", "http://10.0.0.1/", "http://[::1]/", "file:///etc/passwd"} {
+		r := do(h, "POST", "/api/v1/chat/conversations", `{"profileId":"p","url":"`+u+`"}`, nil)
+		if r.Code != 400 {
+			t.Errorf("%s: %d %s", u, r.Code, r.Body)
+		}
+	}
+}
+
+func TestChatNeedsTheTokenAndInfoShowsTheAgent(t *testing.T) {
+	h := chatHandler(t, "0123456789abcdef", stubFetcher{})
+	for _, c := range [][2]string{{"POST", "/api/v1/chat/conversations"}, {"GET", "/api/v1/chat/conversations?profileId=p"}, {"POST", "/api/v1/chat/conversations/x/messages"}, {"POST", "/api/v1/chat/proposals/x/decision"}} {
+		if r := do(h, c[0], c[1], `{}`, nil); r.Code != 401 {
+			t.Errorf("%s %s without a token: %d", c[0], c[1], r.Code)
+		}
+	}
+	if r := do(h, "GET", "/api/v1/info", "", nil); !strings.Contains(r.Body.String(), `"agent":{"name":"Demo agent","ai":false}`) {
+		t.Fatalf("%s", r.Body)
+	}
+}
+
+func TestErrorMessagesAreForPeopleNotCode(t *testing.T) {
+	h := chatHandler(t, "", stubFetcher{})
+	r := do(h, "POST", "/api/v1/chat/conversations", `{"profileId":"p","text":"tiny"}`, nil)
+	var out struct{ Error struct{ Code, Message string } }
+	_ = json.Unmarshal(r.Body.Bytes(), &out)
+	if r.Code != 400 || out.Error.Code != "invalid" || strings.Contains(out.Error.Message, "invalid input") || out.Error.Message == "" || out.Error.Message[0] < 'A' || out.Error.Message[0] > 'Z' {
+		t.Fatalf("%d %q", r.Code, out.Error.Message)
+	}
 }

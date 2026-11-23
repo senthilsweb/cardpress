@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/senthilsweb/cardpress/internal/service"
 )
@@ -50,6 +52,17 @@ type Publishing interface {
 	Go(fn func())
 }
 
+// Chatting is the part of the chat service the HTTP API needs.
+type Chatting interface {
+	Agent() service.AgentInfo
+	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
+	List(ctx context.Context, profileID string) ([]service.Conversation, error)
+	Get(ctx context.Context, id string) (service.Conversation, error)
+	Delete(ctx context.Context, id string) error
+	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
+	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
+}
+
 // Settings is the part of the settings service the HTTP API needs.
 type Settings interface {
 	View(ctx context.Context) (service.SettingsView, error)
@@ -63,6 +76,7 @@ type Options struct {
 	Studio      Studio
 	Settings    Settings
 	Publishing  Publishing
+	Chat        Chatting
 	Token       string   // empty: no bearer token required
 	CORSOrigins []string // exact origins allowed to call the API from a browser
 	Version     string
@@ -104,6 +118,12 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("PUT "+prefix+"/publish/jobs/{id}/schedule", s.rescheduleJob)
 	mux.HandleFunc("POST "+prefix+"/publish/jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("DELETE "+prefix+"/publish/jobs/{id}", s.deleteJob)
+	mux.HandleFunc("POST "+prefix+"/chat/conversations", s.startConversation)
+	mux.HandleFunc("GET "+prefix+"/chat/conversations", s.listConversations)
+	mux.HandleFunc("GET "+prefix+"/chat/conversations/{id}", s.getConversation)
+	mux.HandleFunc("DELETE "+prefix+"/chat/conversations/{id}", s.deleteConversation)
+	mux.HandleFunc("POST "+prefix+"/chat/conversations/{id}/messages", s.sendMessage)
+	mux.HandleFunc("POST "+prefix+"/chat/proposals/{id}/decision", s.decideProposal)
 	mux.HandleFunc(prefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "no such endpoint")
 	})
@@ -177,9 +197,11 @@ func (s *server) auth(next http.Handler) http.Handler {
 /* ---------------------------------------------------------------- handlers */
 
 func (s *server) info(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"name": "cardpress", "version": s.Version, "db": s.DBDriver, "authRequired": s.Token != "",
-	})
+	out := map[string]any{"name": "cardpress", "version": s.Version, "db": s.DBDriver, "authRequired": s.Token != ""}
+	if s.Chat != nil {
+		out["agent"] = s.Chat.Agent()
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *server) state(w http.ResponseWriter, r *http.Request) {
@@ -345,6 +367,125 @@ func (s *server) testNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+/* ---------------------------------------------------------------- chat */
+
+func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ProfileID string `json:"profileId"`
+		URL       string `json:"url"`
+		Text      string `json:"text"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	v, err := s.Chat.Start(r.Context(), body.ProfileID, body.URL, body.Text)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, v)
+}
+
+func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	list, err := s.Chat.List(r.Context(), profileID)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"conversations": list, "agent": s.Chat.Agent()})
+}
+
+func (s *server) getConversation(w http.ResponseWriter, r *http.Request) {
+	v, err := s.Chat.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *server) deleteConversation(w http.ResponseWriter, r *http.Request) {
+	if err := s.Chat.Delete(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// sendMessage answers as a stream of server-sent events: "user" (the stored message), "delta" (text as it is written),
+// "proposal", "message" (the stored reply), then "done"; or "error". A problem found before anything is written is a
+// normal JSON error with a status code.
+func (s *server) sendMessage(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, r, http.StatusInternalServerError, "internal", "streaming is not supported here")
+		return
+	}
+	started := false
+	send := func(name string, data any) {
+		if !started {
+			h := w.Header()
+			h.Set("Content-Type", "text/event-stream")
+			h.Set("Cache-Control", "no-store")
+			h.Set("X-Accel-Buffering", "no") // proxies must not hold the stream back
+			w.WriteHeader(http.StatusOK)
+			started = true
+		}
+		b, _ := json.Marshal(data)
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, b)
+		flusher.Flush()
+	}
+	err := s.Chat.Send(r.Context(), r.PathValue("id"), body.Content, func(e service.ChatEvent) { send(e.Name, e.Data) })
+	if err == nil {
+		send("done", map[string]any{})
+		return
+	}
+	var agentErr *service.AgentError
+	switch {
+	case errors.As(err, &agentErr):
+		if !started {
+			writeError(w, r, http.StatusBadGateway, "agent_error", agentErr.Msg)
+			return
+		}
+		send("error", map[string]string{"code": "agent_error", "message": agentErr.Msg})
+	case !started:
+		fail(w, r, err)
+	default:
+		log.Printf("chat stream: %v", err)
+		send("error", map[string]string{"code": "internal", "message": "Something went wrong while writing the reply."})
+	}
+}
+
+// decideProposal records a person's answer. Approving does not save or publish anything: the browser applies the content
+// to a draft and reports which one.
+func (s *server) decideProposal(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Status  string                `json:"status"`
+		DraftID string                `json:"draftId"`
+		Edited  *service.ProposalEdit `json:"edited"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	v, err := s.Chat.Decide(r.Context(), r.PathValue("id"), service.Decision{Status: body.Status, DraftID: body.DraftID, Edited: body.Edited})
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 /* ---------------------------------------------------------------- publishing */
@@ -521,7 +662,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 func fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalid):
-		writeError(w, r, http.StatusBadRequest, "invalid", err.Error())
+		writeError(w, r, http.StatusBadRequest, "invalid", readable(err, service.ErrInvalid))
 	case errors.Is(err, service.ErrSecretsUnavailable):
 		writeError(w, r, http.StatusConflict, "no_secret_key", err.Error())
 	case errors.Is(err, service.ErrUnsupported):
@@ -529,11 +670,22 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, service.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, service.ErrConflict):
-		writeError(w, r, http.StatusConflict, "conflict", err.Error())
+		writeError(w, r, http.StatusConflict, "conflict", readable(err, service.ErrConflict))
 	default:
 		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
 		writeError(w, r, http.StatusInternalServerError, "internal", "internal error")
 	}
+}
+
+// readable turns "invalid input: choose a time…" into "Choose a time…": the category prefix is for code, not people.
+func readable(err, sentinel error) string {
+	m := strings.TrimPrefix(err.Error(), sentinel.Error()+": ")
+	if m == "" {
+		return err.Error()
+	}
+	r := []rune(m)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
