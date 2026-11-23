@@ -1,12 +1,13 @@
 # Chat: preparing content
 
-The **Chat** tab drafts a post or an article from something you give it, and you steer it with replies. It prepares **content only**. It cannot choose the card's layout, colours or background, and it cannot save, publish or schedule anything: its output ends at a card that you approve. Publishing stays your own step in the [Full preview](publishing.md).
+The **Assistant** drafts a post or an article from something you give it, and you steer it with replies. It prepares **content only**. It cannot choose the card's layout, colours or background, and it cannot save, publish or schedule anything: its output ends at a card that you approve. Publishing stays your own step in the [Full preview](publishing.md).
 
 > **The chat currently uses a built-in demo agent, not an AI model.** It picks sentences from the source by simple rules and understands a few instructions (below). It exists so the whole chat can be used and tested now; the screen says "Demo agent · no AI model". The real agent (a Claude Managed Agent) will plug into the same place later, with no change to the screen.
 
 ## Using it
 
-1. Open **Chat**. Give it a **web address** or **paste the text** (one or the other, at least 40 characters), and press **Draft from this**.
+1. Click the **sparkle button** in the header to open the Assistant. It is a drawer on the right that stays beside the card, so you can talk to it while watching the design; Esc or the close button hides it. Writing and editing yourself stays in the sidebar tabs (Design, Text, Post, Profile), and the conversation lives here. The button shows a number when proposals are waiting for you.
+   Then Give it a **web address** or **paste the text** (one or the other, at least 40 characters), and press **Draft from this**.
 2. It replies and shows a **proposal card**: the kind (post or article), a title for the card, the text, hashtags, alt text, and a note on why.
 3. Choose:
    - **Approve and use** copies it into a draft. If your current draft is empty it is filled in; **if it already has text, a new draft is made instead**, so your own writing is never overwritten. Tick or untick *Also use the title as the card's title*. Then **Open the Post tab**.
@@ -21,7 +22,7 @@ The **Chat** tab drafts a post or an article from something you give it, and you
 
 ## Proposals from an outside agent
 
-An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the Chat tab shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
+An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the sparkle button in the header shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
 
 ## Reading a web address safely
 
