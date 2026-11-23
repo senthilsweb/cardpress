@@ -4,7 +4,6 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,10 +11,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
+	"strconv"
 	"time"
-	"unicode"
 
+	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/service"
 )
 
@@ -73,14 +72,19 @@ type Settings interface {
 
 // Options configure the handler.
 type Options struct {
-	Studio      Studio
-	Settings    Settings
-	Publishing  Publishing
-	Chat        Chatting
-	Token       string   // empty: no bearer token required
-	CORSOrigins []string // exact origins allowed to call the API from a browser
-	Version     string
-	DBDriver    string
+	Studio       Studio
+	Settings     Settings
+	Publishing   Publishing
+	Chat         Chatting
+	Token        string   // empty: no bearer token required
+	CORSOrigins  []string // exact origins allowed to call the API from a browser
+	LocalGuard   bool     // no token: answer only to localhost names (see ProtectOptions)
+	AllowedHosts []string // extra host names the server may be reached by when LocalGuard is on
+	Audit        interface {
+		List(ctx context.Context, limit int) ([]mcpserver.AuditEntry, error)
+	} // MCP call log; nil if MCP is off
+	Version  string
+	DBDriver string
 }
 
 type server struct {
@@ -124,10 +128,13 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("DELETE "+prefix+"/chat/conversations/{id}", s.deleteConversation)
 	mux.HandleFunc("POST "+prefix+"/chat/conversations/{id}/messages", s.sendMessage)
 	mux.HandleFunc("POST "+prefix+"/chat/proposals/{id}/decision", s.decideProposal)
+	mux.HandleFunc("GET "+prefix+"/mcp/audit", s.mcpAudit)
 	mux.HandleFunc(prefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "no such endpoint")
 	})
-	return s.requestID(s.recoverer(s.cors(s.auth(mux))))
+	protect := ProtectOptions{Token: o.Token, LocalGuard: o.LocalGuard, AllowedHosts: o.AllowedHosts, TrustedOrigins: o.CORSOrigins}
+	// /info stays open so the web app can learn whether it needs a token
+	return s.requestID(s.recoverer(s.cors(browserGuards(protect)(bearerGuard(o.Token, prefix+"/info")(mux)))))
 }
 
 /* ---------------------------------------------------------------- middleware */
@@ -172,23 +179,6 @@ func (s *server) cors(next http.Handler) http.Handler {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// auth requires the bearer token, when one is configured. /info stays open so the web app can learn whether to ask.
-func (s *server) auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.Token == "" || r.URL.Path == prefix+"/info" || r.Method == http.MethodOptions {
-			next.ServeHTTP(w, r)
-			return
-		}
-		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if got == r.Header.Get("Authorization") || subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="cardpress"`)
-			writeError(w, r, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
-			return
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -367,6 +357,21 @@ func (s *server) testNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// mcpAudit lists what outside agents did through MCP, newest first.
+func (s *server) mcpAudit(w http.ResponseWriter, r *http.Request) {
+	if s.Audit == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"entries": []any{}, "enabled": false})
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	entries, err := s.Audit.List(r.Context(), limit)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": entries, "enabled": true})
 }
 
 /* ---------------------------------------------------------------- chat */
@@ -662,7 +667,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 func fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalid):
-		writeError(w, r, http.StatusBadRequest, "invalid", readable(err, service.ErrInvalid))
+		writeError(w, r, http.StatusBadRequest, "invalid", service.UserMessage(err))
 	case errors.Is(err, service.ErrSecretsUnavailable):
 		writeError(w, r, http.StatusConflict, "no_secret_key", err.Error())
 	case errors.Is(err, service.ErrUnsupported):
@@ -670,22 +675,11 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, service.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, service.ErrConflict):
-		writeError(w, r, http.StatusConflict, "conflict", readable(err, service.ErrConflict))
+		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
 	default:
 		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
 		writeError(w, r, http.StatusInternalServerError, "internal", "internal error")
 	}
-}
-
-// readable turns "invalid input: choose a time…" into "Choose a time…": the category prefix is for code, not people.
-func readable(err, sentinel error) string {
-	m := strings.TrimPrefix(err.Error(), sentinel.Error()+": ")
-	if m == "" {
-		return err.Error()
-	}
-	r := []rune(m)
-	r[0] = unicode.ToUpper(r[0])
-	return string(r)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

@@ -19,6 +19,10 @@ The **Chat** tab drafts a post or an article from something you give it, and you
 
 `shorter` · `longer` · `make it an article` · `make it a post` · `no hashtags` · `add #Tag` · `no question`. Later messages override earlier ones. Anything else gets a reply listing these.
 
+## Proposals from an outside agent
+
+An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the Chat tab shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
+
 ## Reading a web address safely
 
 The server fetches the page for you, which could be abused to make it reach private things (a cloud metadata service, your router, `localhost`). So it only reads the public web:

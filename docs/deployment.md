@@ -29,6 +29,8 @@ Migrations are embedded and run at startup. Back up the `data/` folder (or use T
 | `CARDPRESS_DB_TOKEN` | | | libSQL auth token. |
 | `CARDPRESS_SERVE_WEB` | `-serve-web` | `true` | Serve the embedded web app. |
 | `CARDPRESS_API_TOKEN` | | | Bearer token required on `/api/v1` (at least 16 characters). |
+| `CARDPRESS_MCP` | `-mcp` | `true` | Serve the MCP endpoint at `/mcp` for outside agents. See [MCP](mcp.md). |
+| `CARDPRESS_ALLOWED_HOSTS` | | | Extra host names the server may be reached by when there is no token (a reverse proxy or LAN name). Without a token only `localhost`, `127.0.0.1` and `::1` are answered. |
 | `CARDPRESS_SECRET_KEY` | | | Encrypts stored social credentials (at least 32 characters). Required for a hosted database or an exposed address; locally a key file is created automatically. See [Social accounts](social-settings.md). |
 | `CARDPRESS_<NETWORK>_<FIELD>` | | | Supplies a social credential from the environment, e.g. `CARDPRESS_LINKEDIN_ACCESS_TOKEN`. Overrides anything stored. |
 | `CARDPRESS_CORS_ORIGINS` | | | Comma-separated origins allowed to call the API from a browser. |
@@ -37,6 +39,8 @@ Migrations are embedded and run at startup. Back up the `data/` folder (or use T
 ## Access guard (not authentication)
 
 There are no user accounts yet. To stop an exposed API from being open to everyone, the server **refuses to start** on a non-loopback address (including `:8080`) unless `CARDPRESS_API_TOKEN` is set or `CARDPRESS_INSECURE=1`. With a token, every `/api/v1` call needs `Authorization: Bearer <token>`; `/healthz` and `/api/v1/info` stay open.
+
+With **no token**, the server also answers only to `localhost` host names and refuses cross-site browser requests that change things, which stops a website you visit from driving your local CardPress (see [MCP](mcp.md#access-rules-http-and-the-json-api)). If you reach it under another name, add it to `CARDPRESS_ALLOWED_HOSTS`.
 
 The web app asks for the token when it needs one and keeps it for that browser tab only (`sessionStorage`). A `PUBLIC_API_TOKEN` set at build time is visible to anyone who can load the app, so use it only on a private network.
 

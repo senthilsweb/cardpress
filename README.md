@@ -2,7 +2,7 @@
 
 > A self-hosted studio for branded social cards and LinkedIn posts: design the card, write and preview the post, then publish it or schedule it. One Go binary with the web app embedded.
 
-**Status.** The card designer, post composer, full preview, encrypted credential storage and the scheduler are built and tested. Publishing to LinkedIn is tested against a local fake of LinkedIn's API, **not yet against a real LinkedIn account**, so treat the first real post as a trial. X and Instagram credentials can be stored but those networks cannot be published to yet. The chat that drafts post content from an article works end to end, but with a built-in demo agent rather than an AI model. The real agent and an MCP server are specified in [`openspec/changes`](openspec/changes) but not built.
+**Status.** The card designer, post composer, full preview, encrypted credential storage and the scheduler are built and tested. Publishing to LinkedIn is tested against a local fake of LinkedIn's API, **not yet against a real LinkedIn account**, so treat the first real post as a trial. X and Instagram credentials can be stored but those networks cannot be published to yet. The chat that drafts post content from an article works end to end, but with a built-in demo agent rather than an AI model. The real Claude Managed Agent is specified in [`openspec/changes`](openspec/changes) but not built; the MCP server it will use is.
 
 Make social media cards for LinkedIn, X, Instagram and Facebook in your own style. Type a title, pick a layout and a background, and download the PNG in every size.
 
@@ -26,6 +26,7 @@ Cards are drawn and exported in the browser. Your profile, drafts and preference
   These are common recommended sizes. Platforms change them from time to time, so edit `web/src/lib/sizes.ts` if needed.
 - **Post composer**: write the post or article in a rich-text editor (lists, hashtags, alt text), check it in a full preview of the LinkedIn feed, and copy it. Drafts are saved on the server. See [Post authoring](docs/post-authoring.md).
 - **Chat for content**: give it a web address or some text and it drafts a post or article for you to approve, edit or reject, then revise by replying. It prepares content only and never publishes. It uses a built-in demo agent for now (no AI model); the real agent plugs in later. See [Chat](docs/chat.md).
+- **MCP server**: an outside AI agent can read drafts and job status, read public web pages, and propose content that waits for your approval. It cannot publish, schedule, change drafts or touch credentials, and every call is audited. Over HTTP at `/mcp` or `cardpress mcp` over stdio. See [MCP](docs/mcp.md).
 - **Publish and schedule**: from the Full preview, post to LinkedIn now or at a chosen time (with the card image), with a queue, per-post status, and no automatic retries. See [Publishing](docs/publishing.md).
 - **Feed preview**: shows the card inside a plain post frame with your post text, plus a character count for each network.
 - **Export**: download a PNG, copy the image to the clipboard, or download all sizes as one zip.

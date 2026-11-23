@@ -15,6 +15,7 @@ import (
 
 	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
+	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
@@ -662,9 +663,135 @@ func TestChatNeedsTheTokenAndInfoShowsTheAgent(t *testing.T) {
 func TestErrorMessagesAreForPeopleNotCode(t *testing.T) {
 	h := chatHandler(t, "", stubFetcher{})
 	r := do(h, "POST", "/api/v1/chat/conversations", `{"profileId":"p","text":"tiny"}`, nil)
-	var out struct{ Error struct{ Code, Message string } }
+	var out struct {
+		Error struct{ Code, Message string }
+	}
 	_ = json.Unmarshal(r.Body.Bytes(), &out)
 	if r.Code != 400 || out.Error.Code != "invalid" || strings.Contains(out.Error.Message, "invalid input") || out.Error.Message == "" || out.Error.Message[0] < 'A' || out.Error.Message[0] > 'Z' {
 		t.Fatalf("%d %q", r.Code, out.Error.Message)
+	}
+}
+
+/* ---------------------------------------------------------------- browser protections */
+
+func guardedHandler(t *testing.T, o Options) http.Handler {
+	t.Helper()
+	ctx := context.Background()
+	db, err := store.Open(ctx, "file:"+filepath.Join(t.TempDir(), "t.db"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	o.Studio = service.New(db.DB)
+	o.Version = "t"
+	return New(o)
+}
+
+func doHost(h http.Handler, method, path, host string, hdr map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(`{"profiles":[{"id":"p"}]}`))
+	req.Host = host
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestWithNoTokenOnlyLocalhostNamesAreAnswered(t *testing.T) {
+	h := guardedHandler(t, Options{LocalGuard: true, AllowedHosts: []string{"cards.lan:8080"}})
+	for host, want := range map[string]int{
+		"localhost:8080": 200, "localhost": 200, "LOCALHOST:4321": 200, "127.0.0.1:8080": 200, "[::1]:8080": 200,
+		"cards.lan": 200, "cards.lan:9999": 200,
+		"evil.example": 403, "evil.example:8080": 403, "127.0.0.1.evil.example": 403, "192.168.1.5:8080": 403, "": 403,
+	} {
+		if r := doHost(h, "GET", "/api/v1/state", host, nil); r.Code != want {
+			t.Errorf("Host %q: %d, want %d (%s)", host, r.Code, want, r.Body)
+		}
+	}
+	if r := doHost(h, "GET", "/api/v1/state", "evil.example", nil); !strings.Contains(r.Body.String(), "host_not_allowed") || !strings.Contains(r.Body.String(), "CARDPRESS_ALLOWED_HOSTS") {
+		t.Fatalf("the refusal should say how to fix it: %s", r.Body)
+	}
+	// with a token the host does not matter: an attacker's page has no token to send
+	tok := guardedHandler(t, Options{Token: "0123456789abcdef"})
+	if r := doHost(tok, "GET", "/api/v1/state", "anything.example", map[string]string{"Authorization": "Bearer 0123456789abcdef"}); r.Code != 200 {
+		t.Fatalf("%d", r.Code)
+	}
+}
+
+func TestAnotherWebsiteCannotMakeYourBrowserChangeThings(t *testing.T) {
+	h := guardedHandler(t, Options{CORSOrigins: []string{"https://studio.example"}})
+	put := func(hdr map[string]string) int {
+		return doHost(h, "PUT", "/api/v1/profiles", "localhost:8080", hdr).Code
+	}
+	if c := put(nil); c != 204 {
+		t.Fatalf("a request with no browser headers (curl, a script, an MCP client): %d", c)
+	}
+	if c := put(map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": "http://localhost:8080"}); c != 204 {
+		t.Fatalf("the app itself: %d", c)
+	}
+	if c := put(map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}); c != 403 {
+		t.Fatalf("another website: %d", c)
+	}
+	if c := put(map[string]string{"Origin": "https://evil.example"}); c != 403 {
+		t.Fatalf("an Origin from another host, in a browser without Sec-Fetch-Site: %d", c)
+	}
+	if r := doHost(h, "PUT", "/api/v1/profiles", "localhost:8080", map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}); !strings.Contains(r.Body.String(), "cross_origin") {
+		t.Fatalf("%s", r.Body)
+	}
+	if c := put(map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://studio.example"}); c != 204 {
+		t.Fatalf("the separately hosted web app that was listed: %d", c)
+	}
+	// reading is a safe method, so it is not blocked here (CORS still stops the other site from reading the answer)
+	if r := doHost(h, "GET", "/api/v1/info", "localhost:8080", map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}); r.Code != 200 || r.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("%d %v", r.Code, r.Header())
+	}
+}
+
+func TestProtectGuardsAnyHandlerLikeTheAPI(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
+	withToken := Protect(ProtectOptions{Token: "0123456789abcdef"}, ok)
+	if r := doHost(withToken, "POST", "/mcp", "localhost", nil); r.Code != 401 {
+		t.Fatalf("no token: %d", r.Code)
+	}
+	if r := doHost(withToken, "POST", "/mcp", "localhost", map[string]string{"Authorization": "Bearer wrong"}); r.Code != 401 {
+		t.Fatalf("wrong token: %d", r.Code)
+	}
+	if r := doHost(withToken, "POST", "/mcp", "localhost", map[string]string{"Authorization": "Bearer 0123456789abcdef"}); r.Code != 200 {
+		t.Fatalf("right token: %d", r.Code)
+	}
+	if r := doHost(withToken, "POST", "/mcp", "localhost", map[string]string{"Authorization": "Bearer 0123456789abcdef", "Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}); r.Code != 403 {
+		t.Fatalf("even with a token, a cross-site browser request is refused: %d", r.Code)
+	}
+	local := Protect(ProtectOptions{LocalGuard: true}, ok)
+	if r := doHost(local, "POST", "/mcp", "evil.example", nil); r.Code != 403 {
+		t.Fatalf("rebinding: %d", r.Code)
+	}
+	if r := doHost(local, "POST", "/mcp", "127.0.0.1:8080", nil); r.Code != 200 {
+		t.Fatalf("%d", r.Code)
+	}
+}
+
+type fakeAudit struct{ entries []mcpserver.AuditEntry }
+
+func (f fakeAudit) List(_ context.Context, limit int) ([]mcpserver.AuditEntry, error) {
+	return f.entries, nil
+}
+
+func TestTheMCPAuditCanBeRead(t *testing.T) {
+	h := guardedHandler(t, Options{Token: "0123456789abcdef", Audit: fakeAudit{[]mcpserver.AuditEntry{{ID: 1, Tool: "propose_content", Caller: "agent 1", Outcome: "ok", Args: "{}"}}}})
+	if r := do(h, "GET", "/api/v1/mcp/audit", "", nil); r.Code != 401 {
+		t.Fatalf("the audit needs the token: %d", r.Code)
+	}
+	r := do(h, "GET", "/api/v1/mcp/audit?limit=5", "", map[string]string{"Authorization": "Bearer 0123456789abcdef"})
+	if r.Code != 200 || !strings.Contains(r.Body.String(), "propose_content") || !strings.Contains(r.Body.String(), `"enabled":true`) {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	off := guardedHandler(t, Options{})
+	if r := do(off, "GET", "/api/v1/mcp/audit", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"enabled":false`) {
+		t.Fatalf("%d %s", r.Code, r.Body)
 	}
 }

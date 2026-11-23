@@ -11,7 +11,8 @@ import { ProposalCard } from "./ProposalCard";
 
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
-function AgentBadge({ chat }: { chat: ChatStore }) {
+function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
+  if (conv?.sourceKind === "mcp") return <Badge variant="warn" title="This was proposed by a program that connected through MCP. Its name is what it called itself and is not verified.">Outside agent</Badge>;
   if (!chat.agent) return null;
   return chat.agent.ai
     ? <Badge variant="brand">{chat.agent.name}</Badge>
@@ -62,7 +63,10 @@ function StartView({ chat }: { chat: ChatStore }) {
               <li key={c.id}>
                 <button type="button" onClick={() => void chat.open(c.id)} className="w-full cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-xs hover:bg-accent">
                   <span className="block truncate font-medium">{c.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">{c.sourceKind === "url" ? host(c.sourceUrl) : "Pasted text"} · {new Date(c.updatedAt).toLocaleDateString()}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {c.sourceKind === "url" ? host(c.sourceUrl) : c.sourceKind === "mcp" ? `Outside agent: ${c.sourceTitle ?? "unknown"}` : "Pasted text"} · {new Date(c.updatedAt).toLocaleDateString()}
+                    {c.pending > 0 && <b className="ml-1 text-brand">· {c.pending} waiting</b>}
+                  </span>
                 </button>
               </li>
             ))}
@@ -157,7 +161,7 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
     <div className="flex h-full flex-col">
       <div className="space-y-1.5 border-b border-border px-3 py-2.5">
         <div className="flex items-center gap-1.5">
-          <AgentBadge chat={chat} />
+          <AgentBadge chat={chat} conv={conv} />
           <span className="flex-1" />
           <Button variant="ghost" size="icon-sm" title="Start a new conversation" aria-label="New conversation" onClick={chat.newConversation}><Plus /></Button>
           <Button variant={confirmDelete ? "destructive" : "ghost"} size={confirmDelete ? "sm" : "icon-sm"} title="Delete this conversation" aria-label="Delete this conversation"
@@ -167,7 +171,9 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
         </div>
         <p className="truncate text-xs font-medium" title={conv.title}>{conv.title}</p>
         <p className="truncate text-[11px] text-muted-foreground">
-          {conv.sourceKind === "url" ? <a href={conv.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{host(conv.sourceUrl)}</a> : "Pasted text"} · {conv.sourceChars.toLocaleString()} characters{conv.sourceTruncated ? " (cut short)" : ""}
+          {conv.sourceKind === "mcp"
+            ? `Proposed by “${conv.sourceTitle ?? "an outside agent"}” (a name it gave itself, not verified)`
+            : <>{conv.sourceKind === "url" ? <a href={conv.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{host(conv.sourceUrl)}</a> : "Pasted text"} · {conv.sourceChars.toLocaleString()} characters{conv.sourceTruncated ? " (cut short)" : ""}</>}
         </p>
       </div>
 
@@ -175,6 +181,11 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
         <Thread conv={conv} chat={chat} onApply={onApply} onOpenPost={onOpenPost} />
       </div>
 
+      {conv.sourceKind === "mcp" ? (
+        <div className="border-t border-border bg-card px-3 py-2.5 text-[11px] leading-snug text-muted-foreground">
+          Review the proposal above: approve it, edit it first, or reject it. To change it further, ask the agent that sent it; it can send a revised version here. Nothing is applied until you approve.
+        </div>
+      ) : (
       <div className="space-y-1.5 border-t border-border bg-card px-3 py-2.5">
         {chat.error && <p role="alert" className="text-xs text-destructive">{chat.error}</p>}
         <div className="flex items-end gap-1.5">
@@ -190,6 +201,7 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
           {demo ? "The demo understands: shorter · longer · make it an article · make it a post · no hashtags · add #Tag · no question." : "Enter sends, Shift+Enter adds a line."}
         </p>
       </div>
+      )}
     </div>
   );
 }

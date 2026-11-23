@@ -18,6 +18,9 @@ export function useChat(profileId: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  // read inside timers, which would otherwise see stale values
+  const live = useRef({ busy: false, current: null as Conversation | null });
+  live.current = { busy, current };
 
   const refreshList = useCallback(async () => {
     const r = await api.listConversations(profileId);
@@ -41,6 +44,22 @@ export function useChat(profileId: string) {
     return () => { live = false; abort.current?.abort(); };
   }, [refreshList]);
 
+  // An outside agent can leave a proposal at any time, so look for new ones now and then, and when the tab regains focus.
+  useEffect(() => {
+    const check = async () => {
+      if (document.hidden || live.current.busy) return;
+      try {
+        const cs = await refreshList();
+        const cur = live.current.current;
+        const item = cur && cs.find((c) => c.id === cur.id);
+        if (cur && item && item.updatedAt > cur.updatedAt) setCurrent(await api.getConversation(cur.id)); // new content in the open thread
+      } catch { /* the next check will try again */ }
+    };
+    const t = window.setInterval(() => void check(), 15_000);
+    window.addEventListener("focus", check);
+    return () => { window.clearInterval(t); window.removeEventListener("focus", check); };
+  }, [refreshList]);
+
   const patch = (id: string, fn: (c: Conversation) => Conversation) => setCurrent((c) => (c && c.id === id ? fn(c) : c));
 
   /** Send a message and show the reply as it arrives. An empty message starts the first draft. */
@@ -62,7 +81,8 @@ export function useChat(profileId: string) {
       if ((e as Error).name !== "AbortError") setError(message(e));
     } finally {
       setStreaming(null); setBusy(false);
-      refreshList().catch(() => undefined);
+      // note the new update time, so the periodic check does not mistake our own change for someone else's
+      refreshList().then((cs) => { const it = cs.find((c) => c.id === convId); if (it) patch(convId, (c) => ({ ...c, updatedAt: it.updatedAt })); }).catch(() => undefined);
     }
   }, [refreshList]);
 
@@ -97,9 +117,11 @@ export function useChat(profileId: string) {
   const decide = useCallback(async (p: Proposal, body: { status: "approved" | "rejected"; draftId?: string; edited?: ProposalEdit }) => {
     const updated = await api.decideProposal(p.id, body);
     patch(p.conversationId, (c) => ({ ...c, proposals: (c.proposals ?? []).map((x) => (x.id === updated.id ? updated : x)) }));
-  }, []);
+    refreshList().catch(() => undefined); // the waiting count on the tab changes
+  }, [refreshList]);
 
-  return { agent, list, current, loaded, streaming, busy, error, setError, start, send, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
+  const pendingCount = list.reduce((n, c) => n + (c.pending ?? 0), 0);
+  return { agent, list, current, loaded, pendingCount, streaming, busy, error, setError, start, send, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
 }
 
 export type ChatStore = ReturnType<typeof useChat>;

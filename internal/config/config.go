@@ -25,6 +25,8 @@ type Config struct {
 	LinkedInAPIBase string        // API address; only for tests and proxies (CARDPRESS_LINKEDIN_API_BASE)
 	CORSOrigins     []string      // allowed browser origins for a separately hosted web app
 	ServeWeb        bool          // serve the embedded web app
+	MCPEnabled      bool          // serve the MCP endpoint at /mcp
+	AllowedHosts    []string      // extra host names accepted when there is no token (CARDPRESS_ALLOWED_HOSTS)
 	Insecure        bool          // allow a non-loopback address without a token
 	ShowVersion     bool
 }
@@ -59,6 +61,10 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	mcp, err := flagBool("CARDPRESS_MCP", true)
+	if err != nil {
+		return Config{}, err
+	}
 	insecure, err := flagBool("CARDPRESS_INSECURE", false)
 	if err != nil {
 		return Config{}, err
@@ -70,6 +76,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs.StringVar(&c.Base, "base", env("BASE_PATH", "/"), "URL prefix the app is served under (must match the Astro build)")
 	fs.StringVar(&c.DBURL, "db", env("CARDPRESS_DB_URL", defaultDB), "database URL: file:./data/cardpress.db or libsql://...")
 	fs.BoolVar(&c.ServeWeb, "serve-web", serveWeb, "serve the embedded web app")
+	fs.BoolVar(&c.MCPEnabled, "mcp", mcp, "serve the MCP endpoint at /mcp for outside agents")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
@@ -87,6 +94,11 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("CARDPRESS_MISSED_GRACE must be a duration between 1m and 24h, got %q", v)
 		}
 		c.MissedGrace = d
+	}
+	for _, h := range strings.Split(env("CARDPRESS_ALLOWED_HOSTS", ""), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			c.AllowedHosts = append(c.AllowedHosts, h)
+		}
 	}
 	for _, o := range strings.Split(env("CARDPRESS_CORS_ORIGINS", ""), ",") {
 		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {

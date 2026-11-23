@@ -3,6 +3,7 @@
 | Page | What it covers |
 |---|---|
 | [Chat](chat.md) | Drafting content from an article with an agent, approving it, and how URLs are fetched safely |
+| [MCP](mcp.md) | Letting an outside agent read drafts and propose content, never publish; connecting it; the audit trail |
 | [Publishing](publishing.md) | Publish or schedule a post to LinkedIn, the queue, no automatic retries, the scheduler |
 | [Social accounts](social-settings.md) | Keys and tokens for LinkedIn, X and Instagram: encryption, environment overrides, testing |
 | [Workspace](workspace.md) | Sidebar hide/show, foldable sections, the grid canvas, what is remembered |

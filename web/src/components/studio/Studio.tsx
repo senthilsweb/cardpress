@@ -233,7 +233,10 @@ function Workspace({ initial }: { initial: Loaded }) {
                 <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
                   <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
-                  <TabsTrigger value="chat" className="gap-1 px-1 text-[12.5px]"><Sparkles /> Chat</TabsTrigger>
+                  <TabsTrigger value="chat" className="gap-1 px-1 text-[12.5px]">
+                    <Sparkles /> Chat
+                    {chat.pendingCount > 0 && <span className="rounded-full bg-brand px-1.5 text-[10px] font-semibold leading-4 text-white" aria-label={`${chat.pendingCount} proposals waiting for your decision`}>{chat.pendingCount}</span>}
+                  </TabsTrigger>
                   <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Post</TabsTrigger>
                   <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Profile</TabsTrigger>
                 </TabsList>

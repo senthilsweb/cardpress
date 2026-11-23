@@ -1,6 +1,12 @@
 # Tasks
-- [ ] MCP server on the Go SDK, HTTP and stdio transports
-- [ ] Tool definitions with input schemas over `server/service`
-- [ ] Token guard on `/mcp`; audit table and middleware
-- [ ] Test: tool list contains no publish or credential tools
-- [ ] Docs: `docs/mcp.md` with a client configuration example
+- [x] MCP server on the official Go SDK, HTTP (`/mcp`) and stdio (`cardpress mcp`) transports
+- [x] Tools over narrow read-and-propose interfaces; a test pins the reachable methods and the tool list
+- [x] Outside proposals stored as pending proposals (own conversation, cap, cannot enter a person's chat); `get_proposal`
+- [x] Token, localhost-only host check and cross-site protection shared by `/api/v1` and `/mcp`
+- [x] Audit table and middleware, argument summaries without secrets, `GET /api/v1/mcp/audit`
+- [x] Web: waiting count on the Chat tab, 15-second check for new proposals, outside-agent conversations
+- [x] Design presets checked against the web app by a test
+- [x] Run for real: stdio and HTTP with raw protocol messages, access rules from outside, a live proposal arriving in an open page, approval, and the agent reading the outcome
+- [x] Docs: `docs/mcp.md`
+- [ ] Try it from a real MCP client application (only protocol-level clients were used here)
+- [ ] A screen in the app to read the audit trail (for now: the API and the table)

@@ -98,3 +98,20 @@ func TestPublishingSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPAndAllowedHosts(t *testing.T) {
+	c, _ := Load(nil, env(nil))
+	if !c.MCPEnabled || len(c.AllowedHosts) != 0 {
+		t.Fatalf("defaults: %+v", c)
+	}
+	c, err := Load(nil, env(map[string]string{"CARDPRESS_MCP": "false", "CARDPRESS_ALLOWED_HOSTS": " cards.lan , 10.0.0.5:8080,, "}))
+	if err != nil || c.MCPEnabled || len(c.AllowedHosts) != 2 || c.AllowedHosts[0] != "cards.lan" || c.AllowedHosts[1] != "10.0.0.5:8080" {
+		t.Fatalf("%v %+v", err, c)
+	}
+	if c, _ := Load([]string{"-mcp=false"}, env(nil)); c.MCPEnabled {
+		t.Fatal("the flag should switch it off")
+	}
+	if _, err := Load(nil, env(map[string]string{"CARDPRESS_MCP": "perhaps"})); err == nil {
+		t.Fatal("a bad value must be refused")
+	}
+}

@@ -72,11 +72,12 @@ type Conversation struct {
 	ID              string         `json:"id"`
 	ProfileID       string         `json:"profileId"`
 	Title           string         `json:"title"`
-	SourceKind      string         `json:"sourceKind"` // "url" or "text"
+	SourceKind      string         `json:"sourceKind"` // "url", "text", or "mcp" (started by an outside agent)
 	SourceURL       string         `json:"sourceUrl,omitempty"`
 	SourceTitle     string         `json:"sourceTitle,omitempty"`
 	SourceChars     int            `json:"sourceChars"`
 	SourceTruncated bool           `json:"sourceTruncated"`
+	Pending         int            `json:"pending"` // proposals waiting for a decision
 	Agent           AgentInfo      `json:"agent"`
 	CreatedAt       string         `json:"createdAt"`
 	UpdatedAt       string         `json:"updatedAt"`
@@ -209,13 +210,13 @@ func (c *Chat) Start(ctx context.Context, profileID, rawURL, text string) (Conve
 	return c.Get(ctx, id)
 }
 
-const convCols = `id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at`
+const convCols = `id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at, (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
 
 func (c *Chat) scanConv(r scanner) (Conversation, string, error) {
 	var v Conversation
 	var text string
 	var tr int
-	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &text, &tr, &v.CreatedAt, &v.UpdatedAt); err != nil {
+	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &text, &tr, &v.CreatedAt, &v.UpdatedAt, &v.Pending); err != nil {
 		return v, "", err
 	}
 	v.SourceChars, v.SourceTruncated, v.Agent = utf8.RuneCountInString(text), tr != 0, c.Agent()
@@ -363,6 +364,9 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	content = strings.TrimSpace(content)
 	if err := cleanText(content, maxChatMessage); err != nil {
 		return err
+	}
+	if conv.SourceKind == "mcp" {
+		return invalid("this conversation was started by an outside agent, so ask that agent for changes")
 	}
 	if !c.lock(id) {
 		return fmt.Errorf("%w: a reply is already being written for this conversation", ErrConflict)
@@ -537,4 +541,107 @@ func (c *Chat) Decide(ctx context.Context, proposalID string, d Decision) (Propo
 		return ProposalView{}, err
 	}
 	return scanProposal(c.db.QueryRowContext(ctx, `SELECT `+propCols+` FROM proposals WHERE id = ?`, proposalID))
+}
+
+/* ------------------------------------------------------------------ proposals from an outside agent (MCP) */
+
+// maxPendingExternal bounds how many unreviewed proposals outside agents may leave for one profile, so a runaway agent
+// cannot bury the person in them.
+const maxPendingExternal = 20
+
+// ExternalProposal is content an outside agent suggests through MCP.
+type ExternalProposal struct {
+	ProfileID      string
+	ConversationID string // add to an earlier proposal conversation; empty starts a new one
+	Caller         string // who is asking, as the client described itself (not verified)
+	Proposal       agent.Proposal
+}
+
+func callerLabel(s string) string {
+	s = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)), " ")
+	if r := []rune(s); len(r) > 80 {
+		s = string(r[:80])
+	}
+	if s == "" {
+		return "An outside agent"
+	}
+	return s
+}
+
+// Propose stores an outside agent's suggestion as a **pending proposal**, exactly like one from the chat. It changes no
+// draft and nothing is applied until a person approves it in the Chat tab.
+func (c *Chat) Propose(ctx context.Context, in ExternalProposal) (ProposalView, error) {
+	if in.ProfileID == "" {
+		return ProposalView{}, invalid("profileId is required")
+	}
+	p := in.Proposal
+	if err := p.Normalize(); err != nil {
+		return ProposalView{}, invalid("%v", err)
+	}
+	caller := callerLabel(in.Caller)
+
+	var pending int
+	if err := c.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM proposals p JOIN conversations c ON c.id = p.conversation_id
+		 WHERE c.profile_id = ? AND c.source_kind = 'mcp' AND p.status = 'pending'`, in.ProfileID).Scan(&pending); err != nil {
+		return ProposalView{}, err
+	}
+	if pending >= maxPendingExternal {
+		return ProposalView{}, fmt.Errorf("%w: %d proposals from outside agents are already waiting for review; ask the person to review them first", ErrConflict, pending)
+	}
+
+	convID := in.ConversationID
+	if convID == "" {
+		convID = newID()
+		title := p.Title
+		if title == "" {
+			title = firstLine(p.Body, 60)
+		}
+		at := c.stamp()
+		if _, err := c.db.ExecContext(ctx,
+			`INSERT INTO conversations (id, profile_id, title, source_kind, source_title, source_text, created_at, updated_at) VALUES (?, ?, ?, 'mcp', ?, '', ?, ?)`,
+			convID, in.ProfileID, title, caller, at, at); err != nil {
+			return ProposalView{}, err
+		}
+	} else {
+		conv, _, err := c.load(ctx, convID)
+		if err != nil {
+			return ProposalView{}, err
+		}
+		if conv.ProfileID != in.ProfileID || conv.SourceKind != "mcp" {
+			return ProposalView{}, invalid("conversationId must be one this agent started for the same profile")
+		}
+	}
+	if !c.lock(convID) {
+		return ProposalView{}, fmt.Errorf("%w: that conversation is busy", ErrConflict)
+	}
+	defer c.unlock(convID)
+	var seq int
+	if err := c.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq), 0) + 1 FROM chat_messages WHERE conversation_id = ?`, convID).Scan(&seq); err != nil {
+		return ProposalView{}, err
+	}
+	what := "post"
+	if p.Kind == agent.KindArticle {
+		what = "article"
+	}
+	reply := fmt.Sprintf("%s proposed a %s: “%s”. Review it below. Nothing changes until you approve it.", caller, what, firstLine(p.Title+" ", 80))
+	_, view, err := c.storeReply(ctx, convID, seq, reply, &p)
+	if err != nil {
+		return ProposalView{}, err
+	}
+	return *view, nil
+}
+
+// Proposal returns one proposal, so an outside agent can learn whether it was approved, edited or rejected.
+func (c *Chat) Proposal(ctx context.Context, id string) (ProposalView, error) {
+	p, err := scanProposal(c.db.QueryRowContext(ctx, `SELECT `+propCols+` FROM proposals WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, ErrNotFound
+	}
+	return p, err
 }

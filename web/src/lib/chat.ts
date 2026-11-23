@@ -28,11 +28,14 @@ export interface Conversation {
   id: string;
   profileId: string;
   title: string;
-  sourceKind: "url" | "text";
+  /** "mcp": started by an outside agent that proposed content through MCP. */
+  sourceKind: "url" | "text" | "mcp";
   sourceUrl?: string;
   sourceTitle?: string;
   sourceChars: number;
   sourceTruncated: boolean;
+  /** Proposals waiting for a decision. */
+  pending: number;
   agent: AgentInfo;
   createdAt: string;
   updatedAt: string;

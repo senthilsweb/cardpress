@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // Errors a caller can test with errors.Is.
@@ -280,4 +282,19 @@ func (s *Studio) ImportLegacy(ctx context.Context, l Legacy) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// UserMessage turns an error into text for a person (or an agent): the category prefix ("invalid input: ") is for code,
+// so it is dropped, and the first letter is capitalised.
+func UserMessage(err error) string {
+	m := err.Error()
+	for _, sentinel := range []error{ErrInvalid, ErrConflict} {
+		m = strings.TrimPrefix(m, sentinel.Error()+": ")
+	}
+	if m == "" {
+		return err.Error()
+	}
+	r := []rune(m)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
 }

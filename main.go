@@ -25,6 +25,7 @@ import (
 	"github.com/senthilsweb/cardpress/internal/api"
 	"github.com/senthilsweb/cardpress/internal/config"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
+	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
@@ -37,6 +38,11 @@ var dist embed.FS
 var version = "dev" // set with -ldflags "-X main.version=v0.1.0"
 
 func main() {
+	// `cardpress mcp` speaks the Model Context Protocol on stdin/stdout, for an agent running on this machine
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		runMCP(os.Args[2:])
+		return
+	}
 	cfg, err := config.Load(os.Args[1:], os.Getenv)
 	if errors.Is(err, flag.ErrHelp) {
 		return
@@ -86,10 +92,21 @@ func main() {
 	publisher := service.NewPublisher(db.DB, settings, linkedin.New(cfg.LinkedInAPIBase, cfg.LinkedInVersion), cfg.MissedGrace)
 	schedulerDone := make(chan struct{})
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
-	chat := service.NewChat(db.DB, &agent.Mock{Delay: 25 * time.Millisecond}, source.New())
-	mux.Handle("/api/v1/", api.New(api.Options{
-		Studio: service.New(db.DB), Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins, Version: version, DBDriver: db.Driver,
-	}))
+	studio := service.New(db.DB)
+	fetcher := source.New()
+	chat := service.NewChat(db.DB, &agent.Mock{Delay: 25 * time.Millisecond}, fetcher)
+	opts := api.Options{
+		Studio: studio, Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
+	}
+	if cfg.MCPEnabled {
+		audit := mcpserver.NewAuditor(db.DB)
+		opts.Audit = audit
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
+		mux.Handle("/mcp", api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv)))
+	}
+	mux.Handle("/api/v1/", api.New(opts))
 	if cfg.ServeWeb {
 		site, err := fs.Sub(dist, "web/dist")
 		if err != nil {
@@ -114,7 +131,7 @@ func main() {
 	if cfg.ServeWeb {
 		web = displayAddr(cfg.Addr) + prefix
 	}
-	log.Printf("cardpress %s listening on %s (%s, %s database, token %s)", version, cfg.Addr, web, db.Driver, onOff(cfg.APIToken != ""))
+	log.Printf("cardpress %s listening on %s (%s, %s database, token %s, MCP %s)", version, cfg.Addr, web, db.Driver, onOff(cfg.APIToken != ""), onOff(cfg.MCPEnabled))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
@@ -187,4 +204,37 @@ func openSecretBox(cfg config.Config) (*secrets.Box, error) {
 		log.Printf("created an encryption key for stored credentials at %s: back it up together with the database", path)
 	}
 	return secrets.NewBox(secret, "file")
+}
+
+// runMCP serves the Model Context Protocol on stdin and stdout, for an agent started by a program on this machine (an
+// editor or desktop assistant). It reads and writes the same database as the server. Nothing else may print to stdout,
+// so log output goes to stderr (the log package's default).
+func runMCP(args []string) {
+	cfg, err := config.Load(args, os.Getenv)
+	if errors.Is(err, flag.ErrHelp) {
+		return
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	db, err := store.Open(ctx, cfg.DBURL, cfg.DBToken)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Migrate(ctx); err != nil {
+		log.Fatal(err)
+	}
+	studio := service.New(db.DB)
+	fetcher := source.New()
+	chat := service.NewChat(db.DB, &agent.Mock{}, fetcher)
+	// the publisher is only handed to the tools as a reader of jobs; it is never started here
+	jobs := service.NewPublisher(db.DB, nil, nil, 0)
+	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
+	log.Printf("cardpress MCP over stdio is ready (%s database)", db.Driver)
+	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
+		log.Fatal(err)
+	}
 }
