@@ -1,0 +1,14 @@
+# Tasks
+- [x] `internal/` package layout, config loading, graceful shutdown
+- [x] `store` with SQLite and libSQL drivers; SQLite tested
+- [ ] libSQL connection test (needs a Turso database)
+- [x] Migration runner and `0001_init.sql` (designs, profiles, settings tables)
+- [x] `internal/service` layer with no HTTP types in its signatures
+- [x] `/api/v1` router, JSON errors, request IDs, bearer-token middleware, CORS
+- [x] Exposure guard at startup
+- [x] Designs and profiles CRUD endpoints
+- [x] Web: `PUBLIC_API_BASE`, API client, replace `usePersistentState` with API-backed state
+- [x] One-time localStorage import
+- [x] Makefile, Dockerfile (data volume) written; `docs/deployment.md`
+- [x] Docker image is built by GitHub Actions (`.github/workflows/ci.yml`); first run pending
+- [ ] Run against a real Turso database (not yet run)

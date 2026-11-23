@@ -1,0 +1,111 @@
+@import "tailwindcss";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* senthilsweb.com tokens (paper / ink / green), mapped onto shadcn variables */
+:root {
+  --paper: #f5f2ea; --card-bg: #fbf9f4; --ink: #1a1712; --ink-2: #4a463d; --muted-ink: #8b8478;
+  --line: #e2dccf; --brand: #1f7a55; --brand-soft: #1f7a5517; --thumb: #e6e1d6;
+  --canvas-bg: #ffffff; --canvas-grid-minor: rgba(0, 0, 0, 0.055); --canvas-grid-major: rgba(0, 0, 0, 0.11);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--card-bg);
+  --card-foreground: var(--ink);
+  --popover: var(--card-bg);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: var(--thumb);
+  --secondary-foreground: var(--ink);
+  --muted: var(--thumb);
+  --muted-foreground: var(--muted-ink);
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--ink);
+  --destructive: #b23a3a;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
+  --radius: 0.5rem;
+}
+[data-theme="dark"] {
+  --paper: #16130e; --card-bg: #1e1a14; --ink: #ece5d8; --ink-2: #c9c0af; --muted-ink: #9c937f;
+  --line: #2d271e; --brand: #3da878; --brand-soft: #3da8781f; --thumb: #26211a;
+  --canvas-bg: #1e1e1e; --canvas-grid-minor: rgba(255, 255, 255, 0.05); --canvas-grid-major: rgba(255, 255, 255, 0.1);
+}
+
+@theme inline {
+  --font-sans: "Space Grotesk Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-ink2: var(--ink-2);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body { @apply bg-background text-foreground; }
+  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+}
+
+/* small mono uppercase label, as on senthilsweb.com */
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); font-weight: 600; }
+.checker {
+  background-color: var(--thumb);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+/* the work area behind the card: a white sheet with a fine grid, like a diagramming tool */
+.canvas-grid {
+  background-color: var(--canvas-bg);
+  background-image:
+    linear-gradient(var(--canvas-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid-major) 1px, transparent 1px),
+    linear-gradient(var(--canvas-grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid-minor) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+  background-attachment: local; /* the grid moves with the content when the canvas scrolls */
+}
+
+/* rich-text editor (TipTap) */
+.rich { min-height: 11rem; padding: .625rem .75rem; font-size: .875rem; line-height: 1.55; outline: none; }
+.rich > * + * { margin-top: .6em; }
+.rich p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--muted-foreground); }
+.rich-lg { min-height: 58vh; padding: 1.25rem 1.75rem 2rem; font-size: 1.0625rem; line-height: 1.7; }
+.rich ul { list-style: disc; padding-left: 1.25rem; }
+.rich ol { list-style: decimal; padding-left: 1.25rem; }
+.rich li > p { margin: 0; }
+.rich h2 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
+.rich h3 { font-size: 1rem; font-weight: 700; line-height: 1.3; }
+.rich blockquote { border-left: 3px solid var(--brand); padding-left: .75rem; color: var(--muted-foreground); }
+.rich a, .article-html a { color: var(--brand); text-decoration: underline; }
+.article-html { font-size: .9rem; line-height: 1.65; }
+.article-html > * + * { margin-top: .8em; }
+.article-html ul { list-style: disc; padding-left: 1.4rem; }
+.article-html ol { list-style: decimal; padding-left: 1.4rem; }
+.article-html h2 { font-size: 1.3rem; font-weight: 700; }
+.article-html h3 { font-size: 1.1rem; font-weight: 700; }
+.article-html blockquote { border-left: 3px solid var(--brand); padding-left: .9rem; color: var(--muted-foreground); }

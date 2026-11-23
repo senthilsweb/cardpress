@@ -1,0 +1,12 @@
+# web
+web/node_modules/
+web/dist/
+web/.astro/
+# go
+bin/
+dist/
+data/
+# misc
+.DS_Store
+*.log
+.env

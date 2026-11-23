@@ -1,0 +1,12 @@
+# Tasks
+- [x] Draft table, endpoints and client
+- [x] TipTap editor with post and article schemas
+- [x] `serializeForLinkedIn()` plus unit tests (lists, Unicode styles, limits)
+- [x] LinkedIn feed preview component and full-preview dialog
+- [x] Article "Copy formatted"
+- [x] Rich editor inside the existing Post tab (no layout change)
+- [x] `docs/post-authoring.md`
+- [x] Migrate the old plain caption into the first draft
+- [x] Expanded editor overlay over the centre, plain background
+- [x] Resizable sidebar editor (height remembered)
+- [ ] Publish and Schedule buttons inside the full preview (the preview has an `actions` slot; added by linkedin-publish-schedule)

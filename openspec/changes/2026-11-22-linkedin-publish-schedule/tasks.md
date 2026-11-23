@@ -1,0 +1,14 @@
+# Tasks
+- [x] `publish_jobs` table with image snapshot
+- [x] LinkedIn client: image upload, create post, version header configurable; escaping and hashtag templates
+- [x] Scheduler loop, atomic claim, grace window, start-up recovery (no automatic retry)
+- [x] Endpoints: create (multipart), list, get, image, publish-now, reschedule, cancel, delete
+- [x] Full preview: publish bar with a second confirmation; schedule with time zone
+- [x] Queue in the Post tab: status, reschedule, cancel, publish again, discard, post link
+- [x] Failed-job UI: reason, publish again, reschedule, discard
+- [x] Tests: LinkedIn client against a fake server, state machine, concurrent claims (with the race detector), API, time zone conversion
+- [x] Run end to end in a browser against a fake LinkedIn: publish now, scheduled run, failure with no retry, publish again
+- [x] Docs: `docs/publishing.md`
+- [ ] Verify against a real LinkedIn app and token (never done): the default `LinkedIn-Version`, the `initializeUpload` response shape, the post id header, and whether a post is accepted
+- [ ] Verify the escaped character list and the `{hashtag|\#|tag}` template against LinkedIn's current documentation, and that hashtags and underscores display correctly
+- [ ] Decide how to refresh LinkedIn tokens (they expire in about 60 days); for now a failed publish shows the reason
