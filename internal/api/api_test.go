@@ -303,7 +303,7 @@ func publishHandler(t *testing.T, token string, creds okCreds) (http.Handler, *a
 	li := &apiPoster{}
 	pub := service.NewPublisher(db.DB, creds, li, 0)
 	t.Cleanup(pub.Wait)
-	return New(Options{Studio: service.New(db.DB), Publishing: pub, Token: token, Version: "t", DBDriver: db.Driver}), li
+	return New(Options{Studio: service.New(db.DB), Publishing: pub, Library: service.NewLibrary(db.DB), Token: token, Version: "t", DBDriver: db.Driver}), li
 }
 
 func postJob(h http.Handler, meta string, image []byte, hdr map[string]string) *httptest.ResponseRecorder {
@@ -476,7 +476,7 @@ func TestPublishingNeedsTheToken(t *testing.T) {
 	if r := postJob(h, `{"profileId":"p","body":"x"}`, apiPNG, nil); r.Code != 401 {
 		t.Fatalf("create without token: %d", r.Code)
 	}
-	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}} {
+	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}, {"GET", "/api/v1/library?profileId=p"}, {"GET", "/api/v1/publish/jobs/x/attempts"}} {
 		if r := do(h, c[0], c[1], "", nil); r.Code != 401 {
 			t.Errorf("%s %s without token: %d", c[0], c[1], r.Code)
 		}
@@ -863,5 +863,35 @@ func TestBrandRoutesAndPerBrandSettings(t *testing.T) {
 	}
 	if r := do(h, "GET", "/api/v1/profiles/p2/settings", "", nil); r.Code != 404 {
 		t.Fatalf("a deleted brand has no settings: %d", r.Code)
+	}
+}
+
+func TestLibraryThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	r := postJob(h, `{"profileId":"p","draftId":"d","body":"Hello library","hashtags":["Go"]}`, apiPNG, nil)
+	if r.Code != 201 {
+		t.Fatalf("create: %d %s", r.Code, r.Body)
+	}
+	var j service.Job
+	_ = json.Unmarshal(r.Body.Bytes(), &j)
+	waitStatus(t, h, j.ID, service.JobPublished)
+
+	got := do(h, "GET", "/api/v1/library?profileId=p&status=published", "", nil)
+	var page service.LibraryPage
+	if got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &page) != nil || len(page.Items) != 1 || page.Items[0].Title != "Hello library" || page.Items[0].PostURL == "" {
+		t.Fatalf("%d %s", got.Code, got.Body)
+	}
+	if r := do(h, "GET", "/api/v1/library", "", nil); r.Code != 400 {
+		t.Fatalf("no brand: %d", r.Code)
+	}
+	if r := do(h, "GET", "/api/v1/library?profileId=p&kind=video", "", nil); r.Code != 400 {
+		t.Fatalf("bad kind: %d", r.Code)
+	}
+	at := do(h, "GET", "/api/v1/publish/jobs/"+j.ID+"/attempts", "", nil)
+	if at.Code != 200 || !strings.Contains(at.Body.String(), `"attempts"`) {
+		t.Fatalf("attempts: %d %s", at.Code, at.Body)
+	}
+	if r := do(h, "GET", "/api/v1/publish/jobs/nope/attempts", "", nil); r.Code != 404 {
+		t.Fatalf("attempts of nothing: %d", r.Code)
 	}
 }

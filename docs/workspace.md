@@ -23,7 +23,7 @@ All of this is remembered: it is saved on the server as the `layout` preference,
 
 ## Drawers
 
-Settings and other tool panels slide in from the right as a drawer (`components/ui/drawer.tsx`), for example **Social accounts** from the gear in the header. A drawer does not dim or block the studio. Its header matches the app header, the body scrolls, and the action buttons are frozen in a footer. Esc closes it.
+Settings and other tool panels slide in from the right as a drawer (`components/ui/drawer.tsx`), for example **Social accounts** from the account menu. A drawer does not dim or block the studio. Its header matches the app header, the body scrolls, and the action buttons are frozen in a footer. Esc closes it.
 
 ## Canvas
 
@@ -38,3 +38,7 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/lib/layout.tsx` | The `Layout` type, safe parsing of the saved value, and the context sections read |
 | `web/src/components/studio/fields.tsx` | `Section`, the foldable group |
 | `web/src/components/studio/Studio.tsx` | Sidebar hide/show and the shortcut |
+
+## Account menu
+
+The footer at the bottom of the sidebar shows the open brand (its initials, name and handle). Click it and a menu opens upward: **Library**, **Social accounts**, **Manage brands**, the light or dark mode, and these docs. It is where sign-in will go when there are user accounts. When the sidebar is hidden, a small round button with the brand's initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.

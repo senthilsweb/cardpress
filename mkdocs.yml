@@ -47,6 +47,7 @@ nav:
   - Publishing:
       - Publishing: publishing.md
       - Social accounts: social-settings.md
+      - Library: library.md
   - Integrate:
       - MCP: mcp.md
   - Code Tour: code-tour.md

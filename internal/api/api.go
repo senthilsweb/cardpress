@@ -43,6 +43,11 @@ type Studio interface {
 	DeleteDraft(ctx context.Context, id string) error
 }
 
+// Library is the part of the library service the HTTP API needs.
+type Library interface {
+	List(ctx context.Context, q service.LibraryQuery) (service.LibraryPage, error)
+}
+
 // Publishing is the part of the publishing service the HTTP API needs.
 type Publishing interface {
 	Create(ctx context.Context, in service.JobInput) (service.Job, error)
@@ -84,6 +89,7 @@ type Options struct {
 	Studio       Studio
 	Settings     Settings
 	Publishing   Publishing
+	Library      Library
 	Chat         Chatting
 	Token        string   // empty: no bearer token required
 	CORSOrigins  []string // exact origins allowed to call the API from a browser
@@ -135,6 +141,7 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("POST "+prefix+"/settings/{network}/test", s.testNetwork)
 	mux.HandleFunc("POST "+prefix+"/publish/jobs", s.createJob)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs", s.listJobs)
+	mux.HandleFunc("GET "+prefix+"/library", s.library)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}", s.getJob)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/attempts", s.jobAttempts)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/image", s.jobImage)
@@ -698,6 +705,20 @@ func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"jobs": jobs})
+}
+
+func (s *server) library(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	page, err := s.Library.List(r.Context(), service.LibraryQuery{
+		ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Kind: q.Get("kind"), Status: q.Get("status"),
+		Q: q.Get("q"), Before: q.Get("before"), Limit: limit,
+	})
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
 }
 
 func (s *server) getJob(w http.ResponseWriter, r *http.Request) {

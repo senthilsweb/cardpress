@@ -1,0 +1,8 @@
+---
+import Base from "../layouts/Base.astro";
+import Library from "../components/library/Library";
+---
+<Base title="CardPress library">
+  <Library client:only="react" />
+  <noscript><p style="padding:2rem">CardPress needs JavaScript.</p></noscript>
+</Base>

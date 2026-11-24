@@ -103,7 +103,10 @@ export function useBoot() {
         await api.putProfiles(DEFAULT_PROFILES);
         state = await api.state();
       }
-      const pid = pickActive(state.preferences.activeProfile, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
+      // another page (the library) can open a given brand: /studio/?brand=<id>
+      const asked = new URLSearchParams(window.location.search).get("brand");
+      const pid = pickActive(asked || state.preferences.activeProfile, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
+      if (asked && pid === asked && pid !== state.preferences.activeProfile) api.putPreference("activeProfile", pid).catch(() => undefined);
       const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
       setBoot({ status: "ready", data: fromState(state, drafts, pid) });
     } catch (e) {

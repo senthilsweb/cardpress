@@ -110,7 +110,7 @@ func main() {
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	opts := api.Options{
-		Studio: studio, Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {

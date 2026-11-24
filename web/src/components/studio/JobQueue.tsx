@@ -10,7 +10,7 @@ import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /** A small preview of the image that will be (or was) posted. */
-function Thumb({ id }: { id: string }) {
+export function Thumb({ id }: { id: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let url: string | undefined;
@@ -40,7 +40,7 @@ function When({ j }: { j: Job }) {
 }
 
 /** What LinkedIn answered for each try: the record behind a post's status. It never shows the access token. */
-function Attempts({ id }: { id: string }) {
+export function Attempts({ id }: { id: string }) {
   const [list, setList] = useState<Attempt[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {

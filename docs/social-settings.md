@@ -1,6 +1,6 @@
 # Social accounts
 
-Open **Social accounts** from the gear icon in the header. It slides in from the right as a drawer, not a modal: nothing is dimmed or blocked, so you can keep using the studio while it is open. It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. **Esc** or the close button closes it; if you have unsaved changes it asks before discarding them (a dot on a tab shows which network has some).
+Open **Social accounts** from the account menu: click your brand at the bottom of the sidebar. It slides in from the right as a drawer, not a modal: nothing is dimmed or blocked, so you can keep using the studio while it is open. It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. **Esc** or the close button closes it; if you have unsaved changes it asks before discarding them (a dot on a tab shows which network has some).
 
 | Network | Fields | Status |
 |---|---|---|

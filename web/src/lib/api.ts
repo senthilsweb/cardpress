@@ -43,6 +43,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 import type { Draft, DraftInput } from "./draft";
 import type { Attempt, Job, NewJob } from "./jobs";
+import type { LibraryFilter, LibraryPage } from "./library";
 import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
 
 export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo }
@@ -148,6 +149,16 @@ export const api = {
     form.set("meta", JSON.stringify(meta));
     form.set("image", image, "card.png");
     return call<Job>("POST", "/publish/jobs", form);
+  },
+  getJob: (id: string) => call<Job>("GET", `/publish/jobs/${encodeURIComponent(id)}`),
+  library: (f: LibraryFilter, activeId: string, before?: string) => {
+    const q = new URLSearchParams();
+    if (f.brand === "all") q.set("scope", "all"); else q.set("profileId", f.brand || activeId);
+    if (f.kind) q.set("kind", f.kind);
+    if (f.status) q.set("status", f.status);
+    if (f.q.trim()) q.set("q", f.q.trim());
+    if (before) q.set("before", before);
+    return call<LibraryPage>("GET", `/library?${q}`);
   },
   jobAttempts: (id: string) => call<{ attempts: Attempt[] }>("GET", `/publish/jobs/${encodeURIComponent(id)}/attempts`).then((r) => r.attempts),
   publishJobNow: (id: string, acceptDuplicate = false) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/publish-now`, { acceptDuplicate }),
