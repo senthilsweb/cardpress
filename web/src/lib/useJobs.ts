@@ -1,6 +1,25 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { api } from "./api";
-import { isActive, type Job } from "./jobs";
+import { isActive, type Job, type JobStatus } from "./jobs";
+
+/** Tell the person how a post that was waiting or sending ended. Nothing is said while it is still going. */
+function announce(j: Job) {
+  const text = j.previewText.replace(/\s+/g, " ").trim();
+  const what = text.length > 70 ? text.slice(0, 70) + "…" : text;
+  if (j.status === "published") {
+    toast.success("Posted to LinkedIn", {
+      description: what,
+      action: j.postUrl ? { label: "View post", onClick: () => window.open(j.postUrl, "_blank", "noopener,noreferrer") } : undefined,
+    });
+  } else if (j.status === "failed") {
+    toast.error("LinkedIn did not post it", { description: j.error || what, duration: 10000 });
+  } else if (j.status === "needs_review") {
+    toast.warning("Check LinkedIn", { description: j.error || "The post may be live. Look before posting again.", duration: 10000 });
+  } else if (j.status === "missed") {
+    toast.warning("A scheduled post was missed", { description: what, duration: 10000 });
+  }
+}
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
@@ -14,8 +33,19 @@ export function useJobs(profileId: string) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // what each job's status was at the last look: a change from running to finished is told once, as a toast
+  const seen = useRef(new Map<string, JobStatus>());
+
   const refresh = useCallback(async () => {
-    try { setJobs(await api.listJobs(profileId, scope)); setError(null); }
+    try {
+      const list = await api.listJobs(profileId, scope);
+      for (const j of list) {
+        const before = seen.current.get(j.id);
+        if (before === "publishing" || before === "scheduled") announce(j);
+        seen.current.set(j.id, j.status);
+      }
+      setJobs(list); setError(null);
+    }
     catch (e) { setError(message(e)); }
     finally { setLoaded(true); }
   }, [profileId, scope]);
@@ -41,7 +71,7 @@ export function useJobs(profileId: string) {
     /** Whose posts the list shows: the open brand's, or every brand's. */
     scope, setScope,
     /** Show a job at once, without waiting for the next refresh. */
-    add: (j: Job) => setJobs((l) => [j, ...l.filter((x) => x.id !== j.id)]),
+    add: (j: Job) => { seen.current.set(j.id, j.status); setJobs((l) => [j, ...l.filter((x) => x.id !== j.id)]); },
     publishNow: (id: string, acceptDuplicate = false) => act(() => api.publishJobNow(id, acceptDuplicate)),
     reschedule: (id: string, scheduledAt: string, timezone: string) => act(() => api.rescheduleJob(id, scheduledAt, timezone)),
     cancel: (id: string) => act(() => api.cancelJob(id)),

@@ -20,6 +20,7 @@ import { blankDesign, brandColor, move } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
+import { Toaster } from "@/components/ui/sonner";
 import { useDrafts } from "@/lib/useDrafts";
 import { useJobs } from "@/lib/useJobs";
 import { useChat } from "@/lib/useChat";
@@ -249,6 +250,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   return (
     <TooltipProvider delayDuration={250}>
      <LayoutContext.Provider value={layoutCtx}>
+      <Toaster theme={theme} />
       <div className="flex h-dvh flex-col">
         {/* header – mirrors senthilsweb.com: mono wordmark, thin bar */}
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border app-header px-4">

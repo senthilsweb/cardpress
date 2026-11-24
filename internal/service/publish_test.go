@@ -443,3 +443,41 @@ func TestListAllShowsEveryBrandsPostsAndListShowsOne(t *testing.T) {
 		t.Fatalf("a: %+v", a)
 	}
 }
+
+func TestEachTripToLinkedInIsRecordedAsAnAttempt(t *testing.T) {
+	h, ctx := newHarness(t, nil), context.Background()
+	j, err := h.p.Create(ctx, jobInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.li.err = errors.New("LinkedIn refused this action.")
+	h.p.Execute(ctx, j.ID)
+	if got := status(t, h, j.ID); got.Status != JobFailed {
+		t.Fatalf("%+v", got)
+	}
+	// a person retries by hand, and this time it goes through
+	h.li.err = nil
+	if _, err := h.p.PublishNow(ctx, j.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	h.p.Execute(ctx, j.ID)
+	at, err := h.p.Attempts(ctx, j.ID)
+	if err != nil || len(at) != 2 {
+		t.Fatalf("%v %+v", err, at)
+	}
+	if at[0].Outcome != JobFailed || at[0].Error == "" || at[1].Outcome != JobPublished || at[1].StartedAt == "" || at[1].FinishedAt == "" {
+		t.Fatalf("%+v", at)
+	}
+	if _, err := h.p.Attempts(ctx, "nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("%v", err)
+	}
+	// deleting the job takes its attempts with it
+	if err := h.p.Delete(ctx, j.ID); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM publish_attempts WHERE job_id = ?`, j.ID).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d attempts left", n)
+	}
+}

@@ -50,6 +50,7 @@ type Publishing interface {
 	List(ctx context.Context, profileID string) ([]service.Job, error)
 	ListAll(ctx context.Context) ([]service.Job, error)
 	Image(ctx context.Context, id string) ([]byte, error)
+	Attempts(ctx context.Context, jobID string) ([]service.Attempt, error)
 	PublishNow(ctx context.Context, id string, acceptDuplicate bool) (service.Job, error)
 	Reschedule(ctx context.Context, id string, at time.Time, timezone string) (service.Job, error)
 	Cancel(ctx context.Context, id string) (service.Job, error)
@@ -135,6 +136,7 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("POST "+prefix+"/publish/jobs", s.createJob)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs", s.listJobs)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}", s.getJob)
+	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/attempts", s.jobAttempts)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/image", s.jobImage)
 	mux.HandleFunc("POST "+prefix+"/publish/jobs/{id}/publish-now", s.publishNow)
 	mux.HandleFunc("PUT "+prefix+"/publish/jobs/{id}/schedule", s.rescheduleJob)
@@ -705,6 +707,15 @@ func (s *server) getJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, j)
+}
+
+func (s *server) jobAttempts(w http.ResponseWriter, r *http.Request) {
+	a, err := s.Publishing.Attempts(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"attempts": a})
 }
 
 func (s *server) jobImage(w http.ResponseWriter, r *http.Request) {

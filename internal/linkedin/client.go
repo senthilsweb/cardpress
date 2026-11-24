@@ -137,13 +137,21 @@ func friendly(status int, body []byte, step string) *APIError {
 	return &APIError{Status: status, Message: msg}
 }
 
-func (c *Client) do(req *http.Request) (*http.Response, []byte, error) {
+func (c *Client) do(step string, req *http.Request) (*http.Response, []byte, error) {
+	started := time.Now()
+	tr, _ := req.Context().Value(traceKey{}).(*Trace)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		if tr != nil {
+			tr.record(step, req, started, nil, nil, err)
+		}
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if tr != nil {
+		tr.record(step, req, started, resp, body, nil)
+	}
 	return resp, body, nil
 }
 
@@ -165,7 +173,7 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	}
 	c.headers(req, token)
 	req.Header.Set("Content-Type", "application/json")
-	resp, body, err := c.do(req)
+	resp, body, err := c.do("Reserve the image upload", req)
 	if err != nil {
 		return "", &APIError{Message: "Could not reach LinkedIn to start the image upload. Nothing was posted."}
 	}
@@ -193,7 +201,7 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 		return "", err
 	}
 	up.Header.Set("Authorization", "Bearer "+token)
-	resp, body, err = c.do(up)
+	resp, body, err = c.do("Upload the image", up)
 	if err != nil {
 		return "", &APIError{Message: "Could not upload the image to LinkedIn. Nothing was posted."}
 	}
@@ -225,7 +233,7 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	}
 	c.headers(post, token)
 	post.Header.Set("Content-Type", "application/json")
-	resp, body, err = c.do(post)
+	resp, body, err = c.do("Create the post", post)
 	if err != nil {
 		return "", &UnknownOutcomeError{Reason: "The request to create the post was sent but no answer came back, so it may or may not have been posted."}
 	}

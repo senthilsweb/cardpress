@@ -20,7 +20,8 @@ import { useLayout } from "@/lib/layout";
 import { normalizeHashtag, type DraftKind } from "@/lib/draft";
 import { LINKEDIN_LIMIT, serializeDraft, serializeForLinkedIn } from "@/lib/linkedin";
 import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
-import type { Job } from "@/lib/jobs";
+import { formatInZone, type Job } from "@/lib/jobs";
+import { toast } from "sonner";
 import type { DraftStore } from "@/lib/useDrafts";
 import type { Design, Palette, Profile } from "@/lib/types";
 
@@ -78,7 +79,8 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
     jobs.add(job);
     setPreview(false);
     setExpanded(false);
-    flash(how === "now" ? "Sent to LinkedIn: see the queue below." : "Scheduled: see the queue below.");
+    if (how === "now") toast("Sending to LinkedIn…", { description: "You will be told when it is posted." });
+    else toast.success("Post scheduled", { description: job.scheduledAt ? formatInZone(job.scheduledAt, job.timezone) : undefined });
   };
   const html = () => (editor && !editor.isDestroyed ? editor.getHTML() : "");
   const copyNow = async () => {

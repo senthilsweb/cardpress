@@ -42,7 +42,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 import type { Draft, DraftInput } from "./draft";
-import type { Job, NewJob } from "./jobs";
+import type { Attempt, Job, NewJob } from "./jobs";
 import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
 
 export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo }
@@ -149,6 +149,7 @@ export const api = {
     form.set("image", image, "card.png");
     return call<Job>("POST", "/publish/jobs", form);
   },
+  jobAttempts: (id: string) => call<{ attempts: Attempt[] }>("GET", `/publish/jobs/${encodeURIComponent(id)}/attempts`).then((r) => r.attempts),
   publishJobNow: (id: string, acceptDuplicate = false) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/publish-now`, { acceptDuplicate }),
   rescheduleJob: (id: string, scheduledAt: string, timezone: string) => call<Job>("PUT", `/publish/jobs/${encodeURIComponent(id)}/schedule`, { scheduledAt, timezone }),
   cancelJob: (id: string) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/cancel`),

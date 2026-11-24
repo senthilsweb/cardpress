@@ -74,7 +74,7 @@ func newFake(t *testing.T) *fake {
 				fmt.Fprint(w, `{"message":"nope"}`)
 				return
 			}
-			up := f.srv.URL + "/upload/abc"
+			up := f.srv.URL + "/upload/abc?sig=SECRET"
 			if f.uploadURLOverride != "" {
 				up = f.uploadURLOverride
 			}
@@ -258,5 +258,38 @@ func TestPublishRequiresTokenAuthorAndImage(t *testing.T) {
 func TestPostURL(t *testing.T) {
 	if PostURL("urn:li:share:9") != "https://www.linkedin.com/feed/update/urn:li:share:9/" || PostURL("") != "" {
 		t.Fatal("wrong URL")
+	}
+}
+
+func TestATraceRecordsEachAnswerAndNeverTheToken(t *testing.T) {
+	f := newFake(t)
+	ctx, tr := WithTrace(context.Background())
+	if _, err := f.client().Publish(ctx, "TOKEN-XYZ", post()); err != nil {
+		t.Fatal(err)
+	}
+	steps := tr.Steps()
+	if len(steps) != 3 || steps[0].Step != "Reserve the image upload" || steps[1].Step != "Upload the image" || steps[2].Step != "Create the post" {
+		t.Fatalf("%+v", steps)
+	}
+	if steps[2].Status != 201 || steps[2].Headers["X-Restli-Id"] != "urn:li:share:123" || steps[2].Path != "/rest/posts" {
+		t.Fatalf("%+v", steps[2])
+	}
+	raw, _ := json.Marshal(steps)
+	if strings.Contains(string(raw), "TOKEN-XYZ") || strings.Contains(string(raw), "SECRET") {
+		t.Fatalf("a trace must hold neither the token nor a query string: %s", raw)
+	}
+}
+
+func TestATraceKeepsAFailedAnswer(t *testing.T) {
+	f := newFake(t)
+	f.postStatus = 422
+	ctx, tr := WithTrace(context.Background())
+	if _, err := f.client().Publish(ctx, "T", post()); err == nil {
+		t.Fatal("expected a failure")
+	}
+	steps := tr.Steps()
+	last := steps[len(steps)-1]
+	if last.Status != 422 || !strings.Contains(last.Body, "Field author is invalid") {
+		t.Fatalf("%+v", last)
 	}
 }
