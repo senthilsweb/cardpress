@@ -5,10 +5,11 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* senthilsweb.com tokens (paper / ink / green), mapped onto shadcn variables */
+/* Warm cream, deep teal and a gold accent. Only the app chrome uses these; cards use their own palettes. */
 :root {
-  --paper: #f5f2ea; --card-bg: #fbf9f4; --ink: #1a1712; --ink-2: #4a463d; --muted-ink: #8b8478;
-  --line: #e2dccf; --brand: #1f7a55; --brand-soft: #1f7a5517; --thumb: #e6e1d6;
+  --paper: #fdf3dc; --card-bg: #fffaf0; --ink: #0a3b33; --ink-2: #2f5a52; --muted-ink: #6b6a55;
+  --line: #ecdcb4; --brand: #0e6b57; --brand-soft: #0e6b5717; --thumb: #f3e3bd;
+  --gold: #f5b301; --header-from: #fff0c8; --header-to: #eef2f4;
   --canvas-bg: #ffffff; --canvas-grid-minor: rgba(0, 0, 0, 0.055); --canvas-grid-major: rgba(0, 0, 0, 0.11);
 
   --background: var(--paper);
@@ -32,8 +33,9 @@
   --radius: 0.5rem;
 }
 [data-theme="dark"] {
-  --paper: #16130e; --card-bg: #1e1a14; --ink: #ece5d8; --ink-2: #c9c0af; --muted-ink: #9c937f;
-  --line: #2d271e; --brand: #3da878; --brand-soft: #3da8781f; --thumb: #26211a;
+  --paper: #0c1f1c; --card-bg: #112a26; --ink: #f4ead0; --ink-2: #cfd8c8; --muted-ink: #8fa89f;
+  --line: #1f3b35; --brand: #3cc4a0; --brand-soft: #3cc4a01f; --thumb: #173530;
+  --gold: #f5b301; --header-from: #14302b; --header-to: #0f2431;
   --canvas-bg: #1e1e1e; --canvas-grid-minor: rgba(255, 255, 255, 0.05); --canvas-grid-major: rgba(255, 255, 255, 0.1);
 }
 
@@ -59,6 +61,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-brand: var(--brand);
+  --color-gold: var(--gold);
   --color-ink2: var(--ink-2);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -109,3 +112,6 @@
 .article-html h2 { font-size: 1.3rem; font-weight: 700; }
 .article-html h3 { font-size: 1.1rem; font-weight: 700; }
 .article-html blockquote { border-left: 3px solid var(--brand); padding-left: .9rem; color: var(--muted-foreground); }
+
+/* the header: a soft cream-to-blue wash */
+.app-header { background-image: linear-gradient(90deg, var(--header-from), var(--header-to)); }
