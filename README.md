@@ -70,6 +70,7 @@ Images are built by GitHub Actions. To build locally anyway:
 ```bash
 make docker
 make docker-run      # http://localhost:8080
+docker compose up -d # with a .env, see docs/deployment.md
 ```
 
 ### Serve under a sub-path
