@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { Check, Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AreaField, Field, Section } from "./fields";
-import { RichEditor } from "./RichEditor";
+import { EditorToolbar, Outline, RichEditor } from "./RichEditor";
 import { FullPreview, linkedinSize } from "./FullPreview";
 import { PublishBar } from "./PublishBar";
 import { ArticleBar } from "./ArticleBar";
@@ -19,16 +19,32 @@ import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
 import { useLayout } from "@/lib/layout";
-import { normalizeHashtag, type DraftKind } from "@/lib/draft";
+import { normalizeHashtag, type Draft, type DocNode, type DraftKind } from "@/lib/draft";
+import { countWords, DEFAULT_SIZE_INDEX, parseSizeIndex, parseWidth, readingMinutes, stepSize, TEXT_SIZES, type TextWidth } from "@/lib/editorTools";
 import { LINKEDIN_LIMIT, serializeDraft, serializeForLinkedIn } from "@/lib/linkedin";
 import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
 import { formatInZone, type Job } from "@/lib/jobs";
 import { toast } from "sonner";
+import { flushPendingEdits } from "@/lib/pendingEdits";
+import { cn } from "@/lib/utils";
 import type { DraftStore } from "@/lib/useDrafts";
 import type { Design, Palette, Profile } from "@/lib/types";
 
 const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
+
+// A draft's label only changes when its document does, and the store keeps untouched documents as the same object, so
+// every draft but the one being typed in is served from here instead of being serialised again on each keystroke.
+const labelCache = new WeakMap<object, string>();
+const labelOf = (d: Draft) => {
+  let l = labelCache.get(d.doc);
+  if (l === undefined) { l = label(serializeDraft(d).text); labelCache.set(d.doc, l); }
+  return l;
+};
+
+/** A saved view choice. Storage can be blocked or full, and the choice is only a convenience. */
+const loadPref = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
+const savePref = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* not remembered */ } };
 
 export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   /** Open the Full preview as soon as this shows (asked for by the library). */
@@ -48,12 +64,33 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
   const { editorHeight, setEditorHeight } = useLayout();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
-  useEffect(() => { if (openPreview) setPreview(true); }, [openPreview]);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [width, setWidth] = useState<TextWidth>(() => parseWidth(loadPref("cardpress.editor.width")));
+  const [sizeIdx, setSizeIdx] = useState(() => parseSizeIndex(loadPref("cardpress.editor.size")));
+  const [outlineOff, setOutlineOff] = useState(() => loadPref("cardpress.editor.outline") === "off");
+  const chooseWidth = () => { const w: TextWidth = width === "narrow" ? "wide" : "narrow"; setWidth(w); savePref("cardpress.editor.width", w); };
+  const chooseSize = (d: 1 | -1) => { const i = stepSize(sizeIdx, d); setSizeIdx(i); savePref("cardpress.editor.size", String(i)); };
+  const toggleOutline = useCallback(() => setOutlineOff((off) => { savePref("cardpress.editor.outline", off ? "on" : "off"); return !off; }), []);
+  // kept as one element so the toolbar (memoised) is not drawn again on every keystroke
+  const viewTools = useMemo(() => (draft?.kind === "post" ? undefined : (
+    <>
+      <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+      <ViewTool label={width === "narrow" ? "Wider text" : "Narrower text"} on={width === "wide"} onClick={chooseWidth}><ArrowLeftRight /></ViewTool>
+      <ViewTool label="Smaller text" disabled={sizeIdx === 0} onClick={() => chooseSize(-1)}><span className="text-[11px] font-semibold">A-</span></ViewTool>
+      <ViewTool label="Larger text" disabled={sizeIdx === TEXT_SIZES.length - 1} onClick={() => chooseSize(1)}><span className="text-sm font-semibold">A+</span></ViewTool>
+      <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+    </>
+  )), [draft?.kind, width, sizeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openFull = () => { flushPendingEdits(); setPreview(true); };
+  const collapse = () => { flushPendingEdits(); setExpanded(false); };
+  useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };
   const [busy, setBusy] = useState<string | null>(null);
+  // typing in an article reaches the store after a short pause; whatever acts on the draft takes what is waiting first
   const guard = (fn: () => Promise<void>) => async () => {
+    flushPendingEdits();
     try { await fn(); } catch (e) { flash(e instanceof Error ? e.message : "Something went wrong"); }
   };
 
@@ -63,6 +100,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || preview || document.querySelector("[role=listbox], [role=menu]")) return;
+      flushPendingEdits();
       setExpanded(false);
     };
     window.addEventListener("keydown", onKey, true);
@@ -73,8 +111,14 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
   const queueKey = jobs.jobs.map((j) => `${j.id}:${j.status}`).join(",");
   useEffect(() => { void store.refreshStatus(); }, [queueKey, draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ser = useMemo(() => (draft ? serializeDraft(draft) : null), [draft]);
-  const labels = useMemo(() => new Map(drafts.map((d) => [d.id, label(serializeDraft(d).text)])), [drafts]);
+  const ser = useMemo(() => {
+    if (!draft) return null;
+    const out = serializeDraft(draft);
+    labelCache.set(draft.doc, label(out.text)); // the label below needs the same text, so it is not worked out twice
+    return out;
+  }, [draft]);
+  const labels = useMemo(() => new Map(drafts.map((d) => [d.id, labelOf(d)])), [drafts]);
+  const words = useMemo(() => (ser ? countWords(ser.text) : 0), [ser]);
   if (!draft || !ser) return null;
   const isPost = draft.kind === "post";
 
@@ -96,6 +140,9 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
     if (how === "now") toast("Sending to LinkedIn…", { description: "You will be told when it is posted." });
     else toast.success("Post scheduled", { description: job.scheduledAt ? formatInZone(job.scheduledAt, job.timezone) : undefined });
   };
+  // the HTML of a long article with pictures is large, so it is made when asked for (the preview opening, a copy), never per keystroke
+  // a hand-over that was written under another draft than the one open now is dropped rather than put into the wrong draft
+  const onDoc = (doc: DocNode, key: string) => { if (key === draft.id) store.update({ doc }); };
   const html = () => (editor && !editor.isDestroyed ? editor.getHTML() : "");
   const copyNow = async () => {
     try {
@@ -129,7 +176,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
           </Field>
         )}
         <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
-          <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) store.setKind(v as DraftKind); }}>
+          <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
             <ToggleGroupItem value="post">Post</ToggleGroupItem>
             <ToggleGroupItem value="article"><FileText className="mr-1 h-3.5 w-3.5" /> Article</ToggleGroupItem>
           </ToggleGroup>
@@ -142,14 +189,14 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
         action={
           <div className="flex items-center gap-2">
             <SaveBadge state={store.saveState} retry={store.retry} />
-            <Button variant="ghost" size="icon-sm" title="Expand the editor over the studio" aria-label="Expand the editor" onClick={() => setExpanded(true)}><Maximize2 /></Button>
+            <Button variant="ghost" size="icon-sm" title="Expand the editor over the studio" aria-label="Expand the editor" onClick={() => { flushPendingEdits(); setExpanded(true); }}><Maximize2 /></Button>
           </div>
         }
       >
         {expanded ? (
           <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-input p-3 text-xs text-muted-foreground">
             <span>Editing in the large view.</span>
-            <Button variant="outline" size="sm" onClick={() => setExpanded(false)}><Minimize2 /> Collapse</Button>
+            <Button variant="outline" size="sm" onClick={collapse}><Minimize2 /> Collapse</Button>
           </div>
         ) : (
           // drag the bottom-right corner to make it taller or shorter; the height is remembered
@@ -162,7 +209,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
+            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -224,7 +271,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
         {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="brand" size="sm" onClick={() => setPreview(true)}><Eye /> Full preview</Button>
+          <Button variant="brand" size="sm" onClick={openFull}><Eye /> Full preview</Button>
           <Button variant="outline" size="sm" onClick={copyNow} disabled={!ser.text.trim()}><Copy /> {isPost ? "Copy text" : "Copy formatted"}</Button>
           {note && <span className="text-xs text-brand">{note}</span>}
         </div>
@@ -236,7 +283,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
 
       <FullPreview
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
-        articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
+        articleHtml={preview ? html() : ""} design={design} profile={profile} palette={palette} size={size}
         actions={(
           <div className="space-y-3">
             {draft.kind === "article" ? (
@@ -261,29 +308,47 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
             <span className="truncate text-xs text-muted-foreground">{labels.get(draft.id)}</span>
             <span className="flex-1" />
             {note && <span className="text-xs text-brand">{note}</span>}
-            <SaveBadge state={store.saveState} retry={store.retry} />
             <Button variant="outline" size="sm" onClick={copyNow} disabled={!ser.text.trim()}><Copy /> {isPost ? "Copy text" : "Copy formatted"}</Button>
-            <Button variant="brand" size="sm" onClick={() => setPreview(true)}><Eye /> Full preview</Button>
-            <Button variant="outline" size="sm" onClick={() => setExpanded(false)} title="Back to the studio (Esc)"><Minimize2 /> Collapse</Button>
+            <Button variant="brand" size="sm" onClick={openFull}><Eye /> Full preview</Button>
+            <Button variant="outline" size="sm" onClick={collapse} title="Back to the studio (Esc)"><Minimize2 /> Collapse</Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-6">
-            <div className="mx-auto w-full max-w-3xl space-y-3">
-              <div className="overflow-hidden rounded-lg border border-border bg-card">
-                <RichEditor large docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5" aria-label="Character counts">
-                {isPost
-                  ? <Badge variant={ser.overLimit ? "warn" : "outline"}>LinkedIn {ser.length.toLocaleString()}/{LINKEDIN_LIMIT.toLocaleString()}</Badge>
-                  : <Badge variant="outline">{ser.length.toLocaleString()} characters</Badge>}
-                {isPost && draft.hashtags.length > 0 && <Badge variant="outline">{draft.hashtags.map((h) => `#${h}`).join(" ")}</Badge>}
-                {ser.warnings.map((w) => <span key={w.code} className="text-[11px] text-amber-700 dark:text-amber-400">{w.message}</span>)}
+          {/* the toolbar stays here, outside the scrolling text */}
+          <div className="border-b border-border bg-card">
+            <EditorToolbar
+              editor={editor} kind={draft.kind} linkOpen={linkOpen} setLinkOpen={setLinkOpen}
+              extra={viewTools}
+            />
+          </div>
+          <div className="flex min-h-0 flex-1">
+            {!isPost && <Outline editor={editor} collapsed={outlineOff} onToggle={toggleOutline} />}
+            <div className="min-h-0 flex-1 overflow-y-auto p-6" data-editor-scroll>
+              <div className={cn("mx-auto w-full", width === "wide" ? "max-w-6xl" : "max-w-3xl")} style={{ "--rich-size": `${TEXT_SIZES[isPost ? DEFAULT_SIZE_INDEX : sizeIdx]}rem` } as React.CSSProperties}>
+                <div className="overflow-hidden rounded-lg border border-border bg-card">
+                  <RichEditor large bare readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
+                </div>
               </div>
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-background px-4 py-1.5 text-xs text-muted-foreground" aria-label="Counts">
+            {isPost
+              ? <Badge variant={ser.overLimit ? "warn" : "outline"}>LinkedIn {ser.length.toLocaleString()}/{LINKEDIN_LIMIT.toLocaleString()}</Badge>
+              : <span>{words.toLocaleString()} words · {readingMinutes(words)} min read · {ser.length.toLocaleString()} characters</span>}
+            {isPost && draft.hashtags.length > 0 && <Badge variant="outline">{draft.hashtags.map((h) => `#${h}`).join(" ")}</Badge>}
+            {ser.warnings.map((w) => <span key={w.code} className="text-[11px] text-amber-700 dark:text-amber-400">{w.message}</span>)}
+            <span className="flex-1" />
+            <SaveBadge state={store.saveState} retry={store.retry} />
           </div>
         </div>,
         host,
       )}
     </>
+  );
+}
+
+function ViewTool({ label, on, disabled, onClick, children }: { label: string; on?: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <Button type="button" variant="ghost" size="icon-sm" title={label} aria-label={label} aria-pressed={on} disabled={disabled}
+      className={cn(on && "bg-accent text-brand")} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>{children}</Button>
   );
 }
 
