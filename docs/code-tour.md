@@ -34,6 +34,11 @@ openspec/                one change proposal per piece of work
 |---|---|
 | `internal/config/config.go` | Every setting, and `Validate`, which refuses to expose the API without protection |
 | `internal/api/protect.go` | Token check, localhost-only Host guard and cross-site request protection, shared by the API and `/mcp` |
+| `internal/api/api.go` and `auth.go` | The route table (who may call each route), sign-in, and how a request becomes a person, a key or the machine |
+| `internal/service/accounts.go`, `principal.go` | People, roles, sessions, password hashing and rate limits; the principal every query is narrowed by |
+| `internal/service/apikeys.go` | API keys: made once, stored as a hash, scoped, revoked |
+| `internal/service/versions.go` | An item's history and the shared store for its pictures |
+| `internal/pages/` | The public, server-rendered article and post pages |
 | `internal/service/publish.go` | The publish queue, the scheduler and the state machine for a job |
 | `internal/service/chat.go` | Conversations, messages, proposals and their approval |
 | `internal/agent/agent.go` | The assistant's port: `Client`, `Proposal` and its validation |

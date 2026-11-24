@@ -28,7 +28,7 @@ flowchart LR
 
 ## Data
 
-Profiles (brands), designs, preferences, drafts, credentials, publish jobs, conversations and the MCP audit log are in one database. Drafts, designs, jobs, conversations and credentials are keyed by brand. The schema is built by numbered migrations at start (`0001` to `0007`). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
+Profiles (brands), designs, preferences, drafts and their versions, credentials, publish jobs and attempts, conversations, accounts (users, roles, sessions, API keys) and the MCP audit log are in one database. Drafts, designs, jobs, conversations and credentials are keyed by brand; a brand belongs to the person who made it. The schema is built by numbered migrations at start (`0001` to `0013`); see [Data model](data-model.md). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
 
 ## The assistant
 
@@ -69,10 +69,12 @@ The scheduler is not a library: it is a loop in the Go server that wakes every 2
 
 ## Security model
 
+- **Accounts first.** Once an account exists, every route needs a sign-in, an API key or the machine token; the server answers for another person's item as if it were not there. Roles (admin, editor, writer) decide what a person may do. Passwords, sessions and API keys are stored only as hashes. See [Accounts and roles](accounts.md).
 - Loopback by default. A non-loopback address needs `CARDPRESS_API_TOKEN` (or an explicit opt-out).
 - Without a token, only `localhost` host names are accepted and cross-site browser requests that change data are refused.
 - Every address the server fetches is checked after DNS resolution and on each redirect.
-- The MCP server gets narrow tools, no publishing and no credentials, and every call is recorded with redacted arguments.
+- The MCP server gets narrow tools, no publishing and no credentials, and every call is recorded with redacted arguments. Over HTTP it needs an API key (which stays inside its person's brands) or the machine token.
+- Public pages are rendered by the server from approved items only, with a content security policy and no scripts.
 - The managed agent has no built-in tools and no network.
 
 ## Decisions

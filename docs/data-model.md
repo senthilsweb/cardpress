@@ -1,14 +1,15 @@
 # Data model
 
-CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is, and notes what the next change adds. **It is updated with every migration.**
+CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0013). **It is updated with every migration.**
 
 ## Conventions
 
 - Ids are 16 hex characters made by the server (`newID`). A brand's id is chosen when it is created.
 - Times are UTC text in RFC 3339 (`2026-11-24T17:43:50Z`); drafts keep milliseconds. Text sorts correctly, so no date type is needed.
 - Structured values are JSON text (`hashtags`, `doc`, `data`, `steps`). The shape of each is below. The server validates them on the way in.
-- A brand owns its rows through `profile_id`. There are no database foreign keys: the services delete a brand's rows together (see `DeleteProfile`), inside one transaction.
-- Secrets are never stored in plain text: `credentials.value` is sealed with the secret key (AES-GCM, tied to its network and field).
+- A brand owns its rows through `profile_id`, and a person owns their brands through `profiles.owner_id`. There are no database foreign keys: the services delete rows together (see `DeleteProfile`), inside one transaction, and every read narrows by owner in the query itself, so a row that is not yours is never returned.
+- Person columns (`owner_id`, `created_by`, `approved_by`, `user_id`) hold a `users.id`. They are **empty for rows that predate accounts**, which the first account adopts.
+- Secrets are never stored in plain text: `credentials.value` is sealed with the secret key (AES-GCM, tied to its network and field). Passwords (`users.password_hash`, argon2id), session cookies (`sessions.token_hash`) and API keys (`api_keys.key_hash`, SHA-256) are stored only as hashes; the value itself cannot be read back.
 
 ## Relationships
 
@@ -24,9 +25,20 @@ erDiagram
     conversations ||--o{ chat_messages : contains
     conversations ||--o{ proposals : "proposes"
     proposals }o--o| drafts : "approved into (draft_id)"
+    drafts ||--o{ draft_versions : "history"
+    draft_versions }o--o{ doc_blobs : "pictures (by hash)"
+    users ||--o{ user_roles : "holds"
+    users ||--o{ sessions : "signs in"
+    users ||--o{ api_keys : "makes"
+    users ||--o{ user_preferences : "settings"
+    users ||--o{ profiles : "owns (owner_id)"
+    users ||--o{ drafts : "writes (created_by)"
+    users ||--o{ conversations : "chats (user_id)"
     preferences
     mcp_audit
 ```
+
+Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown as the `users` lines. `drafts.approved_by` and `publish_jobs.created_by` also hold a user id.
 
 ## Tables
 
@@ -125,11 +137,24 @@ stateDiagram-v2
 | `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, layout, the open brand, custom fonts. System-wide keys (such as `envProfile`) stay in `preferences` |
 | `api_keys` | `id` (PK), `user_id`, `name`, `prefix` (the key's first characters, to tell keys apart), `key_hash` (SHA-256 of the key; unique; **the key itself is never stored**), `scope` (`editor`), `created_at`, `last_used_at`, `revoked_at` (empty while the key works) |
 
+Indexes: `users.email` is unique; `user_roles` and `user_preferences` are keyed by their primary keys; `sessions` has `(user_id)` and `(expires_at)`; `api_keys` has `(user_id)` and a unique `key_hash`; `profiles` has `(owner_id)`.
+
 A brand belongs to the person in `profiles.owner_id`, and everything keyed by `profile_id` (designs, drafts, posts, conversations, credentials) follows it. An admin sees all; anyone else sees only their own brands. See [Accounts and roles](accounts.md).
+
+**What the roles are.** `user_roles.role` is the only place a role is kept. What a role may do (`write`, `approve`, `publish`, `social`, `users`) is code, not data: writer has `write`; editor adds `approve`, `publish` and `social`; admin has all five. A person with several rows may do everything any of them allows. An API key's scope (`api_keys.scope`, today `editor`) names a set of those permissions; the key may do what its scope **and** its person's roles both allow, and is never an admin.
+
+**Sessions and keys.** A session lasts 14 days from the last use (`expires_at` moves forward as it is used); expired rows are removed. A key is revoked by setting `revoked_at`; a revoked key, or a key whose person is `disabled`, is refused. `last_used_at` is written at most once a minute.
+
+**What is removed with what.** Deleting a brand removes its designs, drafts (with their versions), posts and attempts, conversations (with messages and proposals) and credentials. Deleting a draft removes its versions. Disabling a person keeps their rows and ends their sessions and keys.
 
 ### History
 
 `draft_versions` holds one row per saved state of an item: `draft_id`, `seq` (1, 2, 3… per item), `label` (`created`, `auto`, `manual`, `approved`, `sent`, `restored`), `note`, `kind`, `title`, `doc`, `hashtags`, `alt_text`, `unicode_styles`, `design`, `design_version`, `blobs`, `created_by`, `created_at`. Versions are taken when an item is created, approved, sent or restored, when saved by hand, and automatically after a change if ten minutes have passed since the last. At most 100 are kept per item (the oldest automatic ones go first). In a version's `doc` each picture is replaced by `blob:<hash>`; `doc_blobs` (`hash`, `mime`, `data`) holds each distinct picture once, so ten versions of an article with seven pictures store seven pictures, not seventy. Pictures no version refers to are removed.
+
+| Table | Columns |
+|---|---|
+| `draft_versions` | `id` (PK), `draft_id`, `seq`, `label`, `note`, `kind`, `title`, `doc`, `hashtags`, `alt_text`, `unicode_styles`, `design`, `design_version`, `blobs` (JSON list of the picture hashes the version uses), `created_by`, `created_at`. Unique `(draft_id, seq)` |
+| `doc_blobs` | `hash` (PK, SHA-256 of the picture), `mime`, `data` (BLOB) |
 
 ### The design column
 
