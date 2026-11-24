@@ -8,4 +8,4 @@
 - [x] The editor: Publish page, Update, Take down, with the card rendered as the preview image
 - [x] Library: a Page badge and a link
 - [x] Docs: public pages, configuration, data model
-- [ ] Re-record the demo
+- [ ] Re-record the demo (deferred: not part of this change)

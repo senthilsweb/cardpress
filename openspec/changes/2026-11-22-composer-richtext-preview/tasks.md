@@ -9,4 +9,4 @@
 - [x] Migrate the old plain caption into the first draft
 - [x] Expanded editor overlay over the centre, plain background
 - [x] Resizable sidebar editor (height remembered)
-- [ ] Publish and Schedule buttons inside the full preview (the preview has an `actions` slot; added by linkedin-publish-schedule)
+- [x] Publish and Schedule buttons inside the full preview (added by linkedin-publish-schedule; now behind the approval step, see content-workflow)

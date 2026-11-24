@@ -15,4 +15,4 @@
 
 ## Bolt 3: finish
 - [x] Docs: `docs/library.md`, workspace and publishing pages, screenshots
-- [ ] Re-record the demo with the account menu
+- [ ] Re-record the demo with the account menu (deferred: not part of this change)

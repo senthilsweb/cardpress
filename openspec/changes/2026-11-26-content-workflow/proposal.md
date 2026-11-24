@@ -1,5 +1,7 @@
 # Content workflow: draft, approve, publish
 
+**Status:** Implemented: data model, approval gate, editor, library, the LinkedIn article export, and the import script. Open: re-record the demo GIF. Left out on purpose: "reset to the brand design" (see design.md, decision 5).
+
 ## Why
 A post or article in CardPress is only text today. Its card design belongs to the brand, not to the item, so two posts cannot look different and a post in the library cannot show the card it was made with. There is no approval step, so anything in the editor can be published. Articles have no images or code in the editor. The library lists items but cannot edit, schedule or delete them, and it pages with "Load more" rather than numbered pages. There is also no realistic content to test any of this with.
 

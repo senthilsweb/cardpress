@@ -1,5 +1,7 @@
 # Public pages for articles and posts
 
+**Status:** Implemented. Not verified: an actual crawl by a social network (the tags and previews were checked, but the server was not reachable from the internet). Open: re-record the demo GIF.
+
 ## Why
 An approved article or post lives only inside the studio. There is nowhere to send a person (or a social network) to read it. A link to a page that is rendered on the server, with the right tags in its HTML, lets LinkedIn, X, Slack and search engines show a proper preview and index the text.
 

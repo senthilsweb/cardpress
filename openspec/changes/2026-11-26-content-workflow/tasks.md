@@ -23,4 +23,10 @@
 
 ## Bolt 5: finish
 - [x] Docs: library, editor, publishing, workspace; data model complete
-- [ ] Re-record the demo
+- [ ] Re-record the demo (deferred: not part of this change)
+
+## Added while building
+- [x] Thumbnails in the library, drawn from each item's saved design
+- [x] The card shown above an article in its Full preview
+- [x] **For LinkedIn**: an article prepared for LinkedIn's article editor (title, body, pictures as files; tables become lists)
+- [x] Search covers the title and the whole text

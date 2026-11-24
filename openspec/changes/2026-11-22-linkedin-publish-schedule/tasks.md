@@ -9,6 +9,6 @@
 - [x] Tests: LinkedIn client against a fake server, state machine, concurrent claims (with the race detector), API, time zone conversion
 - [x] Run end to end in a browser against a fake LinkedIn: publish now, scheduled run, failure with no retry, publish again
 - [x] Docs: `docs/publishing.md`
-- [ ] Verify against a real LinkedIn app and token (never done): the default `LinkedIn-Version`, the `initializeUpload` response shape, the post id header, and whether a post is accepted
+- [x] Verify against a real LinkedIn app and token: done on 2026-11-24 with a real personal profile. `LinkedIn-Version` 202610, the `initializeUpload` shape, the `x-restli-id` header and an image post were all accepted, and the post was deleted afterwards on LinkedIn. A retired version now gets a clear message (426)
 - [ ] Verify the escaped character list and the `{hashtag|\#|tag}` template against LinkedIn's current documentation, and that hashtags and underscores display correctly
 - [ ] Decide how to refresh LinkedIn tokens (they expire in about 60 days); for now a failed publish shows the reason

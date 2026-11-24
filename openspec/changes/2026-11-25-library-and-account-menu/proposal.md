@@ -1,5 +1,7 @@
 # Library and account menu
 
+**Status:** Implemented. Open: re-record the demo GIF (it still shows the old header).
+
 ## Why
 Everything that was posted, scheduled or drafted lives in small lists inside the Post tab: the queue shows five items, drafts sit in a picker, and a published post can only be reached while its job is in the queue. There is no place to look back at what went out, when, and what LinkedIn answered. The header also keeps growing: Social accounts and the theme toggle sit beside the Assistant, and sign-in is coming.
 
