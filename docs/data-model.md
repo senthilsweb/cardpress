@@ -44,7 +44,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)` and `(profile_id, status, updated_at DESC)` |
+| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -87,6 +87,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0007 | Brands: `credentials` keyed by brand, `profiles.archived_at`, the `envProfile` preference |
 | 0008 | `publish_attempts` |
 | 0009 | `drafts`: `title`, `design`, `design_version`, `approved_at`, `scheduled_at`, `timezone`; the status workflow |
+| 0010 | `drafts`: `slug`, `summary`, `page_at`, `cover`; the public pages |
 
 ## Draft status and approval
 
@@ -106,6 +107,10 @@ stateDiagram-v2
 - While a post is waiting or running (`scheduled`) the draft cannot be edited. Cancel the post first.
 - The draft's status follows its job: waiting, running or "check LinkedIn" means `scheduled`; posted means `published`; failed, missed, cancelled or discarded hands it back as `approved`.
 - An **article** is never sent (LinkedIn has no API for articles). Approving marks it final; `scheduled_at` holds its planned date, a reminder only, and its status stays `approved`.
+
+### The public page columns
+
+`slug` is the page's address within its kind (`/articles/<slug>` or `/posts/<slug>`) and is unique per kind. `page_at` is when the page went live; **empty means it is not public**. `summary` is the description for previews (empty: the first paragraph). `cover` is the card as a PNG (1200 × 627), the page's preview image, `NULL` when there is none. Only an item whose status is `approved`, `scheduled` or `published` can have a live page, and the public reader checks that again; any change to the item, or taking its approval back, clears `page_at` and `cover`. Taking a page down clears only `page_at`, so its address is kept. See [Public pages](public-pages.md).
 
 ### The design column
 

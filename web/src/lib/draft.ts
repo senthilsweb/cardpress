@@ -29,6 +29,11 @@ export interface Draft {
   /** An article's planned date (UTC). Nothing is sent. */
   scheduledAt?: string;
   timezone?: string;
+  /** The public page: its address within its kind, its description, when it went live, and whether it has a preview image. */
+  slug?: string;
+  summary?: string;
+  pageAt?: string;
+  hasCover?: boolean;
   createdAt: string;
   updatedAt: string;
 }

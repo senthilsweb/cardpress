@@ -138,6 +138,14 @@ export const api = {
   updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
+  /** Put an approved item's page on the public web. `cover` is the card as a PNG, used as the preview image. */
+  publishPage: (id: string, meta: { slug?: string; summary?: string }, cover?: Blob) => {
+    const form = new FormData();
+    form.set("meta", JSON.stringify(meta));
+    if (cover) form.set("cover", cover, "cover.png");
+    return call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/page`, form);
+  },
+  unpublishPage: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/page`),
   approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),
   unapproveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/unapprove`),
   /** An approved article's planned date; leave both out to clear it. */

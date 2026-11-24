@@ -44,6 +44,8 @@ type Studio interface {
 	Approve(ctx context.Context, id string) (service.Draft, error)
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
 	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
+	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
+	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
 }
 
 // Library is the part of the library service the HTTP API needs.
@@ -141,6 +143,8 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("POST "+prefix+"/drafts/{id}/approve", s.approveDraft)
 	mux.HandleFunc("POST "+prefix+"/drafts/{id}/unapprove", s.unapproveDraft)
 	mux.HandleFunc("PUT "+prefix+"/drafts/{id}/plan", s.planDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/page", s.publishPage)
+	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}/page", s.unpublishPage)
 	mux.HandleFunc("GET "+prefix+"/settings", s.getSettings)
 	mux.HandleFunc("GET "+prefix+"/settings/{network}", s.getNetwork)
 	mux.HandleFunc("PUT "+prefix+"/settings/{network}", s.putNetwork)
@@ -368,6 +372,51 @@ func (s *server) planDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.Plan(r.Context(), r.PathValue("id"), in.ScheduledAt, in.Timezone)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// publishPage puts an approved item's page on the public web. Multipart: `meta` (JSON: slug, summary, both optional) and
+// `cover` (the card as a PNG, optional).
+func (s *server) publishPage(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		writeError(w, r, http.StatusBadRequest, "bad_request", "expected a multipart form with a meta field and an optional cover image")
+		return
+	}
+	var meta struct {
+		Slug    string `json:"slug"`
+		Summary string `json:"summary"`
+	}
+	if raw := r.FormValue("meta"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+			writeError(w, r, http.StatusBadRequest, "bad_json", "meta is not valid JSON")
+			return
+		}
+	}
+	in := service.PageInput{Slug: meta.Slug, Summary: meta.Summary}
+	if f, _, err := r.FormFile("cover"); err == nil {
+		defer f.Close()
+		img, err := io.ReadAll(io.LimitReader(f, 3<<20+1))
+		if err != nil {
+			writeError(w, r, http.StatusBadRequest, "bad_request", "could not read the cover image")
+			return
+		}
+		in.Cover = img
+	}
+	d, err := s.Studio.PublishPage(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) unpublishPage(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.UnpublishPage(r.Context(), r.PathValue("id"))
 	if err != nil {
 		fail(w, r, err)
 		return

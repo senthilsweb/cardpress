@@ -13,7 +13,7 @@ const toInput = (d: Draft): DraftInput => ({
 });
 
 /** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
-const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone });
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;
@@ -57,7 +57,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
     // a draft waiting to be sent is not edited (the server refuses it too); a changed approved draft goes back to draft
     if (ref.current.find((d) => d.id === id)?.status === "scheduled") return;
     commit(ref.current.map((d) => (d.id === id
-      ? { ...d, ...patch, ...(d.status === "approved" || d.status === "published" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined } : {}), updatedAt: new Date().toISOString() }
+      ? { ...d, ...patch, ...(d.status === "approved" || d.status === "published" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined, pageAt: undefined, hasCover: false } : {}), updatedAt: new Date().toISOString() }
       : d)));
     dirty.current = id;
     setSaveState("saving");
@@ -114,6 +114,9 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush]);
   const approve = useCallback(() => decide((id) => api.approveDraft(id)), [decide]);
   const unapprove = useCallback(() => decide((id) => api.unapproveDraft(id)), [decide]);
+  /** Put the open draft's page on the public web (or update it), with the card as its preview image. */
+  const publishPage = useCallback((m: { slug?: string; summary?: string }, cover?: Blob) => decide((id) => api.publishPage(id, m, cover)), [decide]);
+  const unpublishPage = useCallback(() => decide((id) => api.unpublishPage(id)), [decide]);
   const plan = useCallback((p: { scheduledAt?: string; timezone?: string }) => decide((id) => api.planDraft(id, p)), [decide]);
   /** Re-read the open draft's status: a post sent from it changes it behind the screen. */
   const refreshStatus = useCallback(async () => {
@@ -123,7 +126,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, []);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, refreshStatus };
+  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

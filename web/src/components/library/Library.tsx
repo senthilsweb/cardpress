@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarClock, Check, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, Globe, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import type { Draft } from "@/lib/draft";
 import { downloadBlob } from "@/lib/export";
 import { defaultTimezone, formatInZone, toLocalInput, type Job } from "@/lib/jobs";
-import { draftLink, LIBRARY_STATUS_LABEL, PAGE_SIZES, pageNumbers, STATUS_FILTERS, type LibraryFilter, type LibraryItem, type LibraryPage } from "@/lib/library";
+import { draftLink, LIBRARY_STATUS_LABEL, PAGE_SIZES, pageNumbers, pagePath, STATUS_FILTERS, type LibraryFilter, type LibraryItem, type LibraryPage } from "@/lib/library";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { DEFAULT_DESIGN } from "@/lib/profiles";
 import { sizeById } from "@/lib/sizes";
@@ -218,6 +218,7 @@ function Row({ item, data, open, onToggle, brandName, onPatch, onGone }: {
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge s={item.status} />
             <Badge variant="outline">{item.kind === "article" ? "Article" : "Post"}</Badge>
+            {pagePath(item) && <Badge variant="outline" title="Has a public page"><Globe className="mr-1 h-3 w-3" />Page</Badge>}
             {brandName && <Badge variant="outline" title="The brand this belongs to">{brandName}</Badge>}
             <span className="text-xs text-muted-foreground">{day(item.at)}</span>
             {item.plannedAt && <span className="text-xs text-brand">Planned {formatInZone(item.plannedAt, item.timezone)}</span>}
@@ -229,7 +230,7 @@ function Row({ item, data, open, onToggle, brandName, onPatch, onGone }: {
           <a href={item.postUrl} target="_blank" rel="noopener noreferrer" className="hidden shrink-0 items-center gap-1 self-start pt-1 text-xs text-brand hover:underline sm:flex">LinkedIn <ExternalLink className="h-3 w-3" /></a>
         )}
       </div>
-      {open && (isJob ? <JobDetail id={item.id} onGone={onGone} /> : <DraftDetail item={item} data={data} onPatch={onPatch} onGone={onGone} />)}
+      {open && (isJob ? <JobDetail id={item.id} page={pagePath(item)} onGone={onGone} /> : <DraftDetail item={item} data={data} onPatch={onPatch} onGone={onGone} />)}
     </li>
   );
 }
@@ -305,6 +306,7 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
 
       <div className="flex flex-wrap items-center gap-2">
         {editable && <Button asChild size="sm" variant="brand"><a href={draftLink(base(), item)}><PenLine /> Edit</a></Button>}
+        {pagePath(draft) && <Button asChild size="sm" variant="outline"><a href={pagePath(draft)!} target="_blank" rel="noopener noreferrer"><Globe /> View page</a></Button>}
         {draft.status === "draft" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => api.approveDraft(draft.id))}><Check /> Approve</Button>}
         {draft.status === "approved" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => api.unapproveDraft(draft.id))}><Undo2 /> Back to draft</Button>}
         {draft.status === "approved" && !isArticle && (
@@ -359,7 +361,7 @@ function Poster({ id }: { id: string }) {
 }
 
 /** The whole record of a post: what was sent, when, and what LinkedIn answered. */
-function JobDetail({ id, onGone }: { id: string; onGone: () => void }) {
+function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGone: () => void }) {
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -399,6 +401,7 @@ function JobDetail({ id, onGone }: { id: string; onGone: () => void }) {
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {job.postUrl && <a href={job.postUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline">View on LinkedIn <ExternalLink className="h-3 w-3" /></a>}
+        {page && <a href={page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline"><Globe className="h-3 w-3" /> Public page</a>}
         {job.status === "published" && <Check className="h-3.5 w-3.5 text-brand" aria-label="Published" />}
         {removable && (
           <Button size="sm" variant={confirm ? "destructive" : "ghost"} className="ml-auto" disabled={busy} onClick={() => void remove()}

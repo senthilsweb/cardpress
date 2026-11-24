@@ -3,14 +3,15 @@ module github.com/senthilsweb/cardpress
 go 1.26.0
 
 require (
+	github.com/anthropics/anthropic-sdk-go/v2 v2.14.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/tursodatabase/libsql-client-go v0.0.0-20260528064733-9d5d30a29a60
 	golang.org/x/net v0.63.0
+	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.63.0
 )
 
 require (
-	github.com/anthropics/anthropic-sdk-go/v2 v2.14.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -42,7 +43,6 @@ require (
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
-	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

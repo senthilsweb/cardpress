@@ -36,6 +36,9 @@ type LibraryItem struct {
 	// Design is the card a draft was made with, so the list can draw a thumbnail. It is left out when it is large (it
 	// carries pictures), and a posted item shows the image that was sent instead.
 	Design json.RawMessage `json:"design,omitempty"`
+	// Slug and PageAt say the item has a live public page at /articles/<slug> or /posts/<slug>.
+	Slug   string `json:"slug,omitempty"`
+	PageAt string `json:"pageAt,omitempty"`
 }
 
 // maxListedDesign is the largest design the list carries; a bigger one is fetched with the draft.
@@ -149,10 +152,12 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 }
 
 func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
-	query := `SELECT id, profile_id, draft_id, status, body, hashtags, scheduled_at, post_url, created_at, published_at FROM publish_jobs`
+	query := `SELECT j.id, j.profile_id, j.draft_id, j.status, j.body, j.hashtags, j.scheduled_at, j.post_url, j.created_at, j.published_at,
+	                 COALESCE(d.slug, ''), COALESCE(d.page_at, '')
+	          FROM publish_jobs j LEFT JOIN drafts d ON d.id = j.draft_id`
 	var args []any
 	if !q.All {
-		query += ` WHERE profile_id = ?`
+		query += ` WHERE j.profile_id = ?`
 		args = append(args, q.ProfileID)
 	}
 	rs, err := l.db.QueryContext(ctx, query, args...)
@@ -162,9 +167,9 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, draft, status, body, tags, postURL, created, published string
+		var id, pid, draft, status, body, tags, postURL, created, published, slug, pageAt string
 		var sched sql.NullString
-		if err := rs.Scan(&id, &pid, &draft, &status, &body, &tags, &sched, &postURL, &created, &published); err != nil {
+		if err := rs.Scan(&id, &pid, &draft, &status, &body, &tags, &sched, &postURL, &created, &published, &slug, &pageAt); err != nil {
 			return nil, err
 		}
 		at := created
@@ -178,7 +183,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 		var hs []string
 		_ = json.Unmarshal([]byte(tags), &hs)
 		out = append(out, row{
-			item: LibraryItem{Type: "job", ID: id, ProfileID: pid, Kind: "post", Status: status, Title: title, Excerpt: excerpt, At: at, PostURL: postURL, DraftID: draft},
+			item: LibraryItem{Type: "job", ID: id, ProfileID: pid, Kind: "post", Status: status, Title: title, Excerpt: excerpt, At: at, PostURL: postURL, DraftID: draft, Slug: slug, PageAt: pageAt},
 			text: strings.ToLower(body + " " + strings.Join(hs, " ")),
 		})
 	}
@@ -187,7 +192,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 
 func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	// a draft that became a post is listed once, as the post
-	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone, design, design_version FROM drafts d
+	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone, design, design_version, slug, page_at FROM drafts d
 	          WHERE NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = d.id)`
 	var args []any
 	if !q.All {
@@ -205,9 +210,9 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, kind, status, own, doc, tags, updated, planned, zone, design string
+		var id, pid, kind, status, own, doc, tags, updated, planned, zone, design, slug, pageAt string
 		var designVersion int
-		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone, &design, &designVersion); err != nil {
+		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone, &design, &designVersion, &slug, &pageAt); err != nil {
 			return nil, err
 		}
 		blocks := docBlocks(doc)
@@ -227,7 +232,7 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		var hs []string
 		_ = json.Unmarshal([]byte(tags), &hs)
 		out = append(out, row{
-			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone, Design: listedDesign(design, designVersion)},
+			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone, Design: listedDesign(design, designVersion), Slug: slug, PageAt: pageAt},
 			text: strings.ToLower(searchable + " " + strings.Join(hs, " ")),
 		})
 	}

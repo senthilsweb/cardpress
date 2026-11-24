@@ -54,8 +54,13 @@ type Draft struct {
 	ApprovedAt  string          `json:"approvedAt,omitempty"`
 	ScheduledAt string          `json:"scheduledAt,omitempty"` // an article's planned date
 	Timezone    string          `json:"timezone,omitempty"`
-	CreatedAt   string          `json:"createdAt"`
-	UpdatedAt   string          `json:"updatedAt"`
+	// The public page: its address, description, when it went live, and whether it has a preview image.
+	Slug      string `json:"slug,omitempty"`
+	Summary   string `json:"summary,omitempty"`
+	PageAt    string `json:"pageAt,omitempty"`
+	HasCover  bool   `json:"hasCover"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 // DraftInput is what a caller may set. Status is controlled by the server.
@@ -137,19 +142,24 @@ func newID() string {
 
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_at, updated_at`
+// draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), created_at, updated_at`
+
+// draftInsertCols are the columns a new draft sets; the rest start empty.
+const draftInsertCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_at, updated_at`
 
 type scanner interface{ Scan(...any) error }
 
 func scanDraft(r scanner) (Draft, error) {
 	var d Draft
 	var doc, tags, design string
-	var uni, designVersion int
+	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)
+	d.HasCover = cover != 0
 	if designVersion > 0 {
 		d.Design = json.RawMessage(design)
 	}
@@ -171,7 +181,7 @@ func (s *Studio) CreateDraft(ctx context.Context, in DraftInput) (Draft, error) 
 	if in.design != "" {
 		design, version = in.design, CardDesignVersion
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?)`,
+	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftInsertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?)`,
 		id, in.ProfileID, in.Kind, StatusDraft, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version, at, at)
 	if err != nil {
 		return Draft{}, err
@@ -206,8 +216,10 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 	changed := cur.Kind != in.Kind || cur.AltText != in.AltText || cur.UnicodeStyles != in.UnicodeStyles || cur.Title != in.Title ||
 		!reflect.DeepEqual(cur.Hashtags, in.Hashtags) || !sameJSON(cur.Doc, in.Doc) || (in.design != "" && !sameJSON(cur.Design, json.RawMessage(in.design)))
 	status, approved, planned, zone := cur.Status, cur.ApprovedAt, cur.ScheduledAt, cur.Timezone
+	takeOffline := false
 	if changed && (status == StatusApproved || status == StatusPublished) {
 		status, approved, planned, zone = StatusDraft, "", "", ""
+		takeOffline = true
 	}
 	tags, _ := json.Marshal(in.Hashtags)
 	at := s.draftStamp()
@@ -218,6 +230,12 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 		status, approved, planned, zone, at, id)
 	if err != nil {
 		return Draft{}, err
+	}
+	if takeOffline {
+		// the public page must always show the approved text: a change takes it down until it is approved and published again
+		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET page_at = '', cover = NULL WHERE id = ?`, id); err != nil {
+			return Draft{}, err
+		}
 	}
 	return s.GetDraft(ctx, id)
 }
@@ -268,7 +286,7 @@ func (s *Studio) Unapprove(ctx context.Context, id string) (Draft, error) {
 	if d.Status == StatusDraft {
 		return d, nil
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = '', scheduled_at = '', timezone = '', updated_at = ? WHERE id = ?`,
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = '', scheduled_at = '', timezone = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
 		StatusDraft, s.draftStamp(), id)
 	if err != nil {
 		return Draft{}, err

@@ -13,3 +13,19 @@ describe("pageNumbers", () => {
     expect(pageNumbers(3, 5)).toEqual([1, 2, 3, 4, 5]);
   });
 });
+
+import { pagePath } from "./library";
+describe("pagePath", () => {
+  it("is the public address of a live page, by kind", () => {
+    expect(pagePath({ kind: "article", slug: "a-fine-title", pageAt: "2026-11-24T10:00:00Z" })).toBe("/articles/a-fine-title");
+    expect(pagePath({ kind: "post", slug: "hello", pageAt: "2026-11-24T10:00:00Z" })).toBe("/posts/hello");
+  });
+  it("is nothing when the page is not live or has no address", () => {
+    expect(pagePath({ kind: "article", slug: "x", pageAt: "" })).toBeNull();
+    expect(pagePath({ kind: "article", slug: "", pageAt: "2026-11-24T10:00:00Z" })).toBeNull();
+    expect(pagePath({ kind: "post" })).toBeNull();
+  });
+  it("escapes an address", () => {
+    expect(pagePath({ kind: "post", slug: "a b", pageAt: "x" })).toBe("/posts/a%20b");
+  });
+});

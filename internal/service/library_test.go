@@ -246,3 +246,21 @@ func TestLibraryRowsCarryTheirDesignForAThumbnailUnlessItIsLarge(t *testing.T) {
 		t.Fatal("a missing or large design is left out of the list")
 	}
 }
+
+func TestLibraryRowsSayWhichHaveALivePage(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	d, _ := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "article", Title: "On the web", Doc: docOf(para("text"))})
+	l.st.Approve(ctx, d.ID)
+	l.st.PublishPage(ctx, d.ID, PageInput{})
+	post := l.draft(t, "p", "post", docOf(para("A sent post")))
+	l.post(t, "p", post.ID, "A sent post")
+	l.st.PublishPage(ctx, post.ID, PageInput{})
+	page, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
+	got := map[string]LibraryItem{}
+	for _, it := range page.Items {
+		got[it.Title] = it
+	}
+	if got["On the web"].Slug != "on-the-web" || got["On the web"].PageAt == "" || got["A sent post"].Slug != "a-sent-post" || got["A sent post"].Type != "job" {
+		t.Fatalf("%+v", got)
+	}
+}

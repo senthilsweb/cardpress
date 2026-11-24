@@ -19,7 +19,14 @@ export interface LibraryItem {
   timezone?: string;
   /** A draft's card, for the thumbnail. Absent for a posted item (its image is fetched) or a design too large to list. */
   design?: Design;
+  /** The item has a live public page at `pagePath(item)`. */
+  slug?: string;
+  pageAt?: string;
 }
+
+/** Where an item's public page is, when it has a live one. */
+export const pagePath = (item: Pick<LibraryItem, "kind" | "slug" | "pageAt">): string | null =>
+  item.slug && item.pageAt ? `/${item.kind === "article" ? "articles" : "posts"}/${encodeURIComponent(item.slug)}` : null;
 
 export interface LibraryPage { items: LibraryItem[]; total: number; page: number; pageSize: number; pages: number }
 

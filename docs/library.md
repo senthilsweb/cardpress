@@ -12,7 +12,7 @@ Each row shows a small image: the card that was posted, or for a draft its own c
 | Approved | Marked final. A post can now be published or scheduled. An article may have a planned date. |
 | Scheduled, Published, Failed, Missed, Check LinkedIn | The state of the post sent from it; see [Publishing](publishing.md) |
 
-A draft that became a post is listed once, as the post. Empty drafts are left out. The title is the one you gave an article, else the first line; a long first paragraph is cut at a word and the rest becomes the excerpt.
+An item with a live [public page](public-pages.md) shows a **Page** badge and a link to it. A draft that became a post is listed once, as the post. Empty drafts are left out. The title is the one you gave an article, else the first line; a long first paragraph is cut at a word and the rest becomes the excerpt.
 
 **Paging is done by the server.** The list shows 10, 20 or 50 rows a page (your choice is remembered), with numbered pages, previous and next, and the total ("1–10 of 16"). Search looks through the title, the whole text and the hashtags; the filters are brand (or **All brands**), posts or articles, and status. Changing a filter goes back to the first page.
 

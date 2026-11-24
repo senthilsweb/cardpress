@@ -14,6 +14,7 @@ import { RichEditor } from "./RichEditor";
 import { FullPreview, linkedinSize } from "./FullPreview";
 import { PublishBar } from "./PublishBar";
 import { ArticleBar } from "./ArticleBar";
+import { PageBar } from "./PageBar";
 import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
@@ -217,6 +218,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
           {(draft.status === "approved" || draft.status === "published") && (
             <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
           )}
+          {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
           {draft.status === "scheduled" && <span className="text-[11px] text-muted-foreground">A post is waiting to be sent. Cancel it in the queue to edit.</span>}
         </div>
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
@@ -235,13 +237,20 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
       <FullPreview
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
-        actions={draft.kind === "article" ? (
-          <ArticleBar draft={draft} html={html} onApprove={approve} onPlan={store.plan} />
-        ) : (
-          <PublishBar
-            draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
-            onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
-          />
+        actions={(
+          <div className="space-y-3">
+            {draft.kind === "article" ? (
+              <ArticleBar draft={draft} html={html} onApprove={approve} onPlan={store.plan} />
+            ) : (
+              <PublishBar
+                draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
+                onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
+              />
+            )}
+            <div className="border-t border-border pt-3">
+              <PageBar draft={draft} renderCover={() => renderPng(linkedinSize(size))} onPublish={store.publishPage} onUnpublish={store.unpublishPage} />
+            </div>
+          </div>
         )}
       />
 

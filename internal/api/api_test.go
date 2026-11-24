@@ -500,7 +500,7 @@ func TestPublishingNeedsTheToken(t *testing.T) {
 	if r := postJobRaw(h, `{"profileId":"p","draftId":"`+id+`","body":"x"}`, apiPNG, nil); r.Code != 401 {
 		t.Fatalf("create without token: %d", r.Code)
 	}
-	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}, {"GET", "/api/v1/library?profileId=p"}, {"GET", "/api/v1/publish/jobs/x/attempts"}, {"POST", "/api/v1/drafts/x/approve"}, {"POST", "/api/v1/drafts/x/unapprove"}, {"PUT", "/api/v1/drafts/x/plan"}} {
+	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}, {"GET", "/api/v1/library?profileId=p"}, {"GET", "/api/v1/publish/jobs/x/attempts"}, {"POST", "/api/v1/drafts/x/approve"}, {"POST", "/api/v1/drafts/x/unapprove"}, {"PUT", "/api/v1/drafts/x/plan"}, {"POST", "/api/v1/drafts/x/page"}, {"DELETE", "/api/v1/drafts/x/page"}} {
 		if r := do(h, c[0], c[1], "", nil); r.Code != 401 {
 			t.Errorf("%s %s without token: %d", c[0], c[1], r.Code)
 		}
@@ -968,5 +968,48 @@ func TestApprovalWorkflowThroughTheAPI(t *testing.T) {
 	do(h, "POST", "/api/v1/drafts/"+art.ID+"/approve", "", nil)
 	if r := do(h, "PUT", "/api/v1/drafts/"+art.ID+"/plan", `{"scheduledAt":"2027-01-05T09:00:00Z","timezone":"UTC"}`, nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"scheduledAt":"2027-01-05T09:00:00Z"`) {
 		t.Fatalf("plan: %d %s", r.Code, r.Body)
+	}
+}
+
+func postPage(h http.Handler, id, meta string, cover []byte) *httptest.ResponseRecorder {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("meta", meta)
+	if cover != nil {
+		fw, _ := mw.CreateFormFile("cover", "cover.png")
+		_, _ = fw.Write(cover)
+	}
+	_ = mw.Close()
+	req := httptest.NewRequest("POST", "/api/v1/drafts/"+id+"/page", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestPublishingAPageThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	r := do(h, "POST", "/api/v1/drafts", `{"profileId":"p","kind":"article","title":"Public Words","doc":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}}`, nil)
+	var d service.Draft
+	_ = json.Unmarshal(r.Body.Bytes(), &d)
+	if p := postPage(h, d.ID, `{}`, nil); p.Code != 409 {
+		t.Fatalf("an unapproved item has no page: %d %s", p.Code, p.Body)
+	}
+	do(h, "POST", "/api/v1/drafts/"+d.ID+"/approve", "", nil)
+	p := postPage(h, d.ID, `{"summary":"A description"}`, apiPNG)
+	if p.Code != 200 || !strings.Contains(p.Body.String(), `"slug":"public-words"`) || !strings.Contains(p.Body.String(), `"hasCover":true`) || !strings.Contains(p.Body.String(), `"pageAt"`) {
+		t.Fatalf("publish page: %d %s", p.Code, p.Body)
+	}
+	if bad := postPage(h, d.ID, `{"slug":"Not Valid"}`, nil); bad.Code != 400 {
+		t.Fatalf("a bad address: %d", bad.Code)
+	}
+	if bad := postPage(h, d.ID, `{}`, []byte("not a png")); bad.Code != 400 {
+		t.Fatalf("a bad cover: %d", bad.Code)
+	}
+	if off := do(h, "DELETE", "/api/v1/drafts/"+d.ID+"/page", "", nil); off.Code != 200 || strings.Contains(off.Body.String(), `"pageAt"`) {
+		t.Fatalf("unpublish: %d %s", off.Code, off.Body)
+	}
+	if nope := do(h, "DELETE", "/api/v1/drafts/nope/page", "", nil); nope.Code != 404 {
+		t.Fatalf("%d", nope.Code)
 	}
 }
