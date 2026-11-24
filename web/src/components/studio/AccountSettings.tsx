@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatePicker } from "@/components/auth/AuthPage";
-import { api } from "@/lib/api";
+import { api, type ApiKey } from "@/lib/api";
+import { formatInZone } from "@/lib/jobs";
 import { joinDate, roleLabel, splitDate, useSession } from "@/lib/session";
 
 /** Your own details and password. Email and role are changed by an administrator. */
@@ -55,18 +56,18 @@ export function AccountSettings({ open, onClose }: { open: boolean; onClose: () 
       open={open} onClose={onClose} title="Account settings" resizeKey="account"
       subheader={
         <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }} className="px-3 py-2">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="password">Password</TabsTrigger>
+            <TabsTrigger value="keys">API keys</TabsTrigger>
           </TabsList>
         </Tabs>
       }
       footer={
         <div className="flex items-center justify-end gap-2">
           {error && <p role="alert" className="mr-auto text-xs text-destructive">{error}</p>}
-          {tab === "profile"
-            ? <Button variant="brand" size="sm" onClick={() => void saveProfile()} disabled={busy || !profileReady}>{busy && <Loader2 className="animate-spin" />} Save</Button>
-            : <Button variant="brand" size="sm" onClick={() => void changePassword()} disabled={busy || !pwReady}>{busy && <Loader2 className="animate-spin" />} Change password</Button>}
+          {tab === "profile" && <Button variant="brand" size="sm" onClick={() => void saveProfile()} disabled={busy || !profileReady}>{busy && <Loader2 className="animate-spin" />} Save</Button>}
+          {tab === "password" && <Button variant="brand" size="sm" onClick={() => void changePassword()} disabled={busy || !pwReady}>{busy && <Loader2 className="animate-spin" />} Change password</Button>}
         </div>
       }
     >
@@ -86,7 +87,72 @@ export function AccountSettings({ open, onClose }: { open: boolean; onClose: () 
           <div className="space-y-1.5"><Label htmlFor="as-new">New password</Label><Input id="as-new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /><p className="text-xs text-muted-foreground">At least 10 characters.</p></div>
           <div className="space-y-1.5"><Label htmlFor="as-again">New password again</Label><Input id="as-again" type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></div>
         </TabsContent>
+        <TabsContent value="keys" className="mt-0"><KeysPanel open={open && tab === "keys"} /></TabsContent>
       </Tabs>
     </Drawer>
+  );
+}
+
+/** Keys for programs (an MCP client, a script) that act as you, with the editor scope. The secret is shown once. */
+function KeysPanel({ open }: { open: boolean }) {
+  const [keys, setKeys] = useState<ApiKey[] | null>(null);
+  const [name, setName] = useState("");
+  const [fresh, setFresh] = useState<{ key: ApiKey; secret: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = async () => { try { setKeys((await api.apiKeys()).keys); } catch (e) { setError(e instanceof Error ? e.message : "Could not load the keys"); } };
+  useEffect(() => { if (open) { setFresh(null); setError(null); void load(); } }, [open]);
+  useEffect(() => { if (!confirm) return; const t = window.setTimeout(() => setConfirm(null), 4000); return () => window.clearTimeout(t); }, [confirm]);
+
+  const create = async () => {
+    setBusy(true); setError(null);
+    try { const r = await api.createApiKey(name); setFresh(r); setName(""); setCopied(false); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not make the key"); } finally { setBusy(false); }
+  };
+  const revoke = async (k: ApiKey) => {
+    if (confirm !== k.id) return setConfirm(k.id);
+    setBusy(true); setError(null);
+    try { await api.revokeApiKey(k.id); setConfirm(null); if (fresh?.key.id === k.id) setFresh(null); await load(); toast.success("Key revoked"); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not revoke"); } finally { setBusy(false); }
+  };
+  const copy = async () => { if (!fresh) return; try { await navigator.clipboard.writeText(fresh.secret); setCopied(true); } catch { setError("Could not copy. Select the key and copy it by hand."); } };
+
+  return (
+    <div className="space-y-4">
+      <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void create(); }}>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Label htmlFor="key-name">New key</Label>
+          <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, such as My agent" maxLength={60} />
+        </div>
+        <Button type="submit" variant="brand" size="sm" className="mb-0.5" disabled={busy || !name.trim()}>{busy ? <Loader2 className="animate-spin" /> : <KeyRound />} Create</Button>
+      </form>
+      <p className="text-xs text-muted-foreground">Scope: Editor. A key acts as you, on your own work.</p>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {fresh && (
+        <div className="space-y-2 rounded-md border border-brand/40 bg-brand/5 p-3" role="status">
+          <p className="text-xs font-medium">Copy the key now. It is not shown again.</p>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 select-all break-all rounded bg-muted px-2 py-1.5 text-xs">{fresh.secret}</code>
+            <Button size="sm" variant="outline" onClick={() => void copy()}>{copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy"}</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">MCP address: <code>{window.location.origin}/mcp</code> with the header <code>Authorization: Bearer …</code></p>
+        </div>
+      )}
+      {!keys ? <p className="text-sm text-muted-foreground">Loading…</p> : keys.length === 0 ? <p className="text-sm text-muted-foreground">No keys yet.</p> : (
+        <ul className="divide-y divide-border rounded-md border border-border" aria-label="Your keys">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center gap-2 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{k.name}</p>
+                <p className="truncate text-xs text-muted-foreground"><code>{k.prefix}…</code> · {k.scope} · made {formatInZone(k.createdAt)} · {k.lastUsedAt ? `used ${formatInZone(k.lastUsedAt)}` : "never used"}</p>
+              </div>
+              <Button size="sm" variant={confirm === k.id ? "destructive" : "ghost"} disabled={busy} onClick={() => void revoke(k)}><Trash2 /> {confirm === k.id ? "Confirm" : "Revoke"}</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

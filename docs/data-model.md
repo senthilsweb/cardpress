@@ -90,6 +90,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0010 | `drafts`: `slug`, `summary`, `page_at`, `cover`; the public pages |
 | 0011 | Accounts: `users`, `user_roles`, `sessions`, `user_preferences`; `profiles.owner_id`, `drafts.created_by` and `approved_by`, `publish_jobs.created_by`, `conversations.user_id` |
 | 0012 | `draft_versions` and `doc_blobs`: the history of an item |
+| 0013 | `api_keys`: keys for programs (MCP, scripts), scoped and revocable |
 
 ## Draft status and approval
 
@@ -122,6 +123,7 @@ stateDiagram-v2
 | `user_roles` | `user_id`, `role` (`admin`, `editor` or `writer`); primary key `(user_id, role)`. One row each today, but a person may hold several: what they may do is everything any of their roles allows |
 | `sessions` | `token_hash` (PK, the hash of the cookie value), `user_id`, `created_at`, `last_seen_at`, `expires_at` |
 | `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, layout, the open brand, custom fonts. System-wide keys (such as `envProfile`) stay in `preferences` |
+| `api_keys` | `id` (PK), `user_id`, `name`, `prefix` (the key's first characters, to tell keys apart), `key_hash` (SHA-256 of the key; unique; **the key itself is never stored**), `scope` (`editor`), `created_at`, `last_used_at`, `revoked_at` (empty while the key works) |
 
 A brand belongs to the person in `profiles.owner_id`, and everything keyed by `profile_id` (designs, drafts, posts, conversations, credentials) follows it. An admin sees all; anyone else sees only their own brands. See [Accounts and roles](accounts.md).
 

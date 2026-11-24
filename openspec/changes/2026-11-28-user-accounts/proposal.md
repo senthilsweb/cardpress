@@ -16,7 +16,8 @@ CardPress had no users. Access was one shared token (or none, on localhost), so 
 5. **Delete rule.** Only a draft can be deleted. An approved or posted item is brought back to draft first.
 6. **Who did what** is recorded on drafts (written by, approved by) and posts.
 7. **Account settings** (profile and **Change password**), a **Users** panel for admins, and **Sign out**, in the account menu.
-8. `cardpress user reset-password <email>`; MCP over HTTP needs the token once any account exists.
+8. `cardpress user reset-password <email>`; MCP over HTTP needs an API key or the token once any account exists.
+9. **API keys** for MCP and scripts: made in Account settings, shown once, stored as a hash, scope `editor`, revocable, acting as their person and never as an admin.
 
 ## What stays
 The bearer token still works for machines and acts as an admin. Public pages stay open to everyone.

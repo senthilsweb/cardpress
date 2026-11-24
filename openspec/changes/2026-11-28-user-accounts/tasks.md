@@ -24,3 +24,11 @@
 - [x] Who wrote and approved an item, shown in the library
 - [ ] Phone-width check of the new screens
 - [ ] Re-record the demo
+
+## Bolt 5: API keys
+- [x] Migration 0013: `api_keys` (hash only, prefix, scope, last used, revoked)
+- [x] Create (secret shown once), list, revoke; at most 20 per person; scope `editor`
+- [x] A key acts as its person within its scope, never as an admin; it cannot make keys or change the account
+- [x] `/mcp` accepts a key and every MCP tool stays inside the key's person's brands; the JSON API accepts a key too
+- [x] Account settings, API keys tab
+- [x] `scripts/seed-test-users`: one account per role for testing

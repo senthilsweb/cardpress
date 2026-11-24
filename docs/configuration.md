@@ -30,7 +30,7 @@ Settings come from environment variables, with a few command-line flags. With Do
 | `CARDPRESS_SIGNUP` | `closed` stops self sign-up once the first account exists (admins add people). Default `open` |
 | `CARDPRESS_ADMIN_EMAIL` | If set, only this email can create the first (admin) account. Set it on a server reachable from the internet |
 
-See [Accounts and roles](accounts.md).
+See [Accounts and roles](accounts.md). API keys are made in the app (Account settings), not in the environment.
 
 ## Public pages
 

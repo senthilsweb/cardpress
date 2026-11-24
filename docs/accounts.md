@@ -34,6 +34,7 @@ There is no email: nothing is verified by mail and a forgotten password is not e
 | **Approves**, plans an article's date | any | their own | no |
 | **Publishes**, schedules, publishes a page, removes a record | yes | their own | no |
 | Connects social accounts | any brand | their own brands | no |
+| Makes API keys (Editor scope) | yes | yes | yes, limited to what a writer may do |
 | Users and roles | yes | no | no |
 
 A new account is an **Editor** by default (`CARDPRESS_DEFAULT_ROLE=writer` makes it a writer). A **writer** drafts; an **admin** reviews, approves and publishes their work, and may open the brand's Social accounts to do so. An editor approves and publishes their own work.
@@ -52,11 +53,13 @@ The session is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` over https). Brows
 
 ## From the app
 
-The account menu (your name at the bottom of the sidebar) has **Account settings** (your names, phone and date of birth, and **Change password**), **Users** (admins: add a person, change a role, disable or enable, set a password) and **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
+The account menu (your name at the bottom of the sidebar) has **Account settings** (your names, phone and date of birth, **Change password**, and **API keys**), **Users** (admins: add a person, change a role, disable or enable, set a password) and **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
 
-## The token and MCP
+## API keys, the token and MCP
 
-`CARDPRESS_API_TOKEN` still works for machines and scripts: a request with `Authorization: Bearer <token>` acts as an admin, with or without any account. **MCP over HTTP needs the token as soon as any account exists**, because MCP works outside any one person's workspace. `cardpress mcp` over stdio runs as a process on your own machine and is not affected.
+A person can make **API keys** (Account settings, API keys) for programs such as an MCP client. A key acts as that person with the **Editor scope**: it can write, approve and publish on their own work, never more than the person may do, never as an admin, and never on anyone else's work. Keys are stored as hashes, shown once, and revoked at once. See [MCP](mcp.md#api-keys).
+
+`CARDPRESS_API_TOKEN` still works for machines and scripts: a request with `Authorization: Bearer <token>` acts as an admin, with or without any account. **MCP over HTTP needs a key or the token as soon as any account exists**, because MCP works outside any one person's workspace. `cardpress mcp` over stdio runs as a process on your own machine and is not affected.
 
 ## Settings
 

@@ -122,14 +122,27 @@ func main() {
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
 		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
 		// process on the same machine cannot use it to reach everyone's work without one.
+		// An API key (cpk_...) makes the call act as the key's person, within its scope, so it reaches only that person's
+		// brands; the access rules above then do not apply to it (the key is the credential).
+		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); got != r.Header.Get("Authorization") && strings.HasPrefix(got, service.KeyPrefix) {
+				u, id, scope, err := accounts.AuthenticateKey(r.Context(), got)
+				if err != nil {
+					w.Header().Set("WWW-Authenticate", `Bearer realm="cardpress"`)
+					http.Error(w, "that API key is not valid (it may have been revoked)", http.StatusUnauthorized)
+					return
+				}
+				keyedHandler.ServeHTTP(w, r.WithContext(service.WithPrincipal(r.Context(), service.Principal{User: &u, Key: id, Scope: scope})))
+				return
+			}
 			if n, err := accounts.Count(r.Context()); (err != nil || n > 0) && cfg.APIToken == "" {
-				http.Error(w, "MCP over HTTP needs CARDPRESS_API_TOKEN once accounts exist (set it and send it as a bearer token)", http.StatusForbidden)
+				http.Error(w, "MCP over HTTP needs an API key (made in Account settings) or CARDPRESS_API_TOKEN, now that accounts exist", http.StatusForbidden)
 				return
 			}
 			mcpHandler.ServeHTTP(w, r)

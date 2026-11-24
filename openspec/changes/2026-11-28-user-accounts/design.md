@@ -11,8 +11,9 @@ See `docs/accounts.md` for the behaviour and `docs/data-model.md` for the tables
 6. **Isolation by one rule in one place.** Every route is declared in a table with the scope it names and the permission it needs. Another person's thing answers `404`, a thing of theirs that their role forbids answers `403`. A test walks the whole table as a second person.
 7. **Passwords:** at least 10 characters, argon2id, no composition rules. Sign-in is rate-limited. No email, so an admin or the command line resets a password.
 8. **Date of birth** is collected, optional, and visible only to the person and admins.
-9. **MCP over HTTP needs the token** once any account exists (it works outside any one workspace). `cardpress mcp` over stdio is a local process and is unchanged.
-10. **Versions** (see `2026-11-28-editor-and-versions`).
+9. **API keys.** A key belongs to a person and acts as them within its scope. One scope for now, `editor` (write, approve, publish, social accounts), always capped by what the person may do, and never an admin: an admin's key reaches only the admin's own brands. Stored as a SHA-256 hash with a short prefix for the list; shown once; at most 20 per person; revoked at once; a disabled person's keys stop. A key cannot make keys, change the password or details, or manage people. MCP tools check brand ownership against the key's person.
+10. **MCP over HTTP needs a key or the token** once any account exists (it works outside any one workspace). `cardpress mcp` over stdio is a local process and is unchanged.
+11. **Versions** (see `2026-11-28-editor-and-versions`).
 
 ## Things learned while building
 - A second person's first brand cannot be called "personal" (the id is taken), so the app creates it under a unique id when the first attempt is refused.

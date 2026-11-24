@@ -2,7 +2,9 @@ package mcpserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -37,6 +39,7 @@ func (j stubJobs) Get(_ context.Context, id string) (service.Job, error) {
 }
 
 type rig struct {
+	db     *sql.DB
 	studio *service.Studio
 	chat   *service.Chat
 	audit  *Auditor
@@ -57,7 +60,7 @@ func newRig(t *testing.T, f service.SourceFetcher) *rig {
 	studio := service.New(db.DB)
 	chat := service.NewChat(db.DB, &agent.Mock{}, f)
 	audit := NewAuditor(db.DB)
-	r := &rig{studio: studio, chat: chat, audit: audit}
+	r := &rig{studio: studio, chat: chat, audit: audit, db: db.DB}
 	r.deps = Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {
 		Fetch(context.Context, string) (source.Source, error)
 	}), Audit: audit, Transport: "stdio", Version: "test"}
@@ -153,7 +156,8 @@ func TestTheToolsCanOnlyCallReadAndProposeMethods(t *testing.T) {
 		}
 	}
 	sort.Strings(reachable)
-	want := []string{"Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List", "Profiles.Profiles", "Proposals.Proposal", "Proposals.Propose"}
+	// Access.BrandOwner and Proposals.ProposalBrand only read who owns a brand, to keep a key to its own person's work
+	want := []string{"Access.BrandOwner", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List", "Profiles.Profiles", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose"}
 	if !reflect.DeepEqual(reachable, want) {
 		t.Fatalf("methods reachable from tools:\n got  %v\n want %v", reachable, want)
 	}
@@ -443,4 +447,94 @@ func TestWorksOverStreamableHTTPAndRecordsTheTransport(t *testing.T) {
 		t.Fatalf("%+v", es)
 	}
 	sort.Slice(es, func(i, j int) bool { return es[i].ID < es[j].ID })
+}
+
+// TestAKeyReachesOnlyItsPersonsBrandsOverHTTP serves MCP the way main does for a key: the request carries its person, and
+// every tool stays inside that person's brands. A call with no person (the machine token) is not narrowed.
+func TestAKeyReachesOnlyItsPersonsBrandsOverHTTP(t *testing.T) {
+	r := newRig(t, stubFetcher{})
+	ctx := context.Background()
+	db := r.db
+	acc := service.NewAccounts(db, service.AccountsOptions{})
+	admin, _ := acc.Signup(ctx, service.SignupInput{FirstName: "A", LastName: "Dmin", Email: "admin@example.com", Password: "correct horse battery"})
+	ana, _ := acc.Signup(ctx, service.SignupInput{FirstName: "Ana", LastName: "A", Email: "ana@example.com", Password: "correct horse battery"})
+	ben, _ := acc.Signup(ctx, service.SignupInput{FirstName: "Ben", LastName: "B", Email: "ben@example.com", Password: "correct horse battery"})
+	as := func(u service.User) context.Context { return service.WithPrincipal(ctx, service.Principal{User: &u}) }
+	for _, b := range []struct {
+		who service.User
+		id  string
+	}{{ana, "ana-1"}, {ben, "ben-1"}} {
+		if err := r.studio.CreateProfile(as(b.who), json.RawMessage(`{"id":"`+b.id+`","name":"`+b.id+`"}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	benDraft, err := r.studio.CreateDraft(as(ben), service.DraftInput{ProfileID: "ben-1", Kind: "post", Doc: json.RawMessage(`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Ben only"}]}]}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.deps.Access = r.studio
+	r.deps.Transport = "http"
+	handler := HTTPHandler(New(r.deps))
+	asKey := func(u service.User) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(service.WithPrincipal(req.Context(), service.Principal{User: &u, Key: "k1", Scope: "editor"})))
+		}))
+	}
+	connectTo := func(url string) *mcp.ClientSession {
+		cs, err := mcp.NewClient(&mcp.Implementation{Name: "agent", Version: "1"}, nil).Connect(ctx, &mcp.StreamableClientTransport{Endpoint: url}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { cs.Close() })
+		return cs
+	}
+	shut := func(s *httptest.Server) { s.CloseClientConnections(); s.Close() } // open MCP streams would make Close wait
+	srv := asKey(ana)
+	defer shut(srv)
+	cs := connectTo(srv.URL)
+
+	if _, out := call(t, cs, "list_profiles", nil); len(out["profiles"].([]any)) != 1 {
+		t.Fatalf("a key lists its person's brands only: %v", out)
+	}
+	for name, c := range map[string]struct {
+		tool string
+		args map[string]any
+	}{
+		"list drafts": {"list_drafts", map[string]any{"profileId": "ben-1"}},
+		"get a draft": {"get_draft", map[string]any{"id": benDraft.ID}},
+		"propose":     {"propose_content", map[string]any{"profileId": "ben-1", "kind": "post", "title": "T", "body": "Words that are long enough to be a post."}},
+		"list jobs":   {"list_jobs", map[string]any{"profileId": "ben-1"}},
+	} {
+		res, _ := call(t, cs, c.tool, c.args)
+		if !res.IsError || !strings.Contains(strings.ToLower(errText(res)), "not found") {
+			t.Errorf("%s in someone else's brand must look like a brand that is not there: %q", name, errText(res))
+		}
+	}
+	res, out := call(t, cs, "propose_content", map[string]any{"profileId": "ana-1", "kind": "post", "title": "Mine", "body": "Words that are long enough to be a post."})
+	if res.IsError || out["proposalId"] == "" {
+		t.Fatalf("a key proposes into its own brand: %+v", res)
+	}
+	var owner string
+	_ = db.QueryRow(`SELECT user_id FROM conversations WHERE id = ?`, out["conversationId"]).Scan(&owner)
+	if owner != ana.ID {
+		t.Fatalf("the conversation belongs to the key's person: %q", owner)
+	}
+	// ben cannot read ana's proposal through his own key
+	bsrv := asKey(ben)
+	defer shut(bsrv)
+	if res, _ := call(t, connectTo(bsrv.URL), "get_proposal", map[string]any{"id": out["proposalId"]}); !res.IsError {
+		t.Fatal("someone else's proposal must not be readable")
+	}
+	// an admin's key is still just the admin's own brands
+	asrv := asKey(admin)
+	defer shut(asrv)
+	if _, o := call(t, connectTo(asrv.URL), "list_profiles", nil); len(o["profiles"].([]any)) != 0 {
+		t.Fatalf("an admin's key is not an admin: %v", o)
+	}
+	// without a person (the token, a local process) nothing is narrowed
+	plain := httptest.NewServer(handler)
+	defer shut(plain)
+	if _, o := call(t, connectTo(plain.URL), "list_profiles", nil); len(o["profiles"].([]any)) != 2 {
+		t.Fatalf("%v", o)
+	}
 }

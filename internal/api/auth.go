@@ -28,6 +28,10 @@ type Accounts interface {
 	SetRole(ctx context.Context, id, role string) (service.User, error)
 	SetStatus(ctx context.Context, id, status string) (service.User, error)
 	SetPassword(ctx context.Context, id, password string) error
+	CreateKey(ctx context.Context, userID, name, scope string) (service.APIKey, string, error)
+	Keys(ctx context.Context, userID string) ([]service.APIKey, error)
+	RevokeKey(ctx context.Context, userID, keyID string) error
+	AuthenticateKey(ctx context.Context, secret string) (service.User, string, string, error)
 }
 
 const cookieName = "cardpress_session"
@@ -104,12 +108,21 @@ func (s *server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.Accounts != nil {
 			var p *service.Principal
-			if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); s.Token != "" && got != r.Header.Get("Authorization") &&
-				subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1 {
+			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			bearer := got != r.Header.Get("Authorization")
+			switch {
+			case bearer && s.Token != "" && subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1:
 				p = &service.Principal{Token: true}
-			} else if c, err := r.Cookie(cookieName); err == nil {
-				if u, err := s.Accounts.Authenticate(r.Context(), c.Value); err == nil {
-					p = &service.Principal{User: &u}
+			case bearer && strings.HasPrefix(got, service.KeyPrefix):
+				// an API key: it acts as its person, within its scope
+				if u, id, scope, err := s.Accounts.AuthenticateKey(r.Context(), got); err == nil {
+					p = &service.Principal{User: &u, Key: id, Scope: scope}
+				}
+			default:
+				if c, err := r.Cookie(cookieName); err == nil {
+					if u, err := s.Accounts.Authenticate(r.Context(), c.Value); err == nil {
+						p = &service.Principal{User: &u}
+					}
 				}
 			}
 			if p != nil {
@@ -293,16 +306,15 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
-	p, _ := principalOf(r)
-	if p.User == nil {
-		fail(w, r, service.ErrForbidden)
+	p, ok := s.person(w, r)
+	if !ok {
 		return
 	}
 	var in service.ProfileInput
 	if !decode(w, r, &in) {
 		return
 	}
-	u, err := s.Accounts.UpdateProfile(r.Context(), p.User.ID, in)
+	u, err := s.Accounts.UpdateProfile(r.Context(), p.ID, in)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -311,9 +323,8 @@ func (s *server) updateMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
-	p, _ := principalOf(r)
-	if p.User == nil {
-		fail(w, r, service.ErrForbidden)
+	p, ok := s.person(w, r)
+	if !ok {
 		return
 	}
 	var in struct {
@@ -327,7 +338,7 @@ func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(cookieName); err == nil {
 		keep = c.Value
 	}
-	if err := s.Accounts.ChangePassword(r.Context(), p.User.ID, in.Current, in.New, keep); err != nil {
+	if err := s.Accounts.ChangePassword(r.Context(), p.ID, in.Current, in.New, keep); err != nil {
 		fail(w, r, err)
 		return
 	}
@@ -446,4 +457,85 @@ func (s *server) changePasswordOrNotConfigured(w http.ResponseWriter, r *http.Re
 		return
 	}
 	s.changePassword(w, r)
+}
+
+/* ------------------------------------------------------------------ API keys */
+
+// session returns the signed-in person for routes that manage the account itself. An API key cannot: a leaked key must not
+// be able to mint more keys, change the password or the details of the person it acts for.
+func (s *server) person(w http.ResponseWriter, r *http.Request) (service.User, bool) {
+	p, _ := principalOf(r)
+	if p.User == nil || p.Key != "" {
+		writeError(w, r, http.StatusForbidden, "forbidden", "sign in to the app to do this; an API key cannot")
+		return service.User{}, false
+	}
+	return *p.User, true
+}
+
+func (s *server) listKeys(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.person(w, r)
+	if !ok {
+		return
+	}
+	ks, err := s.Accounts.Keys(r.Context(), u.ID)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"keys": ks, "scopes": service.KeyScopes})
+}
+
+// createKey makes a key. The secret is in this answer and nowhere else, ever.
+func (s *server) createKey(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.person(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Name  string `json:"name"`
+		Scope string `json:"scope"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	k, secret, err := s.Accounts.CreateKey(r.Context(), u.ID, in.Name, in.Scope)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"key": k, "secret": secret})
+}
+
+func (s *server) revokeKey(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.person(w, r)
+	if !ok {
+		return
+	}
+	if err := s.Accounts.RevokeKey(r.Context(), u.ID, r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) listKeysOrOff(w http.ResponseWriter, r *http.Request) {
+	if s.Accounts == nil {
+		s.off(w, r)
+		return
+	}
+	s.listKeys(w, r)
+}
+func (s *server) createKeyOrOff(w http.ResponseWriter, r *http.Request) {
+	if s.Accounts == nil {
+		s.off(w, r)
+		return
+	}
+	s.createKey(w, r)
+}
+func (s *server) revokeKeyOrOff(w http.ResponseWriter, r *http.Request) {
+	if s.Accounts == nil {
+		s.off(w, r)
+		return
+	}
+	s.revokeKey(w, r)
 }

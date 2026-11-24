@@ -62,6 +62,8 @@ export interface DraftVersion {
   note?: string; kind: string; title: string; createdBy?: string; createdByName?: string; createdAt: string; preview?: string;
   doc?: import("./draft").DocNode; hashtags?: string[]; altText?: string;
 }
+/** An API key as listed. The secret is shown once, when the key is made, and never again. */
+export interface ApiKey { id: string; name: string; prefix: string; scope: string; createdAt: string; lastUsedAt?: string }
 export interface SignupInput { firstName: string; lastName: string; email: string; password: string; phone?: string; birthDate?: string }
 /** One credential field as the server lets the browser see it: a secret is only ever its last four characters. */
 export interface SettingsField {
@@ -144,6 +146,9 @@ export const api = {
   logout: () => call<void>("POST", "/auth/logout"),
   updateMe: (input: { firstName: string; lastName: string; phone: string; birthDate: string }) => call<{ user: User; perms: Perm[] }>("PUT", "/auth/me", input),
   changePassword: (current: string, next: string) => call<void>("PUT", "/auth/password", { current, new: next }),
+  apiKeys: () => call<{ keys: ApiKey[]; scopes: string[] }>("GET", "/api-keys"),
+  createApiKey: (name: string, scope = "editor") => call<{ key: ApiKey; secret: string }>("POST", "/api-keys", { name, scope }),
+  revokeApiKey: (id: string) => call<void>("DELETE", `/api-keys/${encodeURIComponent(id)}`),
   users: () => call<{ users: User[] }>("GET", "/users").then((r) => r.users),
   addUser: (input: SignupInput & { role: string }) => call<User>("POST", "/users", input),
   updateUser: (id: string, change: { role?: string; status?: "active" | "disabled" }) => call<User>("PUT", `/users/${encodeURIComponent(id)}`, change),

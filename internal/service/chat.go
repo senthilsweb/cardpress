@@ -604,8 +604,8 @@ func (c *Chat) Propose(ctx context.Context, in ExternalProposal) (ProposalView, 
 		}
 		at := c.stamp()
 		if _, err := c.db.ExecContext(ctx,
-			`INSERT INTO conversations (id, profile_id, title, source_kind, source_title, source_text, created_at, updated_at) VALUES (?, ?, ?, 'mcp', ?, '', ?, ?)`,
-			convID, in.ProfileID, title, caller, at, at); err != nil {
+			`INSERT INTO conversations (id, user_id, profile_id, title, source_kind, source_title, source_text, created_at, updated_at) VALUES (?, ?, ?, ?, 'mcp', ?, '', ?, ?)`,
+			convID, actorID(ctx), in.ProfileID, title, caller, at, at); err != nil {
 			return ProposalView{}, err
 		}
 	} else {

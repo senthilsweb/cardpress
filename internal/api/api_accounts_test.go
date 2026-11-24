@@ -506,3 +506,106 @@ func TestNobodyReachesAnotherPersonsWork(t *testing.T) {
 		t.Fatalf("b sees %d library items", len(page.Items))
 	}
 }
+
+type keyBody struct {
+	Key    service.APIKey `json:"key"`
+	Secret string         `json:"secret"`
+}
+
+func (r *rig) bearer(t *testing.T, secret string) *client {
+	c := r.browser(t)
+	c.extra["Authorization"] = "Bearer " + secret
+	return c
+}
+
+func TestAPIKeysAreMadeShownOnceAndActAsTheirPersonWithinTheirScope(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, wr, other := r.browser(t), r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	w := wr.mustSignup("wren@example.com", "Wren")
+	other.mustSignup("other@example.com", "Other")
+	admin.json("PUT", "/api/v1/users/"+w.ID, `{"role":"writer"}`, nil)
+	wr.login("wren@example.com", "correct horse battery")
+
+	var made keyBody
+	if code := ed.json("POST", "/api/v1/api-keys", `{"name":"My agent"}`, &made); code != 201 || !strings.HasPrefix(made.Secret, "cpk_") || made.Key.Scope != "editor" || made.Key.Name != "My agent" {
+		t.Fatalf("%d %+v", code, made)
+	}
+	// the secret is in that answer only
+	rec := ed.do("GET", "/api/v1/api-keys", "")
+	if rec.Code != 200 || strings.Contains(rec.Body.String(), made.Secret) || !strings.Contains(rec.Body.String(), made.Key.Prefix) || !strings.Contains(rec.Body.String(), `"scopes":["editor"]`) {
+		t.Fatalf("a listing never carries the secret: %s", rec.Body)
+	}
+	if code := ed.json("POST", "/api/v1/api-keys", `{"name":""}`, nil); code != 400 {
+		t.Fatalf("%d", code)
+	}
+
+	// the editor's brand and work, and someone else's
+	ed.json("POST", "/api/v1/profiles", `{"id":"ed-brand","name":"Ed"}`, nil)
+	other.json("POST", "/api/v1/profiles", `{"id":"other-brand","name":"Other"}`, nil)
+	var theirs service.Draft
+	other.json("POST", "/api/v1/drafts", `{"profileId":"other-brand","kind":"post","doc":`+itemDoc+`}`, &theirs)
+
+	k := r.bearer(t, made.Secret) // no cookie: only the key
+	var st service.State
+	if code := k.json("GET", "/api/v1/state", "", &st); code != 200 || len(st.Profiles) != 1 {
+		t.Fatalf("a key sees its person's brands only: %d %d", code, len(st.Profiles))
+	}
+	var mine service.Draft
+	if code := k.json("POST", "/api/v1/drafts", `{"profileId":"ed-brand","kind":"post","doc":`+itemDoc+`}`, &mine); code != 201 || mine.CreatedByName != "Ed Tester" {
+		t.Fatalf("a key writes as its person: %d %+v", code, mine)
+	}
+	if k.do("POST", "/api/v1/drafts/"+mine.ID+"/approve", "").Code != 200 {
+		t.Fatal("the editor scope approves")
+	}
+	if k.do("GET", "/api/v1/drafts/"+theirs.ID, "").Code != 404 || k.do("POST", "/api/v1/drafts", `{"profileId":"other-brand","kind":"post","doc":`+itemDoc+`}`).Code != 404 {
+		t.Fatal("a key cannot reach someone else's work")
+	}
+	// a key cannot manage the account behind it
+	for name, code := range map[string]int{
+		"make a key": k.do("POST", "/api/v1/api-keys", `{"name":"more"}`).Code,
+		"list keys":  k.do("GET", "/api/v1/api-keys", "").Code,
+		"password":   k.do("PUT", "/api/v1/auth/password", `{"current":"correct horse battery","new":"another long passphrase"}`).Code,
+		"details":    k.do("PUT", "/api/v1/auth/me", `{"firstName":"X","lastName":"Y"}`).Code,
+		"users":      k.do("GET", "/api/v1/users", "").Code,
+	} {
+		if code != 403 {
+			t.Errorf("a key must not %s: %d", name, code)
+		}
+	}
+	// someone else cannot revoke it
+	if other.do("DELETE", "/api/v1/api-keys/"+made.Key.ID, "").Code != 404 {
+		t.Fatal("not theirs to revoke")
+	}
+
+	// a writer's key can write but not approve; an admin's key is not an admin
+	var wk, ak keyBody
+	wr.json("POST", "/api/v1/api-keys", `{"name":"w"}`, &wk)
+	admin.json("POST", "/api/v1/api-keys", `{"name":"a"}`, &ak)
+	wr.json("POST", "/api/v1/profiles", `{"id":"wren-brand","name":"W"}`, nil)
+	wkc := r.bearer(t, wk.Secret)
+	var wd service.Draft
+	if wkc.json("POST", "/api/v1/drafts", `{"profileId":"wren-brand","kind":"post","doc":`+itemDoc+`}`, &wd) != 201 || wkc.do("POST", "/api/v1/drafts/"+wd.ID+"/approve", "").Code != 403 {
+		t.Fatal("a writer's key is limited by the writer")
+	}
+	akc := r.bearer(t, ak.Secret)
+	if akc.do("GET", "/api/v1/users", "").Code != 403 || akc.do("GET", "/api/v1/drafts/"+theirs.ID, "").Code != 404 {
+		t.Fatal("an admin's key does not see everyone's work or manage people")
+	}
+	if admin.do("GET", "/api/v1/drafts/"+theirs.ID, "").Code != 200 {
+		t.Fatal("while the admin does")
+	}
+
+	// revoking stops it at once; garbage never works
+	if ed.do("DELETE", "/api/v1/api-keys/"+made.Key.ID, "").Code != 204 || k.do("GET", "/api/v1/state", "").Code != 401 {
+		t.Fatal("a revoked key stops working")
+	}
+	if r.bearer(t, "cpk_"+strings.Repeat("a", 43)).do("GET", "/api/v1/state", "").Code != 401 {
+		t.Fatal("an unknown key is refused")
+	}
+	var list struct{ Keys []service.APIKey }
+	if ed.json("GET", "/api/v1/api-keys", "", &list); len(list.Keys) != 0 {
+		t.Fatalf("%+v", list.Keys)
+	}
+}

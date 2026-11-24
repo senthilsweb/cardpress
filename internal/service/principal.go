@@ -75,6 +75,10 @@ func (u User) Perms() []Perm {
 type Principal struct {
 	User  *User
 	Token bool
+	// Key is the id of the API key this call came with, and Scope the key's scope. A key acts as its person but only within
+	// its scope, and never as an admin: it sees what the person owns, not everyone's work.
+	Key   string
+	Scope string
 }
 
 type principalKey struct{}
@@ -99,14 +103,30 @@ func (p Principal) UserID() string {
 }
 
 // Admin reports whether the principal sees and may do everything.
-func (p Principal) Admin() bool { return p.Token || (p.User != nil && p.User.IsAdmin()) }
+func (p Principal) Admin() bool { return p.Token || (p.User != nil && p.Key == "" && p.User.IsAdmin()) }
+
+// keyScopes are the scopes an API key can have, and what each allows. A key may do what its scope allows and its person may do.
+var keyScopes = map[string][]Perm{
+	"editor": {PermWrite, PermApprove, PermPublish, PermSocial},
+}
 
 // Can reports whether the principal may do p in general (a role check; whose work it is, is a separate one).
 func (p Principal) Can(perm Perm) bool {
 	if p.Token {
 		return true
 	}
-	return p.User != nil && p.User.Can(perm)
+	if p.User == nil || !p.User.Can(perm) {
+		return false
+	}
+	if p.Key == "" {
+		return true
+	}
+	for _, allowed := range keyScopes[p.Scope] {
+		if allowed == perm {
+			return true
+		}
+	}
+	return false
 }
 
 // sees reports whether the principal may see a brand owned by owner. The system and admins see all.
