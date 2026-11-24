@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 /** Mark, wordmark and a small line under it. The line is hidden on narrow screens. */
 function Logo() {
   return (
-    <div className="flex items-center gap-2.5" aria-label="CardPress">
+    <a href={import.meta.env.BASE_URL} className="flex items-center gap-2.5" aria-label="CardPress home">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden className="shrink-0">
         <rect x="2.5" y="3.5" width="25" height="23" rx="7.5" className="fill-gold" />
         <rect x="8" y="11" width="14" height="2.4" rx="1.2" className="fill-foreground" opacity="0.85" />
@@ -46,7 +46,7 @@ function Logo() {
         <span className="text-[22px] font-bold tracking-tight text-foreground">CardPress</span>
         <span className="mt-1 hidden text-[10.5px] text-muted-foreground md:block">Agentic AI for social media authoring and management</span>
       </div>
-    </div>
+    </a>
   );
 }
 
