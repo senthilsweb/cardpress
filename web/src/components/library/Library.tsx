@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarClock, Check, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { AccountMenu, studioHref } from "@/components/studio/AccountMenu";
 import { Attempts, Thumb } from "@/components/studio/JobQueue";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
+import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog";
 import { Logo } from "@/components/studio/Logo";
 import { ScaledCard } from "@/components/studio/preview";
 import { ScheduleFields, resolveSchedule } from "@/components/studio/ScheduleFields";
@@ -212,7 +213,7 @@ function Row({ item, data, open, onToggle, brandName, onPatch, onGone }: {
   return (
     <li className="py-3">
       <div className="flex gap-3">
-        {isJob ? <Thumb id={item.id} /> : <div className="grid h-12 w-20 shrink-0 place-items-center rounded border border-dashed border-border text-muted-foreground" aria-hidden><FileText className="h-4 w-4" /></div>}
+        {isJob ? <Thumb id={item.id} /> : <CardThumb design={item.design} profile={data.profiles.find((p) => p.id === item.profileId)} />}
         <button type="button" onClick={onToggle} aria-expanded={open} className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge s={item.status} />
@@ -233,6 +234,16 @@ function Row({ item, data, open, onToggle, brandName, onPatch, onGone }: {
   );
 }
 
+/** A small card for a list row, drawn from the design saved with the item (a plain frame when it has none). */
+function CardThumb({ design, profile }: { design?: Design; profile?: Profile }) {
+  const frame = "h-12 w-20 shrink-0 overflow-hidden rounded border border-border bg-muted";
+  if (!design || !profile) return <div className={`${frame} grid place-items-center text-muted-foreground`} aria-hidden><FileText className="h-4 w-4" /></div>;
+  const d: Design = { ...DEFAULT_DESIGN, ...design };
+  const palette = profile.palettes.find((p) => p.id === d.paletteId) ?? profile.palettes[0];
+  if (!palette) return <div className={frame} aria-hidden />;
+  return <div className={`${frame} grid place-items-center`} aria-hidden><ScaledCard design={d} profile={profile} palette={palette} size={sizeById(d.sizeId)} maxW={80} maxH={48} rounded={false} /></div>;
+}
+
 /** The card, drawn from the design saved with the item. */
 function CardView({ design, profile }: { design?: Design; profile?: Profile }) {
   if (!profile) return null;
@@ -249,6 +260,7 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [forLinkedIn, setForLinkedIn] = useState(false);
   const [tz, setTz] = useState(defaultTimezone());
   const [local, setLocal] = useState(() => toLocalInput(new Date(Date.now() + 7 * 24 * 3600_000), defaultTimezone()));
   const profile = useMemo(() => data.profiles.find((p) => p.id === item.profileId), [data.profiles, item.profileId]);
@@ -303,6 +315,7 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
         )}
         {isArticle && (
           <>
+            <Button size="sm" variant="ghost" onClick={() => setForLinkedIn(true)}><Share2 /> For LinkedIn</Button>
             <Button size="sm" variant="ghost" onClick={() => downloadBlob(new Blob([docToMarkdown(draft.doc)], { type: "text/markdown;charset=utf-8" }), `${name}.md`)}><Download /> Markdown</Button>
             <Button size="sm" variant="ghost" onClick={() => downloadBlob(new Blob([articleHtmlPage(draft.title || item.title, document.querySelector<HTMLElement>("[data-doc] .ProseMirror")?.innerHTML ?? "")], { type: "text/html;charset=utf-8" }), `${name}.html`)}><Download /> HTML</Button>
           </>
@@ -327,6 +340,7 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
           </div>
         </div>
       )}
+      {isArticle && <LinkedInArticleDialog open={forLinkedIn} onOpenChange={setForLinkedIn} doc={draft.doc} title={draft.title || item.title} />}
       {confirm && <p className="text-xs text-muted-foreground">This deletes the {isArticle ? "article" : "draft"} and its card. It cannot be undone.</p>}
     </div>
   );

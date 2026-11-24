@@ -4,7 +4,7 @@ The **Library** is the list of everything you have posted, scheduled and drafted
 
 ## The list
 
-Each row shows a small image (the card that was posted; drafts show a plain icon), a status, the kind (post or article), the date, a title and the start of the text. A published post also links to LinkedIn.
+Each row shows a small image: the card that was posted, or for a draft its own card drawn from the design saved with it (a plain frame if it has none, or a design too large to list), a status, the kind (post or article), the date, a title and the start of the text. A published post also links to LinkedIn.
 
 | Status | Meaning |
 |---|---|
@@ -25,6 +25,7 @@ Click a row to open it in place.
   - **Approve** / **Back to draft**.
   - **Schedule…** (an approved post) opens its Full preview with the schedule step, because the card image is made there.
   - **Plan a date** / **Change date** (an approved article) saves a planned date. Nothing is sent: LinkedIn has no way to receive an article, so the date is a reminder and a way to order the list.
+  - **For LinkedIn** (articles) prepares the article for LinkedIn's article editor; see [the workspace](workspace.md#for-linkedin).
   - **Markdown** and **HTML** (articles) download the article, pictures included.
   - **Delete** asks twice. A draft with a post waiting to be sent cannot be edited or deleted until that post is cancelled.
 - **A post that was sent** shows the card that was posted, the text and hashtags as sent, when it was created, scheduled and posted, LinkedIn's post id and link, the alt text, and each try with what LinkedIn answered. **Delete record** removes it from here after a second click; the post itself stays on LinkedIn.

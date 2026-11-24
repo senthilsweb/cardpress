@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, Check, Download, Loader2, X } from "lucide-react";
+import { CalendarClock, Check, Download, Share2, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Draft } from "@/lib/draft";
 import { defaultTimezone, formatInZone, toLocalInput } from "@/lib/jobs";
@@ -7,6 +7,7 @@ import { downloadBlob } from "@/lib/export";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { slugify } from "@/lib/slug";
 import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
+import { LinkedInArticleDialog } from "./LinkedInArticleDialog";
 
 /**
  * What an article gets instead of Publish: LinkedIn has no way to send one, so it is approved (marked final), can be given a
@@ -20,6 +21,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
   onPlan: (plan: { scheduledAt?: string; timezone?: string }) => Promise<void>;
 }) {
   const [planning, setPlanning] = useState(false);
+  const [forLinkedIn, setForLinkedIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tz, setTz] = useState(defaultTimezone());
@@ -41,8 +43,10 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
           {draft.status === "draft" ? "Approve this article to mark it final." : "This article is marked as published. Edit it to make a new version."}
         </span>
         {draft.status === "draft" && <Button size="sm" variant="brand" onClick={() => void onApprove()}><Check /> Approve</Button>}
+        <Button size="sm" variant="outline" onClick={() => setForLinkedIn(true)}><Share2 /> For LinkedIn</Button>
         <Button size="sm" variant="outline" onClick={exportMd}><Download /> Markdown</Button>
         <Button size="sm" variant="outline" onClick={exportHtml}><Download /> HTML</Button>
+        <LinkedInArticleDialog open={forLinkedIn} onOpenChange={setForLinkedIn} doc={draft.doc} title={draft.title} />
       </div>
     );
   }
@@ -53,6 +57,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
           {draft.scheduledAt ? <>Planned for <b className="text-foreground">{formatInZone(draft.scheduledAt, draft.timezone)}</b>. Nothing is sent.</> : "Articles are not sent from here."}
         </span>
         <Button size="sm" variant="outline" onClick={() => setPlanning((v) => !v)}><CalendarClock /> {draft.scheduledAt ? "Change date" : "Plan a date"}</Button>
+        <Button size="sm" variant="outline" onClick={() => setForLinkedIn(true)}><Share2 /> For LinkedIn</Button>
         <Button size="sm" variant="outline" onClick={exportMd}><Download /> Markdown</Button>
         <Button size="sm" variant="outline" onClick={exportHtml}><Download /> HTML</Button>
       </div>
@@ -69,6 +74,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
         </div>
       )}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      <LinkedInArticleDialog open={forLinkedIn} onOpenChange={setForLinkedIn} doc={draft.doc} title={draft.title} />
     </div>
   );
 }

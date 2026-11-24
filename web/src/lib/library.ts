@@ -1,4 +1,5 @@
 import type { JobStatus } from "./jobs";
+import type { Design } from "./types";
 
 /** One row of the library: a post (sent, waiting or failed) or a draft that has not become a post. */
 export interface LibraryItem {
@@ -16,6 +17,8 @@ export interface LibraryItem {
   /** An approved article's planned date (UTC). Nothing is sent. */
   plannedAt?: string;
   timezone?: string;
+  /** A draft's card, for the thumbnail. Absent for a posted item (its image is fetched) or a design too large to list. */
+  design?: Design;
 }
 
 export interface LibraryPage { items: LibraryItem[]; total: number; page: number; pageSize: number; pages: number }

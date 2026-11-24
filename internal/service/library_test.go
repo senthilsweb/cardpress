@@ -222,3 +222,27 @@ func TestALibraryRowUsesTheTitleThePersonWrote(t *testing.T) {
 		t.Fatalf("a title search found %d", len(found.Items))
 	}
 }
+
+func TestLibraryRowsCarryTheirDesignForAThumbnailUnlessItIsLarge(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	small, _ := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "post", Doc: docOf(para("With a card")), Design: json.RawMessage(goodDesign)})
+	l.advance(time.Second)
+	bare, _ := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "post", Doc: docOf(para("No card"))})
+	l.advance(time.Second)
+	big := strings.Replace(goodDesign, `"photos":[]`, `"photos":["data:image/png;base64,`+strings.Repeat("A", 70<<10)+`"]`, 1)
+	large, err := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "post", Doc: docOf(para("Heavy card")), Design: json.RawMessage(big)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
+	by := map[string]LibraryItem{}
+	for _, it := range page.Items {
+		by[it.ID] = it
+	}
+	if !strings.Contains(string(by[small.ID].Design), `"layout":"hero"`) {
+		t.Fatalf("a small design is listed: %s", by[small.ID].Design)
+	}
+	if len(by[bare.ID].Design) != 0 || len(by[large.ID].Design) != 0 {
+		t.Fatal("a missing or large design is left out of the list")
+	}
+}

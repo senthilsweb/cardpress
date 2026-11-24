@@ -33,7 +33,13 @@ type LibraryItem struct {
 	// PlannedAt is an approved article's planned date (UTC), with the zone it was chosen in.
 	PlannedAt string `json:"plannedAt,omitempty"`
 	Timezone  string `json:"timezone,omitempty"`
+	// Design is the card a draft was made with, so the list can draw a thumbnail. It is left out when it is large (it
+	// carries pictures), and a posted item shows the image that was sent instead.
+	Design json.RawMessage `json:"design,omitempty"`
 }
+
+// maxListedDesign is the largest design the list carries; a bigger one is fetched with the draft.
+const maxListedDesign = 64 << 10
 
 // LibraryQuery says what to list.
 type LibraryQuery struct {
@@ -181,7 +187,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 
 func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	// a draft that became a post is listed once, as the post
-	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone FROM drafts d
+	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone, design, design_version FROM drafts d
 	          WHERE NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = d.id)`
 	var args []any
 	if !q.All {
@@ -199,8 +205,9 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, kind, status, own, doc, tags, updated, planned, zone string
-		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone); err != nil {
+		var id, pid, kind, status, own, doc, tags, updated, planned, zone, design string
+		var designVersion int
+		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone, &design, &designVersion); err != nil {
 			return nil, err
 		}
 		blocks := docBlocks(doc)
@@ -220,7 +227,7 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		var hs []string
 		_ = json.Unmarshal([]byte(tags), &hs)
 		out = append(out, row{
-			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone},
+			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone, Design: listedDesign(design, designVersion)},
 			text: strings.ToLower(searchable + " " + strings.Join(hs, " ")),
 		})
 	}
@@ -249,6 +256,14 @@ func titleAndExcerpt(blocks []string) (string, string) {
 		title = cut(title, titleChars)
 	}
 	return title, cut(rest, excerptChars)
+}
+
+// listedDesign is the design to put in a list row: none if there is none, or if it is too large to carry along.
+func listedDesign(design string, version int) json.RawMessage {
+	if version == 0 || len(design) > maxListedDesign {
+		return nil
+	}
+	return json.RawMessage(design)
 }
 
 func squash(s string) string { return strings.Join(strings.Fields(s), " ") }
