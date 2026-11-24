@@ -1,0 +1,76 @@
+# Docs site, published to GitHub Pages by .github/workflows/docs.yml
+# (https://senthilsweb.github.io/cardpress/, also reachable at senthilsweb.com/cardpress/).
+# Same setup as the claimwise-agents repo: MkDocs Material, strict build, Pages from Actions.
+site_name: CardPress
+site_description: Open-source, self-hosted agentic AI for social media authoring and management
+site_url: https://senthilsweb.github.io/cardpress/
+repo_url: https://github.com/senthilsweb/cardpress
+repo_name: senthilsweb/cardpress
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.footer
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Overview: index.md
+  - Getting Started: getting-started.md
+  - Authoring:
+      - Workspace: workspace.md
+      - Post authoring: post-authoring.md
+      - Adding backgrounds: adding-backgrounds.md
+      - Palettes: palettes.md
+      - Fonts: fonts.md
+  - Assistant:
+      - Chat: chat.md
+      - Claude Managed Agent: cma-agent.md
+  - Publishing:
+      - Publishing: publishing.md
+      - Social accounts: social-settings.md
+  - Integrate:
+      - MCP: mcp.md
+  - Code Tour: code-tour.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Deployment: deployment.md
+  - Operations: operations.md
+  - Reference: reference.md
+  - AI-DLC record: ai-dlc/README.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

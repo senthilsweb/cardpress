@@ -1,0 +1,38 @@
+# Overview
+
+CardPress is an open-source, self-hosted tool for writing and publishing social media posts. You design a branded card, draft the post text with an assistant, preview exactly what will be sent, and publish or schedule it yourself. It ships as one Go binary with the web app inside.
+
+![Designing a card, drafting a post with the assistant, and previewing it in CardPress](media/cardpress-demo.gif)
+
+## What it does
+
+- **Design cards** in your own brand: one profile (name, handle, logo, fonts), 28 colour sets, 6 layouts, 12 backgrounds drawn in code, and 10 sizes for LinkedIn, X, Instagram and Facebook. See [Workspace](workspace.md), [Palettes](palettes.md), [Fonts](fonts.md) and [Adding backgrounds](adding-backgrounds.md).
+- **Write posts and articles** in a rich-text editor, with hashtags, alt text and a preview of the LinkedIn feed. See [Post authoring](post-authoring.md).
+- **Draft with an assistant**: give it a web address or some text and it proposes a post or article. You approve, edit or reject each proposal. It prepares content only. See [Chat](chat.md) and [Claude Managed Agent](cma-agent.md).
+- **Publish or schedule to LinkedIn** from the full preview, with a queue and no automatic retries. See [Publishing](publishing.md) and [Social accounts](social-settings.md).
+- **Connect an outside agent** over MCP. It can read drafts and propose content, never publish. See [MCP](mcp.md).
+
+## Principles
+
+- **A person publishes.** The assistant and any MCP client end at a proposal. Nothing is posted without your click, and a failed post is never retried on its own.
+- **Your data stays with you.** A SQLite file (or Turso) on your server holds everything. Social credentials are encrypted. Nothing is kept in the browser.
+- **Safe by default.** It listens on loopback, refuses to expose the API without a token, and fetches web pages with an SSRF guard.
+- **Honest about AI.** The default assistant is a small built-in demo and says so. A real model is opt-in and the screen shows it.
+
+## Status
+
+| Area | State |
+|---|---|
+| Card designer, composer, full preview, exports | Built and tested |
+| Encrypted credentials, scheduler | Built and tested |
+| LinkedIn publishing | Tested against a local fake of LinkedIn's API, **not yet against a real account**. Treat the first real post as a trial |
+| X and Instagram | Credentials can be stored; publishing is not built |
+| Assistant | Works with the built-in demo agent. The Claude Managed Agent adapter is built and tested against a fake API, **not yet against a real Anthropic account** |
+| MCP server | Built and tested |
+
+## Where to go next
+
+- New here: [Getting Started](getting-started.md).
+- Running it for real: [Deployment](deployment.md), [Configuration](configuration.md), [Operations](operations.md).
+- Changing the code: [Code Tour](code-tour.md) and [Architecture](architecture.md).
+- Looking something up: [Reference](reference.md).

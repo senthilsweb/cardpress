@@ -8,10 +8,21 @@ Make LinkedIn and blog social cards in my own brand colours and fonts, from a si
 
 ## Units of work and bolts
 
+These are the changes recorded so far, in the order they were built. Later work (the Assistant drawer, the cream and teal theme, the landing page, Docker Compose and this docs site) has no separate proposal yet.
+
 | Unit of work | Bolt | OpenSpec change |
 |---|---|---|
-| Studio and cards | Scaffold: Astro and React, Go-embedded binary, Dockerfile; layouts, sizes, PNG export | [studio-scaffold](../../openspec/changes/2026-11-22-studio-scaffold/proposal.md) |
-| Look | The 11 built-in backgrounds; profiles and the brochure palettes | [backgrounds-and-profiles](../../openspec/changes/2026-11-22-backgrounds-and-profiles/proposal.md) |
-| Standard theme | 8 cover palettes shared by every profile; saved-profile migration | [standard-theme-palettes](../../openspec/changes/2026-11-22-standard-theme-palettes/proposal.md) |
-| Extensibility | Drop-in backgrounds in `card/bg/` | [dropin-backgrounds](../../openspec/changes/2026-11-22-dropin-backgrounds/proposal.md) |
-| Typography | Logo small line above or below; per-element Google fonts | [logo-line-and-fonts](../../openspec/changes/2026-11-22-logo-line-and-fonts/proposal.md) |
+| Studio and cards | Scaffold: Astro and React, Go-embedded binary, Dockerfile; layouts, sizes, PNG export | [studio-scaffold](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/studio-scaffold) |
+| Look | Built-in backgrounds; profiles and the brochure palettes | [backgrounds-and-profiles](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/backgrounds-and-profiles) |
+| Standard theme | Cover palettes shared by every profile; saved-profile migration | [standard-theme-palettes](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/standard-theme-palettes) |
+| Extensibility | Drop-in backgrounds in `card/bg/` | [dropin-backgrounds](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/dropin-backgrounds) |
+| Typography | Logo small line above or below; per-element Google fonts | [logo-line-and-fonts](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/logo-line-and-fonts) |
+| Card footer | Footer text at the bottom right and a sample card from a real post | [card-footer-and-sample](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/card-footer-and-sample) |
+| Server | Go server, database, JSON API, token guard | [server-foundation](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/server-foundation) |
+| Workspace | Sidebar hide and show, foldable sections, grid canvas | [workspace-panels](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/workspace-panels) |
+| Composer | Rich-text post editor, LinkedIn text rules, full preview | [composer-richtext-preview](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/composer-richtext-preview) |
+| Credentials | Encrypted social credentials and the Social accounts screen | [social-settings](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/social-settings) |
+| Publishing | Publish to LinkedIn now or later, the queue, the scheduler | [linkedin-publish-schedule](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/linkedin-publish-schedule) |
+| Assistant | Chat that drafts content from an article, with proposals you approve | [chat-content-agent](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/chat-content-agent) |
+| Integration | MCP server for outside agents, with an audit trail | [mcp-server](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/mcp-server) |
+| Real agent | Claude Managed Agent adapter behind the same port | [agent-cma-adapter](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/agent-cma-adapter) |
