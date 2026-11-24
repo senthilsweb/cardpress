@@ -750,10 +750,11 @@ func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) library(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
+	pageNo, _ := strconv.Atoi(q.Get("page"))
+	size, _ := strconv.Atoi(q.Get("pageSize"))
 	page, err := s.Library.List(r.Context(), service.LibraryQuery{
 		ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Kind: q.Get("kind"), Status: q.Get("status"),
-		Q: q.Get("q"), Before: q.Get("before"), Limit: limit,
+		Q: q.Get("q"), Page: pageNo, PageSize: size,
 	})
 	if err != nil {
 		fail(w, r, err)

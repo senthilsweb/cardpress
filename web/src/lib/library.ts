@@ -18,7 +18,18 @@ export interface LibraryItem {
   timezone?: string;
 }
 
-export interface LibraryPage { items: LibraryItem[]; next?: string }
+export interface LibraryPage { items: LibraryItem[]; total: number; page: number; pageSize: number; pages: number }
+
+export const PAGE_SIZES = [10, 20, 50] as const;
+
+/** The page numbers to show: the first, the last, and a few around the current one, with "…" where pages are left out. */
+export function pageNumbers(page: number, pages: number): (number | "…")[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  const sorted = [...keep].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((n, i) => { if (i > 0 && n - sorted[i - 1] > 1) out.push("…"); out.push(n); });
+  return out;
+}
 
 export interface LibraryFilter {
   /** A brand id, or "all". */

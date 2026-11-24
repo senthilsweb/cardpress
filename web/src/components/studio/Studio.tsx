@@ -102,11 +102,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   }, [toggleSidebar]);
   // the right-hand drawers share one edge, so only one is open at a time
   const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | null>(null);
+  // the library can send someone straight to a draft's Full preview (to schedule it)
+  const [previewRequested, setPreviewRequested] = useState(false);
   // another page (the library) can ask for a drawer or a draft: /studio/?open=accounts|brands, /studio/?draft=<id>
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const want = q.get("open"), draft = q.get("draft");
     if (want === "accounts" || want === "brands") setPanel(want === "accounts" ? "accounts" : "manage");
+    if (want === "preview") setPreviewRequested(true);
     if (draft) { void store.select(draft); setTab("post"); }
     if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -295,7 +298,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}

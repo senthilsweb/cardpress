@@ -42,3 +42,9 @@ The expanded post editor has a plain background, without the grid.
 ## Account menu
 
 The footer at the bottom of the sidebar shows the open brand (its initials, name and handle). Click it and a menu opens upward: **Library**, **Social accounts**, **Manage brands**, the light or dark mode, and these docs. It is where sign-in will go when there are user accounts. When the sidebar is hidden, a small round button with the brand's initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.
+
+## The article editor
+
+Posts are plain text with LinkedIn's rules: paragraphs, lists, bold and italic. **Articles** are the rich kind. The toolbar offers bold, italic, underline, strikethrough and code; a title, heading and subheading; quote and code block; link; **pictures**, a table and a divider; and undo and redo. Add a picture with the picture button, or paste or drop one: it is shrunk to 1600 px and kept inside the text as base64, so an article with its pictures is a single row in the database (the limit for one article is about 24 MB). In a table, buttons appear to add or remove rows and columns. An article has its own **Title**, used by the library and the file names.
+
+An article is **approved** (marked final) rather than published. Its Full preview offers a **planned date** and **Markdown** or **HTML** export to paste into LinkedIn's article editor or a site.

@@ -48,6 +48,7 @@ nav:
       - Publishing: publishing.md
       - Social accounts: social-settings.md
       - Library: library.md
+      - Loading your own writing: import-writing.md
   - Integrate:
       - MCP: mcp.md
   - Code Tour: code-tour.md

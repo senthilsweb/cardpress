@@ -3,12 +3,15 @@ import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, withStandardPalettes } from "./profiles";
 import { brandColor, pickActive } from "./brands";
 import type { Design, Profile } from "./types";
+import { hydrateCustomFonts, type FontDef } from "./fonts";
 
 export interface LibraryBoot {
   profiles: Profile[];
   activeId: string;
   theme?: "light" | "dark";
   colors: Record<string, string>;
+  /** Each brand's own design: the card shown for an item that was never given one. */
+  designs: Record<string, Design>;
 }
 
 export type LibraryBootState =
@@ -32,7 +35,9 @@ export function useLibraryBoot() {
       const designs = state.designs as Record<string, Design>;
       const colors = Object.fromEntries(profiles.map((p) => [p.id, brandColor(p, designs[p.id])]));
       const theme = state.preferences.theme === "dark" || state.preferences.theme === "light" ? state.preferences.theme : undefined;
-      setBoot({ status: "ready", data: { profiles, activeId, theme, colors } });
+      const fonts = Array.isArray(state.preferences.customFonts) ? (state.preferences.customFonts as FontDef[]) : [];
+      hydrateCustomFonts(fonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); });
+      setBoot({ status: "ready", data: { profiles, activeId, theme, colors, designs } });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { clearToken(); return setBoot({ status: "auth", error: "That token was not accepted." }); }
       setBoot({ status: "error", message: e instanceof Error ? e.message : "Something went wrong" });

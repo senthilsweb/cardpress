@@ -29,7 +29,9 @@ import type { Design, Palette, Profile } from "@/lib/types";
 const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
-export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+  /** Open the Full preview as soon as this shows (asked for by the library). */
+  openPreview?: boolean;
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
@@ -45,6 +47,7 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
   const { editorHeight, setEditorHeight } = useLayout();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
+  useEffect(() => { if (openPreview) setPreview(true); }, [openPreview]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };

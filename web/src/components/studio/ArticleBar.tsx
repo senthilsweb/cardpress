@@ -58,7 +58,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
       </div>
       {planning && (
         <div className="space-y-2 rounded-md border border-border bg-card p-3">
-          <ScheduleFields idPrefix="plan" local={local} tz={tz} onLocal={setLocal} onTz={setTz} />
+          <ScheduleFields verb="Planned for" idPrefix="plan" local={local} tz={tz} onLocal={setLocal} onTz={setTz} />
           <div className="flex justify-end gap-2">
             {draft.scheduledAt && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(async () => { await onPlan({}); setPlanning(false); })}><X /> Clear</Button>}
             <Button size="sm" variant="brand" disabled={busy || !!sched.problem || !sched.at}

@@ -902,7 +902,7 @@ func TestLibraryThroughTheAPI(t *testing.T) {
 
 	got := do(h, "GET", "/api/v1/library?profileId=p&status=published", "", nil)
 	var page service.LibraryPage
-	if got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &page) != nil || len(page.Items) != 1 || page.Items[0].Title != "Hello library" || page.Items[0].PostURL == "" {
+	if got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &page) != nil || len(page.Items) != 1 || page.Total != 1 || page.Pages != 1 || page.Page != 1 || page.PageSize != 20 || page.Items[0].Title != "Hello library" || page.Items[0].PostURL == "" {
 		t.Fatalf("%d %s", got.Code, got.Body)
 	}
 	if r := do(h, "GET", "/api/v1/library", "", nil); r.Code != 400 {
@@ -910,6 +910,12 @@ func TestLibraryThroughTheAPI(t *testing.T) {
 	}
 	if r := do(h, "GET", "/api/v1/library?profileId=p&kind=video", "", nil); r.Code != 400 {
 		t.Fatalf("bad kind: %d", r.Code)
+	}
+	if r := do(h, "GET", "/api/v1/library?profileId=p&pageSize=7", "", nil); r.Code != 400 {
+		t.Fatalf("bad page size: %d", r.Code)
+	}
+	if r := do(h, "GET", "/api/v1/library?profileId=p&page=9&pageSize=10", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"page":1`) {
+		t.Fatalf("a page past the end: %d %s", r.Code, r.Body)
 	}
 	at := do(h, "GET", "/api/v1/publish/jobs/"+j.ID+"/attempts", "", nil)
 	if at.Code != 200 || !strings.Contains(at.Body.String(), `"attempts"`) {

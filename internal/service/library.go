@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -41,22 +42,27 @@ type LibraryQuery struct {
 	Kind      string // "", "post" or "article"
 	Status    string // "", a job status, or "draft"
 	Q         string // text to look for, any case
-	Before    string // the cursor of the last row already seen
-	Limit     int
+	Page      int    // 1-based; 0 means the first
+	PageSize  int    // 10, 20 or 50; 0 means the default
 }
 
-// LibraryPage is one page of the list. Next is empty when there is no more.
+// LibraryPage is one page of the list, with where it sits in the whole.
 type LibraryPage struct {
-	Items []LibraryItem `json:"items"`
-	Next  string        `json:"next,omitempty"`
+	Items    []LibraryItem `json:"items"`
+	Total    int           `json:"total"`    // rows in the whole list (after the filters)
+	Page     int           `json:"page"`     // the page returned (1-based, kept within range)
+	PageSize int           `json:"pageSize"` //
+	Pages    int           `json:"pages"`    // at least 1
 }
 
 const (
-	libraryDefaultLimit = 30
-	libraryMaxLimit     = 100
-	titleChars          = 80
-	excerptChars        = 160
+	libraryDefaultPageSize = 20
+	titleChars             = 80
+	excerptChars           = 160
 )
+
+// LibraryPageSizes are the page sizes a caller may ask for.
+var LibraryPageSizes = []int{10, 20, 50}
 
 type row struct {
 	item LibraryItem
@@ -71,12 +77,15 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 	if q.Kind != "" && q.Kind != "post" && q.Kind != "article" {
 		return LibraryPage{}, invalid("kind must be post or article")
 	}
-	limit := q.Limit
-	if limit <= 0 {
-		limit = libraryDefaultLimit
+	size := q.PageSize
+	if size == 0 {
+		size = libraryDefaultPageSize
 	}
-	if limit > libraryMaxLimit {
-		limit = libraryMaxLimit
+	if !slices.Contains(LibraryPageSizes, size) {
+		return LibraryPage{}, invalid("pageSize must be 10, 20 or 50")
+	}
+	if q.Page < 0 {
+		return LibraryPage{}, invalid("page must be 1 or more")
 	}
 
 	var rows []row
@@ -111,24 +120,26 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 		}
 		return a.ID > b.ID
 	})
-	if q.Before != "" {
-		at, id, _ := strings.Cut(q.Before, "|")
-		i := sort.Search(len(kept), func(i int) bool { // the first row strictly after the cursor
-			it := kept[i].item
-			return it.At < at || (it.At == at && it.ID < id)
-		})
-		kept = kept[i:]
+	pages := (len(kept) + size - 1) / size
+	if pages == 0 {
+		pages = 1
 	}
-	page := LibraryPage{Items: []LibraryItem{}}
-	for i, r := range kept {
-		if i == limit {
-			last := page.Items[len(page.Items)-1]
-			page.Next = last.At + "|" + last.ID
-			break
-		}
-		page.Items = append(page.Items, r.item)
+	page := q.Page
+	if page == 0 {
+		page = 1
 	}
-	return page, nil
+	if page > pages {
+		page = pages // a page past the end (after a delete, say) shows the last one
+	}
+	lo, hi := (page-1)*size, page*size
+	if hi > len(kept) {
+		hi = len(kept)
+	}
+	out := LibraryPage{Items: []LibraryItem{}, Total: len(kept), Page: page, PageSize: size, Pages: pages}
+	for _, r := range kept[lo:hi] {
+		out.Items = append(out.Items, r.item)
+	}
+	return out, nil
 }
 
 func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
@@ -197,6 +208,7 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		if title == "" && excerpt == "" {
 			continue // nothing written yet
 		}
+		searchable := strings.Join(blocks, " ") + " " + own // the whole text and the title, before anything is dropped for the excerpt
 		if own = squash(own); own != "" {
 			// a title the person wrote is used as it is; the text then starts the excerpt unless it only repeats the title
 			if len(blocks) > 0 && squash(blocks[0]) == own {
@@ -209,7 +221,7 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		_ = json.Unmarshal([]byte(tags), &hs)
 		out = append(out, row{
 			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone},
-			text: strings.ToLower(strings.Join(blocks, " ") + " " + strings.Join(hs, " ")),
+			text: strings.ToLower(searchable + " " + strings.Join(hs, " ")),
 		})
 	}
 	return out, rs.Err()

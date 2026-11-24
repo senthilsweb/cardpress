@@ -156,13 +156,12 @@ export const api = {
     return call<Job>("POST", "/publish/jobs", form);
   },
   getJob: (id: string) => call<Job>("GET", `/publish/jobs/${encodeURIComponent(id)}`),
-  library: (f: LibraryFilter, activeId: string, before?: string) => {
-    const q = new URLSearchParams();
+  library: (f: LibraryFilter, activeId: string, page: number, pageSize: number) => {
+    const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (f.brand === "all") q.set("scope", "all"); else q.set("profileId", f.brand || activeId);
     if (f.kind) q.set("kind", f.kind);
     if (f.status) q.set("status", f.status);
     if (f.q.trim()) q.set("q", f.q.trim());
-    if (before) q.set("before", before);
     return call<LibraryPage>("GET", `/library?${q}`);
   },
   jobAttempts: (id: string) => call<{ attempts: Attempt[] }>("GET", `/publish/jobs/${encodeURIComponent(id)}/attempts`).then((r) => r.attempts),

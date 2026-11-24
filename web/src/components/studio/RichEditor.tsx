@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * Posts allow paragraphs, lists, bold and italic (what LinkedIn shows). Articles are the rich kind: headings, quotes, links,
  * code, dividers, tables and pictures that live inside the text as base64.
  */
-function extensionsFor(kind: DraftKind) {
+export function extensionsFor(kind: DraftKind) {
   const placeholder = Placeholder.configure({ placeholder: kind === "post" ? "Write your post…" : "Write your article…" });
   if (kind === "post") {
     return [StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, strike: false, underline: false, link: false }), placeholder];

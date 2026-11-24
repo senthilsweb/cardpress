@@ -17,7 +17,7 @@ export function resolveSchedule(local: string, tz: string, now = Date.now()): { 
 }
 
 /** A date and time in a chosen time zone, with the result spelled out so a daylight-saving edge is never a surprise. */
-export function ScheduleFields({ idPrefix, local, tz, onLocal, onTz }: { idPrefix: string; local: string; tz: string; onLocal: (v: string) => void; onTz: (v: string) => void }) {
+export function ScheduleFields({ idPrefix, local, tz, onLocal, onTz, verb = "Posts" }: { idPrefix: string; local: string; tz: string; onLocal: (v: string) => void; onTz: (v: string) => void; /** What happens at that time: "Posts" for a post, "Planned for" for an article. */ verb?: string }) {
   const zones = useMemo(() => timezones(), []);
   const { at, problem } = resolveSchedule(local, tz);
   return (
@@ -38,7 +38,7 @@ export function ScheduleFields({ idPrefix, local, tz, onLocal, onTz }: { idPrefi
         </div>
       </div>
       <p className={problem ? "text-xs text-destructive" : "text-xs text-muted-foreground"} aria-live="polite">
-        {problem ?? (at && `Posts ${formatInZone(at.toISOString(), tz)} (${relative(at.toISOString())}).`)}
+        {problem ?? (at && `${verb} ${formatInZone(at.toISOString(), tz)} (${relative(at.toISOString())}).`)}
       </p>
     </div>
   );

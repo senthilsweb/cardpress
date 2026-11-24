@@ -55,4 +55,4 @@ Posts stay plain text with LinkedIn's rules (no headings, optional unicode style
 2. **Page size.** Recommended: 20, with 10 and 50.
 3. **Image limits.** Recommended: shrink to 1600 px, 25 MB per document.
 4. **How much to import.** Recommended: about ten posts and six articles with images, a mix of draft and approved.
-5. **Design for a new item.** Recommended: copy the brand's current design when the item is created; **Use brand design** resets it.
+5. **Design for a new item.** Built: a new item starts from the brand's current design, and the brand's design follows the latest card edited in the Design tab, so a new item looks like the last one you made. A separate "reset to the brand design" was left out, since the two are the same thing.

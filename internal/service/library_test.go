@@ -135,29 +135,39 @@ func TestLibraryFiltersByBrandKindStatusAndText(t *testing.T) {
 	}
 }
 
-func TestLibraryPagesWithACursorAndNothingSkippedOrRepeated(t *testing.T) {
+func TestLibraryPagesWithATotalAndNothingSkippedOrRepeated(t *testing.T) {
 	l, ctx := newLib(t), context.Background()
-	for i := 0; i < 7; i++ {
-		l.draft(t, "p", "post", docOf(para(fmt.Sprintf("Draft number %d", i))))
+	for i := 0; i < 23; i++ {
+		l.draft(t, "p", "post", docOf(para(fmt.Sprintf("Draft number %02d", i))))
 		l.advance(time.Second)
 	}
+	first, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
+	if err != nil || first.Total != 23 || first.Pages != 2 || first.Page != 1 || first.PageSize != 20 || len(first.Items) != 20 {
+		t.Fatalf("%+v %v", first, err)
+	}
+	second, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Page: 2})
+	if len(second.Items) != 3 || second.Page != 2 {
+		t.Fatalf("%+v", second)
+	}
+	// newest first, every row once across the pages
 	var seen []string
-	before := ""
-	for pages := 0; pages < 10; pages++ {
-		p, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Limit: 3, Before: before})
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, p := range []LibraryPage{first, second} {
 		for _, it := range p.Items {
 			seen = append(seen, it.Title)
 		}
-		if p.Next == "" {
-			break
-		}
-		before = p.Next
 	}
-	if len(seen) != 7 || seen[0] != "Draft number 6" || seen[6] != "Draft number 0" {
+	if len(seen) != 23 || seen[0] != "Draft number 22" || seen[22] != "Draft number 00" {
 		t.Fatalf("%v", seen)
+	}
+	// a page past the end shows the last one; a page size outside 10, 20, 50 is refused
+	if past, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Page: 9, PageSize: 10}); err != nil || past.Page != 3 || len(past.Items) != 3 {
+		t.Fatalf("%+v %v", past, err)
+	}
+	if _, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", PageSize: 7}); err == nil {
+		t.Fatal("an odd page size should be refused")
+	}
+	if empty, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Q: "nothing like this"}); err != nil || empty.Total != 0 || empty.Pages != 1 || empty.Page != 1 || len(empty.Items) != 0 {
+		t.Fatalf("%+v %v", empty, err)
 	}
 }
 
@@ -206,5 +216,9 @@ func TestALibraryRowUsesTheTitleThePersonWrote(t *testing.T) {
 	page, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
 	if len(page.Items) != 1 || page.Items[0].ID != d.ID || page.Items[0].Title != "My own title" || page.Items[0].Excerpt != "First paragraph of the body." {
 		t.Fatalf("%+v", page.Items)
+	}
+	// the title stays searchable even though the excerpt skips the line that repeats it
+	if found, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Q: "my own title"}); len(found.Items) != 1 {
+		t.Fatalf("a title search found %d", len(found.Items))
 	}
 }
