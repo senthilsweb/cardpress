@@ -65,7 +65,7 @@ stateDiagram-v2
   CheckLinkedIn --> Publishing: you press Publish anyway
 ```
 
-The scheduler runs inside the server, so the server has to be running at the scheduled time. A post later than the grace window is marked Missed and waits for you, and a publish with an unknown outcome is flagged Check LinkedIn. See [Publishing](publishing.md).
+The scheduler is not a library: it is a loop in the Go server that wakes every 20 seconds, claims each due job with one atomic database update, and publishes it. The server has to be running at the scheduled time. A post later than the grace window is marked Missed and waits for you, and a publish with an unknown outcome is flagged Check LinkedIn. See [Publishing](publishing.md).
 
 ## Security model
 

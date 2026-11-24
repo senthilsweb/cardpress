@@ -1,0 +1,27 @@
+# CardPress on Fly.io with a remote Turso (libSQL) database and no volume. Deploy with
+# scripts/deploy-fly.sh --turso (see docs/fly.md). CARDPRESS_DB_URL and CARDPRESS_DB_TOKEN are set as secrets.
+# Keep one machine: the scheduler runs inside the server, and two would both poll for due posts.
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ADDR = ":8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

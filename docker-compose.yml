@@ -17,7 +17,8 @@ services:
         required: false
     environment:
       ADDR: ":8080"
-      CARDPRESS_DB_URL: "file:/data/cardpress.db"
+      # the SQLite file in the volume, unless .env sets CARDPRESS_DB_URL (a libsql:// Turso URL, plus CARDPRESS_DB_TOKEN)
+      CARDPRESS_DB_URL: "${CARDPRESS_DB_URL:-file:/data/cardpress.db}"
     ports:
       # loopback only by default. Set CARDPRESS_BIND=0.0.0.0 (and CARDPRESS_API_TOKEN) to expose it.
       - "${CARDPRESS_BIND:-127.0.0.1}:${CARDPRESS_PORT:-8080}:8080"

@@ -34,16 +34,19 @@ Everything you save lives on your server (SQLite, or Turso); nothing is kept in 
 make build
 ./bin/cardpress                 # http://localhost:8080  (the editor is at /studio/)
 
-# Docker Compose (SQLite in a volume, settings from .env)
+# Docker Compose on your own machine (SQLite in a volume, settings from .env)
 cp .env.example .env
 docker compose up -d
+
+# Fly.io (one always-on machine; SQLite on a volume or Turso)
+scripts/deploy-fly.sh up --app my-cardpress
 
 # Development (Go API on :8080, Astro with hot reload)
 cd web && npm install && cd ..
 make dev
 ```
 
-It listens on loopback only and refuses to expose the API without `CARDPRESS_API_TOKEN`. To use a real model for the assistant, see [Claude Managed Agent](docs/cma-agent.md).
+See [Deploy to Fly.io](docs/fly.md). It listens on loopback only and refuses to expose the API without `CARDPRESS_API_TOKEN`. To use a real model for the assistant, see [Claude Managed Agent](docs/cma-agent.md).
 
 ## Documentation
 
