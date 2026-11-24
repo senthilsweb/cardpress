@@ -59,7 +59,7 @@ On start, any post left "publishing" by a previous run becomes **Check LinkedIn*
 | Variable | Default | Meaning |
 |---|---|---|
 | `CARDPRESS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
-| `CARDPRESS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header. LinkedIn retires versions after about a year, so keep it current. |
+| `CARDPRESS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header (`YYYYMM`). LinkedIn retires versions after about a year; if posts fail with "no longer accepts the API version", set this to a current one. |
 | `CARDPRESS_LINKEDIN_API_BASE` | LinkedIn's API | For tests or a proxy only. It must be https (plain http only for localhost), because the access token is sent there. |
 
 ## API

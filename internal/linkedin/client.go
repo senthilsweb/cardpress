@@ -125,6 +125,9 @@ func friendly(status int, body []byte, step string) *APIError {
 		msg = "LinkedIn refused this action. Check that the token has the w_member_social (or w_organization_social) scope and matches the author URN."
 	case status == http.StatusTooManyRequests:
 		msg = "LinkedIn's rate limit was reached. Try again later."
+	case status == http.StatusUpgradeRequired:
+		// LinkedIn retires API versions about a year after release and answers 426 for one that is no longer active
+		msg = "LinkedIn no longer accepts the API version this app sends. Set CARDPRESS_LINKEDIN_VERSION to a current version (YYYYMM, see LinkedIn's API versioning page) and restart."
 	default:
 		msg = fmt.Sprintf("LinkedIn could not %s (%d %s).", step, status, http.StatusText(status))
 	}

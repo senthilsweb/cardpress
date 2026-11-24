@@ -163,6 +163,7 @@ func TestFailuresBeforeThePostAreKnownNotPosted(t *testing.T) {
 		"expired token":   {func(f *fake) { f.initStatus = 401 }, 401, "may have expired"},
 		"wrong scope":     {func(f *fake) { f.initStatus = 403 }, 403, "scope"},
 		"rate limited":    {func(f *fake) { f.initStatus = 429 }, 429, "rate limit"},
+		"retired version": {func(f *fake) { f.initStatus = 426 }, 426, "CARDPRESS_LINKEDIN_VERSION"},
 		"upload rejected": {func(f *fake) { f.uploadStatus = 400 }, 400, "accept the image"},
 		"post rejected":   {func(f *fake) { f.postStatus = 422 }, 422, "Field author is invalid"},
 	} {
