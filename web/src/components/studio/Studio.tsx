@@ -12,6 +12,7 @@ import { ContentPanel, DesignPanel, ProfilePanel } from "./panels";
 import { Composer } from "./Composer";
 import { SocialSettings } from "./SocialSettings";
 import { ChatPanel } from "./ChatPanel";
+import { Drawer } from "@/components/ui/drawer";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
 import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
@@ -104,7 +105,11 @@ function Workspace({ initial }: { initial: Loaded }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpenRaw] = useState(false);
+  const [assistantOpen, setAssistantOpenRaw] = useState(false);
+  // the two right-hand drawers share one edge, so only one is open at a time
+  const setSettingsOpen = (o: boolean) => { setSettingsOpenRaw(o); if (o) setAssistantOpenRaw(false); };
+  const setAssistantOpen = (o: boolean) => { setAssistantOpenRaw(o); if (o) setSettingsOpenRaw(false); };
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
@@ -206,6 +211,15 @@ function Workspace({ initial }: { initial: Loaded }) {
           <div className="flex-1" />
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button variant={assistantOpen ? "secondary" : "ghost"} size="icon-sm" className="relative" onClick={() => setAssistantOpen(!assistantOpen)} aria-label={chat.pendingCount > 0 ? `Assistant, ${chat.pendingCount} proposals waiting for your decision` : "Assistant"} aria-expanded={assistantOpen}>
+                <Sparkles />
+                {chat.pendingCount > 0 && <span aria-hidden className="absolute -right-1 -top-1 min-w-4 rounded-full bg-brand px-1 text-[10px] font-semibold leading-4 text-white">{chat.pendingCount}</span>}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Assistant: draft a post from an article</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button variant="ghost" size="icon-sm" onClick={() => setSettingsOpen(true)} aria-label="Social accounts"><SettingsIcon /></Button>
             </TooltipTrigger>
             <TooltipContent>Social accounts</TooltipContent>
@@ -230,13 +244,9 @@ function Workspace({ initial }: { initial: Loaded }) {
            <div className="flex min-h-0 flex-1 flex-col lg:w-[380px]">
             <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
               <div className="border-b border-border px-3 py-2.5">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
                   <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
-                  <TabsTrigger value="chat" className="gap-1 px-1 text-[12.5px]">
-                    <Sparkles /> Chat
-                    {chat.pendingCount > 0 && <span className="rounded-full bg-brand px-1.5 text-[10px] font-semibold leading-4 text-white" aria-label={`${chat.pendingCount} proposals waiting for your decision`}>{chat.pendingCount}</span>}
-                  </TabsTrigger>
                   <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Post</TabsTrigger>
                   <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Profile</TabsTrigger>
                 </TabsList>
@@ -244,7 +254,6 @@ function Workspace({ initial }: { initial: Loaded }) {
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="chat" className="mt-0 h-full"><ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => setTab("post")} /></TabsContent>
                 <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
@@ -335,6 +344,9 @@ function Workspace({ initial }: { initial: Loaded }) {
         </div>
       </div>
       <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title="Assistant" resizeKey="assistant">
+        <ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => { setTab("post"); if (sidebarHidden) toggleSidebar(); setAssistantOpen(false); }} />
+      </Drawer>
      </LayoutContext.Provider>
 
       {/* off-screen export stage: full-size cards, no transforms */}

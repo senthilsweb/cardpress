@@ -38,7 +38,7 @@ function StartView({ chat }: { chat: ChatStore }) {
       {chat.agent && !chat.agent.ai && (
         <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] leading-snug">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-          <p>The chat is using a built-in <b>demo agent</b>: it picks sentences from the article by simple rules and understands only a few instructions. It is not an AI model. The real agent plugs in here later.</p>
+          <p>The chat is using a built-in <b>demo agent</b>: it picks sentences from the article by simple rules and understands only a few instructions. It is not an AI model. A real one can be connected (see docs/cma-agent.md).</p>
         </div>
       )}
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); go(); }}>
