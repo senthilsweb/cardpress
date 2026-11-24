@@ -50,9 +50,6 @@ export function PublishBar({ draft, onApprove, serialized, bodyOnly, size, rende
     return () => { live = false; };
   }, [draft.profileId]);
 
-  if (draft.kind === "article") {
-    return <p className="text-xs text-muted-foreground">Articles are not published from here. Copy the text into LinkedIn or your blog.</p>;
-  }
 
   const empty = !serialized.text.trim();
   const blocked = empty ? "The post has no text." : serialized.overLimit ? "The post is over LinkedIn's length limit." : null;

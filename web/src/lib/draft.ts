@@ -73,8 +73,16 @@ export function flattenForPost(doc: DocNode): DocNode {
     const marks = (n.marks ?? []).filter((m) => POST_MARKS.has(m.type));
     return marks.length ? { ...n, marks } : { type: "text", text: n.text };
   };
+  const cellText = (cell: DocNode): string => (cell.content ?? []).map((p) => (p.content ?? []).map((t) => t.text ?? "").join("")).join(" ").trim();
   const walk = (n: DocNode): DocNode[] => {
-    if (n.type === "horizontalRule") return [];
+    if (n.type === "horizontalRule" || n.type === "image") return [];
+    // a table has no place in a post: each row becomes a paragraph of its cells
+    if (n.type === "table") {
+      return (n.content ?? [])
+        .map((row) => (row.content ?? []).map(cellText).join(" | ").trim())
+        .filter(Boolean)
+        .map((text): DocNode => ({ type: "paragraph", content: [{ type: "text", text }] }));
+    }
     if (TEXT_BLOCKS.has(n.type)) {
       // a quote holds paragraphs; keep each as its own paragraph
       if (n.type === "blockquote") return (n.content ?? []).flatMap(walk);

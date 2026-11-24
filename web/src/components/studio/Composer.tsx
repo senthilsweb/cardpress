@@ -13,6 +13,7 @@ import { AreaField, Field, Section } from "./fields";
 import { RichEditor } from "./RichEditor";
 import { FullPreview, linkedinSize } from "./FullPreview";
 import { PublishBar } from "./PublishBar";
+import { ArticleBar } from "./ArticleBar";
 import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
@@ -118,6 +119,11 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
             ))}
           </SelectContent>
         </Select>
+        {!isPost && (
+          <Field label="Title" hint="Shown in the library and used for the file name.">
+            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={draft.status === "scheduled"} />
+          </Field>
+        )}
         <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
           <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) store.setKind(v as DraftKind); }}>
             <ToggleGroupItem value="post">Post</ToggleGroupItem>
@@ -226,12 +232,14 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
       <FullPreview
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
-        actions={
+        actions={draft.kind === "article" ? (
+          <ArticleBar draft={draft} html={html} onApprove={approve} onPlan={store.plan} />
+        ) : (
           <PublishBar
             draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
             onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
           />
-        }
+        )}
       />
 
       {expanded && host && createPortal(

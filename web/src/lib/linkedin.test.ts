@@ -123,4 +123,20 @@ describe("draft helpers", () => {
     expect(JSON.stringify(flat)).not.toContain("link");
     expect(JSON.stringify(flat)).toContain("quoted");
   });
+  it("an article's pictures, tables and code are handled in both forms", () => {
+    const row = (...cells: string[]): DocNode => ({ type: "tableRow", content: cells.map((c) => ({ type: "tableCell", content: [p(t(c))] })) });
+    const article = doc(
+      p(t("Intro")),
+      { type: "image", attrs: { src: "data:image/png;base64,AAAA", alt: "x" } },
+      { type: "codeBlock", content: [t("select 1")] },
+      { type: "table", content: [row("Name", "Rows"), row("orders", "12")] },
+    );
+    // the plain text keeps the words and the table rows, and has nothing for the picture
+    expect(serializeForLinkedIn(article).text).toBe("Intro\n\nselect 1\n\nName | Rows\norders | 12");
+    // as a post: no picture, the table becomes one paragraph per row
+    const flat = flattenForPost(article);
+    expect(flat.content!.map((n) => n.type)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph"]);
+    expect(JSON.stringify(flat)).not.toContain("base64");
+    expect(serializeForLinkedIn(flat).text).toBe("Intro\n\nselect 1\n\nName | Rows\n\norders | 12");
+  });
 });

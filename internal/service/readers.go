@@ -67,6 +67,23 @@ func (n docNode) blocks(indent string) []string {
 			}
 		case "blockquote":
 			out = append(out, c.blocks(indent)...)
+		case "image", "horizontalRule":
+			// a picture or a divider has no text
+		case "table":
+			// each row is a line, its cells joined with " | "
+			var rows []string
+			for _, row := range c.Content {
+				var cells []string
+				for _, cell := range row.Content {
+					cells = append(cells, strings.TrimSpace(strings.Join(cell.blocks(""), " ")))
+				}
+				if line := strings.TrimSpace(strings.Join(cells, " | ")); line != "" && line != "|" {
+					rows = append(rows, indent+line)
+				}
+			}
+			if len(rows) > 0 {
+				out = append(out, strings.Join(rows, "\n"))
+			}
 		case "heading":
 			if t := strings.TrimSpace(c.inline()); t != "" {
 				level := 2

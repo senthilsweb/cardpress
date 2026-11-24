@@ -101,6 +101,7 @@
 .rich ul { list-style: disc; padding-left: 1.25rem; }
 .rich ol { list-style: decimal; padding-left: 1.25rem; }
 .rich li > p { margin: 0; }
+.rich h1 { font-size: 1.4rem; font-weight: 700; line-height: 1.25; }
 .rich h2 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
 .rich h3 { font-size: 1rem; font-weight: 700; line-height: 1.3; }
 .rich blockquote { border-left: 3px solid var(--brand); padding-left: .75rem; color: var(--muted-foreground); }
@@ -109,9 +110,23 @@
 .article-html > * + * { margin-top: .8em; }
 .article-html ul { list-style: disc; padding-left: 1.4rem; }
 .article-html ol { list-style: decimal; padding-left: 1.4rem; }
+.article-html h1 { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
 .article-html h2 { font-size: 1.3rem; font-weight: 700; }
 .article-html h3 { font-size: 1.1rem; font-weight: 700; }
 .article-html blockquote { border-left: 3px solid var(--brand); padding-left: .9rem; color: var(--muted-foreground); }
 
 /* the header: a soft cream-to-blue wash */
 .app-header { background-image: linear-gradient(90deg, var(--header-from), var(--header-to)); }
+
+/* article content: code, pictures, dividers, tables (the editor and the read-only views) */
+.rich code, .article-html code { font-family: var(--font-mono, ui-monospace, monospace); font-size: .86em; background: var(--muted); border-radius: .25rem; padding: .1em .3em; }
+.rich pre, .article-html pre { background: var(--muted); border-radius: .5rem; padding: .7rem .85rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+.rich pre code, .article-html pre code { background: none; padding: 0; font-size: inherit; }
+.rich hr, .article-html hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
+.rich img, .article-html img { max-width: 100%; height: auto; border-radius: .5rem; display: block; margin: .8em auto; }
+.rich img.ProseMirror-selectednode { outline: 2px solid var(--brand); }
+.rich table, .article-html table { border-collapse: collapse; width: 100%; font-size: .9em; display: block; overflow-x: auto; }
+.rich th, .rich td, .article-html th, .article-html td { border: 1px solid var(--border); padding: .35rem .55rem; vertical-align: top; text-align: left; min-width: 4rem; }
+.rich th, .article-html th { background: var(--muted); font-weight: 600; }
+.rich .selectedCell { background: color-mix(in oklab, var(--brand) 14%, transparent); }
+.rich s, .article-html s { opacity: .8; }

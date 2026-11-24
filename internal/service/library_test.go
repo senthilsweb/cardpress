@@ -174,3 +174,37 @@ func TestLibraryTitleAndExcerptFromAnyKindOfText(t *testing.T) {
 		t.Fatalf("%q / %q", title, excerpt)
 	}
 }
+
+func TestLibraryReadsRichArticlesTextWithoutTheirPicturesOrMarkup(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	cell := func(s string) string {
+		return `{"type":"tableCell","content":[` + para(s) + `]}`
+	}
+	table := `{"type":"table","content":[{"type":"tableRow","content":[` + cell("Name") + `,` + cell("Rows") + `]},{"type":"tableRow","content":[` + cell("orders") + `,` + cell("12") + `]}]}`
+	image := `{"type":"image","attrs":{"src":"data:image/png;base64,AAAA","alt":"a chart"}}`
+	code := `{"type":"codeBlock","content":[{"type":"text","text":"select 1"}]}`
+	a := l.draft(t, "p", "article", docOf(heading("Rich article"), para("Intro text."), image, code, table, `{"type":"horizontalRule"}`))
+	page, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Q: "orders | 12"})
+	if err != nil || len(page.Items) != 1 || page.Items[0].ID != a.ID {
+		t.Fatalf("%+v %v", page, err)
+	}
+	got := page.Items[0]
+	if got.Title != "Rich article" || strings.Contains(got.Excerpt, "base64") || !strings.Contains(got.Excerpt, "Intro text.") {
+		t.Fatalf("%+v", got)
+	}
+	if txt := DraftText(a.Doc); strings.Contains(txt, "base64") || !strings.Contains(txt, "Name | Rows") {
+		t.Fatalf("%q", txt)
+	}
+}
+
+func TestALibraryRowUsesTheTitleThePersonWrote(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	d, err := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "article", Title: "My own title", Doc: docOf(heading("My own title"), para("First paragraph of the body."))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
+	if len(page.Items) != 1 || page.Items[0].ID != d.ID || page.Items[0].Title != "My own title" || page.Items[0].Excerpt != "First paragraph of the body." {
+		t.Fatalf("%+v", page.Items)
+	}
+}

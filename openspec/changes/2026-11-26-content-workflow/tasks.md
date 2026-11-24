@@ -7,8 +7,8 @@
 - [x] `docs/data-model.md` updated
 
 ## Bolt 2: editor
-- [ ] Rich toolbar for articles: code, code block, divider, table, underline, strike, H1
-- [ ] Images: upload, paste, drop; shrink to 1600 px; stored as base64 in the text
+- [x] Rich toolbar for articles: code, code block, divider, table, underline, strike, H1
+- [x] Images: upload, paste, drop; shrink to 1600 px; stored as base64 in the text
 - [x] The card design saved with the draft; "Use brand design"
 - [x] Approve and the approval gate in the editor and Full preview
 

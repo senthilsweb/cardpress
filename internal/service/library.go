@@ -170,7 +170,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 
 func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	// a draft that became a post is listed once, as the post
-	query := `SELECT id, profile_id, kind, status, doc, hashtags, updated_at, scheduled_at, timezone FROM drafts d
+	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone FROM drafts d
 	          WHERE NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = d.id)`
 	var args []any
 	if !q.All {
@@ -188,14 +188,22 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, kind, status, doc, tags, updated, planned, zone string
-		if err := rs.Scan(&id, &pid, &kind, &status, &doc, &tags, &updated, &planned, &zone); err != nil {
+		var id, pid, kind, status, own, doc, tags, updated, planned, zone string
+		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone); err != nil {
 			return nil, err
 		}
 		blocks := docBlocks(doc)
 		title, excerpt := titleAndExcerpt(blocks)
 		if title == "" && excerpt == "" {
 			continue // nothing written yet
+		}
+		if own = squash(own); own != "" {
+			// a title the person wrote is used as it is; the text then starts the excerpt unless it only repeats the title
+			if len(blocks) > 0 && squash(blocks[0]) == own {
+				blocks = blocks[1:]
+			}
+			_, excerpt = titleAndExcerpt(append([]string{own}, blocks...))
+			title = cut(own, titleChars)
 		}
 		var hs []string
 		_ = json.Unmarshal([]byte(tags), &hs)
