@@ -49,6 +49,19 @@ Posts are plain text with LinkedIn's rules: paragraphs, lists, bold and italic. 
 
 An article is **approved** (marked final) rather than published. Its Full preview shows the **card** above the text, and offers a **planned date**, **For LinkedIn**, and **Markdown** or **HTML** export.
 
+### Editing a long article
+
+Open the **expanded editor** (the arrows in the Article section) for long writing.
+
+- **Fixed toolbar.** The toolbar, the table controls (shown while the cursor is in a table) and the link field stay at the top. Only the text scrolls. The footer stays at the bottom with the word count, the reading time (about 200 words a minute), the character count and the save status.
+- **Floating menu.** Select some text and a small menu appears above it: bold, italic, link and heading. Link opens the link field in the toolbar.
+- **`/` menu.** Type `/` at the start of an empty paragraph to insert a block: heading, subheading, picture, table, code block, quote, divider, bulleted or numbered list. Keep typing to narrow the list, use the arrow keys and Enter to choose, Esc to close it. The `/` and what you typed after it are removed when the block is inserted.
+- **Outline.** The headings (H1 to H3) are listed at the left, indented by level. Click one to jump to it. Hide or show the outline with the button at its top; the choice is remembered in the browser.
+- **Width and size.** The toolbar has a button for narrow or wide text and **A-** / **A+** for the text size. Both are remembered in the browser.
+- **Saving.** Typing is passed on and saved after a short pause (a quarter of a second, then the usual save delay). Anything that needs the whole text, such as the preview, copying, approving, switching or deleting a draft, or collapsing the editor, takes what you have just typed first. Posts are updated at once.
+
+The code for these is in `components/studio/RichEditor.tsx` (editor, menus, outline), `lib/editorTools.ts` (the `/` list, the outline, the counts) and `lib/pendingEdits.ts` (the pause and the flush).
+
 ### For LinkedIn
 
 LinkedIn cannot receive an article from outside, so you paste it into its article editor. **For LinkedIn** prepares it for that: the title (for LinkedIn's own title field) and the body each have a **Copy** button, and the pictures come as a **.zip**. The body keeps headings (two levels), bold, italic, underline, lists, quotes, links and code blocks. What LinkedIn's editor has no place for is changed, and the dialog says what changed: a **table** becomes a list of rows ("Layer: Bronze; Tables: 7"), a **divider** is dropped, strikethrough and inline code lose their styling, and each **picture** becomes a marker such as `[Picture 2: a chart]` to replace with the file. LinkedIn changes its editor from time to time, so check what it accepts if a paste looks different.

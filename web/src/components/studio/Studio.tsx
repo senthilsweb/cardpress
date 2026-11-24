@@ -25,6 +25,7 @@ import { AccountMenu } from "./AccountMenu";
 import { AccountSettings } from "./AccountSettings";
 import { UsersDrawer } from "./UsersDrawer";
 import { VersionsDrawer } from "./VersionsDrawer";
+import { flushPendingEdits } from "@/lib/pendingEdits";
 import { SessionProvider } from "./SessionProvider";
 import { Logo } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
@@ -397,7 +398,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
       </div>
       <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
       <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
-      <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={store.restoreVersion} statusKey={`${store.current?.id}:${store.current?.status}`} />
+      <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />
       <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} profileId={profile.id} brandName={profile.name} />
       <NewBrandDrawer
         open={panel === "newBrand"} onClose={() => setPanel(null)} brands={profiles} current={profile} source={copyOf}
