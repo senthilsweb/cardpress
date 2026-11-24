@@ -1,8 +1,55 @@
 ---
 import Base from "../layouts/Base.astro";
-import Studio from "../components/studio/Studio";
+import Mark from "../components/Mark.astro";
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const editor = `${base}studio/`;
+const features = [
+  { title: "Design", text: "Branded cards in every LinkedIn, X, Instagram and Facebook size." },
+  { title: "Draft", text: "An assistant writes from an article. You approve every word." },
+  { title: "Publish", text: "Preview, schedule, and post to LinkedIn. Always your click." },
+];
 ---
 <Base title="CardPress">
-  <Studio client:only="react" />
-  <noscript><p style="padding:2rem">CardPress needs JavaScript.</p></noscript>
+  <div class="flex min-h-screen flex-col" style="background-image: radial-gradient(1200px 500px at 50% -10%, var(--header-from), transparent 70%), radial-gradient(900px 400px at 100% 0%, var(--header-to), transparent 70%);">
+    <header class="mx-auto flex w-full max-w-5xl items-center gap-3 px-6 py-5">
+      <Mark />
+      <span class="text-[22px] font-bold leading-none tracking-tight">CardPress</span>
+      <span class="flex-1"></span>
+      <a href="https://github.com/senthilsweb/cardpress" class="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">GitHub</a>
+      <a href={editor} class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Open editor</a>
+    </header>
+
+    <main class="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
+      <section class="py-16 text-center sm:py-24">
+        <h1 class="mx-auto max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Social posts, drafted by an agent. Published by you.</h1>
+        <p class="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">Agentic AI for social media authoring and management. Open source and self-hosted.</p>
+        <div class="mt-8 flex items-center justify-center gap-3">
+          <a href={editor} class="rounded-lg bg-brand px-6 py-3 text-base font-medium text-white shadow-sm hover:opacity-90">Open the editor</a>
+          <a href="https://github.com/senthilsweb/cardpress#readme" class="rounded-lg border border-border bg-card px-6 py-3 text-base font-medium hover:bg-accent">Read the docs</a>
+        </div>
+      </section>
+
+      <section aria-hidden="true" class="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-card p-3 shadow-[0_20px_60px_-20px_rgba(10,59,51,0.25)]">
+        <div class="aspect-[1200/627] rounded-xl bg-[#f5f2ea] p-[6%] text-[#0f1b3a]">
+          <div class="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] sm:text-xs"><span class="inline-block h-2 w-2 rotate-45 bg-[#e0479e]"></span>Your handle</div>
+          <div class="mt-[9%] font-mono text-[9px] uppercase tracking-[0.12em] text-[#3b5bdb] sm:text-xs">Your topic · Your series</div>
+          <div class="mt-2 text-2xl font-bold leading-[1.05] tracking-tight sm:text-5xl">A good schema makes queries simple</div>
+          <div class="mt-3 text-xs text-[#4a5a7a] sm:text-lg">Cards in your own colours and fonts.</div>
+        </div>
+      </section>
+
+      <section class="grid gap-6 py-16 sm:grid-cols-3 sm:py-24">
+        {features.map((f) => (
+          <div>
+            <h2 class="eyebrow">{f.title}</h2>
+            <p class="mt-2 text-base leading-snug">{f.text}</p>
+          </div>
+        ))}
+      </section>
+    </main>
+
+    <footer class="mx-auto w-full max-w-5xl px-6 py-8 text-sm text-muted-foreground">
+      Open source under the MIT license.
+    </footer>
+  </div>
 </Base>
