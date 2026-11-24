@@ -27,6 +27,12 @@ type Config struct {
 	ServeWeb        bool          // serve the embedded web app
 	MCPEnabled      bool          // serve the MCP endpoint at /mcp
 	AllowedHosts    []string      // extra host names accepted when there is no token (CARDPRESS_ALLOWED_HOSTS)
+	Agent           string        // "mock" (demo, default) or "cma" (Claude Managed Agent) (CARDPRESS_AGENT)
+	AgentID         string        // CARDPRESS_AGENT_ID
+	AgentVersion    int           // CARDPRESS_AGENT_VERSION; 0 = latest
+	AgentEnvID      string        // CARDPRESS_AGENT_ENVIRONMENT_ID
+	AgentBudget     int           // spend cap per conversation in US cents (CARDPRESS_AGENT_BUDGET_CENTS); 0 = none
+	AgentTimeout    time.Duration // longest wait for one reply (CARDPRESS_AGENT_TIMEOUT)
 	Insecure        bool          // allow a non-loopback address without a token
 	ShowVersion     bool
 }
@@ -95,6 +101,30 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 		}
 		c.MissedGrace = d
 	}
+	c.Agent = strings.ToLower(env("CARDPRESS_AGENT", "mock"))
+	c.AgentID = env("CARDPRESS_AGENT_ID", "")
+	c.AgentEnvID = env("CARDPRESS_AGENT_ENVIRONMENT_ID", "")
+	for _, f := range []struct {
+		key string
+		dst *int
+		max int
+	}{{"CARDPRESS_AGENT_VERSION", &c.AgentVersion, 1 << 20}, {"CARDPRESS_AGENT_BUDGET_CENTS", &c.AgentBudget, 1 << 24}} {
+		if v := env(f.key, ""); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 || n > f.max {
+				return Config{}, fmt.Errorf("%s must be a whole number of at least 0, got %q", f.key, v)
+			}
+			*f.dst = n
+		}
+	}
+	c.AgentTimeout = 4 * time.Minute
+	if v := env("CARDPRESS_AGENT_TIMEOUT", ""); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < 10*time.Second || d > 30*time.Minute {
+			return Config{}, fmt.Errorf("CARDPRESS_AGENT_TIMEOUT must be a duration between 10s and 30m, got %q", v)
+		}
+		c.AgentTimeout = d
+	}
 	for _, h := range strings.Split(env("CARDPRESS_ALLOWED_HOSTS", ""), ",") {
 		if h = strings.TrimSpace(h); h != "" {
 			c.AllowedHosts = append(c.AllowedHosts, h)
@@ -125,6 +155,15 @@ func (c Config) Validate() error {
 	}
 	if c.APIToken != "" && len(c.APIToken) < 16 {
 		return errors.New("CARDPRESS_API_TOKEN is too short: use at least 16 characters")
+	}
+	switch c.Agent {
+	case "mock":
+	case "cma":
+		if c.AgentID == "" || c.AgentEnvID == "" {
+			return errors.New("CARDPRESS_AGENT=cma needs CARDPRESS_AGENT_ID and CARDPRESS_AGENT_ENVIRONMENT_ID (run `cardpress agent-setup` to create them)")
+		}
+	default:
+		return fmt.Errorf("CARDPRESS_AGENT must be mock or cma, got %q", c.Agent)
 	}
 	return nil
 }

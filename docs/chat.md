@@ -2,7 +2,7 @@
 
 The **Chat** tab drafts a post or an article from something you give it, and you steer it with replies. It prepares **content only**. It cannot choose the card's layout, colours or background, and it cannot save, publish or schedule anything: its output ends at a card that you approve. Publishing stays your own step in the [Full preview](publishing.md).
 
-> **The chat currently uses a built-in demo agent, not an AI model.** It picks sentences from the source by simple rules and understands a few instructions (below). It exists so the whole chat can be used and tested now; the screen says "Demo agent · no AI model". The real agent (a Claude Managed Agent) will plug into the same place later, with no change to the screen.
+> **The chat currently uses a built-in demo agent, not an AI model.** It picks sentences from the source by simple rules and understands a few instructions (below). It exists so the whole chat can be used and tested now; the screen says "Demo agent · no AI model". A real model (a Claude Managed Agent) plugs into the same place with no change to the screen: see [Claude Managed Agent](cma-agent.md).
 
 ## Using it
 
@@ -41,6 +41,7 @@ These pages have no readable text for the server, so it says so. Paste the text 
 | Piece | Where |
 |---|---|
 | The agent boundary: `Client` interface, proposal validation, the demo agent | `internal/agent` |
+| The Claude Managed Agent adapter | `internal/cma` |
 | URL fetching and the safety checks | `internal/source` |
 | Conversations, messages, proposals, approval rules | `internal/service/chat.go` |
 | Endpoints under `/api/v1/chat`, replies streamed as server-sent events | `internal/api/api.go` |
