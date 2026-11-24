@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, FileText, Loader2, PenLine, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, FileText, Loader2, PenLine, Search, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +88,7 @@ function Page({ data }: { data: LibraryBoot }) {
   return (
     <div className="flex h-dvh">
       <Toaster theme={theme} />
-      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-border bg-card lg:flex">
+      <aside className="hidden w-[380px] shrink-0 flex-col border-r border-border bg-card lg:flex">
         <div className="px-4 py-3"><Logo /></div>
         <nav className="flex flex-col gap-0.5 px-2 pt-2 text-sm" aria-label="Pages">
           <a href={studioHref()} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"><PenLine className="h-4 w-4" /> Editor</a>
@@ -104,6 +104,7 @@ function Page({ data }: { data: LibraryBoot }) {
             {menu("avatar")}
             <Logo />
           </div>
+          <a href={studioHref()} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Back to the editor</a>
           <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {filter.brand === "all" ? "Posts and articles for every brand" : `Posts and articles for ${brand.name}`}
