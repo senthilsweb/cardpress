@@ -20,7 +20,7 @@ LinkedIn posts are plain text. There is no bold, italic, headings or link text. 
 - Lists become lines starting with `•` or `1.`, indented two spaces per level.
 - Hashtags are added as the last line, `#One #Two`.
 - Links are written out as plain URLs.
-- **Bold and italic are left out by default.** Turn on *Keep bold and italic using Unicode letters* to send them as look-alike characters instead. Screen readers may read those letter by letter and search will not match them, so use it sparingly.
+- **Bold and italic are left out by default.** Turn on *Keep bold and italic (Unicode)* to send them as look-alike characters instead. Screen readers may read those letter by letter and search will not match them, so use it sparingly.
 
 Mentions (`@name`) are not supported: LinkedIn needs a member ID for each one.
 

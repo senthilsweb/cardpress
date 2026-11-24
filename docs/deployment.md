@@ -2,6 +2,18 @@
 
 Everything the studio saves (profiles, designs, preferences) is in a database, not in the browser. The Go server owns the database and serves `/api/v1`.
 
+## Where it can run
+
+The Go server is required: it owns the database, the encrypted credentials, publishing, the scheduler, the assistant and MCP. The web app is only the UI.
+
+| Setup | Works? |
+|---|---|
+| **Docker Compose on your own machine or server** | Yes. See [Docker Compose](#docker-compose) below |
+| **One Docker image on Fly.io**, SQLite on a volume or Turso | Yes. See [Deploy to Fly.io](fly.md) |
+| **Static front end on Vercel or similar, Go server elsewhere** | Yes, through the separate-hosts mode below, but it adds CORS and build-time setup for little gain |
+| **Go server on a serverless platform** | No. The scheduler needs a process that keeps running, and replies stream |
+| **Front end plus Turso only** | No. A browser cannot use the database directly, and none of the rules would run |
+
 ## Modes
 
 | Mode | How |
@@ -54,6 +66,21 @@ make docker-run     # published on 127.0.0.1:8080, data in ./data
 ```
 
 To expose it, set a token instead of `CARDPRESS_INSECURE`: `docker run -p 8080:8080 -e CARDPRESS_API_TOKEN=<long random value> -v cardpress-data:/data cardpress`.
+
+### Docker Compose
+
+```bash
+cp .env.example .env      # edit it: token or loopback, secret key, assistant settings
+docker compose up -d      # pulls ghcr.io/<owner>/cardpress:latest (or: docker compose up -d --build)
+```
+
+- **Settings**: every line in `.env` is passed into the container, so new `CARDPRESS_*` settings and `ANTHROPIC_API_KEY` need no change to `docker-compose.yml`. `.env` is git-ignored.
+- **Database**: SQLite in the volume by default. To use Turso instead, set `CARDPRESS_DB_URL=libsql://...` and `CARDPRESS_DB_TOKEN` in `.env` (and a `CARDPRESS_SECRET_KEY`).
+- **Data**: the SQLite database (and the key file, if you did not set `CARDPRESS_SECRET_KEY`) live in the `cardpress-data` volume, mounted at `/data`. Back it up with `docker run --rm -v cardpress-data:/data -v $PWD:/out busybox tar czf /out/cardpress-data.tgz /data`. To use a folder instead of the named volume, make it writable by uid 65532 (the image runs as non-root).
+- **Access**: the port is published on `127.0.0.1` only. To expose it, set `CARDPRESS_BIND=0.0.0.0`, a `CARDPRESS_API_TOKEN` and a `CARDPRESS_SECRET_KEY`, and put it behind HTTPS.
+- **Assistant**: see [Claude Managed Agent](cma-agent.md). Create the agent once with `docker compose run --rm -e ANTHROPIC_API_KEY=... cardpress agent-setup`, then add `CARDPRESS_AGENT=cma`, the two ids and the key to `.env` and run `docker compose up -d`.
+- **Health**: the container runs `/cardpress healthcheck` (there is no shell or curl in the image).
+- **Image tags**: `latest` and `main` follow the main branch; `vX.Y.Z` tags follow releases; set `CARDPRESS_IMAGE_TAG` to pin one.
 
 ## Moving from the older, browser-only version
 

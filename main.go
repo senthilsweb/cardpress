@@ -44,6 +44,10 @@ func main() {
 		runMCP(os.Args[2:])
 		return
 	}
+	// `cardpress healthcheck` is for the container health check: the image has no shell or curl
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck())
+	}
 	// `cardpress agent-setup` creates the Claude Managed Agent once; the user runs it on purpose
 	if len(os.Args) > 1 && os.Args[1] == "agent-setup" {
 		runAgentSetup(os.Args[2:])
@@ -278,4 +282,34 @@ func runAgentSetup(args []string) {
 	}
 	fmt.Printf("Created agent %s (version %d) and environment %s.\n\nAdd to the server's environment:\n\n  CARDPRESS_AGENT=cma\n  CARDPRESS_AGENT_ID=%s\n  CARDPRESS_AGENT_ENVIRONMENT_ID=%s\n  ANTHROPIC_API_KEY=...   (the same key)\n\nOptional: CARDPRESS_AGENT_BUDGET_CENTS=500 caps what one conversation can spend.\n",
 		created.AgentID, created.AgentVersion, created.EnvironmentID, created.AgentID, created.EnvironmentID)
+}
+
+// runHealthcheck asks the server on this machine whether it is up. It returns the exit code.
+func runHealthcheck() int {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:" + envOr("PORT", "8080")
+	}
+	if strings.HasPrefix(addr, ":") {
+		addr = "127.0.0.1" + addr
+	}
+	client := http.Client{Timeout: 4 * time.Second}
+	resp, err := client.Get("http://" + addr + "/healthz")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "unhealthy:", resp.Status)
+		return 1
+	}
+	return 0
+}
+
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
 }

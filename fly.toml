@@ -1,0 +1,34 @@
+# CardPress on Fly.io with SQLite on a volume. Deploy with scripts/deploy-fly.sh (see docs/fly.md).
+# One always-on machine: the scheduler runs inside the server, and a SQLite file belongs to one machine.
+# `app` is not set here; the script passes it with -a.
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    RUN_USER = "0:0"        # a Fly volume is mounted root-owned
+
+[env]
+  ADDR = ":8080"
+  CARDPRESS_DB_URL = "file:/data/cardpress.db"
+
+[mounts]
+  source = "cardpress_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

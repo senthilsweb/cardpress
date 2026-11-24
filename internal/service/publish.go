@@ -78,9 +78,10 @@ type LinkedInPoster interface {
 	Publish(ctx context.Context, token string, p linkedin.Post) (string, error)
 }
 
-// CredentialSource gives the plaintext credentials for a network. *Settings implements it.
+// CredentialSource gives the plaintext credentials of one brand for a network. *Settings implements it. A brand never
+// gets another brand's credentials.
 type CredentialSource interface {
-	Resolve(ctx context.Context, network string) (map[string]string, error)
+	Resolve(ctx context.Context, profileID, network string) (map[string]string, error)
 }
 
 // Publisher creates, schedules and runs publish jobs. All publishing is started by a person; there is no retry.
@@ -153,14 +154,26 @@ func (p *Publisher) checkFuture(t time.Time) error {
 	return nil
 }
 
+// readyFor is ready for the brand that owns an existing job.
+func (p *Publisher) readyFor(ctx context.Context, jobID string) error {
+	var profileID string
+	if err := p.db.QueryRowContext(ctx, `SELECT profile_id FROM publish_jobs WHERE id = ?`, jobID).Scan(&profileID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	return p.ready(ctx, profileID)
+}
+
 // ready checks that LinkedIn credentials are present, so a job is never created that could not possibly run.
-func (p *Publisher) ready(ctx context.Context) error {
-	c, err := p.creds.Resolve(ctx, "linkedin")
+func (p *Publisher) ready(ctx context.Context, profileID string) error {
+	c, err := p.creds.Resolve(ctx, profileID, "linkedin")
 	if err != nil {
 		return invalid("%v", err)
 	}
 	if c["accessToken"] == "" || c["authorUrn"] == "" {
-		return invalid("LinkedIn is not set up: add the access token and author URN in Social accounts")
+		return invalid("LinkedIn is not set up: add the access token and author URN in Social accounts for this brand")
 	}
 	return nil
 }
@@ -171,7 +184,7 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	if err := p.validate(&in); err != nil {
 		return Job{}, err
 	}
-	if err := p.ready(ctx); err != nil {
+	if err := p.ready(ctx, in.ProfileID); err != nil {
 		return Job{}, err
 	}
 	tags, _ := json.Marshal(in.Hashtags)
@@ -226,9 +239,18 @@ func (p *Publisher) Get(ctx context.Context, id string) (Job, error) {
 	return j, err
 }
 
-// List returns a profile's jobs, newest first.
+// List returns a brand's jobs, newest first.
 func (p *Publisher) List(ctx context.Context, profileID string) ([]Job, error) {
-	rows, err := p.db.QueryContext(ctx, `SELECT `+jobCols+` FROM publish_jobs WHERE profile_id = ? ORDER BY created_at DESC, id LIMIT 200`, profileID)
+	return p.list(ctx, `WHERE profile_id = ?`, profileID)
+}
+
+// ListAll returns every brand's jobs, newest first. Each job says which brand owns it.
+func (p *Publisher) ListAll(ctx context.Context) ([]Job, error) {
+	return p.list(ctx, ``)
+}
+
+func (p *Publisher) list(ctx context.Context, where string, args ...any) ([]Job, error) {
+	rows, err := p.db.QueryContext(ctx, `SELECT `+jobCols+` FROM publish_jobs `+where+` ORDER BY created_at DESC, id LIMIT 200`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +312,7 @@ func (p *Publisher) PublishNow(ctx context.Context, id string, acceptDuplicate b
 	if acceptDuplicate {
 		from = append(from, JobNeedsReview)
 	}
-	if err := p.ready(ctx); err != nil {
+	if err := p.readyFor(ctx, id); err != nil {
 		return Job{}, err
 	}
 	ok, err := p.transition(ctx, id, JobPublishing, from, `, error = ''`)
@@ -314,7 +336,7 @@ func (p *Publisher) Reschedule(ctx context.Context, id string, at time.Time, tim
 	if err := p.checkFuture(at); err != nil {
 		return Job{}, err
 	}
-	if err := p.ready(ctx); err != nil {
+	if err := p.readyFor(ctx, id); err != nil {
 		return Job{}, err
 	}
 	ok, err := p.transition(ctx, id, JobScheduled, []string{JobScheduled, JobMissed, JobFailed, JobCancelled}, `, scheduled_at = ?, timezone = ?, error = ''`, p.stamp(at), timezone)
@@ -373,16 +395,16 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 		}
 	}()
 
-	var status, body, tags, alt string
+	var status, body, tags, alt, profileID string
 	var img []byte
-	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image FROM publish_jobs WHERE id = ?`, id).Scan(&status, &body, &tags, &alt, &img)
+	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image, profile_id FROM publish_jobs WHERE id = ?`, id).Scan(&status, &body, &tags, &alt, &img, &profileID)
 	if err != nil || status != JobPublishing {
 		return // not ours to run
 	}
 	var hashtags []string
 	_ = json.Unmarshal([]byte(tags), &hashtags)
 
-	c, err := p.creds.Resolve(ctx, "linkedin")
+	c, err := p.creds.Resolve(ctx, profileID, "linkedin")
 	if err == nil && (c["accessToken"] == "" || c["authorUrn"] == "") {
 		err = errors.New("LinkedIn is not set up: add the access token and author URN in Social accounts")
 	}

@@ -48,7 +48,7 @@ func (f *fakePoster) count() int { f.mu.Lock(); defer f.mu.Unlock(); return len(
 
 type fakeCreds map[string]string
 
-func (c fakeCreds) Resolve(context.Context, string) (map[string]string, error) { return c, nil }
+func (c fakeCreds) Resolve(context.Context, string, string) (map[string]string, error) { return c, nil }
 
 type harness struct {
 	p   *Publisher
@@ -418,5 +418,28 @@ func TestListIsPerProfileNewestFirstAndOmitsImages(t *testing.T) {
 	}
 	if none, _ := h.p.List(ctx, "zzz"); none == nil || len(none) != 0 {
 		t.Fatal("empty list must be [] not nil")
+	}
+}
+
+func TestListAllShowsEveryBrandsPostsAndListShowsOne(t *testing.T) {
+	h, ctx := newHarness(t, nil), context.Background()
+	for _, brand := range []string{"a", "b", "b"} {
+		in := jobInput()
+		in.ProfileID = brand
+		at := h.clk.Add(time.Hour)
+		in.ScheduledAt, in.Timezone = &at, "Europe/London"
+		if _, err := h.p.Create(ctx, in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, err := h.p.ListAll(ctx)
+	if err != nil || len(all) != 3 {
+		t.Fatalf("all: %d %v", len(all), err)
+	}
+	if b, _ := h.p.List(ctx, "b"); len(b) != 2 {
+		t.Fatalf("b: %d", len(b))
+	}
+	if a, _ := h.p.List(ctx, "a"); len(a) != 1 || a[0].ProfileID != "a" {
+		t.Fatalf("a: %+v", a)
 	}
 }

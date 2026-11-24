@@ -31,5 +31,7 @@ COPY --from=bin --chown=nonroot:nonroot /out/data /data
 ENV ADDR=:8080 BASE_PATH=${BASE_PATH} CARDPRESS_DB_URL=file:/data/cardpress.db
 VOLUME /data
 EXPOSE 8080
-USER nonroot:nonroot
+# non-root by default. A mounted volume (Fly.io) is root-owned, so that deployment passes --build-arg RUN_USER=0:0.
+ARG RUN_USER=nonroot:nonroot
+USER ${RUN_USER}
 ENTRYPOINT ["/cardpress"]

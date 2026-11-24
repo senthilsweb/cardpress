@@ -45,7 +45,7 @@ export function ContentPanel({ design, set }: { design: Design; set: SetDesign }
       <Section title="Images">
         <ImageField
           label="Photos for the mosaic"
-          hint="Used by the Photo mosaic background. The first one is also the Headshot layout photo when the profile has none."
+          hint="For Photo mosaic. The first one also stands in as the headshot."
           values={design.photos}
           onChange={(v) => set({ photos: v })}
           multiple
@@ -53,7 +53,7 @@ export function ContentPanel({ design, set }: { design: Design; set: SetDesign }
           maxPx={700}
         />
         <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} />
-        <ImageField label="Background image" hint="Used by the Own image background, with a colour overlay." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} />
+        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} />
       </Section>
     </>
   );
@@ -146,11 +146,11 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground">Edit or add colour sets in the Profile tab.</p>
+        <p className="text-[11px] text-muted-foreground">Edit colour sets in Profile.</p>
       </Section>
 
       <Section title="Fonts (this card)">
-        <p className="text-[11px] leading-snug text-muted-foreground">Override a font for this card only. Leave on Default to use the profile fonts.</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the profile fonts.</p>
         <div className="grid grid-cols-2 gap-2">
           {FONT_ROLES.map((r) => {
             const inherited = resolveFonts(profile)[r.id];
@@ -220,7 +220,7 @@ function AddGoogleFont() {
     setBusy(false);
   };
   return (
-    <Field label="Add a Google font" hint={msg || "Type a family exactly as on fonts.google.com, e.g. Lexend. It is saved in this browser."} >
+    <Field label="Add a Google font" hint={msg || "A name from fonts.google.com, e.g. Lexend."} >
       <div className="flex gap-1.5">
         <Input value={name} onChange={(e) => { setName(e.target.value); setMsg(""); }} placeholder="Lexend" onKeyDown={(e) => { if (e.key === "Enter") void add(); }} />
         <Button variant="outline" size="sm" onClick={() => void add()} disabled={busy}>{busy ? "…" : "Add"}</Button>
@@ -274,8 +274,8 @@ export function ProfilePanel(props: {
 
   return (
     <>
-      <Section title="Profile">
-        <TextField id="pname" label="Profile name" value={pr.name} onChange={(v) => up({ name: v })} />
+      <Section title="Brand">
+        <TextField id="pname" label="Brand name" value={pr.name} onChange={(v) => up({ name: v })} />
         <div className="grid grid-cols-2 gap-2">
           <TextField id="dname" label="Display name" value={pr.displayName} onChange={(v) => up({ displayName: v })} />
           <TextField id="handle" label="Handle" value={pr.handle} onChange={(v) => up({ handle: v })} />
@@ -308,7 +308,7 @@ export function ProfilePanel(props: {
         {pr.mark === "image" && (
           <ImageField label="Logo image" hint="PNG or SVG with transparent background works best." values={pr.logoImage ? [pr.logoImage] : []} onChange={(v) => up({ logoImage: v[0] })} maxPx={600} keepPng />
         )}
-        <ImageField label="Headshot" hint="Used by the Headshot layout and the feed preview avatar." values={pr.headshot ? [pr.headshot] : []} onChange={(v) => up({ headshot: v[0] })} maxPx={800} />
+        <ImageField label="Headshot" hint="For the Headshot layout and feed preview." values={pr.headshot ? [pr.headshot] : []} onChange={(v) => up({ headshot: v[0] })} maxPx={800} />
       </Section>
 
       <Section title="Fonts">
@@ -353,7 +353,7 @@ export function ProfilePanel(props: {
           <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><FileUp /> Import JSON</Button>
           <Button variant="ghost" size="sm" onClick={props.resetProfiles}><RotateCcw /> Reset</Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">Profiles are saved in this browser only. Export to move them to another machine.</p>
+        <p className="text-[11px] text-muted-foreground">Export or import this brand's look as JSON.</p>
         <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => importJson(e.target.files?.[0])} />
       </Section>
     </>

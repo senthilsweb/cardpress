@@ -110,7 +110,7 @@ export function ProposalCard({ p, onApprove, onReject, onOpenPost }: {
                 <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setEditing((e) => !e)}><Pencil /> {editing ? "Done editing" : "Edit"}</Button>
                 <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void run("reject", onReject)}>{busy === "reject" ? <Loader2 className="animate-spin" /> : <X />} Reject</Button>
               </div>
-              <p className="text-[11px] leading-snug text-muted-foreground">Approving copies this into a draft. Nothing is published.</p>
+              <p className="text-[11px] leading-snug text-muted-foreground">Creates a draft. Nothing is published.</p>
             </div>
           )}
 

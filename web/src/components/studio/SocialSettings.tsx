@@ -112,7 +112,7 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
           </div>
         );
       })}
-      {storingNeedsKey && <p className="text-xs text-destructive">There is no encryption key, so these cannot be saved yet. See the note above.</p>}
+      {storingNeedsKey && <p className="text-xs text-destructive">Cannot save: no encryption key.</p>}
     </div>
   );
 }
@@ -121,7 +121,7 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
  * Credentials for each network, kept encrypted on the server. Opened from the gear in the header as a right-hand
  * drawer: the networks are tabs, and Save and Test connection are frozen at the bottom for the selected one.
  */
-export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function SocialSettings({ open, onOpenChange, profileId, brandName }: { open: boolean; onOpenChange: (o: boolean) => void; profileId: string; brandName: string }) {
   const [view, setView] = useState<SettingsView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [active, setActive] = useState("linkedin");
@@ -135,8 +135,8 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
 
   const load = useCallback(async () => {
     setLoadError(null);
-    try { setView(await api.getSettings()); } catch (e) { setLoadError(errMsg(e)); }
-  }, []);
+    try { setView(await api.getSettings(profileId)); } catch (e) { setLoadError(errMsg(e)); }
+  }, [profileId]);
 
   useEffect(() => { if (open) void load(); }, [open, load]);
 
@@ -164,7 +164,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
     try {
       const out: Record<string, string | null> = {};
       for (const f of changedFields(net, edits[net.id] ?? {})) out[f.key] = (edits[net.id] ?? {})[f.key];
-      replace(await api.putNetwork(net.id, out));
+      replace(await api.putNetwork(profileId, net.id, out));
       setEdits((e) => ({ ...e, [net.id]: {} }));
       setSavedNet(net.id);
       window.setTimeout(() => setSavedNet((s) => (s === net.id ? null : s)), 2500);
@@ -174,14 +174,14 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
   const test = async () => {
     if (!net) return;
     setBusy("test"); setErr(net.id, null); setResults((r) => ({ ...r, [net.id]: null }));
-    try { const res = await api.testNetwork(net.id); setResults((r) => ({ ...r, [net.id]: res })); }
+    try { const res = await api.testNetwork(profileId, net.id); setResults((r) => ({ ...r, [net.id]: res })); }
     catch (e) { setErr(net.id, errMsg(e)); } finally { setBusy(null); toTop(); }
   };
 
   const removeField = async (n: NetworkSettings, f: SettingsField) => {
     setBusy("remove"); setErr(n.id, null); setResults((r) => ({ ...r, [n.id]: null }));
     try {
-      replace(await api.putNetwork(n.id, { [f.key]: "" }));
+      replace(await api.putNetwork(profileId, n.id, { [f.key]: "" }));
       setEdits((e) => { const { [f.key]: _gone, ...rest } = e[n.id] ?? {}; return { ...e, [n.id]: rest }; });
     } catch (e) { setErr(n.id, errMsg(e)); } finally { setBusy(null); }
   };
@@ -233,7 +233,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
       <div>
         <span ref={top} />
         <p className="px-4 pt-4 text-xs leading-snug text-muted-foreground">
-          Keys and tokens the server uses to publish. They are stored encrypted on the server; this screen only ever shows the last four characters of a secret.
+          Accounts for <b className="text-foreground">{brandName}</b>. Stored encrypted; only the last four characters are shown.
         </p>
         {loadError && (
           <div role="alert" className="space-y-2 px-4 pt-4 text-sm">
@@ -246,8 +246,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
           <div className="mx-4 mt-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
             <p>
-              Credentials cannot be saved: the server has no encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> to a long random value
-              (for example <code className="font-mono">openssl rand -hex 32</code>) and restart. Values set through environment variables still work.
+              No encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> and restart.
             </p>
           </div>
         )}

@@ -115,11 +115,17 @@ export function upgradePlaceholderText(d: Design): Design {
 
 /**
  * Saved profiles predate newer palettes: append any standard palette whose id is missing, keep the user's edits.
- * The studio works with a single profile, so only the first saved one is kept.
  */
 export function withStandardPalettes(saved: Profile[]): Profile[] {
   if (!saved.length) return DEFAULT_PROFILES;
-  return saved.slice(0, 1).map((pr) => {
+  return completeProfiles(saved);
+}
+
+/** The same for a list that may be empty (archived brands): an empty list stays empty. */
+export function completeProfiles(saved: Profile[]): Profile[] {
+  return saved.map((one) => {
+    // a profile saved by something other than the studio (the API, a script) may lack fields: fill them from the default
+    const pr: Profile = { ...DEFAULT_PROFILES[0], ...one, palettes: Array.isArray(one.palettes) ? one.palettes : [] };
     const have = new Set(pr.palettes.map((pal) => pal.id));
     const missing = standardPalettes.filter((pal) => !have.has(pal.id));
     return missing.length ? { ...pr, palettes: [...pr.palettes, ...missing] } : pr;

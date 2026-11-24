@@ -1,0 +1,7 @@
+{
+  "name": "cardpress-record-demo",
+  "private": true,
+  "type": "module",
+  "description": "Records the marketing demo (WebM + GIF) from a running CardPress",
+  "dependencies": { "gifenc": "1.0.3", "pngjs": "7.0.0", "playwright-core": "1.49.1" }
+}

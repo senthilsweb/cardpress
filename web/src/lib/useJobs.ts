@@ -10,14 +10,15 @@ const message = (e: unknown) => (e instanceof Error ? e.message : "Something wen
  */
 export function useJobs(profileId: string) {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [scope, setScope] = useState<"brand" | "all">("brand");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    try { setJobs(await api.listJobs(profileId)); setError(null); }
+    try { setJobs(await api.listJobs(profileId, scope)); setError(null); }
     catch (e) { setError(message(e)); }
     finally { setLoaded(true); }
-  }, [profileId]);
+  }, [profileId, scope]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -37,6 +38,8 @@ export function useJobs(profileId: string) {
 
   return {
     jobs, loaded, error, refresh,
+    /** Whose posts the list shows: the open brand's, or every brand's. */
+    scope, setScope,
     /** Show a job at once, without waiting for the next refresh. */
     add: (j: Job) => setJobs((l) => [j, ...l.filter((x) => x.id !== j.id)]),
     publishNow: (id: string, acceptDuplicate = false) => act(() => api.publishJobNow(id, acceptDuplicate)),

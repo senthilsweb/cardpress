@@ -26,10 +26,12 @@ import type { Design, Palette, Profile } from "@/lib/types";
 
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
-export function Composer({ store, jobs, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
+  /** Every active brand's name by id (for the queue's "All brands" view). */
+  brandNames: Record<string, string>;
   /** Draws the card as a PNG at a size (the same renderer as Download). */
   renderPng: (size: Size) => Promise<Blob>;
   onOpenSettings: () => void;
@@ -170,19 +172,18 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } else if (e.key === "Backspace" && !tag && draft.hashtags.length) store.update({ hashtags: draft.hashtags.slice(0, -1) }); }}
               onBlur={addTag}
             />
-            <p className="text-[11px] leading-snug text-muted-foreground">Added as the last line of the post. Letters, digits and underscores only.</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">Added as the last line.</p>
           </Section>
 
           <Section title="Image">
-            <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="Describes the card for people using screen readers. LinkedIn shows it as the image's description." />
+            <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="For screen readers." />
           </Section>
 
           <Section title="Bold and italic">
             <div className="flex items-start gap-2">
               <Switch id="uni" checked={draft.unicodeStyles} onCheckedChange={(v) => store.update({ unicodeStyles: v })} />
               <div className="space-y-1">
-                <Label htmlFor="uni" className="text-foreground">Keep bold and italic using Unicode letters</Label>
-                <p className="text-[11px] leading-snug text-muted-foreground">LinkedIn posts have no formatting. When on, styled text is sent as look-alike characters, which screen readers can read letter by letter. When off, the styling is left out.</p>
+                <Label htmlFor="uni" className="text-foreground">Keep bold and italic (Unicode)</Label>
               </div>
             </div>
           </Section>
@@ -200,7 +201,7 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
       </Section>
 
       <Section id="queue" title="Publishing queue">
-        <JobQueue store={jobs} />
+        <JobQueue store={jobs} brands={brandNames} />
       </Section>
 
       <FullPreview
@@ -208,7 +209,7 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
         actions={
           <PublishBar
-            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished}
+            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
             onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
           />
         }

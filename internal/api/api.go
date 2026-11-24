@@ -27,6 +27,12 @@ const (
 type Studio interface {
 	State(ctx context.Context) (service.State, error)
 	ReplaceProfiles(ctx context.Context, list []json.RawMessage) error
+	CreateProfile(ctx context.Context, raw json.RawMessage) error
+	SaveProfile(ctx context.Context, id string, raw json.RawMessage) error
+	ReorderProfiles(ctx context.Context, ids []string) error
+	ArchiveProfile(ctx context.Context, id string) (service.ArchiveResult, error)
+	RestoreProfile(ctx context.Context, id string) error
+	DeleteProfile(ctx context.Context, id string) error
 	ReplaceDesigns(ctx context.Context, designs map[string]json.RawMessage) error
 	SetPreference(ctx context.Context, key string, value json.RawMessage) error
 	ImportLegacy(ctx context.Context, l service.Legacy) error
@@ -42,6 +48,7 @@ type Publishing interface {
 	Create(ctx context.Context, in service.JobInput) (service.Job, error)
 	Get(ctx context.Context, id string) (service.Job, error)
 	List(ctx context.Context, profileID string) ([]service.Job, error)
+	ListAll(ctx context.Context) ([]service.Job, error)
 	Image(ctx context.Context, id string) ([]byte, error)
 	PublishNow(ctx context.Context, id string, acceptDuplicate bool) (service.Job, error)
 	Reschedule(ctx context.Context, id string, at time.Time, timezone string) (service.Job, error)
@@ -64,10 +71,11 @@ type Chatting interface {
 
 // Settings is the part of the settings service the HTTP API needs.
 type Settings interface {
-	View(ctx context.Context) (service.SettingsView, error)
-	Network(ctx context.Context, id string) (service.NetworkView, error)
-	Put(ctx context.Context, id string, changes map[string]*string) (service.NetworkView, error)
-	Test(ctx context.Context, id string) (service.TestResult, error)
+	EnvProfile(ctx context.Context) (string, error)
+	View(ctx context.Context, profileID string) (service.SettingsView, error)
+	Network(ctx context.Context, profileID, id string) (service.NetworkView, error)
+	Put(ctx context.Context, profileID, id string, changes map[string]*string) (service.NetworkView, error)
+	Test(ctx context.Context, profileID, id string) (service.TestResult, error)
 }
 
 // Options configure the handler.
@@ -102,6 +110,16 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("GET "+prefix+"/info", s.info)
 	mux.HandleFunc("GET "+prefix+"/state", s.state)
 	mux.HandleFunc("PUT "+prefix+"/profiles", s.putProfiles)
+	mux.HandleFunc("POST "+prefix+"/profiles", s.createProfile)
+	mux.HandleFunc("PUT "+prefix+"/profiles/order", s.orderProfiles)
+	mux.HandleFunc("PUT "+prefix+"/profiles/{id}", s.saveProfile)
+	mux.HandleFunc("POST "+prefix+"/profiles/{id}/archive", s.archiveProfile)
+	mux.HandleFunc("POST "+prefix+"/profiles/{id}/restore", s.restoreProfile)
+	mux.HandleFunc("DELETE "+prefix+"/profiles/{id}", s.deleteProfile)
+	mux.HandleFunc("GET "+prefix+"/profiles/{id}/settings", s.getSettings)
+	mux.HandleFunc("GET "+prefix+"/profiles/{id}/settings/{network}", s.getNetwork)
+	mux.HandleFunc("PUT "+prefix+"/profiles/{id}/settings/{network}", s.putNetwork)
+	mux.HandleFunc("POST "+prefix+"/profiles/{id}/settings/{network}/test", s.testNetwork)
 	mux.HandleFunc("PUT "+prefix+"/designs", s.putDesigns)
 	mux.HandleFunc("PUT "+prefix+"/preferences/{key}", s.putPreference)
 	mux.HandleFunc("POST "+prefix+"/import/legacy", s.importLegacy)
@@ -315,8 +333,30 @@ func (s *server) deleteDraft(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// settingsProfile is the brand a settings request is about: the one in the path, or for the older routes without one, the
+// brand the environment credentials belong to (the first brand).
+func (s *server) settingsProfile(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if id := r.PathValue("id"); id != "" {
+		return id, true
+	}
+	id, err := s.Settings.EnvProfile(r.Context())
+	if err != nil {
+		fail(w, r, err)
+		return "", false
+	}
+	if id == "" {
+		fail(w, r, service.ErrNotFound)
+		return "", false
+	}
+	return id, true
+}
+
 func (s *server) getSettings(w http.ResponseWriter, r *http.Request) {
-	v, err := s.Settings.View(r.Context())
+	pid, ok := s.settingsProfile(w, r)
+	if !ok {
+		return
+	}
+	v, err := s.Settings.View(r.Context(), pid)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -325,7 +365,11 @@ func (s *server) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) getNetwork(w http.ResponseWriter, r *http.Request) {
-	v, err := s.Settings.Network(r.Context(), r.PathValue("network"))
+	pid, ok := s.settingsProfile(w, r)
+	if !ok {
+		return
+	}
+	v, err := s.Settings.Network(r.Context(), pid, r.PathValue("network"))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -342,7 +386,11 @@ func (s *server) putNetwork(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	v, err := s.Settings.Put(r.Context(), r.PathValue("network"), body.Fields)
+	pid, ok := s.settingsProfile(w, r)
+	if !ok {
+		return
+	}
+	v, err := s.Settings.Put(r.Context(), pid, r.PathValue("network"), body.Fields)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -351,12 +399,81 @@ func (s *server) putNetwork(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) testNetwork(w http.ResponseWriter, r *http.Request) {
-	res, err := s.Settings.Test(r.Context(), r.PathValue("network"))
+	pid, ok := s.settingsProfile(w, r)
+	if !ok {
+		return
+	}
+	res, err := s.Settings.Test(r.Context(), pid, r.PathValue("network"))
 	if err != nil {
 		fail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// ---- brands ----
+
+func (s *server) createProfile(w http.ResponseWriter, r *http.Request) {
+	var raw json.RawMessage
+	if !decode(w, r, &raw) {
+		return
+	}
+	if err := s.Studio.CreateProfile(r.Context(), raw); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *server) saveProfile(w http.ResponseWriter, r *http.Request) {
+	var raw json.RawMessage
+	if !decode(w, r, &raw) {
+		return
+	}
+	if err := s.Studio.SaveProfile(r.Context(), r.PathValue("id"), raw); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) orderProfiles(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if err := s.Studio.ReorderProfiles(r.Context(), body.IDs); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) archiveProfile(w http.ResponseWriter, r *http.Request) {
+	res, err := s.Studio.ArchiveProfile(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *server) restoreProfile(w http.ResponseWriter, r *http.Request) {
+	if err := s.Studio.RestoreProfile(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) deleteProfile(w http.ResponseWriter, r *http.Request) {
+	if err := s.Studio.DeleteProfile(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // mcpAudit lists what outside agents did through MCP, newest first.
@@ -561,11 +678,19 @@ func (s *server) createJob(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
 	profileID := r.URL.Query().Get("profileId")
-	if profileID == "" {
-		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+	var (
+		jobs []service.Job
+		err  error
+	)
+	switch {
+	case r.URL.Query().Get("scope") == "all":
+		jobs, err = s.Publishing.ListAll(r.Context())
+	case profileID == "":
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required (or scope=all for every brand)")
 		return
+	default:
+		jobs, err = s.Publishing.List(r.Context(), profileID)
 	}
-	jobs, err := s.Publishing.List(r.Context(), profileID)
 	if err != nil {
 		fail(w, r, err)
 		return

@@ -1,0 +1,35 @@
+# Run CardPress with Docker Compose:
+#   cp .env.example .env     # then edit it
+#   docker compose up -d
+#
+# Everything in .env is passed into the container (CARDPRESS_*, ANTHROPIC_API_KEY), so new settings
+# need no change to this file. Data (SQLite database and encryption key) lives in the cardpress-data volume.
+services:
+  cardpress:
+    image: ghcr.io/senthilsweb/cardpress:${CARDPRESS_IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        VERSION: ${CARDPRESS_IMAGE_TAG:-dev}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ADDR: ":8080"
+      # the SQLite file in the volume, unless .env sets CARDPRESS_DB_URL (a libsql:// Turso URL, plus CARDPRESS_DB_TOKEN)
+      CARDPRESS_DB_URL: "${CARDPRESS_DB_URL:-file:/data/cardpress.db}"
+    ports:
+      # loopback only by default. Set CARDPRESS_BIND=0.0.0.0 (and CARDPRESS_API_TOKEN) to expose it.
+      - "${CARDPRESS_BIND:-127.0.0.1}:${CARDPRESS_PORT:-8080}:8080"
+    volumes:
+      - cardpress-data:/data
+    healthcheck:
+      test: ["CMD", "/cardpress", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cardpress-data:

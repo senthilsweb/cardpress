@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
-import { DEFAULT_PROFILES, upgradePlaceholderText, withStandardPalettes } from "./profiles";
+import { DEFAULT_PROFILES, completeProfiles, upgradePlaceholderText, withStandardPalettes } from "./profiles";
+import { pickActive } from "./brands";
 import { docFromPlainText, EMPTY_DOC, type Draft } from "./draft";
 import type { Design, Profile } from "./types";
 import type { FontDef } from "./fonts";
@@ -8,7 +9,12 @@ import { parseLayout, type Layout } from "./layout";
 
 /** What the studio needs to start. */
 export interface Loaded {
+  /** Every active brand, in order. */
   profiles: Profile[];
+  /** Brands hidden from the studio but kept with their history. */
+  archived: Profile[];
+  /** The brand that is open. */
+  activeId: string;
   designs: Record<string, Design>;
   theme?: "light" | "dark";
   customFonts: FontDef[];
@@ -72,12 +78,13 @@ async function loadDrafts(profileId: string, design: Design | undefined): Promis
   return [await api.createDraft({ profileId, kind: "post", doc, hashtags: [], altText: "", unicodeStyles: false })];
 }
 
-function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[]): Loaded {
+function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[], activeId: string): Loaded {
   const profiles = (s.profiles as Profile[]).length ? withStandardPalettes(s.profiles as Profile[]) : DEFAULT_PROFILES;
+  const archived = Array.isArray(s.archived) ? completeProfiles(s.archived as Profile[]) : [];
   const theme = s.preferences.theme === "dark" || s.preferences.theme === "light" ? s.preferences.theme : undefined;
   const fonts = Array.isArray(s.preferences.customFonts) ? (s.preferences.customFonts as FontDef[]) : [];
   const designs = Object.fromEntries(Object.entries(s.designs as Record<string, Design>).map(([k, d]) => [k, upgradePlaceholderText(d)]));
-  return { profiles, designs, theme, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout) };
+  return { profiles, archived, activeId, designs, theme, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout) };
 }
 
 export function useBoot() {
@@ -93,9 +100,9 @@ export function useBoot() {
         const legacy = readLegacy();
         if (legacy) return setBoot({ status: "legacy", legacy });
       }
-      const pid = ((state.profiles[0] as Profile | undefined) ?? DEFAULT_PROFILES[0]).id;
+      const pid = pickActive(state.preferences.activeProfile, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
       const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
-      setBoot({ status: "ready", data: fromState(state, drafts) });
+      setBoot({ status: "ready", data: fromState(state, drafts, pid) });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { clearToken(); return setBoot({ status: "auth", error: "That token was not accepted." }); }
       setBoot({ status: "error", message: e instanceof Error ? e.message : "Something went wrong" });
@@ -103,6 +110,19 @@ export function useBoot() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * Open a brand: read the server's state again and load that brand's drafts, then swap the whole studio over to it, so
+   * its card, drafts, queue, accounts and conversations are shown and nothing of the previous brand is. The screen stays
+   * as it is until the new one is ready. Throws if the server cannot be reached.
+   */
+  const openBrand = useCallback(async (id: string) => {
+    const state = await api.state();
+    const pid = pickActive(id, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
+    const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
+    api.putPreference("activeProfile", pid).catch(() => undefined); // only means the choice is not remembered
+    setBoot({ status: "ready", data: fromState(state, drafts, pid) });
+  }, []);
 
   const submitToken = (t: string) => { setToken(t.trim()); void load(); };
 
@@ -123,5 +143,5 @@ export function useBoot() {
 
   const discardLegacy = () => { clearLegacy(); void load(); };
 
-  return { boot, retry: load, submitToken, importLegacy, discardLegacy };
+  return { boot, retry: load, submitToken, importLegacy, discardLegacy, openBrand };
 }
