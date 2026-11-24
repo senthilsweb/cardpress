@@ -26,10 +26,12 @@ import type { Design, Palette, Profile } from "@/lib/types";
 
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
-export function Composer({ store, jobs, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
+  /** Every active brand's name by id (for the queue's "All brands" view). */
+  brandNames: Record<string, string>;
   /** Draws the card as a PNG at a size (the same renderer as Download). */
   renderPng: (size: Size) => Promise<Blob>;
   onOpenSettings: () => void;
@@ -199,7 +201,7 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
       </Section>
 
       <Section id="queue" title="Publishing queue">
-        <JobQueue store={jobs} />
+        <JobQueue store={jobs} brands={brandNames} />
       </Section>
 
       <FullPreview
@@ -207,7 +209,7 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
         actions={
           <PublishBar
-            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished}
+            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
             onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
           />
         }

@@ -274,8 +274,8 @@ export function ProfilePanel(props: {
 
   return (
     <>
-      <Section title="Profile">
-        <TextField id="pname" label="Profile name" value={pr.name} onChange={(v) => up({ name: v })} />
+      <Section title="Brand">
+        <TextField id="pname" label="Brand name" value={pr.name} onChange={(v) => up({ name: v })} />
         <div className="grid grid-cols-2 gap-2">
           <TextField id="dname" label="Display name" value={pr.displayName} onChange={(v) => up({ displayName: v })} />
           <TextField id="handle" label="Handle" value={pr.handle} onChange={(v) => up({ handle: v })} />
@@ -353,7 +353,7 @@ export function ProfilePanel(props: {
           <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><FileUp /> Import JSON</Button>
           <Button variant="ghost" size="sm" onClick={props.resetProfiles}><RotateCcw /> Reset</Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">Saved in this browser. Export to move them.</p>
+        <p className="text-[11px] text-muted-foreground">Export or import this brand's look as JSON.</p>
         <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => importJson(e.target.files?.[0])} />
       </Section>
     </>

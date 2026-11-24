@@ -28,7 +28,7 @@ flowchart LR
 
 ## Data
 
-Profiles, designs, preferences, drafts, credentials, publish jobs, conversations and the MCP audit log are in one database. The schema is built by numbered migrations at start (`0001` to `0006`). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
+Profiles (brands), designs, preferences, drafts, credentials, publish jobs, conversations and the MCP audit log are in one database. Drafts, designs, jobs, conversations and credentials are keyed by brand. The schema is built by numbered migrations at start (`0001` to `0007`). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
 
 ## The assistant
 

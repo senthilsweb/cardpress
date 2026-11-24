@@ -1,19 +1,24 @@
 # Multiple brands (profiles)
 
 ## Why
-CardPress has one profile: a name, handle, logo, fonts and colours that every card, draft and post uses. Someone who writes for more than one brand (a personal account, a company page, a client) has to export and import profiles to switch. The database already keys drafts, designs, publish jobs and conversations by `profile_id`, so the data model is ready; the screen and the credentials are not.
+CardPress has one profile: a name, handle, logo, fonts and colours that every card, draft and post uses. Someone who writes for more than one brand (a personal account, a company page, a client) has to export and import profiles to switch, and the one LinkedIn connection posts as one account.
+
+## What the code already does
+- `profiles` holds many rows in order, and `GET /state` returns all of them. `designs`, `drafts`, `publish_jobs` and `conversations` are already keyed by `profile_id`.
+- The screen uses only `profiles[0]`, and the legacy import keeps one profile.
+- **Social credentials are global**: `credentials (network, field)`, and the environment override `CARDPRESS_<NETWORK>_<FIELD>` is global too. A second brand would post with the first brand's LinkedIn token.
+- `PUT /profiles` replaces the whole list, so removing a brand removes its row without looking at its jobs or drafts.
+- Preferences (theme, layout) are global, which stays right.
 
 ## What changes
-- A **brand switcher** in the header: list, create, rename, duplicate and delete brands. The open brand decides the card, the drafts, the queue and the assistant conversations.
-- **Per-brand credentials.** Social credentials are global today. Each brand gets its own LinkedIn (and later X and Instagram) connection, stored encrypted, with the environment-variable override scoped to a brand.
-- **Per-brand publishing.** A job publishes with the credentials of its brand; the queue shows only that brand's jobs, with an "all brands" view.
-- **MCP and the assistant** act on one brand at a time: `list_profiles` already exists, and proposals are created under a named brand.
-- A migration that moves today's credentials onto the existing single profile, so nothing is lost.
+1. **Per-brand credentials** (database change, see `design.md`).
+2. **Per-brand endpoints** for creating, renaming, duplicating, reordering and archiving brands, replacing the whole-list `PUT /profiles`.
+3. **Publishing and the scheduler** resolve credentials by the job's brand.
+4. **A brand switcher** in the header, a "New brand" drawer and a "Manage brands" drawer; Social accounts, the queue and the assistant follow the open brand. The publish confirmation names the brand and the LinkedIn account it will post as.
+5. **MCP and chat** act on a named brand.
 
 ## Out of scope
-User accounts and sign-in (there is still one shared token), teams, roles, and sharing a brand between people. Those are a separate change.
+User accounts, sign-in, teams, roles and sharing a brand between people (there is still one shared token). Multi-user is a separate change.
 
-## Open points
-- Whether a brand can reuse another brand's colour sets and fonts (a shared "theme") or each keeps its own copy.
-- The deletion rule: whether deleting a brand with scheduled posts is refused or cancels them first.
-- The URL shape: `/studio/` with the brand remembered on the server, or `/studio/<brand>/`.
+## Decisions to confirm
+See `design.md`, "Decisions".

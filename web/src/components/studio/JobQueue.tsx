@@ -39,7 +39,7 @@ function When({ j }: { j: Job }) {
   return <>Created {formatInZone(j.createdAt)}</>;
 }
 
-function JobRow({ job, store }: { job: Job; store: JobsStore }) {
+function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: string }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [resched, setResched] = useState(false);
   const [tz, setTz] = useState(job.timezone || defaultTimezone());
@@ -66,6 +66,7 @@ function JobRow({ job, store }: { job: Job; store: JobsStore }) {
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge s={s} />
+            {brand && <Badge variant="outline" title="The brand this post belongs to">{brand}</Badge>}
             {s === "publishing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" aria-label="Publishing" />}
             <span className="text-[11px] text-muted-foreground"><When j={job} /></span>
           </div>
@@ -126,17 +127,23 @@ function JobRow({ job, store }: { job: Job; store: JobsStore }) {
 }
 
 /** Scheduled, running and finished posts. Every action here acts on a post that was already confirmed in the preview. */
-export function JobQueue({ store }: { store: JobsStore }) {
+export function JobQueue({ store, brands }: { store: JobsStore; /** Brand names by id, for the label on each post when every brand is shown. */ brands: Record<string, string> }) {
   const [all, setAll] = useState(false);
   const jobs = all ? store.jobs : store.jobs.slice(0, 5);
   if (!store.loaded) return <p className="text-xs text-muted-foreground">Loading…</p>;
   return (
     <div className="space-y-2">
       {store.error && <p role="alert" className="text-xs text-destructive">{store.error}</p>}
+      {Object.keys(brands).length > 1 && (
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" className="accent-[var(--brand)]" checked={store.scope === "all"} onChange={(e) => store.setScope(e.target.checked ? "all" : "brand")} />
+          All brands
+        </label>
+      )}
       {store.jobs.length === 0 ? (
         <p className="text-xs leading-snug text-muted-foreground">Nothing yet.</p>
       ) : (
-        <ul className="space-y-2">{jobs.map((j) => <JobRow key={j.id} job={j} store={store} />)}</ul>
+        <ul className="space-y-2">{jobs.map((j) => <JobRow key={j.id} job={j} store={store} brand={store.scope === "all" ? brands[j.profileId] ?? j.profileId : undefined} />)}</ul>
       )}
       {store.jobs.length > 5 && (
         <Button size="sm" variant="ghost" onClick={() => setAll((v) => !v)}>{all ? "Show fewer" : `Show all ${store.jobs.length}`}</Button>

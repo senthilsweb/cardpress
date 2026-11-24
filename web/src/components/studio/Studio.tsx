@@ -11,10 +11,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ContentPanel, DesignPanel, ProfilePanel } from "./panels";
 import { Composer } from "./Composer";
 import { SocialSettings } from "./SocialSettings";
+import { BrandSwitcher, ManageBrandsDrawer, NewBrandDrawer } from "./Brands";
 import { ChatPanel } from "./ChatPanel";
 import { Drawer } from "@/components/ui/drawer";
 import { FeedFrame, ScaledCard } from "./preview";
-import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
+import { DEFAULT_DESIGN, DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "@/lib/profiles";
+import { blankDesign, brandColor, move } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
@@ -78,18 +80,20 @@ function useBox<T extends HTMLElement>() {
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
 export default function Studio() {
-  const { boot, retry, submitToken, importLegacy, discardLegacy } = useBoot();
+  const { boot, retry, submitToken, importLegacy, discardLegacy, openBrand } = useBoot();
   if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={importLegacy} discardLegacy={discardLegacy} />;
-  return <Workspace initial={boot.data} />;
+  // keyed by brand: opening another brand starts the whole studio over for it, so nothing of the last one is left on screen
+  return <Workspace key={boot.data.activeId} initial={boot.data} openBrand={openBrand} />;
 }
 
-function Workspace({ initial }: { initial: Loaded }) {
+function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: string) => Promise<void> }) {
   const [theme, toggleTheme] = useTheme(initial.theme);
   useState(() => { hydrateCustomFonts(initial.customFonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); }); });
-  const [profiles, setProfiles] = useSyncedState<Profile[]>(initial.profiles, (v) => api.putProfiles(v));
+  const [profiles, setProfiles, , replaceProfiles] = useSyncedState<Profile[]>(initial.profiles, (v) => api.putProfiles(v));
+  const [archived, setArchived] = useState<Profile[]>(initial.archived);
   // designs are keyed by profile id
   const [designs, setDesigns, saveError] = useSyncedState<Record<string, Design>>(initial.designs, (v) => api.putDesigns(v));
-  const profile = profiles[0] ?? DEFAULT_PROFILES[0];
+  const profile = profiles.find((p) => p.id === initial.activeId) ?? profiles[0] ?? DEFAULT_PROFILES[0];
   const design: Design = useMemo(() => {
     const d = { ...DEFAULT_DESIGN, ...(designs[profile.id] ?? {}) };
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
@@ -114,11 +118,11 @@ function Workspace({ initial }: { initial: Loaded }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
-  const [settingsOpen, setSettingsOpenRaw] = useState(false);
-  const [assistantOpen, setAssistantOpenRaw] = useState(false);
-  // the two right-hand drawers share one edge, so only one is open at a time
-  const setSettingsOpen = (o: boolean) => { setSettingsOpenRaw(o); if (o) setAssistantOpenRaw(false); };
-  const setAssistantOpen = (o: boolean) => { setAssistantOpenRaw(o); if (o) setSettingsOpenRaw(false); };
+  // the right-hand drawers share one edge, so only one is open at a time
+  const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | null>(null);
+  const settingsOpen = panel === "accounts", assistantOpen = panel === "assistant";
+  const setSettingsOpen = (o: boolean) => setPanel(o ? "accounts" : null);
+  const setAssistantOpen = (o: boolean) => setPanel(o ? "assistant" : null);
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
@@ -136,6 +140,46 @@ function Workspace({ initial }: { initial: Loaded }) {
     flash(cur && id === cur.id ? "Copied into your draft" : "Copied into a new draft");
     return id;
   };
+
+  /* ---------- brands ---------- */
+  const brandNames = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p.name])), [profiles]);
+  const brandColors = useMemo(() => Object.fromEntries([...profiles, ...archived].map((p) => [p.id, brandColor(p, designs[p.id])])), [profiles, archived, designs]);
+  const [switching, setSwitching] = useState(false);
+  const [copyOf, setCopyOf] = useState<Profile | undefined>(undefined);
+  const switchBrand = async (id: string) => {
+    if (switching || id === profile.id) return;
+    setSwitching(true);
+    try { await openBrand(id); } // the studio is replaced when this succeeds
+    catch (e) { flash(`Could not open the brand: ${(e as Error).message}`); setSwitching(false); }
+  };
+  /** Read the brand list again, so what is shown is what the server has. */
+  const syncBrands = async () => {
+    const st = await api.state();
+    replaceProfiles(withStandardPalettes(st.profiles as Profile[]));
+    setArchived(Array.isArray(st.archived) ? completeProfiles(st.archived as Profile[]) : []);
+  };
+  const createBrand = async (p: Profile, from: Profile | undefined, open: boolean) => {
+    await api.createProfile(p);
+    // the new brand's card: a copy starts from the other brand's card, a blank one from the default card without footer text
+    const base = from ? { ...DEFAULT_DESIGN, ...(designs[from.id] ?? {}) } : blankDesign(DEFAULT_DESIGN);
+    await api.putDesigns({ ...designs, [p.id]: base });
+    if (open) await openBrand(p.id); else await syncBrands();
+  };
+  const duplicateBrand = async (p: Profile) => { setCopyOf(p); setPanel("newBrand"); };
+  const moveBrand = async (id: string, dir: -1 | 1) => {
+    await api.orderProfiles(move(profiles.map((b) => b.id), id, dir));
+    await syncBrands();
+  };
+  const archiveBrand = async (id: string) => {
+    const res = await api.archiveProfile(id);
+    if (id === profile.id) {
+      const next = profiles.find((b) => b.id !== id);
+      if (next) await openBrand(next.id);
+    } else await syncBrands();
+    return res;
+  };
+  const restoreBrand = async (id: string) => { await api.restoreProfile(id); await syncBrands(); };
+  const deleteBrand = async (id: string) => { await api.deleteProfile(id); await syncBrands(); };
 
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
@@ -192,8 +236,9 @@ function Workspace({ initial }: { initial: Loaded }) {
   });
 
   /* ---------- profiles ---------- */
-  const resetProfiles = () => setProfiles(DEFAULT_PROFILES);
-  const importProfiles = (list: Profile[]) => { setProfiles(list.slice(0, 1)); flash("Imported profile"); };
+  // reset and import act on the open brand's look; its id and name stay
+  const resetBrand = () => updateProfile({ ...DEFAULT_PROFILES[0], id: profile.id, name: profile.name, displayName: profile.displayName, handle: profile.handle, website: profile.website, logoText: profile.logoText });
+  const importBrand = (list: Profile[]) => { const src = list[0]; updateProfile({ ...src, id: profile.id, name: profile.name }); flash("Imported"); };
 
   /* ---------- canvas size ---------- */
   const [canvasRef, box] = useBox<HTMLDivElement>();
@@ -217,6 +262,7 @@ function Workspace({ initial }: { initial: Loaded }) {
           </Tooltip>
           <Logo />
           <div className="flex-1" />
+          <BrandSwitcher brands={profiles} activeId={profile.id} colors={brandColors} busy={switching} onSwitch={(id) => void switchBrand(id)} onNew={() => { setCopyOf(undefined); setPanel("newBrand"); }} onManage={() => setPanel("manage")} />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant={assistantOpen ? "secondary" : "ghost"} size="icon-sm" className="relative" onClick={() => setAssistantOpen(!assistantOpen)} aria-label={chat.pendingCount > 0 ? `Assistant, ${chat.pendingCount} proposals waiting for your decision` : "Assistant"} aria-expanded={assistantOpen}>
@@ -256,22 +302,22 @@ function Workspace({ initial }: { initial: Loaded }) {
                   <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
                   <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
                   <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Post</TabsTrigger>
-                  <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Profile</TabsTrigger>
+                  <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Brand</TabsTrigger>
                 </TabsList>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
-                    profiles={profiles}
+                    profiles={[profile]}
                     paletteId={palette.id}
                     updateProfile={updateProfile}
                     setPaletteId={(id) => set({ paletteId: id })}
-                    resetProfiles={resetProfiles}
-                    importProfiles={importProfiles}
+                    resetProfiles={resetBrand}
+                    importProfiles={importBrand}
                   />
                 </TabsContent>
               </div>
@@ -351,8 +397,16 @@ function Workspace({ initial }: { initial: Loaded }) {
           </main>
         </div>
       </div>
-      <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title="Assistant" resizeKey="assistant">
+      <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} profileId={profile.id} brandName={profile.name} />
+      <NewBrandDrawer
+        open={panel === "newBrand"} onClose={() => setPanel(null)} brands={profiles} current={profile} source={copyOf}
+        onCreate={(p, from) => createBrand(p, from, true)}
+      />
+      <ManageBrandsDrawer
+        open={panel === "manage"} onClose={() => setPanel(null)} active={profiles} archived={archived} activeId={profile.id} colors={brandColors}
+        onOpen={switchBrand} onMove={moveBrand} onDuplicate={(p) => void duplicateBrand(p)} onArchive={archiveBrand} onRestore={restoreBrand} onDelete={deleteBrand}
+      />
+      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title={`Assistant · ${profile.name}`} resizeKey="assistant">
         <ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => { setTab("post"); if (sidebarHidden) toggleSidebar(); setAssistantOpen(false); }} />
       </Drawer>
      </LayoutContext.Provider>

@@ -8,10 +8,13 @@ All routes are under `/api/v1`. With `CARDPRESS_API_TOKEN` set, send `Authorizat
 |---|---|
 | `GET /info` | Name, version, database driver, whether a token is needed, and the assistant in use |
 | `GET /state` | Profile, designs and preferences |
-| `PUT /profiles`, `PUT /designs`, `PUT /preferences/{key}` | Save them |
+| `PUT /profiles`, `PUT /designs`, `PUT /preferences/{key}` | Save them. `PUT /profiles` adds and updates; it never removes a brand |
+| `POST /profiles`, `PUT /profiles/{id}`, `PUT /profiles/order` | Create, save and reorder brands |
+| `POST /profiles/{id}/archive`, `POST /profiles/{id}/restore` | Hide a brand and bring it back; archiving keeps everything and says how many posts are still scheduled |
+| `DELETE /profiles/{id}` | Delete an archived brand and everything it owns; refused (`409`) while it has scheduled or unfinished posts |
 | `POST /import/legacy` | Import data from the older browser-only version |
 | `GET/POST /drafts`, `GET/PUT/DELETE /drafts/{id}` | Drafts |
-| `GET /settings`, `GET/PUT /settings/{network}`, `POST /settings/{network}/test` | Social credentials (secrets are write-only) |
+| `GET /profiles/{id}/settings`, `GET/PUT /profiles/{id}/settings/{network}`, `POST .../test` | One brand's social credentials (secrets are write-only). The older `/settings...` routes act on the first brand |
 | `POST/GET /publish/jobs`, `GET/DELETE /publish/jobs/{id}` | Publish jobs |
 | `GET /publish/jobs/{id}/image` | The card image of a job |
 | `POST /publish/jobs/{id}/publish-now`, `PUT .../schedule`, `POST .../cancel` | Job actions |

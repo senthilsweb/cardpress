@@ -2,6 +2,17 @@
 
 How the studio screen is arranged, and what is remembered.
 
+## Brands
+
+A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The open brand is shown at the right of the header.
+
+- **Switch**: click the brand in the header and pick another. The whole studio changes to that brand, and the last one you opened is remembered on the server.
+- **New brand…**: a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
+- **Manage brands…**: open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
+- **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
+- **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
+- The **Brand** tab edits the open brand. Credentials set through environment variables belong to the first brand only.
+
 ## Sidebar
 
 - **Hide or show** the whole sidebar with the button at the left of the header, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
