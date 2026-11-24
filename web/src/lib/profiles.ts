@@ -119,7 +119,9 @@ export function upgradePlaceholderText(d: Design): Design {
  */
 export function withStandardPalettes(saved: Profile[]): Profile[] {
   if (!saved.length) return DEFAULT_PROFILES;
-  return saved.slice(0, 1).map((pr) => {
+  return saved.slice(0, 1).map((saved) => {
+    // a profile saved by something other than the studio (the API, a script) may lack fields: fill them from the default
+    const pr: Profile = { ...DEFAULT_PROFILES[0], ...saved, palettes: Array.isArray(saved.palettes) ? saved.palettes : [] };
     const have = new Set(pr.palettes.map((pal) => pal.id));
     const missing = standardPalettes.filter((pal) => !have.has(pal.id));
     return missing.length ? { ...pr, palettes: [...pr.palettes, ...missing] } : pr;
