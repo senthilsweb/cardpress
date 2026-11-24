@@ -52,6 +52,7 @@ nav:
       - MCP: mcp.md
   - Code Tour: code-tour.md
   - Architecture: architecture.md
+  - Data model: data-model.md
   - Configuration: configuration.md
   - Deployment:
       - Deployment: deployment.md
