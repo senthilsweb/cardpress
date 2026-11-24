@@ -43,7 +43,7 @@ Archiving hides a brand but keeps its drafts, jobs, conversations and credential
 
 | Route | Purpose |
 |---|---|
-| `POST /profiles` | Create a brand: blank, or `copyFrom` another brand (identity, palettes, fonts; not credentials, drafts or jobs) |
+| `POST /profiles` | Create a brand from a profile the client has built: blank, or a copy of another brand's identity, palettes and fonts with a new id. Credentials, drafts and jobs are never copied because they are not part of a profile |
 | `PUT /profiles/{id}` | Save one brand |
 | `PUT /profiles/order` | Reorder |
 | `POST /profiles/{id}/archive`, `POST /profiles/{id}/restore` | Archive and restore |
@@ -51,7 +51,7 @@ Archiving hides a brand but keeps its drafts, jobs, conversations and credential
 | `GET/PUT /profiles/{id}/settings/{network}`, `POST .../test` | Credentials of one brand |
 | `GET /publish/jobs?profile={id}` | One brand's queue; omit for all brands |
 
-`PUT /profiles` (replace all) and the global `/settings/...` routes stay for one release and act on the first brand, then are removed. Chat and MCP already take a profile id; `propose_content` requires one.
+`PUT /profiles` no longer replaces the list: it adds and updates, and never removes, archives or reorders a brand, so a stale client cannot delete a brand by saving a shorter list. The global `/settings/...` routes stay for one release and act on the environment brand (the first), then are removed. Chat and MCP already take a profile id; `propose_content` requires one.
 
 ### Environment credentials
 `CARDPRESS_<NETWORK>_<FIELD>` today overrides stored credentials. With several brands an environment override cannot be global without posting as the wrong account, so it applies to **the first brand only**, and the other brands use stored credentials. A per-brand environment syntax (`CARDPRESS_<BRAND>_<NETWORK>_<FIELD>`) is possible later.
@@ -119,8 +119,8 @@ The tab edits the open brand (name, handle, website, logo, headshot, fonts, colo
 - A brand with scheduled posts cannot be permanently deleted; archiving keeps its history.
 - Switching brands never shows another brand's drafts, queue or conversations.
 
-## Decisions
-1. **Removal**: archive first (reversible) and permanent delete only from the archive. *Recommended.*
-2. **Environment credentials**: first brand only. *Recommended.* The alternative is a per-brand environment naming scheme now.
-3. **Duplicating a brand**: copies identity, colours and fonts, never credentials or posts. *Recommended.* The alternative is a shared theme several brands reuse.
-4. **Where the open brand lives**: remembered on the server (`activeProfile`), URL stays `/studio/`. *Recommended.* The alternative is `/studio/<brand>/`, which allows bookmarks per brand and two tabs on two brands.
+## Decisions (confirmed 2026-11-24)
+1. **Removal**: archive first; permanent delete only from the archive, and refused while posts are scheduled or in flight.
+2. **Environment credentials**: apply to the first brand only.
+3. **Duplicating a brand**: copies identity, colours and fonts, never credentials, drafts or posts.
+4. **Open brand**: remembered on the server (`activeProfile`); the URL stays `/studio/`.

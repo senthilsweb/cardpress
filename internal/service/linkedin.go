@@ -53,7 +53,7 @@ var urnRe = regexp.MustCompile(`^urn:li:(person|organization):[A-Za-z0-9_-]+$`)
 //
 // It asks LinkedIn's token introspection endpoint whether the access token is active and when it expires, then checks
 // the author URN's shape and that the token's scopes allow posting as that author.
-func (s *Settings) Test(ctx context.Context, id string) (TestResult, error) {
+func (s *Settings) Test(ctx context.Context, profileID, id string) (TestResult, error) {
 	spec, ok := networkByID(id)
 	if !ok {
 		return TestResult{}, ErrNotFound
@@ -61,7 +61,7 @@ func (s *Settings) Test(ctx context.Context, id string) (TestResult, error) {
 	if !spec.Testable {
 		return TestResult{}, ErrUnsupported
 	}
-	creds, err := s.Resolve(ctx, id)
+	creds, err := s.Resolve(ctx, profileID, id)
 	if err != nil {
 		return TestResult{Status: TestInvalid, Message: err.Error()}, nil
 	}

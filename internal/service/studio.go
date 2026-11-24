@@ -30,14 +30,16 @@ const (
 	timeLayout   = time.RFC3339
 	PrefTheme    = "theme"
 	PrefFonts    = "customFonts"
-	PrefLayout   = "layout" // sidebar and section fold state, editor height
+	PrefLayout   = "layout"        // sidebar and section fold state, editor height
+	PrefActive   = "activeProfile" // the brand that was open last
 )
 
-var allowedPrefs = map[string]bool{PrefTheme: true, PrefFonts: true, PrefLayout: true}
+var allowedPrefs = map[string]bool{PrefTheme: true, PrefFonts: true, PrefLayout: true, PrefActive: true}
 
 // State is everything the studio loads at start.
 type State struct {
 	Profiles    []json.RawMessage          `json:"profiles"`
+	Archived    []json.RawMessage          `json:"archived"` // brands hidden from the studio, kept with their history
 	Designs     map[string]json.RawMessage `json:"designs"`
 	Preferences map[string]json.RawMessage `json:"preferences"`
 }
@@ -62,19 +64,24 @@ func (s *Studio) stamp() string { return s.now().UTC().Format(timeLayout) }
 
 // State returns all saved state. Empty collections are returned as empty, never nil.
 func (s *Studio) State(ctx context.Context) (State, error) {
-	st := State{Profiles: []json.RawMessage{}, Designs: map[string]json.RawMessage{}, Preferences: map[string]json.RawMessage{}}
+	st := State{Profiles: []json.RawMessage{}, Archived: []json.RawMessage{}, Designs: map[string]json.RawMessage{}, Preferences: map[string]json.RawMessage{}}
 
-	rows, err := s.db.QueryContext(ctx, `SELECT data FROM profiles ORDER BY position`)
+	rows, err := s.db.QueryContext(ctx, `SELECT data, archived_at IS NOT NULL FROM profiles ORDER BY position, id`)
 	if err != nil {
 		return st, err
 	}
 	for rows.Next() {
 		var d string
-		if err := rows.Scan(&d); err != nil {
+		var archived bool
+		if err := rows.Scan(&d, &archived); err != nil {
 			rows.Close()
 			return st, err
 		}
-		st.Profiles = append(st.Profiles, json.RawMessage(d))
+		if archived {
+			st.Archived = append(st.Archived, json.RawMessage(d))
+		} else {
+			st.Profiles = append(st.Profiles, json.RawMessage(d))
+		}
 	}
 	if err := closeRows(rows); err != nil {
 		return st, err
@@ -117,7 +124,9 @@ func closeRows(r *sql.Rows) error {
 	return err
 }
 
-// ReplaceProfiles replaces the saved profiles with list, keeping its order.
+// ReplaceProfiles saves the profiles in list. It adds new ones and updates existing ones, and never removes a profile,
+// archives one or changes the order: those have their own operations, so a stale client cannot delete a brand by saving
+// a shorter list.
 func (s *Studio) ReplaceProfiles(ctx context.Context, list []json.RawMessage) error {
 	ids, err := validateProfiles(list)
 	if err != nil {
@@ -128,10 +137,32 @@ func (s *Studio) ReplaceProfiles(ctx context.Context, list []json.RawMessage) er
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	if err := insertProfiles(ctx, tx, list, ids, s.stamp()); err != nil {
-		return err
+	for i, raw := range list {
+		if err := upsertProfile(ctx, tx, ids[i], raw, s.stamp()); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
+}
+
+// upsertProfile updates a profile's data, or adds it at the end.
+func upsertProfile(ctx context.Context, tx *sql.Tx, id string, raw json.RawMessage, at string) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO profiles (id, position, data, updated_at) VALUES (?, (SELECT COALESCE(MAX(position), -1) + 1 FROM profiles), ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+		id, string(raw), at)
+	if err != nil {
+		return err
+	}
+	return pinEnvProfile(ctx, tx, at)
+}
+
+// pinEnvProfile records which brand the environment-variable credentials belong to the first time a brand exists, so the
+// choice does not move when brands are later reordered or archived (see Settings.EnvProfile).
+func pinEnvProfile(ctx context.Context, tx *sql.Tx, at string) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO preferences (key, value, updated_at) SELECT 'envProfile', json_quote(id), ? FROM profiles ORDER BY position LIMIT 1`, at)
+	return err
 }
 
 func validateProfiles(list []json.RawMessage) ([]string, error) {
@@ -171,7 +202,7 @@ func insertProfiles(ctx context.Context, tx *sql.Tx, list []json.RawMessage, ids
 			return err
 		}
 	}
-	return nil
+	return pinEnvProfile(ctx, tx, at)
 }
 
 // ReplaceDesigns replaces the saved working designs, keyed by profile id.

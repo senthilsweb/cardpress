@@ -180,8 +180,12 @@ func settingsHandler(t *testing.T, token string, withKey bool, env map[string]st
 			t.Fatal(err)
 		}
 	}
+	studio := service.New(db.DB)
+	if err := studio.ReplaceProfiles(ctx, []json.RawMessage{json.RawMessage(`{"id":"p1"}`)}); err != nil {
+		t.Fatal(err)
+	}
 	return New(Options{
-		Studio: service.New(db.DB), Settings: service.NewSettings(db.DB, box, func(k string) string { return env[k] }),
+		Studio: studio, Settings: service.NewSettings(db.DB, box, func(k string) string { return env[k] }),
 		Token: token, Version: "test", DBDriver: db.Driver,
 	})
 }
@@ -280,7 +284,7 @@ func (p *apiPoster) n() int { p.mu.Lock(); defer p.mu.Unlock(); return len(p.cal
 
 type okCreds map[string]string
 
-func (c okCreds) Resolve(context.Context, string) (map[string]string, error) { return c, nil }
+func (c okCreds) Resolve(context.Context, string, string) (map[string]string, error) { return c, nil }
 
 func publishHandler(t *testing.T, token string, creds okCreds) (http.Handler, *apiPoster) {
 	t.Helper()
@@ -793,5 +797,71 @@ func TestTheMCPAuditCanBeRead(t *testing.T) {
 	off := guardedHandler(t, Options{})
 	if r := do(off, "GET", "/api/v1/mcp/audit", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"enabled":false`) {
 		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+}
+
+func TestBrandRoutesAndPerBrandSettings(t *testing.T) {
+	h := settingsHandler(t, "", true, nil) // brand p1 exists
+	if r := do(h, "POST", "/api/v1/profiles", `{"id":"p2","name":"Two"}`, nil); r.Code != 201 {
+		t.Fatalf("create: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "POST", "/api/v1/profiles", `{"id":"p2"}`, nil); r.Code != 409 {
+		t.Fatalf("duplicate: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/profiles/p2", `{"id":"p2","name":"Second"}`, nil); r.Code != 204 {
+		t.Fatalf("save: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/profiles/p2", `{"id":"other"}`, nil); r.Code != 400 {
+		t.Fatalf("mismatched id: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/profiles/order", `{"ids":["p2","p1"]}`, nil); r.Code != 204 {
+		t.Fatalf("order: %d %s", r.Code, r.Body)
+	}
+
+	// credentials belong to a brand: the older routes act on the first brand only (p1)
+	put := `{"fields":{"accessToken":"` + testSecret + `"}}`
+	if r := do(h, "PUT", "/api/v1/settings/linkedin", put, nil); r.Code != 200 {
+		t.Fatalf("legacy put: %d %s", r.Code, r.Body)
+	}
+	if body := do(h, "GET", "/api/v1/profiles/p1/settings/linkedin", "", nil).Body.String(); !strings.Contains(body, "••••1234") {
+		t.Fatalf("p1 should have the token: %s", body)
+	}
+	other := do(h, "GET", "/api/v1/profiles/p2/settings/linkedin", "", nil)
+	if other.Code != 200 || strings.Contains(other.Body.String(), "••••1234") || strings.Contains(other.Body.String(), `"complete":true`) {
+		t.Fatalf("p2 must not see p1's token: %d %s", other.Code, other.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/profiles/p2/settings/linkedin", `{"fields":{"accessToken":"second-token-0000-WXYZ"}}`, nil); r.Code != 200 {
+		t.Fatalf("p2 put: %d %s", r.Code, r.Body)
+	}
+	if body := do(h, "GET", "/api/v1/profiles/p1/settings/linkedin", "", nil).Body.String(); !strings.Contains(body, "••••1234") || strings.Contains(body, "WXYZ") {
+		t.Fatalf("p1 changed: %s", body)
+	}
+	if r := do(h, "GET", "/api/v1/profiles/nope/settings", "", nil); r.Code != 404 {
+		t.Fatalf("unknown brand: %d", r.Code)
+	}
+
+	// archive, then delete from the archive
+	if r := do(h, "DELETE", "/api/v1/profiles/p2", "", nil); r.Code != 409 {
+		t.Fatalf("delete before archive: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "POST", "/api/v1/profiles/p2/archive", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"scheduled":0`) {
+		t.Fatalf("archive: %d %s", r.Code, r.Body)
+	}
+	state := do(h, "GET", "/api/v1/state", "", nil).Body.String()
+	if !strings.Contains(state, `"archived":[{"id":"p2"`) {
+		t.Fatalf("state should list p2 as archived: %s", state)
+	}
+	if r := do(h, "POST", "/api/v1/profiles/p1/archive", "", nil); r.Code != 409 {
+		t.Fatalf("the last brand cannot be archived: %d", r.Code)
+	}
+	if r := do(h, "POST", "/api/v1/profiles/p2/restore", "", nil); r.Code != 204 {
+		t.Fatalf("restore: %d %s", r.Code, r.Body)
+	}
+	do(h, "POST", "/api/v1/profiles/p2/archive", "", nil)
+	if r := do(h, "DELETE", "/api/v1/profiles/p2", "", nil); r.Code != 204 {
+		t.Fatalf("delete: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "GET", "/api/v1/profiles/p2/settings", "", nil); r.Code != 404 {
+		t.Fatalf("a deleted brand has no settings: %d", r.Code)
 	}
 }

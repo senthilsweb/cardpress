@@ -17,6 +17,9 @@ import (
 	"github.com/senthilsweb/cardpress/internal/store"
 )
 
+// testBrand is the first (and environment) brand in these tests.
+const testBrand = "p1"
+
 const (
 	keyA        = "0123456789abcdef0123456789abcdef"
 	keyB        = "ffffffffffffffffffffffffffffffff"
@@ -41,6 +44,9 @@ func newSettings(t *testing.T, secret string, env map[string]string) (*Settings,
 			t.Fatal(err)
 		}
 	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO profiles (id, position, data, updated_at) VALUES (?, 0, ?, 'now')`, testBrand, `{"id":"`+testBrand+`"}`); err != nil {
+		t.Fatal(err)
+	}
 	return NewSettings(db.DB, box, func(k string) string { return env[k] }), db
 }
 
@@ -55,7 +61,7 @@ func linkedinAll() map[string]*string {
 func TestPutEncryptsAndViewMasks(t *testing.T) {
 	s, db := newSettings(t, keyA, nil)
 	ctx := context.Background()
-	v, err := s.Put(ctx, "linkedin", linkedinAll())
+	v, err := s.Put(ctx, testBrand, "linkedin", linkedinAll())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +95,7 @@ func TestPutEncryptsAndViewMasks(t *testing.T) {
 	if got["clientId"].Value != "77abc" || got["authorUrn"].Value != "urn:li:person:Ab_12" {
 		t.Fatalf("identifiers should be shown in full: %+v", got)
 	}
-	all, _ := s.View(ctx)
+	all, _ := s.View(ctx, testBrand)
 	js, _ := json.Marshal(all)
 	for _, secret := range []string{tokenSecret, clientSec} {
 		if strings.Contains(string(js), secret) {
@@ -110,15 +116,15 @@ func TestShortSecretsAreFullyMasked(t *testing.T) {
 func TestPutSemantics(t *testing.T) {
 	s, _ := newSettings(t, keyA, nil)
 	ctx := context.Background()
-	if _, err := s.Put(ctx, "linkedin", linkedinAll()); err != nil {
+	if _, err := s.Put(ctx, testBrand, "linkedin", linkedinAll()); err != nil {
 		t.Fatal(err)
 	}
 	// nil leaves a field alone, whitespace is trimmed, "" removes
-	v, err := s.Put(ctx, "linkedin", map[string]*string{"clientId": nil, "authorUrn": ptr("  urn:li:organization:99  \n"), "accessToken": ptr("")})
+	v, err := s.Put(ctx, testBrand, "linkedin", map[string]*string{"clientId": nil, "authorUrn": ptr("  urn:li:organization:99  \n"), "accessToken": ptr("")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	creds, _ := s.Resolve(ctx, "linkedin")
+	creds, _ := s.Resolve(ctx, testBrand, "linkedin")
 	if creds["clientId"] != "77abc" || creds["authorUrn"] != "urn:li:organization:99" || creds["accessToken"] != "" {
 		t.Fatalf("%v", creds)
 	}
@@ -130,11 +136,11 @@ func TestPutSemantics(t *testing.T) {
 		"control char":  {"clientId": ptr("ab\ncd")},
 		"too long":      {"clientId": ptr(strings.Repeat("a", maxCredentialLen+1))},
 	} {
-		if _, err := s.Put(ctx, "linkedin", ch); !errors.Is(err, ErrInvalid) {
+		if _, err := s.Put(ctx, testBrand, "linkedin", ch); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v, want ErrInvalid", name, err)
 		}
 	}
-	if _, err := s.Put(ctx, "myspace", nil); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Put(ctx, testBrand, "myspace", nil); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown network: %v", err)
 	}
 }
@@ -143,19 +149,19 @@ func TestEnvironmentOverridesAndLocks(t *testing.T) {
 	env := map[string]string{"CARDPRESS_LINKEDIN_ACCESS_TOKEN": "env-token-env-token-9999"}
 	s, _ := newSettings(t, keyA, env)
 	ctx := context.Background()
-	if _, err := s.Put(ctx, "linkedin", map[string]*string{"accessToken": ptr("typed-in-ui")}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "CARDPRESS_LINKEDIN_ACCESS_TOKEN") {
+	if _, err := s.Put(ctx, testBrand, "linkedin", map[string]*string{"accessToken": ptr("typed-in-ui")}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "CARDPRESS_LINKEDIN_ACCESS_TOKEN") {
 		t.Fatalf("changing an environment field must be refused and name the variable: %v", err)
 	}
-	if _, err := s.Put(ctx, "linkedin", map[string]*string{"clientId": ptr("c1")}); err != nil {
+	if _, err := s.Put(ctx, testBrand, "linkedin", map[string]*string{"clientId": ptr("c1")}); err != nil {
 		t.Fatal(err)
 	}
-	v, _ := s.Network(ctx, "linkedin")
+	v, _ := s.Network(ctx, testBrand, "linkedin")
 	for _, f := range v.Fields {
 		if f.Key == "accessToken" && (!f.Locked || f.Source != "env" || f.Value != "••••9999") {
 			t.Fatalf("%+v", f)
 		}
 	}
-	creds, _ := s.Resolve(ctx, "linkedin")
+	creds, _ := s.Resolve(ctx, testBrand, "linkedin")
 	if creds["accessToken"] != "env-token-env-token-9999" || creds["clientId"] != "c1" {
 		t.Fatalf("%v", creds)
 	}
@@ -164,7 +170,7 @@ func TestEnvironmentOverridesAndLocks(t *testing.T) {
 func TestEnvironmentWorksWithoutAKey(t *testing.T) {
 	env := map[string]string{"CARDPRESS_X_API_KEY": "k", "CARDPRESS_X_API_SECRET": "s", "CARDPRESS_X_ACCESS_TOKEN": "a", "CARDPRESS_X_ACCESS_TOKEN_SECRET": "b"}
 	s, _ := newSettings(t, "", env)
-	v, err := s.Network(context.Background(), "x")
+	v, err := s.Network(context.Background(), testBrand, "x")
 	if err != nil || !v.Complete {
 		t.Fatalf("%v %+v", err, v)
 	}
@@ -173,13 +179,13 @@ func TestEnvironmentWorksWithoutAKey(t *testing.T) {
 func TestNoKeyRefusesToStoreButAllowsRemoving(t *testing.T) {
 	s, _ := newSettings(t, "", nil)
 	ctx := context.Background()
-	if _, err := s.Put(ctx, "x", map[string]*string{"apiKey": ptr("abc")}); !errors.Is(err, ErrSecretsUnavailable) {
+	if _, err := s.Put(ctx, testBrand, "x", map[string]*string{"apiKey": ptr("abc")}); !errors.Is(err, ErrSecretsUnavailable) {
 		t.Fatalf("%v", err)
 	}
-	if _, err := s.Put(ctx, "x", map[string]*string{"apiKey": ptr("")}); err != nil {
+	if _, err := s.Put(ctx, testBrand, "x", map[string]*string{"apiKey": ptr("")}); err != nil {
 		t.Fatalf("removing needs no key: %v", err)
 	}
-	if v, _ := s.View(ctx); v.CanStore {
+	if v, _ := s.View(ctx, testBrand); v.CanStore {
 		t.Fatal("CanStore should be false")
 	}
 }
@@ -187,11 +193,11 @@ func TestNoKeyRefusesToStoreButAllowsRemoving(t *testing.T) {
 func TestWrongKeyIsReportedNotCrashed(t *testing.T) {
 	s, db := newSettings(t, keyA, nil)
 	ctx := context.Background()
-	if _, err := s.Put(ctx, "linkedin", linkedinAll()); err != nil {
+	if _, err := s.Put(ctx, testBrand, "linkedin", linkedinAll()); err != nil {
 		t.Fatal(err)
 	}
 	other := NewSettings(db.DB, mustBox(t, keyB), func(string) string { return "" })
-	v, err := other.Network(ctx, "linkedin")
+	v, err := other.Network(ctx, testBrand, "linkedin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,11 +209,11 @@ func TestWrongKeyIsReportedNotCrashed(t *testing.T) {
 			t.Fatalf("%s should be flagged unreadable", f.Key)
 		}
 	}
-	if _, err := other.Resolve(ctx, "linkedin"); err == nil || !strings.Contains(err.Error(), "CARDPRESS_SECRET_KEY") {
+	if _, err := other.Resolve(ctx, testBrand, "linkedin"); err == nil || !strings.Contains(err.Error(), "CARDPRESS_SECRET_KEY") {
 		t.Fatalf("%v", err)
 	}
 	// entering the value again replaces the unreadable one
-	if _, err := other.Put(ctx, "linkedin", map[string]*string{"clientId": ptr("new")}); err != nil {
+	if _, err := other.Put(ctx, testBrand, "linkedin", map[string]*string{"clientId": ptr("new")}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -241,7 +247,7 @@ func ready(t *testing.T, srvURL string) *Settings {
 	t.Helper()
 	s, _ := newSettings(t, keyA, nil)
 	s.linkedinIntrospect = srvURL
-	if _, err := s.Put(context.Background(), "linkedin", linkedinAll()); err != nil {
+	if _, err := s.Put(context.Background(), testBrand, "linkedin", linkedinAll()); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -253,7 +259,7 @@ func TestLinkedInValidShowsExpiry(t *testing.T) {
 	exp := time.Now().Add(40 * 24 * time.Hour).Unix()
 	var seen url.Values
 	srv := fakeLinkedIn(t, 200, fmt.Sprintf(`{"active":true,"expires_at":%d,"scope":"r_liteprofile,w_member_social"}`, exp), &seen)
-	res, err := ready(t, srv.URL).Test(context.Background(), "linkedin")
+	res, err := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +291,7 @@ func TestLinkedInOutcomes(t *testing.T) {
 		{"garbage", 200, `<html>`, TestError},
 	} {
 		srv := fakeLinkedIn(t, tc.status, tc.body, nil)
-		res, err := ready(t, srv.URL).Test(context.Background(), "linkedin")
+		res, err := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin")
 		if err != nil || res.Status != tc.want {
 			t.Errorf("%s: %+v %v, want %s", tc.name, res, err, tc.want)
 		}
@@ -295,10 +301,10 @@ func TestLinkedInOutcomes(t *testing.T) {
 func TestLinkedInOrganizationNeedsOrganizationScope(t *testing.T) {
 	srv := fakeLinkedIn(t, 200, `{"active":true,"scope":"w_member_social"}`, nil)
 	s := ready(t, srv.URL)
-	if _, err := s.Put(context.Background(), "linkedin", map[string]*string{"authorUrn": ptr("urn:li:organization:5")}); err != nil {
+	if _, err := s.Put(context.Background(), testBrand, "linkedin", map[string]*string{"authorUrn": ptr("urn:li:organization:5")}); err != nil {
 		t.Fatal(err)
 	}
-	if res, _ := s.Test(context.Background(), "linkedin"); res.Status != TestInvalid || !strings.Contains(mustJSON(res), "w_organization_social") {
+	if res, _ := s.Test(context.Background(), testBrand, "linkedin"); res.Status != TestInvalid || !strings.Contains(mustJSON(res), "w_organization_social") {
 		t.Fatalf("%+v", res)
 	}
 }
@@ -306,16 +312,16 @@ func TestLinkedInOrganizationNeedsOrganizationScope(t *testing.T) {
 func TestLinkedInBadURNAndIncomplete(t *testing.T) {
 	srv := fakeLinkedIn(t, 200, `{"active":true,"scope":"w_member_social"}`, nil)
 	s := ready(t, srv.URL)
-	if _, err := s.Put(context.Background(), "linkedin", map[string]*string{"authorUrn": ptr("not-a-urn")}); err != nil {
+	if _, err := s.Put(context.Background(), testBrand, "linkedin", map[string]*string{"authorUrn": ptr("not-a-urn")}); err != nil {
 		t.Fatal(err)
 	}
-	if res, _ := s.Test(context.Background(), "linkedin"); res.Status != TestInvalid {
+	if res, _ := s.Test(context.Background(), testBrand, "linkedin"); res.Status != TestInvalid {
 		t.Fatalf("a token that works but has a bad author URN must not be 'valid': %+v", res)
 	}
-	if _, err := s.Put(context.Background(), "linkedin", map[string]*string{"clientSecret": ptr("")}); err != nil {
+	if _, err := s.Put(context.Background(), testBrand, "linkedin", map[string]*string{"clientSecret": ptr("")}); err != nil {
 		t.Fatal(err)
 	}
-	if res, _ := s.Test(context.Background(), "linkedin"); res.Status != TestIncomplete || !strings.Contains(res.Message, "Client secret") {
+	if res, _ := s.Test(context.Background(), testBrand, "linkedin"); res.Status != TestIncomplete || !strings.Contains(res.Message, "Client secret") {
 		t.Fatalf("%+v", res)
 	}
 }
@@ -324,7 +330,7 @@ func TestLinkedInUnreachable(t *testing.T) {
 	srv := fakeLinkedIn(t, 200, `{}`, nil)
 	s := ready(t, srv.URL)
 	srv.Close()
-	if res, _ := s.Test(context.Background(), "linkedin"); res.Status != TestError {
+	if res, _ := s.Test(context.Background(), testBrand, "linkedin"); res.Status != TestError {
 		t.Fatalf("%+v", res)
 	}
 }
@@ -337,7 +343,7 @@ func TestCredentialsAreNeverSentToARedirectTarget(t *testing.T) {
 		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
 	}))
 	defer redirector.Close()
-	res, _ := ready(t, redirector.URL).Test(context.Background(), "linkedin")
+	res, _ := ready(t, redirector.URL).Test(context.Background(), testBrand, "linkedin")
 	if hit {
 		t.Fatal("the request was forwarded to the redirect target")
 	}
@@ -349,11 +355,11 @@ func TestCredentialsAreNeverSentToARedirectTarget(t *testing.T) {
 func TestOtherNetworksCannotBeTestedYet(t *testing.T) {
 	s, _ := newSettings(t, keyA, nil)
 	for _, id := range []string{"x", "instagram"} {
-		if _, err := s.Test(context.Background(), id); !errors.Is(err, ErrUnsupported) {
+		if _, err := s.Test(context.Background(), testBrand, id); !errors.Is(err, ErrUnsupported) {
 			t.Errorf("%s: %v", id, err)
 		}
 	}
-	if _, err := s.Test(context.Background(), "nope"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Test(context.Background(), testBrand, "nope"); !errors.Is(err, ErrNotFound) {
 		t.Fatal("unknown network")
 	}
 }

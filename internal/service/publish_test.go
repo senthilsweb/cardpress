@@ -48,7 +48,7 @@ func (f *fakePoster) count() int { f.mu.Lock(); defer f.mu.Unlock(); return len(
 
 type fakeCreds map[string]string
 
-func (c fakeCreds) Resolve(context.Context, string) (map[string]string, error) { return c, nil }
+func (c fakeCreds) Resolve(context.Context, string, string) (map[string]string, error) { return c, nil }
 
 type harness struct {
 	p   *Publisher

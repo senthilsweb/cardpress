@@ -36,7 +36,7 @@ func TestEmptyStateIsNotNil(t *testing.T) {
 	}
 }
 
-func TestProfilesRoundTripKeepOrderAndReplace(t *testing.T) {
+func TestProfilesRoundTripKeepOrderAndNeverRemove(t *testing.T) {
 	s, ctx := newStudio(t), context.Background()
 	if err := s.ReplaceProfiles(ctx, []json.RawMessage{raw(`{"id":"b","n":1}`), raw(`{"id":"a"}`)}); err != nil {
 		t.Fatal(err)
@@ -45,11 +45,13 @@ func TestProfilesRoundTripKeepOrderAndReplace(t *testing.T) {
 	if len(st.Profiles) != 2 || string(st.Profiles[0]) != `{"id":"b","n":1}` {
 		t.Fatalf("order or content lost: %s", st.Profiles)
 	}
-	if err := s.ReplaceProfiles(ctx, []json.RawMessage{raw(`{"id":"c"}`)}); err != nil {
+	// saving a different list updates and adds, but never removes: a stale client cannot delete a brand this way
+	if err := s.ReplaceProfiles(ctx, []json.RawMessage{raw(`{"id":"c"}`), raw(`{"id":"b","n":2}`)}); err != nil {
 		t.Fatal(err)
 	}
-	if st, _ = s.State(ctx); len(st.Profiles) != 1 {
-		t.Fatalf("replace kept old rows: %s", st.Profiles)
+	st, _ = s.State(ctx)
+	if len(st.Profiles) != 3 || string(st.Profiles[0]) != `{"id":"b","n":2}` || string(st.Profiles[1]) != `{"id":"a"}` || string(st.Profiles[2]) != `{"id":"c"}` {
+		t.Fatalf("expected b (updated, first), a, c: %s", st.Profiles)
 	}
 }
 

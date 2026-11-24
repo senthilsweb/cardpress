@@ -33,6 +33,8 @@ There are no user accounts yet, so anyone who can reach the server can open this
 
 A credential can come from the environment instead. An environment value overrides a stored one, is shown as "Set by environment", and cannot be changed in the screen. This suits Docker and CI.
 
+**With several brands, environment credentials belong to the first brand only.** An environment variable is global, so applying it to every brand would make them all post as the same account. The first brand created keeps them, even if you later reorder or archive brands; every other brand uses credentials stored in the app.
+
 | LinkedIn | X | Instagram |
 |---|---|---|
 | `CARDPRESS_LINKEDIN_CLIENT_ID` | `CARDPRESS_X_API_KEY` | `CARDPRESS_INSTAGRAM_APP_ID` |
@@ -40,13 +42,21 @@ A credential can come from the environment instead. An environment value overrid
 | `CARDPRESS_LINKEDIN_ACCESS_TOKEN` | `CARDPRESS_X_ACCESS_TOKEN` | `CARDPRESS_INSTAGRAM_ACCESS_TOKEN` |
 | `CARDPRESS_LINKEDIN_AUTHOR_URN` | `CARDPRESS_X_ACCESS_TOKEN_SECRET` | `CARDPRESS_INSTAGRAM_BUSINESS_ACCOUNT_ID` |
 
+## One set per brand
+
+Credentials belong to a brand (a profile). Each brand has its own LinkedIn (and X and Instagram) connection, stored encrypted, and a post is only ever published with the credentials of the brand that owns it. A brand never falls back to another brand's token. Installations that predate brands keep their credentials on the first brand.
+
 ## API
+
+Credentials are per brand:
 
 | Request | Purpose |
 |---|---|
-| `GET /api/v1/settings` | All networks, `canStore`, and where the key comes from |
-| `GET /api/v1/settings/{network}` | One network |
-| `PUT /api/v1/settings/{network}` | `{"fields": {"accessToken": "…"}}`. A string stores it, `""` removes it, `null` or leaving it out keeps it |
-| `POST /api/v1/settings/{network}/test` | Test connection. `501` for X and Instagram |
+| `GET /api/v1/profiles/{id}/settings` | All networks for that brand, `canStore`, and where the key comes from |
+| `GET /api/v1/profiles/{id}/settings/{network}` | One network |
+| `PUT /api/v1/profiles/{id}/settings/{network}` | `{"fields": {"accessToken": "…"}}`. A string stores it, `""` removes it, `null` or leaving it out keeps it |
+| `POST /api/v1/profiles/{id}/settings/{network}/test` | Test connection. `501` for X and Instagram |
+
+The older routes without a brand (`/api/v1/settings...`) act on the first brand and remain for now.
 
 Server code: `internal/secrets` (encryption), `internal/service/settings.go`, `networks.go` and `linkedin.go`.
