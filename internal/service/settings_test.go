@@ -286,6 +286,7 @@ func TestLinkedInOutcomes(t *testing.T) {
 		{"expired by date", 200, fmt.Sprintf(`{"active":false,"expires_at":%d}`, past), TestExpired},
 		{"inactive", 200, `{"active":false}`, TestInvalid},
 		{"bad client credentials", 401, `{"error":"invalid_client"}`, TestInvalid},
+		{"unknown client id", 400, `{"error":"invalid_client_id","error_description":"The passed in client_id is invalid \"x\""}`, TestInvalid},
 		{"missing scope", 200, `{"active":true,"scope":"r_liteprofile"}`, TestInvalid},
 		{"server error", 503, ``, TestError},
 		{"garbage", 200, `<html>`, TestError},
@@ -361,5 +362,22 @@ func TestOtherNetworksCannotBeTestedYet(t *testing.T) {
 	}
 	if _, err := s.Test(context.Background(), testBrand, "nope"); !errors.Is(err, ErrNotFound) {
 		t.Fatal("unknown network")
+	}
+}
+
+func TestARejectedCheckSaysWhichValueIsWrongWithoutEchoingIt(t *testing.T) {
+	for code, want := range map[string]string{
+		"invalid_client_id":     "Client ID",
+		"invalid_client_secret": "Client secret",
+		"invalid_token":         "access token",
+	} {
+		srv := fakeLinkedIn(t, 400, fmt.Sprintf(`{"error":%q,"error_description":"bad value %s"}`, code, clientSec), nil)
+		res, err := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin")
+		if err != nil || res.Status != TestInvalid || !strings.Contains(res.Message, want) {
+			t.Errorf("%s: %+v %v", code, res, err)
+		}
+		if strings.Contains(mustJSON(res), clientSec) {
+			t.Errorf("%s: the answer repeats a credential: %s", code, mustJSON(res))
+		}
 	}
 }

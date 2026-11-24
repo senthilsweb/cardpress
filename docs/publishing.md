@@ -28,13 +28,21 @@ The **Publishing queue** section of the Post tab lists posts with a small image,
 |---|---|---|
 | Scheduled | Waiting for its time | Publish now, Reschedule, Cancel |
 | Publishing… | Being sent | Wait |
-| Published | Done; shows **View on LinkedIn** | Remove from the list (the post stays on LinkedIn) |
+| Published | Done; shows **View on LinkedIn** and **Details**. It stays in the list as your record. | View, Details |
 | Failed | LinkedIn or the network refused; **known not posted**. The reason is shown. | Publish again, Reschedule, Discard |
 | Missed | The time passed while the server was not running (more than the grace window late) | Publish now, Reschedule, Discard |
 | Check LinkedIn | The outcome is **unknown** (see below) | Open LinkedIn; Publish anyway (asks again, may duplicate); Discard |
 | Cancelled | You cancelled it | Schedule again, Discard |
 
 Buttons that would send a post ask twice: the first click changes the label to "Confirm…", and the second sends.
+
+## Messages
+
+A toast (bottom right) tells you what happened. **Sending to LinkedIn…** appears when you confirm; **Posted to LinkedIn**, with a **View post** button, when it is live; **LinkedIn did not post it** or **Check LinkedIn**, with the reason, when it is not. A post that was scheduled tells you the same when its time comes, as long as the studio is open.
+
+## What is kept
+
+Every post is saved in the database before it is sent, and stays: the text and hashtags exactly as confirmed, the image, when it was created, scheduled and posted (UTC), and LinkedIn's post id and link. The **Details** button on a post also shows each try: the three calls made to LinkedIn (reserve the image upload, upload the image, create the post), the status and time of each, LinkedIn's post id and request id, and whatever it said back. Tries are kept in `publish_attempts`, one row per trip, so a post you publish again after a failure shows both. The record never holds the access token, and an address with a signature in it is stored without the signature.
 
 ## No automatic retries
 
@@ -59,7 +67,7 @@ On start, any post left "publishing" by a previous run becomes **Check LinkedIn*
 | Variable | Default | Meaning |
 |---|---|---|
 | `CARDPRESS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
-| `CARDPRESS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header. LinkedIn retires versions after about a year, so keep it current. |
+| `CARDPRESS_LINKEDIN_VERSION` | `202610` | The `LinkedIn-Version` header (`YYYYMM`). LinkedIn retires versions after about a year; if posts fail with "no longer accepts the API version", set this to a current one. |
 | `CARDPRESS_LINKEDIN_API_BASE` | LinkedIn's API | For tests or a proxy only. It must be https (plain http only for localhost), because the access token is sent there. |
 
 ## API
@@ -68,7 +76,7 @@ On start, any post left "publishing" by a previous run becomes **Check LinkedIn*
 |---|---|
 | `POST /api/v1/publish/jobs` | Multipart: `meta` (JSON: `profileId`, `draftId`, `body`, `hashtags`, `altText`, and for later `scheduledAt` + `timezone`) and `image` (PNG). Publish-now jobs return at once and run in the background. |
 | `GET /api/v1/publish/jobs?profileId=` | The list (no images) |
-| `GET /api/v1/publish/jobs/{id}` and `/image` | One job, and its PNG |
+| `GET /api/v1/publish/jobs/{id}`, `/image` and `/attempts` | One job, its PNG, and what LinkedIn answered on each try |
 | `POST /api/v1/publish/jobs/{id}/publish-now` | `{"acceptDuplicate": true}` is required for a Check LinkedIn job |
 | `PUT /api/v1/publish/jobs/{id}/schedule` | `{"scheduledAt", "timezone"}` |
 | `POST /api/v1/publish/jobs/{id}/cancel` and `DELETE /api/v1/publish/jobs/{id}` | Cancel a scheduled job; delete a finished one |
