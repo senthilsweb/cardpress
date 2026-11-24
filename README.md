@@ -1,6 +1,6 @@
 # CardPress
 
-> A self-hosted studio for branded social cards and LinkedIn posts: design the card, write and preview the post, then publish it or schedule it. One Go binary with the web app embedded.
+> Free, self-hosted agentic AI for social media authoring and management: design branded cards, draft posts with an assistant, preview them, then publish or schedule. One Go binary with the web app embedded.
 
 **Status.** The card designer, post composer, full preview, encrypted credential storage and the scheduler are built and tested. Publishing to LinkedIn is tested against a local fake of LinkedIn's API, **not yet against a real LinkedIn account**, so treat the first real post as a trial. X and Instagram credentials can be stored but those networks cannot be published to yet. The chat that drafts post content from an article works end to end, but with a built-in demo agent rather than an AI model. The real Claude Managed Agent is specified in [`openspec/changes`](openspec/changes) but not built; the MCP server it will use is.
 
