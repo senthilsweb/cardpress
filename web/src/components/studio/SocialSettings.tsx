@@ -112,7 +112,7 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
           </div>
         );
       })}
-      {storingNeedsKey && <p className="text-xs text-destructive">There is no encryption key, so these cannot be saved yet. See the note above.</p>}
+      {storingNeedsKey && <p className="text-xs text-destructive">Cannot save: no encryption key.</p>}
     </div>
   );
 }
@@ -233,7 +233,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
       <div>
         <span ref={top} />
         <p className="px-4 pt-4 text-xs leading-snug text-muted-foreground">
-          Keys and tokens the server uses to publish. They are stored encrypted on the server; this screen only ever shows the last four characters of a secret.
+          Stored encrypted on the server. Only the last four characters are shown.
         </p>
         {loadError && (
           <div role="alert" className="space-y-2 px-4 pt-4 text-sm">
@@ -246,8 +246,7 @@ export function SocialSettings({ open, onOpenChange }: { open: boolean; onOpenCh
           <div className="mx-4 mt-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
             <p>
-              Credentials cannot be saved: the server has no encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> to a long random value
-              (for example <code className="font-mono">openssl rand -hex 32</code>) and restart. Values set through environment variables still work.
+              No encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> and restart.
             </p>
           </div>
         )}

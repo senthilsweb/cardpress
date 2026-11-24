@@ -12,11 +12,11 @@ import { ProposalCard } from "./ProposalCard";
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
 function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
-  if (conv?.sourceKind === "mcp") return <Badge variant="warn" title="This was proposed by a program that connected through MCP. Its name is what it called itself and is not verified.">Outside agent</Badge>;
+  if (conv?.sourceKind === "mcp") return <Badge variant="warn" title="Sent by a program through MCP. Name not verified.">Outside agent</Badge>;
   if (!chat.agent) return null;
   return chat.agent.ai
     ? <Badge variant="brand">{chat.agent.name}</Badge>
-    : <Badge variant="warn" title="Replies come from a simple built-in demo, not an AI model.">{chat.agent.name} · no AI model</Badge>;
+    : <Badge variant="warn" title="Built-in demo, not an AI model.">{chat.agent.name} · no AI model</Badge>;
 }
 
 /** Where a conversation starts: a web address or pasted text, plus older conversations to reopen. */
@@ -33,12 +33,12 @@ function StartView({ chat }: { chat: ChatStore }) {
         <AgentBadge chat={chat} />
       </div>
       <p className="text-xs leading-snug text-muted-foreground">
-        Give the chat an article to work from. It drafts a post or an article for you to approve, then you can ask for changes. Nothing is published or saved until you approve it, and publishing stays your own step.
+        Give it an article. It drafts a post for you to approve.
       </p>
       {chat.agent && !chat.agent.ai && (
         <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] leading-snug">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-          <p>The chat is using a built-in <b>demo agent</b>: it picks sentences from the article by simple rules and understands only a few instructions. It is not an AI model. A real one can be connected (see docs/cma-agent.md).</p>
+          <p><b>Demo agent</b>: simple rules, not an AI model.</p>
         </div>
       )}
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); go(); }}>
@@ -183,7 +183,7 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
 
       {conv.sourceKind === "mcp" ? (
         <div className="border-t border-border bg-card px-3 py-2.5 text-[11px] leading-snug text-muted-foreground">
-          Review the proposal above: approve it, edit it first, or reject it. To change it further, ask the agent that sent it; it can send a revised version here. Nothing is applied until you approve.
+          Approve, edit or reject. To change it, ask the agent that sent it.
         </div>
       ) : (
       <div className="space-y-1.5 border-t border-border bg-card px-3 py-2.5">
@@ -198,7 +198,7 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
           <Button variant="brand" size="icon" aria-label="Send" disabled={chat.busy || !draft.trim()} onClick={send}>{chat.busy ? <Loader2 className="animate-spin" /> : <Send />}</Button>
         </div>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          {demo ? "The demo understands: shorter · longer · make it an article · make it a post · no hashtags · add #Tag · no question." : "Enter sends, Shift+Enter adds a line."}
+          {demo ? "Try: shorter · longer · make it an article · no hashtags" : "Enter sends, Shift+Enter adds a line."}
         </p>
       </div>
       )}

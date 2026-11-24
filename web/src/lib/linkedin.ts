@@ -61,16 +61,16 @@ function inline(nodes: DocNode[] | undefined, ctx: Ctx): string {
     if (bold || italic) {
       if (ctx.opts.unicodeStyles) {
         t = styleText(t, bold, italic);
-        ctx.warnings.set("styles-unicode", { code: "styles-unicode", message: "Bold and italic are sent as special Unicode characters. Screen readers may read them letter by letter, and search will not match them." });
+        ctx.warnings.set("styles-unicode", { code: "styles-unicode", message: "Bold and italic are sent as Unicode characters." });
       } else {
-        ctx.warnings.set("styles-dropped", { code: "styles-dropped", message: "Bold and italic are not supported by LinkedIn posts, so they are left out. Turn on Unicode styles to keep them." });
+        ctx.warnings.set("styles-dropped", { code: "styles-dropped", message: "Bold and italic are left out." });
       }
     }
     const link = (n.marks ?? []).find((m) => m.type === "link");
     const href = link?.attrs?.href;
     if (typeof href === "string" && href && href !== t) {
       t = `${t} (${href})`;
-      ctx.warnings.set("links-expanded", { code: "links-expanded", message: "Links are written out as plain URLs; LinkedIn posts have no link text." });
+      ctx.warnings.set("links-expanded", { code: "links-expanded", message: "Links are sent as plain URLs." });
     }
     out += t;
   }

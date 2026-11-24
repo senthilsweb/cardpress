@@ -170,19 +170,18 @@ export function Composer({ store, jobs, renderPng, onOpenSettings, design, profi
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } else if (e.key === "Backspace" && !tag && draft.hashtags.length) store.update({ hashtags: draft.hashtags.slice(0, -1) }); }}
               onBlur={addTag}
             />
-            <p className="text-[11px] leading-snug text-muted-foreground">Added as the last line of the post. Letters, digits and underscores only.</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">Added as the last line.</p>
           </Section>
 
           <Section title="Image">
-            <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="Describes the card for people using screen readers. LinkedIn shows it as the image's description." />
+            <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="For screen readers." />
           </Section>
 
           <Section title="Bold and italic">
             <div className="flex items-start gap-2">
               <Switch id="uni" checked={draft.unicodeStyles} onCheckedChange={(v) => store.update({ unicodeStyles: v })} />
               <div className="space-y-1">
-                <Label htmlFor="uni" className="text-foreground">Keep bold and italic using Unicode letters</Label>
-                <p className="text-[11px] leading-snug text-muted-foreground">LinkedIn posts have no formatting. When on, styled text is sent as look-alike characters, which screen readers can read letter by letter. When off, the styling is left out.</p>
+                <Label htmlFor="uni" className="text-foreground">Keep bold and italic (Unicode)</Label>
               </div>
             </div>
           </Section>
