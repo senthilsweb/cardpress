@@ -66,7 +66,7 @@ A compact control on the right of the header, next to the Assistant button, show
 ```
  ┌───────────────────────────┐
  │ ● Senthil Karuppaiah   ✓  │
- │ ● Zynomi                  │
+ │ ● TemplrPress             │
  │ ● Client: Acme            │
  │ ─────────────────────────│
  │ + New brand…              │
@@ -81,8 +81,8 @@ Same drawer as Social accounts and the Assistant (themed header, scrolling body,
 ```
  NEW BRAND                         ✕
  ───────────────────────────────────
- Brand name      [ Zynomi          ]
- Handle          [ @zynomi         ]
+ Brand name      [ TemplrPress     ]
+ Handle          [ @templrpress    ]
  Start from      (•) Blank
                  ( ) A copy of "Senthil Karuppaiah"
                      Copies identity, colours and

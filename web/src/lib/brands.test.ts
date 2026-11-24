@@ -4,9 +4,9 @@ import { DEFAULT_DESIGN, DEFAULT_PROFILES, upgradePlaceholderText } from "./prof
 
 describe("newBrandId", () => {
   it("makes a readable id and never reuses one", () => {
-    const first = newBrandId("Zynomi Labs", [], () => 0.5);
-    expect(first).toMatch(/^zynomi-labs-[0-9a-z]{4}$/);
-    const next = newBrandId("Zynomi Labs", [first], (() => { const v = [0.5, 0.25]; return () => v.shift() ?? 0.9; })());
+    const first = newBrandId("TemplrPress", [], () => 0.5);
+    expect(first).toMatch(/^templrpress-[0-9a-z]{4}$/);
+    const next = newBrandId("TemplrPress", [first], (() => { const v = [0.5, 0.25]; return () => v.shift() ?? 0.9; })());
     expect(next).not.toBe(first);
   });
   it("copes with names that have no letters", () => {
@@ -78,7 +78,7 @@ describe("move", () => {
 describe("initials and colours", () => {
   it("makes short badges", () => {
     expect(initials("Senthil Karuppaiah")).toBe("SK");
-    expect(initials("zynomi")).toBe("ZY");
+    expect(initials("templrpress")).toBe("TE");
     expect(initials("  ")).toBe("?");
   });
   it("takes the accent of the colour set the card uses", () => {
