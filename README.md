@@ -57,7 +57,7 @@ Needs Node 22+ and Go 1.22+.
 
 ```bash
 make build           # builds web/dist and bin/cardpress
-./bin/cardpress                 # http://localhost:8080
+./bin/cardpress                 # http://localhost:8080 (landing page; the editor is at /studio/)
 ./bin/cardpress -addr 127.0.0.1:9000   # another port
 ```
 
