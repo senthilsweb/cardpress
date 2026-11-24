@@ -8,7 +8,7 @@ Open **Social accounts** from the account menu: click your brand at the bottom o
 | X | API key, API secret, Access token, Access token secret | Stored only; publishing not yet supported |
 | Instagram | App ID, App secret, Long-lived access token, Business account ID | Stored only; publishing not yet supported |
 
-You paste the values in. There is no sign-in flow in the studio yet, and tokens are not refreshed for you: when a LinkedIn token expires (about 60 days), create a new one and enter it again.
+You paste the values in. There is no LinkedIn sign-in (OAuth) flow in the studio yet, and tokens are not refreshed for you: when a LinkedIn token expires (about 60 days), create a new one and enter it again.
 
 ## What the drawer does
 
@@ -27,7 +27,7 @@ You paste the values in. There is no sign-in flow in the studio yet, and tokens 
 - Responses from the API never contain a secret. They are also marked `no-store`.
 - LinkedIn is called at a fixed address and redirects are never followed, so credentials are only sent where intended.
 
-There are no user accounts yet, so anyone who can reach the server can open this screen and use the stored credentials to publish. Keep it on loopback, or set `CARDPRESS_API_TOKEN` (see [Deployment](deployment.md)).
+Social accounts belong to a brand, and a brand belongs to a person. Only its owner (an editor) and admins can open this screen or use the stored credentials; a writer cannot see it at all (see [Accounts and roles](accounts.md)). Anyone with the server's `CARDPRESS_API_TOKEN` acts as an admin, so keep it secret (see [Deployment](deployment.md)).
 
 ## Environment variables
 
