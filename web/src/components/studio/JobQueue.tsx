@@ -134,7 +134,7 @@ export function JobQueue({ store }: { store: JobsStore }) {
     <div className="space-y-2">
       {store.error && <p role="alert" className="text-xs text-destructive">{store.error}</p>}
       {store.jobs.length === 0 ? (
-        <p className="text-xs leading-snug text-muted-foreground">Nothing yet. Use Full preview to publish a post or schedule it for later.</p>
+        <p className="text-xs leading-snug text-muted-foreground">Nothing yet.</p>
       ) : (
         <ul className="space-y-2">{jobs.map((j) => <JobRow key={j.id} job={j} store={store} />)}</ul>
       )}

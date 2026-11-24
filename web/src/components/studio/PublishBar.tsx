@@ -47,7 +47,7 @@ export function PublishBar({ draft, serialized, bodyOnly, size, renderPng, onDon
   }, []);
 
   if (draft.kind === "article") {
-    return <p className="text-xs text-muted-foreground">Articles are not published from here: copy the formatted text into LinkedIn's article editor or your blog.</p>;
+    return <p className="text-xs text-muted-foreground">Articles are not published from here. Copy the text into LinkedIn or your blog.</p>;
   }
 
   const empty = !serialized.text.trim();
@@ -95,7 +95,7 @@ export function PublishBar({ draft, serialized, bodyOnly, size, renderPng, onDon
       {step === "confirm" && (
         <div role="alertdialog" aria-label="Confirm publishing" className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <p className="font-medium">Post this to LinkedIn now?</p>
-          <p className="text-muted-foreground">It goes live immediately{setup.author ? <> as <code className="font-mono">{setup.author}</code></> : ""}, with the card image shown above. It cannot be unpublished from here.</p>
+          <p className="text-muted-foreground">Goes live now{setup.author ? <> as <code className="font-mono">{setup.author}</code></> : ""} with the card above. This cannot be undone here.</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setStep("idle")}>Back</Button>
             <Button size="sm" variant="brand" disabled={busy} onClick={() => void submit()}>{busy ? <Loader2 className="animate-spin" /> : <Send />} Yes, publish now</Button>
@@ -107,7 +107,7 @@ export function PublishBar({ draft, serialized, bodyOnly, size, renderPng, onDon
         <div className="space-y-2 rounded-md border border-border bg-card p-3">
           <p className="text-xs font-medium">Schedule for later</p>
           <ScheduleFields idPrefix="new" local={local} tz={tz} onLocal={setLocal} onTz={setTz} />
-          <p className="text-[11px] text-muted-foreground">The server must be running at that time. If it was not, you will be asked what to do instead of it posting late.</p>
+          <p className="text-[11px] text-muted-foreground">The server must be running at that time.</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setStep("idle")}>Back</Button>
             <Button size="sm" variant="brand" disabled={busy || !!schedule.problem || !schedule.at} onClick={() => schedule.at && void submit({ at: schedule.at, tz })}>

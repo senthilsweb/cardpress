@@ -37,7 +37,7 @@ export function BootScreen(props: {
   if (boot.status === "error") {
     return (
       <Shell title="Cannot reach the server">
-        <p className="mb-4 text-sm text-muted-foreground">{boot.message}. Check that the Go server is running and that the API address ({API_BASE}) is right.</p>
+        <p className="mb-4 text-sm text-muted-foreground">{boot.message}. Is the server running at {API_BASE}?</p>
         <Button variant="brand" size="sm" onClick={props.retry}>Try again</Button>
       </Shell>
     );
@@ -50,7 +50,7 @@ export function BootScreen(props: {
             <Label htmlFor="tok">Access token</Label>
             <Input id="tok" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} autoFocus />
             {boot.error && <p className="text-xs text-destructive">{boot.error}</p>}
-            <p className="text-xs text-muted-foreground">It is set on the server as CARDPRESS_API_TOKEN. It is kept for this browser tab only.</p>
+            <p className="text-xs text-muted-foreground">Set as CARDPRESS_API_TOKEN on the server. Kept for this tab only.</p>
           </div>
           <Button type="submit" variant="brand" size="sm" disabled={!token.trim()}>Continue</Button>
         </form>
@@ -63,9 +63,9 @@ export function BootScreen(props: {
   return (
     <Shell title="Move your saved work to the server?">
       <p className="mb-2 text-sm text-muted-foreground">
-        This browser has data from the older version: the profile “{name}”{l.customFonts.length ? ` and ${l.customFonts.length} added font(s)` : ""}. Studio now keeps everything on the server.
+        Found the profile “{name}”{l.customFonts.length ? ` and ${l.customFonts.length} added font(s)` : ""} saved in this browser.
       </p>
-      <p className="mb-4 text-xs text-muted-foreground">Importing copies it to the server and then removes it from this browser. Only the profile you used last is kept.</p>
+      <p className="mb-4 text-xs text-muted-foreground">Copies it to the server, then clears it from this browser.</p>
       {boot.error && <p className="mb-3 text-xs text-destructive">{boot.error}</p>}
       <div className="flex gap-2">
         <Button variant="brand" size="sm" disabled={boot.busy} onClick={() => props.importLegacy(l)}>{boot.busy && <Loader2 className="animate-spin" />} Import</Button>

@@ -72,7 +72,7 @@ export function FullPreview(props: {
             {isPost && (
               <>
                 <Check2 ok={!s.overLimit} text={s.overLimit ? `Over LinkedIn's ${LINKEDIN_LIMIT.toLocaleString()} character limit` : "Within the length limit"} />
-                <Check2 ok={!empty && !fold(s.text).truncated} text={empty ? "The post has no text" : fold(s.text).truncated ? `The feed shows about ${FOLD_LINES} lines or ${FOLD_CHARS} characters, then “…see more”. Put the hook first.` : "Fits without a “see more” cut"} />
+                <Check2 ok={!empty && !fold(s.text).truncated} text={empty ? "The post has no text" : fold(s.text).truncated ? `Cut after about ${FOLD_LINES} lines or ${FOLD_CHARS} characters (“…see more”)` : "Fits without a “see more” cut"} />
                 <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />
               </>
             )}
