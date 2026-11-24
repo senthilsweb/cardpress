@@ -55,6 +55,20 @@ make docker-run     # published on 127.0.0.1:8080, data in ./data
 
 To expose it, set a token instead of `CARDPRESS_INSECURE`: `docker run -p 8080:8080 -e CARDPRESS_API_TOKEN=<long random value> -v cardpress-data:/data cardpress`.
 
+### Docker Compose
+
+```bash
+cp .env.example .env      # edit it: token or loopback, secret key, assistant settings
+docker compose up -d      # pulls ghcr.io/<owner>/cardpress:latest (or: docker compose up -d --build)
+```
+
+- **Settings**: every line in `.env` is passed into the container, so new `CARDPRESS_*` settings and `ANTHROPIC_API_KEY` need no change to `docker-compose.yml`. `.env` is git-ignored.
+- **Data**: the SQLite database (and the key file, if you did not set `CARDPRESS_SECRET_KEY`) live in the `cardpress-data` volume, mounted at `/data`. Back it up with `docker run --rm -v cardpress-data:/data -v $PWD:/out busybox tar czf /out/cardpress-data.tgz /data`. To use a folder instead of the named volume, make it writable by uid 65532 (the image runs as non-root).
+- **Access**: the port is published on `127.0.0.1` only. To expose it, set `CARDPRESS_BIND=0.0.0.0`, a `CARDPRESS_API_TOKEN` and a `CARDPRESS_SECRET_KEY`, and put it behind HTTPS.
+- **Assistant**: see [Claude Managed Agent](cma-agent.md). Create the agent once with `docker compose run --rm -e ANTHROPIC_API_KEY=... cardpress agent-setup`, then add `CARDPRESS_AGENT=cma`, the two ids and the key to `.env` and run `docker compose up -d`.
+- **Health**: the container runs `/cardpress healthcheck` (there is no shell or curl in the image).
+- **Image tags**: `latest` and `main` follow the main branch; `vX.Y.Z` tags follow releases; set `CARDPRESS_IMAGE_TAG` to pin one.
+
 ## Moving from the older, browser-only version
 
 On first load, if the browser holds old data and the database is empty, the app offers to import it. Import copies it to the server and then removes it from the browser. The studio now has a single profile, so only the one you used last is kept. Import is refused if the database already has data.
