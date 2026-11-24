@@ -43,7 +43,12 @@ func (l *libHarness) draft(t *testing.T, profile, kind string, doc json.RawMessa
 
 func (l *libHarness) post(t *testing.T, profile, draftID, body string) Job {
 	t.Helper()
-	in := jobInput()
+	in := JobInput{Hashtags: []string{"Go"}, AltText: "a card", Image: testPNG}
+	if draftID == "" {
+		draftID = l.approvedDraft(profile)
+	} else if _, err := l.st.Approve(context.Background(), draftID); err != nil {
+		t.Fatal(err)
+	}
 	in.ProfileID, in.DraftID, in.Body = profile, draftID, body
 	j, err := l.p.Create(context.Background(), in)
 	if err != nil {

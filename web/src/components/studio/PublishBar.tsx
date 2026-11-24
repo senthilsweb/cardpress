@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CalendarClock, Loader2, Send, Settings } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, Loader2, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { Draft } from "@/lib/draft";
@@ -17,8 +17,10 @@ const suggested = (tz: string) => toLocalInput(new Date(Math.ceil((Date.now() + 
  * Publish or schedule the post being previewed. It lives inside the full preview, so what is confirmed here is what was
  * just shown. Nothing is sent until a second, explicit confirmation.
  */
-export function PublishBar({ draft, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
+export function PublishBar({ draft, onApprove, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
   draft: Draft;
+  /** Approve the draft (a post is only sent from an approved draft). */
+  onApprove: () => void | Promise<void>;
   /** The brand the post belongs to: it is named in the confirmation, so nobody posts as the wrong one. */
   brandName: string;
   serialized: Serialized;
@@ -71,6 +73,19 @@ export function PublishBar({ draft, serialized, bodyOnly, size, renderPng, onDon
       setBusy(false);
     }
   };
+
+  if (draft.status !== "approved") {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="flex-1 text-muted-foreground">
+          {draft.status === "scheduled" ? "A post is already waiting to be sent from this draft."
+            : draft.status === "published" ? "This draft was posted. Edit it to post a new version."
+            : "Approve this draft to publish or schedule it."}
+        </span>
+        {draft.status === "draft" && <Button size="sm" variant="brand" disabled={!!blocked} onClick={() => void onApprove()}><Check /> Approve</Button>}
+      </div>
+    );
+  }
 
   if (!setup) return <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking LinkedIn setup…</p>;
 

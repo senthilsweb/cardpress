@@ -6,13 +6,16 @@ export interface LibraryItem {
   id: string;
   profileId: string;
   kind: "post" | "article";
-  status: JobStatus | "draft";
+  status: JobStatus | "draft" | "approved";
   title: string;
   excerpt: string;
   /** UTC. When it was posted, else scheduled for, else created; for a draft, when it was last edited. */
   at: string;
   postUrl?: string;
   draftId?: string;
+  /** An approved article's planned date (UTC). Nothing is sent. */
+  plannedAt?: string;
+  timezone?: string;
 }
 
 export interface LibraryPage { items: LibraryItem[]; next?: string }
@@ -34,6 +37,7 @@ export const LIBRARY_STATUS_LABEL: Record<LibraryItem["status"], string> = {
   needs_review: "Check LinkedIn",
   cancelled: "Cancelled",
   draft: "Draft",
+  approved: "Approved",
 };
 
 /** The statuses worth filtering by, in the order they are offered. */
@@ -42,6 +46,7 @@ export const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "published", label: "Published" },
   { value: "scheduled", label: "Scheduled" },
   { value: "draft", label: "Drafts" },
+  { value: "approved", label: "Approved" },
   { value: "failed", label: "Failed" },
   { value: "needs_review", label: "Check LinkedIn" },
 ];

@@ -70,17 +70,20 @@ function Toolbar({ editor, kind }: { editor: Editor; kind: DraftKind }) {
  * The editor for one draft. It is created again when `docKey` or `kind` changes, so switching drafts
  * loads the new document. Changes are reported as TipTap JSON.
  */
-export function RichEditor({ docKey, kind, doc, onChange, onEditor, large = false, fill = false }: {
+export function RichEditor({ docKey, kind, doc, onChange, onEditor, large = false, fill = false, readOnly = false }: {
   docKey: string; kind: DraftKind; doc: DocNode; onChange: (doc: DocNode) => void; onEditor: (e: Editor | null) => void;
   /** The expanded, full-height editor. It takes focus when it opens. */
   large?: boolean;
   /** Fill the height of the parent and scroll inside, so the parent can be resized. */
   fill?: boolean;
+  /** Shown but not changeable, for a draft that a post is waiting on. */
+  readOnly?: boolean;
 }) {
   const editor = useEditor(
     {
       extensions: extensionsFor(kind),
       content: doc,
+      editable: !readOnly,
       autofocus: large ? "end" : false,
       shouldRerenderOnTransaction: true,
       editorProps: { attributes: { class: large ? "rich rich-lg" : "rich", role: "textbox", "aria-multiline": "true", "aria-label": kind === "post" ? "Post text" : "Article text" } },
@@ -88,7 +91,7 @@ export function RichEditor({ docKey, kind, doc, onChange, onEditor, large = fals
       onDestroy: () => onEditor(null),
       onUpdate: ({ editor: e }) => onChange(e.getJSON() as DocNode),
     },
-    [docKey, kind, large],
+    [docKey, kind, large, readOnly],
   );
   if (!editor) return <div className={large ? "h-[60vh] bg-card" : "h-44 rounded-md border border-input bg-card"} />;
   return (

@@ -184,6 +184,9 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	if err := p.validate(&in); err != nil {
 		return Job{}, err
 	}
+	if err := p.requireApproved(ctx, in.ProfileID, in.DraftID); err != nil {
+		return Job{}, err
+	}
 	if err := p.ready(ctx, in.ProfileID); err != nil {
 		return Job{}, err
 	}
@@ -201,7 +204,59 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	if err != nil {
 		return Job{}, err
 	}
+	p.syncDraft(ctx, id, status)
 	return p.Get(ctx, id)
+}
+
+// requireApproved is the gate: a post is only ever sent from a draft that a person approved, and the draft must be
+// the one this post was made from.
+func (p *Publisher) requireApproved(ctx context.Context, profileID, draftID string) error {
+	if draftID == "" {
+		return invalid("a post is published from an approved draft: save the draft and approve it first")
+	}
+	var owner, status string
+	err := p.db.QueryRowContext(ctx, `SELECT profile_id, status FROM drafts WHERE id = ?`, draftID).Scan(&owner, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return invalid("the draft was not found: save it and approve it first")
+	}
+	if err != nil {
+		return err
+	}
+	if owner != profileID {
+		return invalid("the draft belongs to another brand")
+	}
+	switch status {
+	case StatusApproved:
+		return nil
+	case StatusScheduled:
+		return fmt.Errorf("%w: a post is already waiting to be sent from this draft", ErrConflict)
+	case StatusPublished:
+		return fmt.Errorf("%w: this draft was already published; edit it to make a new version", ErrConflict)
+	}
+	return fmt.Errorf("%w: approve the draft before publishing it", ErrConflict)
+}
+
+// syncDraft moves the draft behind a job along with the job: waiting or running means scheduled, posted means published,
+// and a job that did not go out (failed, missed, cancelled) hands the draft back as approved.
+func (p *Publisher) syncDraft(ctx context.Context, jobID, jobStatus string) {
+	ctx = context.WithoutCancel(ctx)
+	var q string
+	switch jobStatus {
+	case JobScheduled, JobPublishing, JobNeedsReview:
+		q = `UPDATE drafts SET status = 'scheduled' WHERE id = (SELECT draft_id FROM publish_jobs WHERE id = ?) AND status = 'approved'`
+	case JobPublished:
+		q = `UPDATE drafts SET status = 'published' WHERE id = (SELECT draft_id FROM publish_jobs WHERE id = ?) AND status IN ('approved', 'scheduled')`
+	default:
+		p.releaseDrafts(ctx)
+		return
+	}
+	_, _ = p.db.ExecContext(ctx, q, jobID)
+}
+
+// releaseDrafts hands back every scheduled draft that no longer has a job waiting or running.
+func (p *Publisher) releaseDrafts(ctx context.Context) {
+	_, _ = p.db.ExecContext(context.WithoutCancel(ctx), `UPDATE drafts SET status = 'approved' WHERE status = 'scheduled'
+		AND NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = drafts.id AND j.status IN ('scheduled', 'publishing', 'needs_review'))`)
 }
 
 /* ------------------------------------------------------------------ read */
@@ -294,6 +349,9 @@ func (p *Publisher) transition(ctx context.Context, id, to string, from []string
 		return false, err
 	}
 	n, _ := res.RowsAffected()
+	if n == 1 {
+		p.syncDraft(ctx, id, to)
+	}
 	return n == 1, nil
 }
 
@@ -369,6 +427,7 @@ func (p *Publisher) Delete(ctx context.Context, id string) error {
 	}
 	if n, _ := res.RowsAffected(); n == 1 {
 		_, _ = p.db.ExecContext(ctx, `DELETE FROM publish_attempts WHERE job_id = ?`, id)
+		p.releaseDrafts(ctx)
 		return nil
 	}
 	return p.wrongState(ctx, id, "deleted")
@@ -495,6 +554,7 @@ func (p *Publisher) RunDue(ctx context.Context) error {
 		JobMissed, late, p.stamp(now), JobScheduled, p.stamp(now.Add(-p.grace))); err != nil {
 		return err
 	}
+	p.releaseDrafts(ctx) // a scheduled post that was missed hands its draft back
 	// a publish that never finished (a hung call) is left for a person to check
 	if _, err := p.db.ExecContext(ctx, `UPDATE publish_jobs SET status = ?, error = ?, updated_at = ? WHERE status = ? AND updated_at < ?`,
 		JobNeedsReview, "Publishing did not finish. Check LinkedIn before publishing again.", p.stamp(now), JobPublishing, p.stamp(now.Add(-stalePublishing))); err != nil {

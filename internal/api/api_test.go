@@ -306,7 +306,29 @@ func publishHandler(t *testing.T, token string, creds okCreds) (http.Handler, *a
 	return New(Options{Studio: service.New(db.DB), Publishing: pub, Library: service.NewLibrary(db.DB), Token: token, Version: "t", DBDriver: db.Driver}), li
 }
 
+// approvedDraft makes a post draft for brand p and approves it through the API, as a person would. A post can only be
+// made from such a draft.
+func approvedDraft(h http.Handler, hdr map[string]string) string {
+	r := do(h, "POST", "/api/v1/drafts", `{"profileId":"p","kind":"post","doc":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}}`, hdr)
+	var d service.Draft
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &d) != nil {
+		panic("could not make a draft: " + r.Body.String())
+	}
+	if a := do(h, "POST", "/api/v1/drafts/"+d.ID+"/approve", "", hdr); a.Code != 200 {
+		panic("could not approve a draft: " + a.Body.String())
+	}
+	return d.ID
+}
+
+// postJob posts a job made from a freshly approved draft of brand p (the meta of a request for brand p gets its draftId).
 func postJob(h http.Handler, meta string, image []byte, hdr map[string]string) *httptest.ResponseRecorder {
+	if strings.HasPrefix(meta, `{"profileId":"p"`) {
+		meta = strings.Replace(strings.Replace(meta, `"draftId":"d",`, "", 1), `{"profileId":"p"`, `{"profileId":"p","draftId":"`+approvedDraft(h, hdr)+`"`, 1)
+	}
+	return postJobRaw(h, meta, image, hdr)
+}
+
+func postJobRaw(h http.Handler, meta string, image []byte, hdr map[string]string) *httptest.ResponseRecorder {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	_ = mw.WriteField("meta", meta)
@@ -342,7 +364,7 @@ func waitStatus(t *testing.T, h http.Handler, id, want string) service.Job {
 
 func TestPublishNowThroughTheAPI(t *testing.T) {
 	h, li := publishHandler(t, "", nil)
-	r := postJob(h, `{"profileId":"p","draftId":"d","body":"Hello","hashtags":["Go"],"altText":"card"}`, apiPNG, nil)
+	r := postJob(h, `{"profileId":"p","body":"Hello","hashtags":["Go"],"altText":"card"}`, apiPNG, nil)
 	if r.Code != 201 {
 		t.Fatalf("create: %d %s", r.Code, r.Body)
 	}
@@ -473,15 +495,17 @@ func TestNoJobWithoutLinkedInCredentials(t *testing.T) {
 
 func TestPublishingNeedsTheToken(t *testing.T) {
 	h, li := publishHandler(t, "0123456789abcdef", nil)
-	if r := postJob(h, `{"profileId":"p","body":"x"}`, apiPNG, nil); r.Code != 401 {
+	auth := map[string]string{"Authorization": "Bearer 0123456789abcdef"}
+	id := approvedDraft(h, auth)
+	if r := postJobRaw(h, `{"profileId":"p","draftId":"`+id+`","body":"x"}`, apiPNG, nil); r.Code != 401 {
 		t.Fatalf("create without token: %d", r.Code)
 	}
-	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}, {"GET", "/api/v1/library?profileId=p"}, {"GET", "/api/v1/publish/jobs/x/attempts"}} {
+	for _, c := range [][2]string{{"GET", "/api/v1/publish/jobs?profileId=p"}, {"POST", "/api/v1/publish/jobs/x/publish-now"}, {"DELETE", "/api/v1/publish/jobs/x"}, {"GET", "/api/v1/publish/jobs/x/image"}, {"GET", "/api/v1/library?profileId=p"}, {"GET", "/api/v1/publish/jobs/x/attempts"}, {"POST", "/api/v1/drafts/x/approve"}, {"POST", "/api/v1/drafts/x/unapprove"}, {"PUT", "/api/v1/drafts/x/plan"}} {
 		if r := do(h, c[0], c[1], "", nil); r.Code != 401 {
 			t.Errorf("%s %s without token: %d", c[0], c[1], r.Code)
 		}
 	}
-	if r := postJob(h, `{"profileId":"p","body":"x"}`, apiPNG, map[string]string{"Authorization": "Bearer 0123456789abcdef"}); r.Code != 201 {
+	if r := postJob(h, `{"profileId":"p","body":"x"}`, apiPNG, auth); r.Code != 201 {
 		t.Fatalf("create with token: %d %s", r.Code, r.Body)
 	}
 	time.Sleep(100 * time.Millisecond)
@@ -868,7 +892,7 @@ func TestBrandRoutesAndPerBrandSettings(t *testing.T) {
 
 func TestLibraryThroughTheAPI(t *testing.T) {
 	h, _ := publishHandler(t, "", nil)
-	r := postJob(h, `{"profileId":"p","draftId":"d","body":"Hello library","hashtags":["Go"]}`, apiPNG, nil)
+	r := postJob(h, `{"profileId":"p","body":"Hello library","hashtags":["Go"]}`, apiPNG, nil)
 	if r.Code != 201 {
 		t.Fatalf("create: %d %s", r.Code, r.Body)
 	}
@@ -893,5 +917,50 @@ func TestLibraryThroughTheAPI(t *testing.T) {
 	}
 	if r := do(h, "GET", "/api/v1/publish/jobs/nope/attempts", "", nil); r.Code != 404 {
 		t.Fatalf("attempts of nothing: %d", r.Code)
+	}
+}
+
+func TestApprovalWorkflowThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	design := `{"sizeId":"linkedin-post","layout":"quote","background":"mesh","paletteId":"cream-emerald","seed":3,"eyebrow":"","title":"T","subtitle":"","footer":"","tag":"","quoteAuthor":"","statValue":"","titleScale":1,"intensity":0.9,"bottomFade":0,"showLogo":true,"showFooter":true,"photos":[]}`
+	r := do(h, "POST", "/api/v1/drafts", `{"profileId":"p","kind":"post","title":"A title","doc":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]},"design":`+design+`}`, nil)
+	var d service.Draft
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &d) != nil || d.Status != "draft" || d.Title != "A title" || !strings.Contains(string(d.Design), `"layout":"quote"`) {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	if bad := do(h, "POST", "/api/v1/drafts", `{"profileId":"p","kind":"post","doc":{"type":"doc"},"design":{"layout":"nope"}}`, nil); bad.Code != 400 {
+		t.Fatalf("a bad design: %d", bad.Code)
+	}
+	// not approved: refused with a conflict
+	meta := `{"profileId":"p","draftId":"` + d.ID + `","body":"Hello"}`
+	if r := postJobRaw(h, meta, apiPNG, nil); r.Code != 409 {
+		t.Fatalf("an unapproved draft must not publish: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "POST", "/api/v1/drafts/"+d.ID+"/approve", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"status":"approved"`) {
+		t.Fatalf("approve: %d %s", r.Code, r.Body)
+	}
+	// a change returns it to draft
+	if r := do(h, "PUT", "/api/v1/drafts/"+d.ID, `{"profileId":"p","kind":"post","title":"A title","doc":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Changed"}]}]}}`, nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"status":"draft"`) {
+		t.Fatalf("edit: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "POST", "/api/v1/drafts/"+d.ID+"/approve", "", nil); r.Code != 200 {
+		t.Fatal(r.Code)
+	}
+	if r := do(h, "POST", "/api/v1/drafts/"+d.ID+"/unapprove", "", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"status":"draft"`) {
+		t.Fatalf("unapprove: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "POST", "/api/v1/drafts/nope/approve", "", nil); r.Code != 404 {
+		t.Fatalf("approve nothing: %d", r.Code)
+	}
+	// an article's planned date
+	a := do(h, "POST", "/api/v1/drafts", `{"profileId":"p","kind":"article","doc":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Long form"}]}]}}`, nil)
+	var art service.Draft
+	_ = json.Unmarshal(a.Body.Bytes(), &art)
+	if r := do(h, "PUT", "/api/v1/drafts/"+art.ID+"/plan", `{"scheduledAt":"2027-01-05T09:00:00Z","timezone":"UTC"}`, nil); r.Code != 409 {
+		t.Fatalf("plan before approving: %d", r.Code)
+	}
+	do(h, "POST", "/api/v1/drafts/"+art.ID+"/approve", "", nil)
+	if r := do(h, "PUT", "/api/v1/drafts/"+art.ID+"/plan", `{"scheduledAt":"2027-01-05T09:00:00Z","timezone":"UTC"}`, nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"scheduledAt":"2027-01-05T09:00:00Z"`) {
+		t.Fatalf("plan: %d %s", r.Code, r.Body)
 	}
 }

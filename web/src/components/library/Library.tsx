@@ -31,7 +31,7 @@ function StatusBadge({ s }: { s: LibraryItem["status"] }) {
   const label = LIBRARY_STATUS_LABEL[s] ?? s;
   if (s === "failed") return <Badge className="border-transparent bg-destructive/15 text-destructive">{label}</Badge>;
   if (s === "missed" || s === "needs_review") return <Badge variant="warn">{label}</Badge>;
-  if (s === "published" || s === "scheduled" || s === "publishing") return <Badge variant="brand">{label}</Badge>;
+  if (s === "published" || s === "scheduled" || s === "publishing" || s === "approved") return <Badge variant="brand">{label}</Badge>;
   return <Badge variant="outline">{label}</Badge>;
 }
 
@@ -176,6 +176,7 @@ function Row({ item, open, onToggle, brandName, onDeleted }: { item: LibraryItem
         <Badge variant="outline">{item.kind === "article" ? "Article" : "Post"}</Badge>
         {brandName && <Badge variant="outline" title="The brand this belongs to">{brandName}</Badge>}
         <span className="text-xs text-muted-foreground">{day(item.at)}</span>
+        {item.plannedAt && <span className="text-xs text-brand">Planned {formatInZone(item.plannedAt, item.timezone)}</span>}
       </div>
       <h2 className="mt-1 text-[15px] font-medium leading-snug">{item.title || "Untitled"}</h2>
       {item.excerpt && <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{item.excerpt}</p>}

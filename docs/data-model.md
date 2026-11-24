@@ -44,9 +44,9 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `created_at`, `updated_at`. Index `(profile_id, updated_at DESC)` |
+| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)` and `(profile_id, status, updated_at DESC)` |
 
-`doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 2 MB.
+`doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
 ### Publishing
 
@@ -86,7 +86,30 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0006 | `mcp_audit` |
 | 0007 | Brands: `credentials` keyed by brand, `profiles.archived_at`, the `envProfile` preference |
 | 0008 | `publish_attempts` |
+| 0009 | `drafts`: `title`, `design`, `design_version`, `approved_at`, `scheduled_at`, `timezone`; the status workflow |
 
-## Next: the content workflow
+## Draft status and approval
 
-Planned in `openspec/changes/2026-11-26-content-workflow`. `drafts` gains `title`, `design` (the item's own card design as typed JSON) with `design_version`, `approved_at`, `scheduled_at` and `timezone`, and `status` becomes `draft` → `approved` → `scheduled` → `published`. The document limit rises to 25 MB so an article can hold its images as base64. This page will be updated when that migration is written.
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> approved: approve
+    approved --> draft: unapprove, or any edit
+    approved --> scheduled: a post is published or scheduled
+    scheduled --> published: LinkedIn accepted it
+    scheduled --> approved: cancelled, failed or missed
+    published --> draft: edit, or unapprove
+```
+
+- Only an `approved` draft can be made into a `publish_jobs` row. The server refuses anything else (`409`), so what is approved is what goes out.
+- Saving the **same** content again changes nothing; saving **different** text, hashtags, alt text, title or design returns an approved or published draft to `draft` and clears `approved_at` and `scheduled_at`.
+- While a post is waiting or running (`scheduled`) the draft cannot be edited. Cancel the post first.
+- The draft's status follows its job: waiting, running or "check LinkedIn" means `scheduled`; posted means `published`; failed, missed, cancelled or discarded hands it back as `approved`.
+- An **article** is never sent (LinkedIn has no API for articles). Approving marks it final; `scheduled_at` holds its planned date, a reminder only, and its status stays `approved`.
+
+### The design column
+
+`drafts.design` is the card, as the typed JSON `service.CardDesign` (version in `design_version`, currently 1): `sizeId`, `layout` (`hero`, `center`, `quote`, `stat`, `split`, `cover`), `background`, `paletteId`, `seed`, `eyebrow`, `title`, `subtitle`, `footer`, `footerLeft`, `tag`, `quoteAuthor`, `statValue`, `titleScale` (0.2 to 4), `intensity` and `bottomFade` (0 to 1), `showLogo`, `showFooter`, `photos` (data URLs, at most 12), `screenshot`, `bgImage`, and `fonts` by role. The server refuses unknown fields, out-of-range numbers and unknown layouts. A draft saved without a design has none (`design_version` 0), and the editor starts it from the brand's design.
+
+The editor and the library draw the card from this one object with the same component, so a design is never described twice. The brand's own design (`designs`) stays as the starting point for new items.
+

@@ -41,6 +41,9 @@ type Studio interface {
 	CreateDraft(ctx context.Context, in service.DraftInput) (service.Draft, error)
 	UpdateDraft(ctx context.Context, id string, in service.DraftInput) (service.Draft, error)
 	DeleteDraft(ctx context.Context, id string) error
+	Approve(ctx context.Context, id string) (service.Draft, error)
+	Unapprove(ctx context.Context, id string) (service.Draft, error)
+	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
 }
 
 // Library is the part of the library service the HTTP API needs.
@@ -135,6 +138,9 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("GET "+prefix+"/drafts/{id}", s.getDraft)
 	mux.HandleFunc("PUT "+prefix+"/drafts/{id}", s.updateDraft)
 	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}", s.deleteDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/approve", s.approveDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/unapprove", s.unapproveDraft)
+	mux.HandleFunc("PUT "+prefix+"/drafts/{id}/plan", s.planDraft)
 	mux.HandleFunc("GET "+prefix+"/settings", s.getSettings)
 	mux.HandleFunc("GET "+prefix+"/settings/{network}", s.getNetwork)
 	mux.HandleFunc("PUT "+prefix+"/settings/{network}", s.putNetwork)
@@ -327,6 +333,41 @@ func (s *server) updateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.UpdateDraft(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) approveDraft(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.Approve(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) unapproveDraft(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.Unapprove(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// planDraft sets (or, with no scheduledAt, clears) an article's planned date.
+func (s *server) planDraft(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ScheduledAt *time.Time `json:"scheduledAt"`
+		Timezone    string     `json:"timezone"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	d, err := s.Studio.Plan(r.Context(), r.PathValue("id"), in.ScheduledAt, in.Timezone)
 	if err != nil {
 		fail(w, r, err)
 		return

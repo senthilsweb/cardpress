@@ -22,13 +22,16 @@ type LibraryItem struct {
 	ID        string `json:"id"`
 	ProfileID string `json:"profileId"`
 	Kind      string `json:"kind"`   // "post" or "article"
-	Status    string `json:"status"` // a job's status, or "draft"
+	Status    string `json:"status"` // a job's status, or the draft's: "draft" or "approved"
 	Title     string `json:"title"`
 	Excerpt   string `json:"excerpt"`
 	// At is when the row happened: posted, else scheduled for, else created (a job); last edited (a draft).
 	At      string `json:"at"`
 	PostURL string `json:"postUrl,omitempty"`
 	DraftID string `json:"draftId,omitempty"`
+	// PlannedAt is an approved article's planned date (UTC), with the zone it was chosen in.
+	PlannedAt string `json:"plannedAt,omitempty"`
+	Timezone  string `json:"timezone,omitempty"`
 }
 
 // LibraryQuery says what to list.
@@ -167,7 +170,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 
 func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	// a draft that became a post is listed once, as the post
-	query := `SELECT id, profile_id, kind, doc, hashtags, updated_at FROM drafts d
+	query := `SELECT id, profile_id, kind, status, doc, hashtags, updated_at, scheduled_at, timezone FROM drafts d
 	          WHERE NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = d.id)`
 	var args []any
 	if !q.All {
@@ -185,8 +188,8 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, kind, doc, tags, updated string
-		if err := rs.Scan(&id, &pid, &kind, &doc, &tags, &updated); err != nil {
+		var id, pid, kind, status, doc, tags, updated, planned, zone string
+		if err := rs.Scan(&id, &pid, &kind, &status, &doc, &tags, &updated, &planned, &zone); err != nil {
 			return nil, err
 		}
 		blocks := docBlocks(doc)
@@ -197,7 +200,7 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		var hs []string
 		_ = json.Unmarshal([]byte(tags), &hs)
 		out = append(out, row{
-			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: "draft", Title: title, Excerpt: excerpt, At: updated, DraftID: id},
+			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone},
 			text: strings.ToLower(strings.Join(blocks, " ") + " " + strings.Join(hs, " ")),
 		})
 	}

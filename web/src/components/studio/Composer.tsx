@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import type { DraftStore } from "@/lib/useDrafts";
 import type { Design, Palette, Profile } from "@/lib/types";
 
+const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
 export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
@@ -63,10 +64,18 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
     return () => window.removeEventListener("keydown", onKey, true);
   }, [expanded, preview, setExpanded]);
 
+  // a post sent from the open draft changes the draft behind the screen (scheduled, then published): look again when the queue moves
+  const queueKey = jobs.jobs.map((j) => `${j.id}:${j.status}`).join(",");
+  useEffect(() => { void store.refreshStatus(); }, [queueKey, draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const ser = useMemo(() => (draft ? serializeDraft(draft) : null), [draft]);
   const labels = useMemo(() => new Map(drafts.map((d) => [d.id, label(serializeDraft(d).text)])), [drafts]);
   if (!draft || !ser) return null;
   const isPost = draft.kind === "post";
+
+  // approving is the step between writing and publishing: only an approved draft can be sent
+  const approve = guard(async () => { await store.approve(); toast.success("Approved", { description: isPost ? "It can now be published or scheduled." : "It is marked final." }); });
+  const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
 
   const addTag = () => {
     const t = normalizeHashtag(tag);
@@ -143,7 +152,7 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
+            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -193,6 +202,14 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
       )}
 
       <Section title="Review">
+        <div className="flex flex-wrap items-center gap-2" aria-label="Approval">
+          <Badge variant={draft.status === "draft" ? "outline" : "brand"}>{STATUS_NAME[draft.status]}</Badge>
+          {draft.status === "draft" && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
+          {(draft.status === "approved" || draft.status === "published") && (
+            <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
+          )}
+          {draft.status === "scheduled" && <span className="text-[11px] text-muted-foreground">A post is waiting to be sent. Cancel it in the queue to edit.</span>}
+        </div>
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
         {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
         <div className="flex flex-wrap items-center gap-2">
@@ -211,7 +228,7 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
         actions={
           <PublishBar
-            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
+            draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
             onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
           />
         }

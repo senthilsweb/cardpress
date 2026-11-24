@@ -20,6 +20,17 @@ Three calls, made by the server with the stored access token:
 
 The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ] { } < > @ | ~ _ * # \`), so it reads exactly as previewed. Hashtags go on a last line as LinkedIn hashtag templates, so they become real hashtags.
 
+## Approve first
+
+A post is only sent from an **approved** draft. In the Review section of the Post tab, a draft shows its status and an **Approve** button; the Full preview offers the same button instead of Publish until it is approved. Approving is a deliberate step between writing and sending.
+
+- **Any change** to an approved draft (its text, hashtags, alt text, title or card) puts it back to Draft, so what you approved is always what goes out. Saving the same content again changes nothing.
+- While a post is **waiting** to be sent from a draft, the draft cannot be edited. Cancel the post in the queue first.
+- A **posted** draft shows **Edit again**, which makes a new version you can approve and post again.
+- The server enforces this, not only the screen: creating a job from a draft that is not approved is refused.
+
+Each draft keeps its **own card design**. Changing the card in the Design tab changes the open draft's card (and the brand's starting point for new drafts), and the card is saved with the draft.
+
 ## The queue
 
 The **Publishing queue** section of the Post tab lists posts with a small image, their time (in the zone you chose), and a status:

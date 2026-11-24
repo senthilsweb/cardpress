@@ -137,6 +137,11 @@ export const api = {
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
+  getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
+  approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),
+  unapproveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/unapprove`),
+  /** An approved article's planned date; leave both out to clear it. */
+  planDraft: (id: string, plan: { scheduledAt?: string; timezone?: string }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/plan`, plan),
   getSettings: (profileId: string) => call<SettingsView>("GET", `/profiles/${encodeURIComponent(profileId)}/settings`),
   /** `fields`: a string stores it, "" removes it, null (or leaving it out) keeps it. */
   putNetwork: (profileId: string, id: string, fields: Record<string, string | null>) => call<NetworkSettings>("PUT", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}`, { fields }),

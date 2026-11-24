@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { flattenForPost, EMPTY_DOC, type Draft, type DraftInput, type DraftKind } from "./draft";
+import { toCardDesign } from "./cardDesign";
+import type { Design } from "./types";
 
 export type SaveState = "saved" | "saving" | "error";
 type Patch = Partial<Omit<DraftInput, "profileId">>;
 
-const toInput = (d: Draft): DraftInput => ({ profileId: d.profileId, kind: d.kind, doc: d.doc, hashtags: d.hashtags, altText: d.altText, unicodeStyles: d.unicodeStyles });
+const toInput = (d: Draft): DraftInput => ({
+  profileId: d.profileId, kind: d.kind, doc: d.doc, hashtags: d.hashtags, altText: d.altText, unicodeStyles: d.unicodeStyles,
+  title: d.title ?? "", ...(d.design ? { design: toCardDesign(d.design) } : {}),
+});
+
+/** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;
  * switching, creating or deleting a draft saves any pending change first.
  */
-export function useDrafts(profileId: string, initial: Draft[]) {
+export function useDrafts(profileId: string, initial: Draft[], designFor?: () => Design | undefined) {
   const [drafts, setDrafts] = useState<Draft[]>(initial);
   const [currentId, setCurrentId] = useState(initial[0]?.id ?? "");
   const [saveState, setSaveState] = useState<SaveState>("saved");
@@ -30,7 +38,9 @@ export function useDrafts(profileId: string, initial: Draft[]) {
     dirty.current = null;
     setSaveState("saving");
     try {
-      await api.updateDraft(d.id, toInput(d));
+      const saved = await api.updateDraft(d.id, toInput(d));
+      // an edit made while this was saving will be saved next, and will say what the server should now know
+      if (!dirty.current) commit(ref.current.map((x) => (x.id === saved.id ? meta(x, saved) : x)));
       setSaveState(dirty.current ? "saving" : "saved");
     } catch {
       dirty.current = dirty.current ?? d.id; // keep it pending so the next change retries
@@ -44,7 +54,11 @@ export function useDrafts(profileId: string, initial: Draft[]) {
 
   const update = useCallback((patch: Patch) => {
     const id = idRef.current;
-    commit(ref.current.map((d) => (d.id === id ? { ...d, ...patch, updatedAt: new Date().toISOString() } : d)));
+    // a draft waiting to be sent is not edited (the server refuses it too); a changed approved draft goes back to draft
+    if (ref.current.find((d) => d.id === id)?.status === "scheduled") return;
+    commit(ref.current.map((d) => (d.id === id
+      ? { ...d, ...patch, ...(d.status === "approved" || d.status === "published" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined } : {}), updatedAt: new Date().toISOString() }
+      : d)));
     dirty.current = id;
     setSaveState("saving");
     window.clearTimeout(timer.current);
@@ -55,7 +69,8 @@ export function useDrafts(profileId: string, initial: Draft[]) {
 
   const create = useCallback(async (kind: DraftKind = "post") => {
     await flush();
-    const d = await api.createDraft({ profileId, kind, doc: EMPTY_DOC, hashtags: [], altText: "", unicodeStyles: false });
+    const design = designFor?.();
+    const d = await api.createDraft({ profileId, kind, doc: EMPTY_DOC, hashtags: [], altText: "", unicodeStyles: false, ...(design ? { design: toCardDesign(design) } : {}) });
     commit([d, ...ref.current]);
     setCurrentId(d.id);
   }, [flush, profileId]);
@@ -66,7 +81,8 @@ export function useDrafts(profileId: string, initial: Draft[]) {
    */
   const createFrom = useCallback(async (content: Pick<DraftInput, "kind" | "doc" | "hashtags" | "altText">): Promise<string> => {
     await flush();
-    const d = await api.createDraft({ profileId, unicodeStyles: false, ...content });
+    const design = designFor?.();
+    const d = await api.createDraft({ profileId, unicodeStyles: false, ...(design ? { design: toCardDesign(design) } : {}), ...content });
     commit([d, ...ref.current]);
     idRef.current = d.id;
     setCurrentId(d.id);
@@ -89,8 +105,25 @@ export function useDrafts(profileId: string, initial: Draft[]) {
     update({ kind, doc: kind === "post" ? flattenForPost(cur.doc) : cur.doc });
   }, [update]);
 
+  /** Approve, take back, or plan the open draft. Any pending change is saved first, so what is approved is what is shown. */
+  const decide = useCallback(async (fn: (id: string) => Promise<Draft>) => {
+    await flush();
+    const id = idRef.current;
+    const saved = await fn(id);
+    commit(ref.current.map((x) => (x.id === saved.id ? meta(x, saved) : x)));
+  }, [flush]);
+  const approve = useCallback(() => decide((id) => api.approveDraft(id)), [decide]);
+  const unapprove = useCallback(() => decide((id) => api.unapproveDraft(id)), [decide]);
+  const plan = useCallback((p: { scheduledAt?: string; timezone?: string }) => decide((id) => api.planDraft(id, p)), [decide]);
+  /** Re-read the open draft's status: a post sent from it changes it behind the screen. */
+  const refreshStatus = useCallback(async () => {
+    const id = idRef.current;
+    if (!id) return;
+    try { const saved = await api.getDraft(id); commit(ref.current.map((x) => (x.id === saved.id && dirty.current !== x.id ? meta(x, saved) : x))); } catch { /* the next look will do */ }
+  }, []);
+
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush };
+  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, refreshStatus };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

@@ -24,6 +24,7 @@ import { useTheme } from "@/lib/useTheme";
 import { AccountMenu } from "./AccountMenu";
 import { Logo } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { useDrafts } from "@/lib/useDrafts";
 import { useJobs } from "@/lib/useJobs";
 import { useChat } from "@/lib/useChat";
@@ -67,12 +68,20 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   // designs are keyed by profile id
   const [designs, setDesigns, saveError] = useSyncedState<Record<string, Design>>(initial.designs, (v) => api.putDesigns(v));
   const profile = profiles.find((p) => p.id === initial.activeId) ?? profiles[0] ?? DEFAULT_PROFILES[0];
-  const design: Design = useMemo(() => {
+  // the brand's design is where a new item starts; each item then keeps its own (see Draft.design)
+  const brandDesign: Design = useMemo(() => {
     const d = { ...DEFAULT_DESIGN, ...(designs[profile.id] ?? {}) };
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
     return d;
   }, [designs, profile]);
-  const store = useDrafts(profile.id, initial.drafts);
+  const store = useDrafts(profile.id, initial.drafts, () => brandDesign);
+  const design: Design = useMemo(() => {
+    const own = store.current?.design;
+    if (!own) return brandDesign;
+    const d = { ...DEFAULT_DESIGN, ...own };
+    if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
+    return d;
+  }, [brandDesign, store.current?.design, profile]);
   const jobs = useJobs(profile.id);
   const chat = useChat(profile.id);
   const [tab, setTab] = useState("design");
@@ -166,7 +175,13 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
 
-  const set = useCallback((patch: Partial<Design>) => setDesigns((all) => ({ ...all, [profile.id]: { ...design, ...patch } })), [design, profile.id, setDesigns]);
+  const waiting = store.current?.status === "scheduled";
+  const set = useCallback((patch: Partial<Design>) => {
+    if (waiting) { toast("A post is waiting to be sent from this draft", { description: "Cancel it in the queue to change the card." }); return; }
+    const next = { ...design, ...patch };
+    setDesigns((all) => ({ ...all, [profile.id]: next })); // the brand's starting point follows the latest card
+    store.update({ design: next });
+  }, [design, profile.id, setDesigns, store, waiting]);
   const updateProfile = (patch: Partial<Profile>) => setProfiles((all) => all.map((p) => (p.id === profile.id ? { ...p, ...patch } : p)));
 
   const [view, setView] = useState<"one" | "all">("one");

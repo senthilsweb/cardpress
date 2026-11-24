@@ -293,8 +293,8 @@ func TestEachPostUsesItsOwnBrandsCredentials(t *testing.T) {
 	}
 	h.p.creds = creds
 	for _, tc := range []struct{ brand, token, author string }{{"p", "TOK-P", "urn:li:person:P"}, {"q", "TOK-Q", "urn:li:organization:Q"}} {
-		in := jobInput()
-		in.ProfileID = tc.brand
+		in := h.job()
+		in.ProfileID, in.DraftID = tc.brand, h.approvedDraft(tc.brand)
 		j, err := h.p.Create(ctx, in)
 		if err != nil {
 			t.Fatal(err)
@@ -305,15 +305,15 @@ func TestEachPostUsesItsOwnBrandsCredentials(t *testing.T) {
 		}
 	}
 	// a brand with no connection cannot create, publish now or reschedule a post, and the message says whose
-	in := jobInput()
-	in.ProfileID = "nc"
+	in := h.job()
+	in.ProfileID, in.DraftID = "nc", h.approvedDraft("nc")
 	if _, err := h.p.Create(ctx, in); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "this brand") {
 		t.Fatalf("%v", err)
 	}
 	// a scheduled post of a brand that later loses its connection is not published with anyone else's
 	at := h.clk.Add(time.Hour)
-	in = jobInput()
-	in.ProfileID, in.ScheduledAt, in.Timezone = "q", &at, "Europe/London"
+	in = h.job()
+	in.ProfileID, in.DraftID, in.ScheduledAt, in.Timezone = "q", h.approvedDraft("q"), &at, "Europe/London"
 	j, err := h.p.Create(ctx, in)
 	if err != nil {
 		t.Fatal(err)

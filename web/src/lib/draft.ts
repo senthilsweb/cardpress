@@ -1,3 +1,5 @@
+import type { Design } from "./types";
+
 /** A rich-text document in TipTap/ProseMirror JSON. */
 export interface DocNode {
   type: string;
@@ -8,22 +10,31 @@ export interface DocNode {
 }
 
 export type DraftKind = "post" | "article";
+/** draft, then approved, then scheduled (a post is waiting) and published. An edit returns approved or published to draft. */
+export type DraftStatus = "draft" | "approved" | "scheduled" | "published";
 
 export interface Draft {
   id: string;
   profileId: string;
   kind: DraftKind;
-  status: string;
+  status: DraftStatus;
   doc: DocNode;
   hashtags: string[];
   altText: string;
   unicodeStyles: boolean;
+  title: string;
+  /** The card this item was made with. Absent on a draft that has not been given one yet. */
+  design?: Design;
+  approvedAt?: string;
+  /** An article's planned date (UTC). Nothing is sent. */
+  scheduledAt?: string;
+  timezone?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 /** The fields a caller may change. */
-export type DraftInput = Pick<Draft, "profileId" | "kind" | "doc" | "hashtags" | "altText" | "unicodeStyles">;
+export type DraftInput = Pick<Draft, "profileId" | "kind" | "doc" | "hashtags" | "altText" | "unicodeStyles"> & { title?: string; design?: Design };
 
 export const EMPTY_DOC: DocNode = { type: "doc", content: [{ type: "paragraph" }] };
 
