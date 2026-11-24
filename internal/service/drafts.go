@@ -55,12 +55,17 @@ type Draft struct {
 	ScheduledAt string          `json:"scheduledAt,omitempty"` // an article's planned date
 	Timezone    string          `json:"timezone,omitempty"`
 	// The public page: its address, description, when it went live, and whether it has a preview image.
-	Slug      string `json:"slug,omitempty"`
-	Summary   string `json:"summary,omitempty"`
-	PageAt    string `json:"pageAt,omitempty"`
-	HasCover  bool   `json:"hasCover"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	Slug     string `json:"slug,omitempty"`
+	Summary  string `json:"summary,omitempty"`
+	PageAt   string `json:"pageAt,omitempty"`
+	HasCover bool   `json:"hasCover"`
+	// Who wrote it and who approved it (ids, and the names for showing).
+	CreatedBy      string `json:"createdBy,omitempty"`
+	CreatedByName  string `json:"createdByName,omitempty"`
+	ApprovedBy     string `json:"approvedBy,omitempty"`
+	ApprovedByName string `json:"approvedByName,omitempty"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
 }
 
 // DraftInput is what a caller may set. Status is controlled by the server.
@@ -143,10 +148,11 @@ func newID() string {
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
 // draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), created_at, updated_at`
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), created_by, approved_by,
+	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
-const draftInsertCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_at, updated_at`
+const draftInsertCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_by, created_at, updated_at`
 
 type scanner interface{ Scan(...any) error }
 
@@ -155,7 +161,7 @@ func scanDraft(r scanner) (Draft, error) {
 	var doc, tags, design string
 	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)
@@ -181,11 +187,12 @@ func (s *Studio) CreateDraft(ctx context.Context, in DraftInput) (Draft, error) 
 	if in.design != "" {
 		design, version = in.design, CardDesignVersion
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftInsertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?)`,
-		id, in.ProfileID, in.Kind, StatusDraft, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version, at, at)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftInsertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, ?)`,
+		id, in.ProfileID, in.Kind, StatusDraft, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version, actorID(ctx), at, at)
 	if err != nil {
 		return Draft{}, err
 	}
+	_ = snapshotDraft(ctx, s.db, id, VersionCreated, "") // history is a convenience: it never blocks saving
 	return s.GetDraft(ctx, id)
 }
 
@@ -231,9 +238,12 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 	if err != nil {
 		return Draft{}, err
 	}
+	if changed {
+		_ = snapshotDraft(ctx, s.db, id, VersionAuto, "")
+	}
 	if takeOffline {
 		// the public page must always show the approved text: a change takes it down until it is approved and published again
-		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET page_at = '', cover = NULL WHERE id = ?`, id); err != nil {
+		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET page_at = '', cover = NULL, approved_by = '' WHERE id = ?`, id); err != nil {
 			return Draft{}, err
 		}
 	}
@@ -266,11 +276,12 @@ func (s *Studio) Approve(ctx context.Context, id string) (Draft, error) {
 	if strings.TrimSpace(DraftText(d.Doc)) == "" {
 		return Draft{}, invalid("there is nothing to approve: the text is empty")
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = ?`,
-		StatusApproved, s.draftStamp(), s.draftStamp(), id, StatusDraft)
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = ?, approved_by = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		StatusApproved, s.draftStamp(), actorID(ctx), s.draftStamp(), id, StatusDraft)
 	if err != nil {
 		return Draft{}, err
 	}
+	_ = snapshotDraft(ctx, s.db, id, VersionApproved, "")
 	return s.GetDraft(ctx, id)
 }
 
@@ -286,7 +297,7 @@ func (s *Studio) Unapprove(ctx context.Context, id string) (Draft, error) {
 	if d.Status == StatusDraft {
 		return d, nil
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = '', scheduled_at = '', timezone = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = '', approved_by = '', scheduled_at = '', timezone = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
 		StatusDraft, s.draftStamp(), id)
 	if err != nil {
 		return Draft{}, err
@@ -347,16 +358,20 @@ func (s *Studio) ListDrafts(ctx context.Context, profileID string) ([]Draft, err
 	return out, closeRows(rows)
 }
 
-// DeleteDraft removes a draft.
+// DeleteDraft removes a draft and its history. An item that is approved, waiting to be sent or posted must be brought
+// back to draft first, so nothing that has been signed off or has gone out is deleted by one click.
 func (s *Studio) DeleteDraft(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM drafts WHERE id = ?`, id)
+	d, err := s.GetDraft(ctx, id)
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
+	if d.Status != StatusDraft {
+		return fmt.Errorf("%w: bring this %s back to draft before deleting it", ErrConflict, d.Kind)
 	}
-	return nil
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM drafts WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return dropVersions(ctx, s.db, id)
 }
 
 func boolInt(b bool) int {

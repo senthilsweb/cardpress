@@ -198,13 +198,14 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	}
 	id := newID()
 	_, err := p.db.ExecContext(ctx,
-		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, scheduled_at, timezone, created_at, updated_at)
-		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, sched, in.Timezone, p.stamp(now), p.stamp(now))
+		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, scheduled_at, timezone, created_by, created_at, updated_at)
+		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
 	if err != nil {
 		return Job{}, err
 	}
 	p.syncDraft(ctx, id, status)
+	_ = snapshotDraft(ctx, p.db, in.DraftID, VersionSent, "") // what went out, kept
 	return p.Get(ctx, id)
 }
 
@@ -301,6 +302,9 @@ func (p *Publisher) List(ctx context.Context, profileID string) ([]Job, error) {
 
 // ListAll returns every brand's jobs, newest first. Each job says which brand owns it.
 func (p *Publisher) ListAll(ctx context.Context) ([]Job, error) {
+	if pr, ok := PrincipalFrom(ctx); ok && !pr.Admin() { // everything, but only what is theirs
+		return p.list(ctx, `WHERE profile_id IN (SELECT id FROM profiles WHERE owner_id = ?)`, pr.UserID())
+	}
 	return p.list(ctx, ``)
 }
 

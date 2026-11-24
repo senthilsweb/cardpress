@@ -6,6 +6,7 @@ import { defaultTimezone, formatInZone, toLocalInput } from "@/lib/jobs";
 import { downloadBlob } from "@/lib/export";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { slugify } from "@/lib/slug";
+import { useSession } from "@/lib/session";
 import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
 import { LinkedInArticleDialog } from "./LinkedInArticleDialog";
 
@@ -20,6 +21,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
   onApprove: () => void | Promise<void>;
   onPlan: (plan: { scheduledAt?: string; timezone?: string }) => Promise<void>;
 }) {
+  const { can } = useSession();
   const [planning, setPlanning] = useState(false);
   const [forLinkedIn, setForLinkedIn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,9 +42,9 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
     return (
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="flex-1 text-muted-foreground">
-          {draft.status === "draft" ? "Approve this article to mark it final." : "This article is marked as published. Edit it to make a new version."}
+          {draft.status === "draft" ? (can("approve") ? "Approve this article to mark it final." : "An editor or admin approves it.") : "This article is marked as published. Edit it to make a new version."}
         </span>
-        {draft.status === "draft" && <Button size="sm" variant="brand" onClick={() => void onApprove()}><Check /> Approve</Button>}
+        {draft.status === "draft" && can("approve") && <Button size="sm" variant="brand" onClick={() => void onApprove()}><Check /> Approve</Button>}
         <Button size="sm" variant="outline" onClick={() => setForLinkedIn(true)}><Share2 /> For LinkedIn</Button>
         <Button size="sm" variant="outline" onClick={exportMd}><Download /> Markdown</Button>
         <Button size="sm" variant="outline" onClick={exportHtml}><Download /> HTML</Button>
@@ -56,7 +58,7 @@ export function ArticleBar({ draft, html, onApprove, onPlan }: {
         <span className="flex-1 text-muted-foreground">
           {draft.scheduledAt ? <>Planned for <b className="text-foreground">{formatInZone(draft.scheduledAt, draft.timezone)}</b>. Nothing is sent.</> : "Articles are not sent from here."}
         </span>
-        <Button size="sm" variant="outline" onClick={() => setPlanning((v) => !v)}><CalendarClock /> {draft.scheduledAt ? "Change date" : "Plan a date"}</Button>
+        {can("approve") && <Button size="sm" variant="outline" onClick={() => setPlanning((v) => !v)}><CalendarClock /> {draft.scheduledAt ? "Change date" : "Plan a date"}</Button>}
         <Button size="sm" variant="outline" onClick={() => setForLinkedIn(true)}><Share2 /> For LinkedIn</Button>
         <Button size="sm" variant="outline" onClick={exportMd}><Download /> Markdown</Button>
         <Button size="sm" variant="outline" onClick={exportHtml}><Download /> HTML</Button>

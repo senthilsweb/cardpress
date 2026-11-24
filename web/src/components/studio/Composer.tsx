@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { Check, Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { Check, Copy, Eye, FileText, History, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
 import { useLayout } from "@/lib/layout";
+import { useSession } from "@/lib/session";
 import { normalizeHashtag, type DraftKind } from "@/lib/draft";
 import { LINKEDIN_LIMIT, serializeDraft, serializeForLinkedIn } from "@/lib/linkedin";
 import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
@@ -30,7 +31,9 @@ import type { Design, Palette, Profile } from "@/lib/types";
 const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
-export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+  /** Open the item's history (versions). */
+  onOpenHistory?: () => void;
   /** Open the Full preview as soon as this shows (asked for by the library). */
   openPreview?: boolean;
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
@@ -45,6 +48,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
   expanded: boolean; setExpanded: (v: boolean) => void; host: HTMLElement | null;
 }) {
   const { current: draft, drafts } = store;
+  const { can } = useSession();
   const { editorHeight, setEditorHeight } = useLayout();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
@@ -110,8 +114,9 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
         title="Draft"
         action={
           <div className="flex gap-1">
+            {onOpenHistory && <Button variant="ghost" size="icon-sm" title="History" aria-label="History" onClick={onOpenHistory}><History /></Button>}
             <Button variant="ghost" size="icon-sm" title="New draft" aria-label="New draft" disabled={busy === "new"} onClick={guard(async () => { setBusy("new"); try { await store.create(draft.kind); } finally { setBusy(null); } })}><Plus /></Button>
-            <Button variant="ghost" size="icon-sm" title="Delete this draft" aria-label="Delete this draft" onClick={guard(() => store.remove(draft.id))}><Trash2 /></Button>
+            <Button variant="ghost" size="icon-sm" title={draft.status === "draft" ? "Delete this draft" : "Bring it back to draft to delete it"} aria-label="Delete this draft" disabled={draft.status !== "draft"} onClick={guard(() => store.remove(draft.id))}><Trash2 /></Button>
           </div>
         }
       >
@@ -162,7 +167,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
+            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={`${draft.id}:${store.rev}`} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -214,7 +219,8 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
       <Section title="Review">
         <div className="flex flex-wrap items-center gap-2" aria-label="Approval">
           <Badge variant={draft.status === "draft" ? "outline" : "brand"}>{STATUS_NAME[draft.status]}</Badge>
-          {draft.status === "draft" && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
+          {draft.status === "draft" && can("approve") && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
+          {draft.status === "draft" && !can("approve") && <span className="text-[11px] text-muted-foreground">An editor or admin approves it.</span>}
           {(draft.status === "approved" || draft.status === "published") && (
             <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
           )}
@@ -247,9 +253,9 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
                 onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
               />
             )}
-            <div className="border-t border-border pt-3">
+            {can("publish") && <div className="border-t border-border pt-3">
               <PageBar draft={draft} renderCover={() => renderPng(linkedinSize(size))} onPublish={store.publishPage} onUnpublish={store.unpublishPage} />
-            </div>
+            </div>}
           </div>
         )}
       />
@@ -269,7 +275,7 @@ export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOp
           <div className="min-h-0 flex-1 overflow-y-auto p-6">
             <div className="mx-auto w-full max-w-3xl space-y-3">
               <div className="overflow-hidden rounded-lg border border-border bg-card">
-                <RichEditor large docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
+                <RichEditor large docKey={`${draft.id}:${store.rev}`} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
               </div>
               <div className="flex flex-wrap items-center gap-1.5" aria-label="Character counts">
                 {isPost

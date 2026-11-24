@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, completeProfiles, upgradePlaceholderText, withStandardPalettes } from "./profiles";
 import { pickActive } from "./brands";
@@ -6,6 +6,8 @@ import { docFromPlainText, EMPTY_DOC, type Draft } from "./draft";
 import type { Design, Profile } from "./types";
 import type { FontDef } from "./fonts";
 import { parseLayout, type Layout } from "./layout";
+import { requireSession } from "./gate";
+import type { Session } from "./session";
 
 /** What the studio needs to start. */
 export interface Loaded {
@@ -20,6 +22,8 @@ export interface Loaded {
   customFonts: FontDef[];
   drafts: Draft[];
   layout: Layout;
+  /** Who is signed in and what their role allows. */
+  session: Session;
 }
 
 export interface LegacyData { profiles: Profile[]; designs: Record<string, Design>; theme?: "light" | "dark"; customFonts: FontDef[] }
@@ -78,23 +82,26 @@ async function loadDrafts(profileId: string, design: Design | undefined): Promis
   return [await api.createDraft({ profileId, kind: "post", doc, hashtags: [], altText: "", unicodeStyles: false })];
 }
 
-function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[], activeId: string): Loaded {
+function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[], activeId: string, session: Session): Loaded {
   const profiles = (s.profiles as Profile[]).length ? withStandardPalettes(s.profiles as Profile[]) : DEFAULT_PROFILES;
   const archived = Array.isArray(s.archived) ? completeProfiles(s.archived as Profile[]) : [];
   const theme = s.preferences.theme === "dark" || s.preferences.theme === "light" ? s.preferences.theme : undefined;
   const fonts = Array.isArray(s.preferences.customFonts) ? (s.preferences.customFonts as FontDef[]) : [];
   const designs = Object.fromEntries(Object.entries(s.designs as Record<string, Design>).map(([k, d]) => [k, upgradePlaceholderText(d)]));
-  return { profiles, archived, activeId, designs, theme, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout) };
+  return { profiles, archived, activeId, designs, theme, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout), session };
 }
 
 export function useBoot() {
   const [boot, setBoot] = useState<Boot>({ status: "loading" });
+  const sessionRef = useRef<Session>({ perms: [] });
 
   const load = useCallback(async () => {
     setBoot({ status: "loading" });
     try {
       const info = await api.info();
-      if (info.authRequired && !getToken()) return setBoot({ status: "auth" });
+      const session = await requireSession(info);
+      if (!session) return; // being sent to sign in
+      if (!info.accounts && info.authRequired && !getToken()) return setBoot({ status: "auth" });
       let state = await api.state();
       if (!state.profiles.length) {
         const legacy = readLegacy();
@@ -108,7 +115,8 @@ export function useBoot() {
       const pid = pickActive(asked || state.preferences.activeProfile, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
       if (asked && pid === asked && pid !== state.preferences.activeProfile) api.putPreference("activeProfile", pid).catch(() => undefined);
       const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
-      setBoot({ status: "ready", data: fromState(state, drafts, pid) });
+      sessionRef.current = session;
+      setBoot({ status: "ready", data: fromState(state, drafts, pid, session) });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { clearToken(); return setBoot({ status: "auth", error: "That token was not accepted." }); }
       setBoot({ status: "error", message: e instanceof Error ? e.message : "Something went wrong" });
@@ -127,7 +135,7 @@ export function useBoot() {
     const pid = pickActive(id, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
     const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
     api.putPreference("activeProfile", pid).catch(() => undefined); // only means the choice is not remembered
-    setBoot({ status: "ready", data: fromState(state, drafts, pid) });
+    setBoot({ status: "ready", data: fromState(state, drafts, pid, sessionRef.current) });
   }, []);
 
   const submitToken = (t: string) => { setToken(t.trim()); void load(); };

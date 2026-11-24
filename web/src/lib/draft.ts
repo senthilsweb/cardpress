@@ -34,6 +34,9 @@ export interface Draft {
   summary?: string;
   pageAt?: string;
   hasCover?: boolean;
+  /** Who wrote it and who approved it, for showing. */
+  createdByName?: string;
+  approvedByName?: string;
   createdAt: string;
   updatedAt: string;
 }

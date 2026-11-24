@@ -46,6 +46,11 @@ type Studio interface {
 	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
 	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
 	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
+	BrandOwner(ctx context.Context, id string) (string, bool, error)
+	Versions(ctx context.Context, draftID string) ([]service.Version, error)
+	Version(ctx context.Context, draftID string, seq int) (service.Version, error)
+	SaveVersion(ctx context.Context, draftID, note string) (service.Version, error)
+	RestoreVersion(ctx context.Context, draftID string, seq int) (service.Draft, error)
 }
 
 // Library is the part of the library service the HTTP API needs.
@@ -78,6 +83,7 @@ type Chatting interface {
 	Delete(ctx context.Context, id string) error
 	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
+	ProposalBrand(ctx context.Context, proposalID string) (string, error)
 }
 
 // Settings is the part of the settings service the HTTP API needs.
@@ -96,6 +102,7 @@ type Options struct {
 	Publishing   Publishing
 	Library      Library
 	Chat         Chatting
+	Accounts     Accounts // nil: no accounts (the token alone, or nothing on localhost)
 	Token        string   // empty: no bearer token required
 	CORSOrigins  []string // exact origins allowed to call the API from a browser
 	LocalGuard   bool     // no token: answer only to localhost names (see ProtectOptions)
@@ -119,59 +126,99 @@ func New(o Options) http.Handler {
 		s.origins[origin] = true
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET "+prefix+"/info", s.info)
-	mux.HandleFunc("GET "+prefix+"/state", s.state)
-	mux.HandleFunc("PUT "+prefix+"/profiles", s.putProfiles)
-	mux.HandleFunc("POST "+prefix+"/profiles", s.createProfile)
-	mux.HandleFunc("PUT "+prefix+"/profiles/order", s.orderProfiles)
-	mux.HandleFunc("PUT "+prefix+"/profiles/{id}", s.saveProfile)
-	mux.HandleFunc("POST "+prefix+"/profiles/{id}/archive", s.archiveProfile)
-	mux.HandleFunc("POST "+prefix+"/profiles/{id}/restore", s.restoreProfile)
-	mux.HandleFunc("DELETE "+prefix+"/profiles/{id}", s.deleteProfile)
-	mux.HandleFunc("GET "+prefix+"/profiles/{id}/settings", s.getSettings)
-	mux.HandleFunc("GET "+prefix+"/profiles/{id}/settings/{network}", s.getNetwork)
-	mux.HandleFunc("PUT "+prefix+"/profiles/{id}/settings/{network}", s.putNetwork)
-	mux.HandleFunc("POST "+prefix+"/profiles/{id}/settings/{network}/test", s.testNetwork)
-	mux.HandleFunc("PUT "+prefix+"/designs", s.putDesigns)
-	mux.HandleFunc("PUT "+prefix+"/preferences/{key}", s.putPreference)
-	mux.HandleFunc("POST "+prefix+"/import/legacy", s.importLegacy)
-	mux.HandleFunc("GET "+prefix+"/drafts", s.listDrafts)
-	mux.HandleFunc("POST "+prefix+"/drafts", s.createDraft)
-	mux.HandleFunc("GET "+prefix+"/drafts/{id}", s.getDraft)
-	mux.HandleFunc("PUT "+prefix+"/drafts/{id}", s.updateDraft)
-	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}", s.deleteDraft)
-	mux.HandleFunc("POST "+prefix+"/drafts/{id}/approve", s.approveDraft)
-	mux.HandleFunc("POST "+prefix+"/drafts/{id}/unapprove", s.unapproveDraft)
-	mux.HandleFunc("PUT "+prefix+"/drafts/{id}/plan", s.planDraft)
-	mux.HandleFunc("POST "+prefix+"/drafts/{id}/page", s.publishPage)
-	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}/page", s.unpublishPage)
-	mux.HandleFunc("GET "+prefix+"/settings", s.getSettings)
-	mux.HandleFunc("GET "+prefix+"/settings/{network}", s.getNetwork)
-	mux.HandleFunc("PUT "+prefix+"/settings/{network}", s.putNetwork)
-	mux.HandleFunc("POST "+prefix+"/settings/{network}/test", s.testNetwork)
-	mux.HandleFunc("POST "+prefix+"/publish/jobs", s.createJob)
-	mux.HandleFunc("GET "+prefix+"/publish/jobs", s.listJobs)
-	mux.HandleFunc("GET "+prefix+"/library", s.library)
-	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}", s.getJob)
-	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/attempts", s.jobAttempts)
-	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/image", s.jobImage)
-	mux.HandleFunc("POST "+prefix+"/publish/jobs/{id}/publish-now", s.publishNow)
-	mux.HandleFunc("PUT "+prefix+"/publish/jobs/{id}/schedule", s.rescheduleJob)
-	mux.HandleFunc("POST "+prefix+"/publish/jobs/{id}/cancel", s.cancelJob)
-	mux.HandleFunc("DELETE "+prefix+"/publish/jobs/{id}", s.deleteJob)
-	mux.HandleFunc("POST "+prefix+"/chat/conversations", s.startConversation)
-	mux.HandleFunc("GET "+prefix+"/chat/conversations", s.listConversations)
-	mux.HandleFunc("GET "+prefix+"/chat/conversations/{id}", s.getConversation)
-	mux.HandleFunc("DELETE "+prefix+"/chat/conversations/{id}", s.deleteConversation)
-	mux.HandleFunc("POST "+prefix+"/chat/conversations/{id}/messages", s.sendMessage)
-	mux.HandleFunc("POST "+prefix+"/chat/proposals/{id}/decision", s.decideProposal)
-	mux.HandleFunc("GET "+prefix+"/mcp/audit", s.mcpAudit)
+	for _, d := range s.table() {
+		s.add(mux, d)
+	}
 	mux.HandleFunc(prefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "no such endpoint")
 	})
 	protect := ProtectOptions{Token: o.Token, LocalGuard: o.LocalGuard, AllowedHosts: o.AllowedHosts, TrustedOrigins: o.CORSOrigins}
 	// /info stays open so the web app can learn whether it needs a token
-	return s.requestID(s.recoverer(s.cors(browserGuards(protect)(bearerGuard(o.Token, prefix+"/info")(mux)))))
+	guard := bearerGuard(o.Token, prefix+"/info")
+	if o.Accounts != nil {
+		guard = s.authenticate // with accounts, who is calling is worked out here and each route's rule decides
+	}
+	return s.requestID(s.recoverer(s.cors(browserGuards(protect)(guard(mux)))))
+}
+
+// table is every route of the API and who may call it. Read it as the access policy:
+//
+//	scopeOpen         anyone (sign-in, sign-up, whether the app needs setting up)
+//	scopeAny          any signed-in person
+//	scope*  + perm    the thing must be the caller's own (or the caller an admin), and their role must grant perm
+//
+// A writer holds only PermWrite; an editor adds approve, publish and social accounts; an admin also sees everyone's work.
+func (s *server) table() []routeDef {
+	any := rule{scope: scopeAny}
+	write := func(sc scope) rule { return rule{scope: sc, perm: service.PermWrite} }
+	return []routeDef{
+		{"GET", "/info", rule{scope: scopeOpen}, s.info},
+		{"POST", "/auth/signup", rule{scope: scopeOpen}, s.signupOrNotConfigured},
+		{"POST", "/auth/login", rule{scope: scopeOpen}, s.loginOrNotConfigured},
+		{"POST", "/auth/logout", rule{scope: scopeOpen}, s.logoutOrNotConfigured},
+		{"GET", "/auth/me", any, s.meOrNotConfigured},
+		{"PUT", "/auth/me", any, s.updateMeOrNotConfigured},
+		{"PUT", "/auth/password", any, s.changePasswordOrNotConfigured},
+		{"GET", "/users", rule{scope: scopeAdmin, perm: service.PermUsers}, s.listUsers},
+		{"POST", "/users", rule{scope: scopeAdmin, perm: service.PermUsers}, s.addUser},
+		{"PUT", "/users/{id}", rule{scope: scopeAdmin, perm: service.PermUsers}, s.updateUser},
+		{"PUT", "/users/{id}/password", rule{scope: scopeAdmin, perm: service.PermUsers}, s.setUserPassword},
+
+		{"GET", "/state", any, s.state},
+		{"PUT", "/profiles", write(scopeAny), s.putProfiles},
+		{"POST", "/profiles", write(scopeAny), s.createProfile},
+		{"PUT", "/profiles/order", write(scopeAny), s.orderProfiles},
+		{"PUT", "/profiles/{id}", write(scopeBrandPath), s.saveProfile},
+		{"POST", "/profiles/{id}/archive", write(scopeBrandPath), s.archiveProfile},
+		{"POST", "/profiles/{id}/restore", write(scopeBrandPath), s.restoreProfile},
+		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
+		{"GET", "/profiles/{id}/settings", rule{scopeBrandPath, service.PermSocial}, s.getSettings},
+		{"GET", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.getNetwork},
+		{"PUT", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.putNetwork},
+		{"POST", "/profiles/{id}/settings/{network}/test", rule{scopeBrandPath, service.PermSocial}, s.testNetwork},
+		{"PUT", "/designs", write(scopeAny), s.putDesigns},
+		{"PUT", "/preferences/{key}", any, s.putPreference},
+		{"POST", "/import/legacy", rule{scope: scopeAdmin, perm: service.PermUsers}, s.importLegacy},
+
+		{"GET", "/drafts", write(scopeBrandQuery), s.listDrafts},
+		{"POST", "/drafts", write(scopeBrandBody), s.createDraft},
+		{"GET", "/drafts/{id}", write(scopeDraft), s.getDraft},
+		{"PUT", "/drafts/{id}", write(scopeDraft), s.updateDraft},
+		{"DELETE", "/drafts/{id}", write(scopeDraft), s.deleteDraft},
+		{"POST", "/drafts/{id}/approve", rule{scopeDraft, service.PermApprove}, s.approveDraft},
+		{"POST", "/drafts/{id}/unapprove", write(scopeDraft), s.unapproveDraft},
+		{"PUT", "/drafts/{id}/plan", rule{scopeDraft, service.PermApprove}, s.planDraft},
+		{"POST", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.publishPage},
+		{"DELETE", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.unpublishPage},
+		{"GET", "/drafts/{id}/versions", write(scopeDraft), s.listVersions},
+		{"POST", "/drafts/{id}/versions", write(scopeDraft), s.saveVersion},
+		{"GET", "/drafts/{id}/versions/{seq}", write(scopeDraft), s.getVersion},
+		{"POST", "/drafts/{id}/versions/{seq}/restore", write(scopeDraft), s.restoreVersion},
+
+		{"GET", "/settings", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getSettings},
+		{"GET", "/settings/{network}", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getNetwork},
+		{"PUT", "/settings/{network}", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putNetwork},
+		{"POST", "/settings/{network}/test", rule{scope: scopeAdmin, perm: service.PermUsers}, s.testNetwork},
+
+		{"POST", "/publish/jobs", rule{scopeBrandBody, service.PermPublish}, s.createJob},
+		{"GET", "/publish/jobs", write(scopeBrandQuery), s.listJobs},
+		{"GET", "/library", write(scopeBrandQuery), s.library},
+		{"GET", "/publish/jobs/{id}", write(scopeJob), s.getJob},
+		{"GET", "/publish/jobs/{id}/attempts", write(scopeJob), s.jobAttempts},
+		{"GET", "/publish/jobs/{id}/image", write(scopeJob), s.jobImage},
+		{"POST", "/publish/jobs/{id}/publish-now", rule{scopeJob, service.PermPublish}, s.publishNow},
+		{"PUT", "/publish/jobs/{id}/schedule", rule{scopeJob, service.PermPublish}, s.rescheduleJob},
+		{"POST", "/publish/jobs/{id}/cancel", rule{scopeJob, service.PermPublish}, s.cancelJob},
+		{"DELETE", "/publish/jobs/{id}", rule{scopeJob, service.PermPublish}, s.deleteJob},
+
+		{"POST", "/chat/conversations", write(scopeBrandBody), s.startConversation},
+		{"GET", "/chat/conversations", write(scopeBrandQuery), s.listConversations},
+		{"GET", "/chat/conversations/{id}", write(scopeConversation), s.getConversation},
+		{"DELETE", "/chat/conversations/{id}", write(scopeConversation), s.deleteConversation},
+		{"POST", "/chat/conversations/{id}/messages", write(scopeConversation), s.sendMessage},
+		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
+		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
+	}
 }
 
 /* ---------------------------------------------------------------- middleware */
@@ -223,8 +270,25 @@ func (s *server) cors(next http.Handler) http.Handler {
 
 /* ---------------------------------------------------------------- handlers */
 
-func (s *server) info(w http.ResponseWriter, _ *http.Request) {
-	out := map[string]any{"name": "cardpress", "version": s.Version, "db": s.DBDriver, "authRequired": s.Token != ""}
+func (s *server) info(w http.ResponseWriter, r *http.Request) {
+	out := map[string]any{"name": "cardpress", "version": s.Version, "db": s.DBDriver, "authRequired": s.Token != "" || s.Accounts != nil, "accounts": s.Accounts != nil}
+	if s.Accounts != nil {
+		// what the app needs to know before it can show anything: set up, sign in, or carry on
+		n, _ := s.Accounts.Count(r.Context())
+		out["needsSetup"] = n == 0
+		out["signupOpen"] = s.Accounts.SignupOpen(r.Context())
+		if p, ok := principalOf(r); ok {
+			out["signedIn"] = true
+			if p.User != nil {
+				out["user"] = p.User
+				out["perms"] = p.User.Perms()
+			} else {
+				out["perms"] = []service.Perm{service.PermWrite, service.PermApprove, service.PermPublish, service.PermSocial, service.PermUsers}
+			}
+		} else {
+			out["signedIn"] = false
+		}
+	}
 	if s.Chat != nil {
 		out["agent"] = s.Chat.Agent()
 	}
@@ -323,6 +387,9 @@ func (s *server) createDraft(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	if !s.requireBrand(w, r, in.ProfileID, service.PermWrite) {
+		return
+	}
 	d, err := s.Studio.CreateDraft(r.Context(), in)
 	if err != nil {
 		fail(w, r, err)
@@ -417,6 +484,59 @@ func (s *server) publishPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) unpublishPage(w http.ResponseWriter, r *http.Request) {
 	d, err := s.Studio.UnpublishPage(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) listVersions(w http.ResponseWriter, r *http.Request) {
+	vs, err := s.Studio.Versions(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"versions": vs})
+}
+
+func (s *server) getVersion(w http.ResponseWriter, r *http.Request) {
+	seq, err := strconv.Atoi(r.PathValue("seq"))
+	if err != nil {
+		fail(w, r, service.ErrNotFound)
+		return
+	}
+	v, err := s.Studio.Version(r.Context(), r.PathValue("id"), seq)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+// saveVersion keeps the item as it is now, with an optional note.
+func (s *server) saveVersion(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Note string `json:"note"`
+	}
+	if r.ContentLength != 0 && !decode(w, r, &in) {
+		return
+	}
+	v, err := s.Studio.SaveVersion(r.Context(), r.PathValue("id"), in.Note)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, v)
+}
+
+func (s *server) restoreVersion(w http.ResponseWriter, r *http.Request) {
+	seq, err := strconv.Atoi(r.PathValue("seq"))
+	if err != nil {
+		fail(w, r, service.ErrNotFound)
+		return
+	}
+	d, err := s.Studio.RestoreVersion(r.Context(), r.PathValue("id"), seq)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -601,6 +721,9 @@ func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
+	if !s.requireBrand(w, r, body.ProfileID, service.PermWrite) {
+		return
+	}
 	v, err := s.Chat.Start(r.Context(), body.ProfileID, body.URL, body.Text)
 	if err != nil {
 		fail(w, r, err)
@@ -744,6 +867,9 @@ func (s *server) createJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.Unmarshal([]byte(r.FormValue("meta")), &meta); err != nil {
 		writeError(w, r, http.StatusBadRequest, "bad_json", "the meta field is not valid JSON")
+		return
+	}
+	if !s.requireBrand(w, r, meta.ProfileID, service.PermPublish) {
 		return
 	}
 	file, _, err := r.FormFile("image")
@@ -924,6 +1050,12 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, service.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
+	case errors.Is(err, service.ErrForbidden):
+		writeError(w, r, http.StatusForbidden, "forbidden", service.UserMessage(err))
+	case errors.Is(err, service.ErrUnauthorized):
+		writeError(w, r, http.StatusUnauthorized, "unauthorized", "the email or password is not right")
+	case errors.Is(err, service.ErrTooManyAttempts):
+		writeError(w, r, http.StatusTooManyRequests, "too_many_attempts", "too many tries; wait a few minutes and try again")
 	default:
 		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
 		writeError(w, r, http.StatusInternalServerError, "internal", "internal error")

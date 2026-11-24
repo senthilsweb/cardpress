@@ -27,6 +27,9 @@ type Config struct {
 	ServeWeb        bool          // serve the embedded web app
 	MCPEnabled      bool          // serve the MCP endpoint at /mcp
 	AllowedHosts    []string      // extra host names accepted when there is no token (CARDPRESS_ALLOWED_HOSTS)
+	DefaultRole     string        // the role of a person who signs up (CARDPRESS_DEFAULT_ROLE): editor (default) or writer
+	SignupClosed    bool          // CARDPRESS_SIGNUP=closed: only an administrator adds people after the first account
+	AdminEmail      string        // CARDPRESS_ADMIN_EMAIL: if set, only this email may create the first (admin) account
 	PublicURL       string        // the address readers use, for the public pages (CARDPRESS_PUBLIC_URL), e.g. https://example.com
 	SiteName        string        // names the public site in titles and previews (CARDPRESS_SITE_NAME); empty uses the brand
 	Agent           string        // "mock" (demo, default) or "cma" (Claude Managed Agent) (CARDPRESS_AGENT)
@@ -132,6 +135,9 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			c.AllowedHosts = append(c.AllowedHosts, h)
 		}
 	}
+	c.DefaultRole = strings.ToLower(env("CARDPRESS_DEFAULT_ROLE", "editor"))
+	c.SignupClosed = strings.EqualFold(env("CARDPRESS_SIGNUP", "open"), "closed")
+	c.AdminEmail = strings.ToLower(env("CARDPRESS_ADMIN_EMAIL", ""))
 	c.PublicURL = strings.TrimRight(env("CARDPRESS_PUBLIC_URL", ""), "/")
 	c.SiteName = env("CARDPRESS_SITE_NAME", "")
 	for _, o := range strings.Split(env("CARDPRESS_CORS_ORIGINS", ""), ",") {
@@ -153,6 +159,9 @@ func (c Config) Validate() error {
 		if err != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && IsLoopback(net.JoinHostPort(u.Hostname(), "0")))) {
 			return errors.New("CARDPRESS_LINKEDIN_API_BASE must be an https address (plain http only for localhost): your access token is sent there")
 		}
+	}
+	if c.DefaultRole != "editor" && c.DefaultRole != "writer" {
+		return fmt.Errorf("CARDPRESS_DEFAULT_ROLE must be editor or writer, got %q", c.DefaultRole)
 	}
 	if c.PublicURL != "" {
 		u, err := url.Parse(c.PublicURL)

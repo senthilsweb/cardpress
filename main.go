@@ -45,6 +45,10 @@ func main() {
 		runMCP(os.Args[2:])
 		return
 	}
+	// `cardpress user reset-password <email>` sets a new random password for someone who is locked out
+	if len(os.Args) > 1 && os.Args[1] == "user" {
+		os.Exit(runUser(os.Args[2:]))
+	}
 	// `cardpress healthcheck` is for the container health check: the image has no shell or curl
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(runHealthcheck())
@@ -110,8 +114,9 @@ func main() {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
+	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
-		Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Accounts: accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
@@ -318,4 +323,39 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// runUser is the command-line side of accounts: there is no email, so a forgotten password is reset here, on the server.
+func runUser(args []string) int {
+	if len(args) != 2 || args[0] != "reset-password" {
+		fmt.Fprintln(os.Stderr, "usage: cardpress user reset-password <email>")
+		return 2
+	}
+	cfg, err := config.Load(nil, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	ctx := context.Background()
+	db, err := store.Open(ctx, cfg.DBURL, cfg.DBToken)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer db.Close()
+	if err := db.Migrate(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	pw, err := service.NewAccounts(db.DB, service.AccountsOptions{}).ResetPasswordByEmail(ctx, args[1])
+	if errors.Is(err, service.ErrNotFound) {
+		fmt.Fprintln(os.Stderr, "there is no account with that email")
+		return 1
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("New password for %s: %s\nThey were signed out everywhere. Ask them to change it from Account settings.\n", args[1], pw)
+	return 0
 }

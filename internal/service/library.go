@@ -86,6 +86,11 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 	if q.Kind != "" && q.Kind != "post" && q.Kind != "article" {
 		return LibraryPage{}, invalid("kind must be post or article")
 	}
+	if !q.All {
+		if err := brandNotHidden(ctx, l.db, q.ProfileID); err != nil {
+			return LibraryPage{}, err
+		}
+	}
 	size := q.PageSize
 	if size == 0 {
 		size = libraryDefaultPageSize
@@ -159,6 +164,9 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	if !q.All {
 		query += ` WHERE j.profile_id = ?`
 		args = append(args, q.ProfileID)
+	} else if p, ok := PrincipalFrom(ctx); ok && !p.Admin() { // everything, but only what is theirs
+		query += ` WHERE j.profile_id IN (SELECT id FROM profiles WHERE owner_id = ?)`
+		args = append(args, p.UserID())
 	}
 	rs, err := l.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -198,6 +206,9 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	if !q.All {
 		query += ` AND profile_id = ?`
 		args = append(args, q.ProfileID)
+	} else if p, ok := PrincipalFrom(ctx); ok && !p.Admin() {
+		query += ` AND profile_id IN (SELECT id FROM profiles WHERE owner_id = ?)`
+		args = append(args, p.UserID())
 	}
 	if q.Kind != "" {
 		query += ` AND kind = ?`

@@ -36,17 +36,33 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   try { json = text ? JSON.parse(text) : undefined; } catch { /* not JSON */ }
   if (!res.ok) {
     const e = (json as { error?: { code?: string; message?: string }; requestId?: string } | undefined) ?? {};
+    // a session that has ended (not a wrong password) sends the person to sign in again
+    if (res.status === 401 && !path.startsWith("/auth/login") && typeof window !== "undefined" && !/\/(login|signup)\/?$/.test(window.location.pathname)) {
+      window.location.assign(`${import.meta.env.BASE_URL}login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    }
     throw new ApiError(res.status, e.error?.code ?? "http", e.error?.message ?? `Request failed (${res.status})`, e.requestId);
   }
   return json as T;
 }
 
 import type { Draft, DraftInput } from "./draft";
+import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage } from "./library";
 import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
 
-export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo }
+export interface ApiInfo {
+  name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo;
+  /** Accounts are on: the app needs a first (admin) account, then people sign in. */
+  accounts?: boolean; needsSetup?: boolean; signupOpen?: boolean; signedIn?: boolean; user?: User; perms?: Perm[];
+}
+/** A saved state of a draft (text only when one is fetched on its own). */
+export interface DraftVersion {
+  id: string; draftId: string; seq: number; label: "created" | "auto" | "manual" | "approved" | "sent" | "restored";
+  note?: string; kind: string; title: string; createdBy?: string; createdByName?: string; createdAt: string; preview?: string;
+  doc?: import("./draft").DocNode; hashtags?: string[]; altText?: string;
+}
+export interface SignupInput { firstName: string; lastName: string; email: string; password: string; phone?: string; birthDate?: string }
 /** One credential field as the server lets the browser see it: a secret is only ever its last four characters. */
 export interface SettingsField {
   key: string; label: string; hint?: string; secret: boolean; set: boolean;
@@ -123,6 +139,19 @@ async function streamMessage(id: string, content: string, h: ChatStreamHandlers,
 
 export const api = {
   info: () => call<ApiInfo>("GET", "/info"),
+  signup: (input: SignupInput) => call<{ user: User; perms: Perm[] }>("POST", "/auth/signup", input),
+  login: (email: string, password: string) => call<{ user: User; perms: Perm[] }>("POST", "/auth/login", { email, password }),
+  logout: () => call<void>("POST", "/auth/logout"),
+  updateMe: (input: { firstName: string; lastName: string; phone: string; birthDate: string }) => call<{ user: User; perms: Perm[] }>("PUT", "/auth/me", input),
+  changePassword: (current: string, next: string) => call<void>("PUT", "/auth/password", { current, new: next }),
+  users: () => call<{ users: User[] }>("GET", "/users").then((r) => r.users),
+  addUser: (input: SignupInput & { role: string }) => call<User>("POST", "/users", input),
+  updateUser: (id: string, change: { role?: string; status?: "active" | "disabled" }) => call<User>("PUT", `/users/${encodeURIComponent(id)}`, change),
+  setUserPassword: (id: string, password: string) => call<void>("PUT", `/users/${encodeURIComponent(id)}/password`, { password }),
+  versions: (id: string) => call<{ versions: DraftVersion[] }>("GET", `/drafts/${encodeURIComponent(id)}/versions`).then((r) => r.versions),
+  version: (id: string, seq: number) => call<DraftVersion>("GET", `/drafts/${encodeURIComponent(id)}/versions/${seq}`),
+  saveVersion: (id: string, note: string) => call<DraftVersion>("POST", `/drafts/${encodeURIComponent(id)}/versions`, { note }),
+  restoreVersion: (id: string, seq: number) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/versions/${seq}/restore`),
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),

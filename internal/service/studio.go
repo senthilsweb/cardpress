@@ -15,8 +15,9 @@ import (
 
 // Errors a caller can test with errors.Is.
 var (
-	ErrInvalid  = errors.New("invalid input")
-	ErrConflict = errors.New("conflict")
+	ErrInvalid   = errors.New("invalid input")
+	ErrConflict  = errors.New("conflict")
+	ErrForbidden = errors.New("not allowed") // the person may see the thing but their role does not allow this
 )
 
 func invalid(format string, a ...any) error {
@@ -24,14 +25,15 @@ func invalid(format string, a ...any) error {
 }
 
 const (
-	maxProfiles  = 50
-	maxPrefBytes = 1 << 20
-	maxDocBytes  = 16 << 20
-	timeLayout   = time.RFC3339
-	PrefTheme    = "theme"
-	PrefFonts    = "customFonts"
-	PrefLayout   = "layout"        // sidebar and section fold state, editor height
-	PrefActive   = "activeProfile" // the brand that was open last
+	maxProfiles        = 50  // brands in one request
+	maxBrandsPerPerson = 200 // brands one person may own
+	maxPrefBytes       = 1 << 20
+	maxDocBytes        = 16 << 20
+	timeLayout         = time.RFC3339
+	PrefTheme          = "theme"
+	PrefFonts          = "customFonts"
+	PrefLayout         = "layout"        // sidebar and section fold state, editor height
+	PrefActive         = "activeProfile" // the brand that was open last
 )
 
 var allowedPrefs = map[string]bool{PrefTheme: true, PrefFonts: true, PrefLayout: true, PrefActive: true}
@@ -66,17 +68,23 @@ func (s *Studio) stamp() string { return s.now().UTC().Format(timeLayout) }
 func (s *Studio) State(ctx context.Context) (State, error) {
 	st := State{Profiles: []json.RawMessage{}, Archived: []json.RawMessage{}, Designs: map[string]json.RawMessage{}, Preferences: map[string]json.RawMessage{}}
 
-	rows, err := s.db.QueryContext(ctx, `SELECT data, archived_at IS NOT NULL FROM profiles ORDER BY position, id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, data, archived_at IS NOT NULL, owner_id FROM profiles ORDER BY position, id`)
 	if err != nil {
 		return st, err
 	}
+	seen, known := map[string]bool{}, map[string]bool{} // the brands this person may see, and every brand there is
 	for rows.Next() {
-		var d string
+		var id, d, owner string
 		var archived bool
-		if err := rows.Scan(&d, &archived); err != nil {
+		if err := rows.Scan(&id, &d, &archived, &owner); err != nil {
 			rows.Close()
 			return st, err
 		}
+		known[id] = true
+		if !sees(ctx, owner) {
+			continue
+		}
+		seen[id] = true
 		if archived {
 			st.Archived = append(st.Archived, json.RawMessage(d))
 		} else {
@@ -96,13 +104,20 @@ func (s *Studio) State(ctx context.Context) (State, error) {
 			rows.Close()
 			return st, err
 		}
-		st.Designs[id] = json.RawMessage(d)
+		if seen[id] || (!known[id] && sees(ctx, "")) { // a design whose brand is gone is only for those who see everything
+			st.Designs[id] = json.RawMessage(d)
+		}
 	}
 	if err := closeRows(rows); err != nil {
 		return st, err
 	}
 
-	if rows, err = s.db.QueryContext(ctx, `SELECT key, value FROM preferences`); err != nil {
+	// theme, layout, the open brand and fonts belong to the person; without one (the token, the system) they are shared
+	query, args := `SELECT key, value FROM preferences`, []any{}
+	if uid := userScope(ctx); uid != "" {
+		query, args = `SELECT key, value FROM user_preferences WHERE user_id = ?`, []any{uid}
+	}
+	if rows, err = s.db.QueryContext(ctx, query, args...); err != nil {
 		return st, err
 	}
 	for rows.Next() {
@@ -114,6 +129,59 @@ func (s *Studio) State(ctx context.Context) (State, error) {
 		st.Preferences[k] = json.RawMessage(v)
 	}
 	return st, closeRows(rows)
+}
+
+// userScope is the person whose preferences and brands apply, or "" for the token and the system.
+func userScope(ctx context.Context) string {
+	if p, ok := PrincipalFrom(ctx); ok && p.User != nil {
+		return p.User.ID
+	}
+	return ""
+}
+
+// brandScope narrows a query on profiles to what the caller may see: nothing for an admin or the system, their own for others.
+func brandScope(ctx context.Context) (string, []any) {
+	if p, ok := PrincipalFrom(ctx); ok && !p.Admin() {
+		return ` AND owner_id = ?`, []any{p.UserID()}
+	}
+	return "", nil
+}
+
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// brandNotHidden returns ErrNotFound only for a brand that exists and belongs to someone else. A brand that does not exist
+// is allowed (what is asked about it is simply empty), which keeps read paths simple.
+func brandNotHidden(ctx context.Context, q rowQuerier, id string) error {
+	var owner string
+	err := q.QueryRowContext(ctx, `SELECT owner_id FROM profiles WHERE id = ?`, id).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !sees(ctx, owner) {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// brandVisible returns ErrNotFound unless the brand exists and the caller may see it. It does not say which, so an id
+// that belongs to someone else looks the same as one that does not exist.
+func brandVisible(ctx context.Context, q rowQuerier, id string) error {
+	var owner string
+	if err := q.QueryRowContext(ctx, `SELECT owner_id FROM profiles WHERE id = ?`, id).Scan(&owner); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if !sees(ctx, owner) {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func closeRows(r *sql.Rows) error {
@@ -138,7 +206,16 @@ func (s *Studio) ReplaceProfiles(ctx context.Context, list []json.RawMessage) er
 	}
 	defer tx.Rollback() //nolint:errcheck
 	for i, raw := range list {
-		if err := upsertProfile(ctx, tx, ids[i], raw, s.stamp()); err != nil {
+		var one int
+		switch err := tx.QueryRowContext(ctx, `SELECT 1 FROM profiles WHERE id = ?`, ids[i]).Scan(&one); {
+		case err == nil: // an existing brand: only if it is the caller's to see
+			if err := brandVisible(ctx, tx, ids[i]); err != nil {
+				return err
+			}
+		case !errors.Is(err, sql.ErrNoRows):
+			return err
+		}
+		if err := upsertProfile(ctx, tx, ids[i], raw, s.stamp(), actorID(ctx)); err != nil {
 			return err
 		}
 	}
@@ -146,11 +223,11 @@ func (s *Studio) ReplaceProfiles(ctx context.Context, list []json.RawMessage) er
 }
 
 // upsertProfile updates a profile's data, or adds it at the end.
-func upsertProfile(ctx context.Context, tx *sql.Tx, id string, raw json.RawMessage, at string) error {
+func upsertProfile(ctx context.Context, tx *sql.Tx, id string, raw json.RawMessage, at, owner string) error {
 	_, err := tx.ExecContext(ctx,
-		`INSERT INTO profiles (id, position, data, updated_at) VALUES (?, (SELECT COALESCE(MAX(position), -1) + 1 FROM profiles), ?, ?)
+		`INSERT INTO profiles (id, position, data, updated_at, owner_id) VALUES (?, (SELECT COALESCE(MAX(position), -1) + 1 FROM profiles), ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
-		id, string(raw), at)
+		id, string(raw), at, owner)
 	if err != nil {
 		return err
 	}
@@ -241,11 +318,45 @@ func validateDesigns(designs map[string]json.RawMessage) error {
 }
 
 func insertDesigns(ctx context.Context, tx *sql.Tx, designs map[string]json.RawMessage, at string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM designs`); err != nil {
+	// only the caller's own designs are replaced: another person's are never touched
+	rows, err := tx.QueryContext(ctx, `SELECT id, owner_id FROM profiles`)
+	if err != nil {
 		return err
 	}
+	visible, owned := map[string]bool{}, map[string]bool{}
+	for rows.Next() {
+		var id, owner string
+		if err := rows.Scan(&id, &owner); err != nil {
+			rows.Close()
+			return err
+		}
+		owned[id] = true
+		visible[id] = sees(ctx, owner)
+	}
+	if err := closeRows(rows); err != nil {
+		return err
+	}
+	for id := range designs {
+		if owned[id] && !visible[id] {
+			return ErrNotFound
+		}
+	}
+	if p, ok := PrincipalFrom(ctx); !ok || p.Admin() {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM designs`); err != nil {
+			return err
+		}
+	} else {
+		for id, ok := range visible {
+			if ok {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM designs WHERE profile_id = ?`, id); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	for id, raw := range designs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO designs (profile_id, data, updated_at) VALUES (?, ?, ?)`, id, string(raw), at); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO designs (profile_id, data, updated_at) VALUES (?, ?, ?)
+			ON CONFLICT(profile_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`, id, string(raw), at); err != nil {
 			return err
 		}
 	}
@@ -259,6 +370,13 @@ func (s *Studio) SetPreference(ctx context.Context, key string, value json.RawMe
 	}
 	if len(value) > maxPrefBytes || !json.Valid(value) {
 		return invalid("preference %q must be valid JSON under %d bytes", key, maxPrefBytes)
+	}
+	if uid := userScope(ctx); uid != "" { // a person's own preferences
+		_, err := s.db.ExecContext(ctx,
+			`INSERT INTO user_preferences (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)
+			 ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+			uid, key, string(value), s.stamp())
+		return err
 	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO preferences (key, value, updated_at) VALUES (?, ?, ?)
@@ -328,4 +446,14 @@ func UserMessage(err error) string {
 	r := []rune(m)
 	r[0] = unicode.ToUpper(r[0])
 	return string(r)
+}
+
+// BrandOwner returns who owns a brand and whether it exists. The API uses it to decide whether a person may reach it.
+func (s *Studio) BrandOwner(ctx context.Context, id string) (string, bool, error) {
+	var owner string
+	err := s.db.QueryRowContext(ctx, `SELECT owner_id FROM profiles WHERE id = ?`, id).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return owner, err == nil, err
 }

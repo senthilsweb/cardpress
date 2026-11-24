@@ -48,13 +48,13 @@ func (s *Studio) CreateProfile(ctx context.Context, raw json.RawMessage) error {
 	if n > 0 {
 		return fmt.Errorf("%w: a brand with id %q already exists", ErrConflict, id)
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM profiles`).Scan(&n); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM profiles WHERE owner_id = ?`, actorID(ctx)).Scan(&n); err != nil {
 		return err
 	}
-	if n >= maxProfiles {
-		return invalid("too many brands (max %d)", maxProfiles)
+	if n >= maxBrandsPerPerson {
+		return invalid("too many brands (max %d)", maxBrandsPerPerson)
 	}
-	if err := upsertProfile(ctx, tx, id, raw, s.stamp()); err != nil {
+	if err := upsertProfile(ctx, tx, id, raw, s.stamp(), actorID(ctx)); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -68,6 +68,9 @@ func (s *Studio) SaveProfile(ctx context.Context, id string, raw json.RawMessage
 	}
 	if got != id {
 		return invalid("the profile id %q does not match %q", got, id)
+	}
+	if err := brandVisible(ctx, s.db, id); err != nil {
+		return err
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE profiles SET data = ?, updated_at = ? WHERE id = ?`, string(raw), s.stamp(), id)
 	if err != nil {
@@ -86,7 +89,8 @@ func (s *Studio) ReorderProfiles(ctx context.Context, ids []string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	rows, err := tx.QueryContext(ctx, `SELECT id FROM profiles WHERE archived_at IS NULL`)
+	scope, scopeArgs := brandScope(ctx)
+	rows, err := tx.QueryContext(ctx, `SELECT id FROM profiles WHERE archived_at IS NULL`+scope, scopeArgs...)
 	if err != nil {
 		return err
 	}
@@ -112,7 +116,7 @@ func (s *Studio) ReorderProfiles(ctx context.Context, ids []string) error {
 		}
 		seen[id] = true
 	}
-	for i, id := range ids {
+	for i, id := range ids { // positions are global, so a person's order only has to be consistent among their own brands
 		if _, err := tx.ExecContext(ctx, `UPDATE profiles SET position = ? WHERE id = ?`, i, id); err != nil {
 			return err
 		}
@@ -134,6 +138,9 @@ func (s *Studio) ArchiveProfile(ctx context.Context, id string) (ArchiveResult, 
 		return ArchiveResult{}, err
 	}
 	defer tx.Rollback() //nolint:errcheck
+	if err := brandVisible(ctx, tx, id); err != nil {
+		return ArchiveResult{}, err
+	}
 	var archived sql.NullString
 	if err := tx.QueryRowContext(ctx, `SELECT archived_at FROM profiles WHERE id = ?`, id).Scan(&archived); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -145,7 +152,8 @@ func (s *Studio) ArchiveProfile(ctx context.Context, id string) (ArchiveResult, 
 		return ArchiveResult{}, nil // already archived
 	}
 	var active int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM profiles WHERE archived_at IS NULL`).Scan(&active); err != nil {
+	scope, scopeArgs := brandScope(ctx)
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM profiles WHERE archived_at IS NULL`+scope, scopeArgs...).Scan(&active); err != nil {
 		return ArchiveResult{}, err
 	}
 	if active <= 1 {
@@ -163,6 +171,9 @@ func (s *Studio) ArchiveProfile(ctx context.Context, id string) (ArchiveResult, 
 
 // RestoreProfile brings an archived brand back, at the end of the list.
 func (s *Studio) RestoreProfile(ctx context.Context, id string) error {
+	if err := brandVisible(ctx, s.db, id); err != nil {
+		return err
+	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE profiles SET archived_at = NULL, position = (SELECT COALESCE(MAX(position), -1) + 1 FROM profiles), updated_at = ? WHERE id = ? AND archived_at IS NOT NULL`,
 		s.stamp(), id)
@@ -186,6 +197,9 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
+	if err := brandVisible(ctx, tx, id); err != nil {
+		return err
+	}
 	var archived sql.NullString
 	if err := tx.QueryRowContext(ctx, `SELECT archived_at FROM profiles WHERE id = ?`, id).Scan(&archived); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -216,6 +230,7 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 		`DELETE FROM conversations WHERE profile_id = ?`,
 		`DELETE FROM publish_attempts WHERE job_id IN (SELECT id FROM publish_jobs WHERE profile_id = ?)`,
 		`DELETE FROM publish_jobs WHERE profile_id = ?`,
+		`DELETE FROM draft_versions WHERE draft_id IN (SELECT id FROM drafts WHERE profile_id = ?)`,
 		`DELETE FROM drafts WHERE profile_id = ?`,
 		`DELETE FROM designs WHERE profile_id = ?`,
 		`DELETE FROM credentials WHERE profile_id = ?`,

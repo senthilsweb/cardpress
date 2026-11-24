@@ -1,0 +1,8 @@
+---
+import Base from "../layouts/Base.astro";
+import AuthPage from "../components/auth/AuthPage";
+---
+<Base title="CardPress sign in" description="Sign in to CardPress.">
+  <AuthPage mode="login" client:only="react" />
+  <noscript><p style="padding:2rem">CardPress needs JavaScript.</p></noscript>
+</Base>
