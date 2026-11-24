@@ -113,5 +113,5 @@
 .article-html h3 { font-size: 1.1rem; font-weight: 700; }
 .article-html blockquote { border-left: 3px solid var(--brand); padding-left: .9rem; color: var(--muted-foreground); }
 
-/* the header: a soft cream-to-blue wash, as on maia.ai */
+/* the header: a soft cream-to-blue wash */
 .app-header { background-image: linear-gradient(90deg, var(--header-from), var(--header-to)); }
