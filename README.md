@@ -19,7 +19,8 @@
 
 ## What it does
 
-- **Cards**: one brand profile, 28 colour sets, 6 layouts, 12 backgrounds drawn in code, and 10 sizes for LinkedIn, X, Instagram and Facebook. Export a PNG, copy it, or download every size as a zip.
+- **Brands**: keep several brands in one install, each with its own look, drafts, queue and accounts.
+- **Cards**: a brand profile with 28 colour sets, 6 layouts, 12 backgrounds drawn in code, and 10 sizes for LinkedIn, X, Instagram and Facebook. Export a PNG, copy it, or download every size as a zip.
 - **Posts**: a rich-text editor with hashtags and alt text, and a full preview of the LinkedIn feed.
 - **Assistant**: paste an article or a web address and it proposes a post. You approve, edit or reject it. It prepares content only.
 - **Publish**: post to LinkedIn now or at a chosen time, with a queue, per-post status and no automatic retries. A person confirms every post.

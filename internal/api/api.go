@@ -48,6 +48,7 @@ type Publishing interface {
 	Create(ctx context.Context, in service.JobInput) (service.Job, error)
 	Get(ctx context.Context, id string) (service.Job, error)
 	List(ctx context.Context, profileID string) ([]service.Job, error)
+	ListAll(ctx context.Context) ([]service.Job, error)
 	Image(ctx context.Context, id string) ([]byte, error)
 	PublishNow(ctx context.Context, id string, acceptDuplicate bool) (service.Job, error)
 	Reschedule(ctx context.Context, id string, at time.Time, timezone string) (service.Job, error)
@@ -677,11 +678,19 @@ func (s *server) createJob(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
 	profileID := r.URL.Query().Get("profileId")
-	if profileID == "" {
-		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+	var (
+		jobs []service.Job
+		err  error
+	)
+	switch {
+	case r.URL.Query().Get("scope") == "all":
+		jobs, err = s.Publishing.ListAll(r.Context())
+	case profileID == "":
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required (or scope=all for every brand)")
 		return
+	default:
+		jobs, err = s.Publishing.List(r.Context(), profileID)
 	}
-	jobs, err := s.Publishing.List(r.Context(), profileID)
 	if err != nil {
 		fail(w, r, err)
 		return

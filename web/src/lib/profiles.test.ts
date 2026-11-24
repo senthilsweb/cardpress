@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PROFILES, withStandardPalettes } from "./profiles";
+import { DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "./profiles";
 import type { Profile } from "./types";
 
 describe("withStandardPalettes", () => {
@@ -21,5 +21,16 @@ describe("withStandardPalettes", () => {
     expect(pr.name).toBe("From the API");
     expect(pr.palettes.length).toBeGreaterThan(20);
     expect(pr.displayFont).toBeTruthy();
+  });
+});
+
+describe("completeProfiles", () => {
+  it("keeps an empty list empty, so there is no phantom brand in the archive", () => {
+    expect(completeProfiles([])).toEqual([]);
+  });
+  it("completes every profile in a list", () => {
+    const out = completeProfiles([{ id: "a", name: "A" }, { id: "b", name: "B" }] as never);
+    expect(out.map((p) => p.id)).toEqual(["a", "b"]);
+    expect(out.every((p) => p.palettes.length > 20)).toBe(true);
   });
 });

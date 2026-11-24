@@ -9,10 +9,10 @@
 - [x] Tests: isolation between brands, migration, deletion rules, environment override
 
 ## Bolt 2: interface
-- [ ] Brand switcher in the header; remember the open brand
-- [ ] New brand and Manage brands drawers
-- [ ] Profile tab renamed Brand; Social accounts, queue and assistant follow the open brand
-- [ ] Publish confirmation names the brand and the LinkedIn account; disabled without a connection
+- [x] Brand switcher in the header; remember the open brand
+- [x] New brand and Manage brands drawers
+- [x] Profile tab renamed Brand; Social accounts, queue and assistant follow the open brand
+- [x] Publish confirmation names the brand and the LinkedIn account; disabled without a connection
 
 ## Bolt 3: agents and docs
 - [ ] MCP and chat name the brand; audit records it

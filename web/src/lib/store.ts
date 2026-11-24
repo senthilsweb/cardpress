@@ -27,5 +27,8 @@ export function useSyncedState<T>(initial: T, save: (value: T) => Promise<void>,
     return () => window.clearTimeout(timer.current);
   }, [value, delayMs]);
 
-  return [value, set, saveError] as const;
+  /** Put in a value that came from the server, without saving it back. */
+  const replace = useCallback((next: T) => { dirty.current = false; window.clearTimeout(timer.current); setValue(next); }, []);
+
+  return [value, set, saveError, replace] as const;
 }

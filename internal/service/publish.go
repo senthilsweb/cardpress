@@ -239,9 +239,18 @@ func (p *Publisher) Get(ctx context.Context, id string) (Job, error) {
 	return j, err
 }
 
-// List returns a profile's jobs, newest first.
+// List returns a brand's jobs, newest first.
 func (p *Publisher) List(ctx context.Context, profileID string) ([]Job, error) {
-	rows, err := p.db.QueryContext(ctx, `SELECT `+jobCols+` FROM publish_jobs WHERE profile_id = ? ORDER BY created_at DESC, id LIMIT 200`, profileID)
+	return p.list(ctx, `WHERE profile_id = ?`, profileID)
+}
+
+// ListAll returns every brand's jobs, newest first. Each job says which brand owns it.
+func (p *Publisher) ListAll(ctx context.Context) ([]Job, error) {
+	return p.list(ctx, ``)
+}
+
+func (p *Publisher) list(ctx context.Context, where string, args ...any) ([]Job, error) {
+	rows, err := p.db.QueryContext(ctx, `SELECT `+jobCols+` FROM publish_jobs `+where+` ORDER BY created_at DESC, id LIMIT 200`, args...)
 	if err != nil {
 		return nil, err
 	}

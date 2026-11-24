@@ -60,6 +60,8 @@ export interface TestResult { status: TestStatus; message: string; expiresAt?: s
 
 export interface ApiState {
   profiles: unknown[];
+  /** Brands hidden from the studio but kept with their history. */
+  archived?: unknown[];
   designs: Record<string, unknown>;
   preferences: Record<string, unknown>;
 }
@@ -122,17 +124,24 @@ export const api = {
   info: () => call<ApiInfo>("GET", "/info"),
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
+  createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
+  orderProfiles: (ids: string[]) => call<void>("PUT", "/profiles/order", { ids }),
+  /** How many of the brand's posts are still scheduled: archiving does not cancel them. */
+  archiveProfile: (id: string) => call<{ scheduled: number }>("POST", `/profiles/${encodeURIComponent(id)}/archive`),
+  restoreProfile: (id: string) => call<void>("POST", `/profiles/${encodeURIComponent(id)}/restore`),
+  deleteProfile: (id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(id)}`),
   putDesigns: (designs: Record<string, unknown>) => call<void>("PUT", "/designs", { designs }),
-  putPreference: (key: "theme" | "customFonts" | "layout", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
+  putPreference: (key: "theme" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
-  getSettings: () => call<SettingsView>("GET", "/settings"),
+  getSettings: (profileId: string) => call<SettingsView>("GET", `/profiles/${encodeURIComponent(profileId)}/settings`),
   /** `fields`: a string stores it, "" removes it, null (or leaving it out) keeps it. */
-  putNetwork: (id: string, fields: Record<string, string | null>) => call<NetworkSettings>("PUT", `/settings/${encodeURIComponent(id)}`, { fields }),
-  testNetwork: (id: string) => call<TestResult>("POST", `/settings/${encodeURIComponent(id)}/test`),
-  listJobs: (profileId: string) => call<{ jobs: Job[] }>("GET", `/publish/jobs?profileId=${encodeURIComponent(profileId)}`).then((r) => r.jobs),
+  putNetwork: (profileId: string, id: string, fields: Record<string, string | null>) => call<NetworkSettings>("PUT", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}`, { fields }),
+  testNetwork: (profileId: string, id: string) => call<TestResult>("POST", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}/test`),
+  /** One brand's posts, or every brand's with `scope: "all"`. */
+  listJobs: (profileId: string, scope: "brand" | "all" = "brand") => call<{ jobs: Job[] }>("GET", scope === "all" ? "/publish/jobs?scope=all" : `/publish/jobs?profileId=${encodeURIComponent(profileId)}`).then((r) => r.jobs),
   /** Confirms a post: publish now (no `scheduledAt`) or later. The image is the card as a PNG. */
   createJob: (meta: NewJob, image: Blob) => {
     const form = new FormData();
