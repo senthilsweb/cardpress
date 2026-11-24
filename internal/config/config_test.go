@@ -143,3 +143,16 @@ func TestAgentSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicURLForThePublicPages(t *testing.T) {
+	c, err := Load(nil, env(map[string]string{"CARDPRESS_PUBLIC_URL": "https://example.com/", "CARDPRESS_SITE_NAME": " My Site "}))
+	if err != nil || c.PublicURL != "https://example.com" || c.SiteName != "My Site" || c.Validate() != nil {
+		t.Fatalf("%+v %v", c, err)
+	}
+	for _, bad := range []string{"example.com", "ftp://example.com", "https://example.com/blog", "https://example.com?x=1", "https://"} {
+		c, _ := Load(nil, env(map[string]string{"CARDPRESS_PUBLIC_URL": bad}))
+		if c.Validate() == nil {
+			t.Errorf("%q should be refused", bad)
+		}
+	}
+}

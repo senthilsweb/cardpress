@@ -27,6 +27,8 @@ type Config struct {
 	ServeWeb        bool          // serve the embedded web app
 	MCPEnabled      bool          // serve the MCP endpoint at /mcp
 	AllowedHosts    []string      // extra host names accepted when there is no token (CARDPRESS_ALLOWED_HOSTS)
+	PublicURL       string        // the address readers use, for the public pages (CARDPRESS_PUBLIC_URL), e.g. https://example.com
+	SiteName        string        // names the public site in titles and previews (CARDPRESS_SITE_NAME); empty uses the brand
 	Agent           string        // "mock" (demo, default) or "cma" (Claude Managed Agent) (CARDPRESS_AGENT)
 	AgentID         string        // CARDPRESS_AGENT_ID
 	AgentVersion    int           // CARDPRESS_AGENT_VERSION; 0 = latest
@@ -130,6 +132,8 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			c.AllowedHosts = append(c.AllowedHosts, h)
 		}
 	}
+	c.PublicURL = strings.TrimRight(env("CARDPRESS_PUBLIC_URL", ""), "/")
+	c.SiteName = env("CARDPRESS_SITE_NAME", "")
 	for _, o := range strings.Split(env("CARDPRESS_CORS_ORIGINS", ""), ",") {
 		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
 			c.CORSOrigins = append(c.CORSOrigins, o)
@@ -148,6 +152,12 @@ func (c Config) Validate() error {
 		u, err := url.Parse(c.LinkedInAPIBase)
 		if err != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && IsLoopback(net.JoinHostPort(u.Hostname(), "0")))) {
 			return errors.New("CARDPRESS_LINKEDIN_API_BASE must be an https address (plain http only for localhost): your access token is sent there")
+		}
+	}
+	if c.PublicURL != "" {
+		u, err := url.Parse(c.PublicURL)
+		if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			return errors.New("CARDPRESS_PUBLIC_URL must be an address with no path, such as https://example.com")
 		}
 	}
 	if c.SecretKey != "" && len(c.SecretKey) < 32 {

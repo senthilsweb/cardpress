@@ -42,7 +42,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 import type { Draft, DraftInput } from "./draft";
-import type { Job, NewJob } from "./jobs";
+import type { Attempt, Job, NewJob } from "./jobs";
+import type { LibraryFilter, LibraryPage } from "./library";
 import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
 
 export interface ApiInfo { name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo }
@@ -136,6 +137,19 @@ export const api = {
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
+  getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
+  /** Put an approved item's page on the public web. `cover` is the card as a PNG, used as the preview image. */
+  publishPage: (id: string, meta: { slug?: string; summary?: string }, cover?: Blob) => {
+    const form = new FormData();
+    form.set("meta", JSON.stringify(meta));
+    if (cover) form.set("cover", cover, "cover.png");
+    return call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/page`, form);
+  },
+  unpublishPage: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/page`),
+  approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),
+  unapproveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/unapprove`),
+  /** An approved article's planned date; leave both out to clear it. */
+  planDraft: (id: string, plan: { scheduledAt?: string; timezone?: string }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/plan`, plan),
   getSettings: (profileId: string) => call<SettingsView>("GET", `/profiles/${encodeURIComponent(profileId)}/settings`),
   /** `fields`: a string stores it, "" removes it, null (or leaving it out) keeps it. */
   putNetwork: (profileId: string, id: string, fields: Record<string, string | null>) => call<NetworkSettings>("PUT", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}`, { fields }),
@@ -149,6 +163,16 @@ export const api = {
     form.set("image", image, "card.png");
     return call<Job>("POST", "/publish/jobs", form);
   },
+  getJob: (id: string) => call<Job>("GET", `/publish/jobs/${encodeURIComponent(id)}`),
+  library: (f: LibraryFilter, activeId: string, page: number, pageSize: number) => {
+    const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (f.brand === "all") q.set("scope", "all"); else q.set("profileId", f.brand || activeId);
+    if (f.kind) q.set("kind", f.kind);
+    if (f.status) q.set("status", f.status);
+    if (f.q.trim()) q.set("q", f.q.trim());
+    return call<LibraryPage>("GET", `/library?${q}`);
+  },
+  jobAttempts: (id: string) => call<{ attempts: Attempt[] }>("GET", `/publish/jobs/${encodeURIComponent(id)}/attempts`).then((r) => r.attempts),
   publishJobNow: (id: string, acceptDuplicate = false) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/publish-now`, { acceptDuplicate }),
   rescheduleJob: (id: string, scheduledAt: string, timezone: string) => call<Job>("PUT", `/publish/jobs/${encodeURIComponent(id)}/schedule`, { scheduledAt, timezone }),
   cancelJob: (id: string) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/cancel`),

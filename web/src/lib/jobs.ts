@@ -115,3 +115,14 @@ export function relative(iso: string, now = Date.now()): string {
   const text = min < 1 ? "less than a minute" : min < 90 ? `${min} min` : min < 60 * 36 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} days`;
   return diff >= 0 ? `in ${text}` : `${text} ago`;
 }
+
+/** One call to LinkedIn and what it answered. It never holds the access token. */
+export interface AttemptStep {
+  step: string; method: string; host: string; path: string;
+  status?: number; headers?: Record<string, string>; body?: string; error?: string; at: string; ms: number;
+}
+/** One trip to LinkedIn for a job. A job retried by hand has several. */
+export interface Attempt {
+  id: string; jobId: string; startedAt: string; finishedAt: string;
+  outcome: JobStatus; error?: string; steps: AttemptStep[];
+}

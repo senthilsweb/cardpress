@@ -1,3 +1,5 @@
+import type { Design } from "./types";
+
 /** A rich-text document in TipTap/ProseMirror JSON. */
 export interface DocNode {
   type: string;
@@ -8,22 +10,36 @@ export interface DocNode {
 }
 
 export type DraftKind = "post" | "article";
+/** draft, then approved, then scheduled (a post is waiting) and published. An edit returns approved or published to draft. */
+export type DraftStatus = "draft" | "approved" | "scheduled" | "published";
 
 export interface Draft {
   id: string;
   profileId: string;
   kind: DraftKind;
-  status: string;
+  status: DraftStatus;
   doc: DocNode;
   hashtags: string[];
   altText: string;
   unicodeStyles: boolean;
+  title: string;
+  /** The card this item was made with. Absent on a draft that has not been given one yet. */
+  design?: Design;
+  approvedAt?: string;
+  /** An article's planned date (UTC). Nothing is sent. */
+  scheduledAt?: string;
+  timezone?: string;
+  /** The public page: its address within its kind, its description, when it went live, and whether it has a preview image. */
+  slug?: string;
+  summary?: string;
+  pageAt?: string;
+  hasCover?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 /** The fields a caller may change. */
-export type DraftInput = Pick<Draft, "profileId" | "kind" | "doc" | "hashtags" | "altText" | "unicodeStyles">;
+export type DraftInput = Pick<Draft, "profileId" | "kind" | "doc" | "hashtags" | "altText" | "unicodeStyles"> & { title?: string; design?: Design };
 
 export const EMPTY_DOC: DocNode = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -62,8 +78,16 @@ export function flattenForPost(doc: DocNode): DocNode {
     const marks = (n.marks ?? []).filter((m) => POST_MARKS.has(m.type));
     return marks.length ? { ...n, marks } : { type: "text", text: n.text };
   };
+  const cellText = (cell: DocNode): string => (cell.content ?? []).map((p) => (p.content ?? []).map((t) => t.text ?? "").join("")).join(" ").trim();
   const walk = (n: DocNode): DocNode[] => {
-    if (n.type === "horizontalRule") return [];
+    if (n.type === "horizontalRule" || n.type === "image") return [];
+    // a table has no place in a post: each row becomes a paragraph of its cells
+    if (n.type === "table") {
+      return (n.content ?? [])
+        .map((row) => (row.content ?? []).map(cellText).join(" | ").trim())
+        .filter(Boolean)
+        .map((text): DocNode => ({ type: "paragraph", content: [{ type: "text", text }] }));
+    }
     if (TEXT_BLOCKS.has(n.type)) {
       // a quote holds paragraphs; keep each as its own paragraph
       if (n.type === "blockquote") return (n.content ?? []).flatMap(walk);

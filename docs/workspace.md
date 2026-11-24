@@ -23,7 +23,7 @@ All of this is remembered: it is saved on the server as the `layout` preference,
 
 ## Drawers
 
-Settings and other tool panels slide in from the right as a drawer (`components/ui/drawer.tsx`), for example **Social accounts** from the gear in the header. A drawer does not dim or block the studio. Its header matches the app header, the body scrolls, and the action buttons are frozen in a footer. Esc closes it.
+Settings and other tool panels slide in from the right as a drawer (`components/ui/drawer.tsx`), for example **Social accounts** from the account menu. A drawer does not dim or block the studio. Its header matches the app header, the body scrolls, and the action buttons are frozen in a footer. Esc closes it.
 
 ## Canvas
 
@@ -38,3 +38,17 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/lib/layout.tsx` | The `Layout` type, safe parsing of the saved value, and the context sections read |
 | `web/src/components/studio/fields.tsx` | `Section`, the foldable group |
 | `web/src/components/studio/Studio.tsx` | Sidebar hide/show and the shortcut |
+
+## Account menu
+
+The footer at the bottom of the sidebar shows the open brand (its initials, name and handle). Click it and a menu opens upward: **Library**, **Social accounts**, **Manage brands**, the light or dark mode, and these docs. It is where sign-in will go when there are user accounts. When the sidebar is hidden, a small round button with the brand's initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.
+
+## The article editor
+
+Posts are plain text with LinkedIn's rules: paragraphs, lists, bold and italic. **Articles** are the rich kind. The toolbar offers bold, italic, underline, strikethrough and code; a title, heading and subheading; quote and code block; link; **pictures**, a table and a divider; and undo and redo. Add a picture with the picture button, or paste or drop one: it is shrunk to 1600 px and kept inside the text as base64, so an article with its pictures is a single row in the database (the limit for one article is about 24 MB). In a table, buttons appear to add or remove rows and columns. An article has its own **Title**, used by the library and the file names.
+
+An article is **approved** (marked final) rather than published. Its Full preview shows the **card** above the text, and offers a **planned date**, **For LinkedIn**, and **Markdown** or **HTML** export.
+
+### For LinkedIn
+
+LinkedIn cannot receive an article from outside, so you paste it into its article editor. **For LinkedIn** prepares it for that: the title (for LinkedIn's own title field) and the body each have a **Copy** button, and the pictures come as a **.zip**. The body keeps headings (two levels), bold, italic, underline, lists, quotes, links and code blocks. What LinkedIn's editor has no place for is changed, and the dialog says what changed: a **table** becomes a list of rows ("Layer: Bronze; Tables: 7"), a **divider** is dropped, strikethrough and inline code lose their styling, and each **picture** becomes a marker such as `[Picture 2: a chart]` to replace with the file. LinkedIn changes its editor from time to time, so check what it accepts if a paste looks different.

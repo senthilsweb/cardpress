@@ -80,14 +80,26 @@ func newHarness(t *testing.T, creds fakeCreds) *harness {
 
 func (h *harness) advance(d time.Duration) { *h.clk = h.clk.Add(d) }
 
-func jobInput() JobInput {
-	return JobInput{ProfileID: "p", DraftID: "d1", Body: "Hello (world)", Hashtags: []string{"Go"}, AltText: "a card", Image: testPNG}
+// approvedDraft stores a draft that a person has approved and returns its id: the only kind a post can be made from.
+func (h *harness) approvedDraft(profile string) string {
+	id := newID()
+	_, err := h.db.DB.Exec(`INSERT INTO drafts (id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_at, updated_at)
+		VALUES (?, ?, 'post', 'approved', '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}', '[]', '', 0, '', '{}', 0, '2026-12-01T09:00:00Z', '', '', '2026-12-01T09:00:00Z', '2026-12-01T09:00:00Z')`, id, profile)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+// job is a post made from a fresh approved draft of brand "p".
+func (h *harness) job() JobInput {
+	return JobInput{ProfileID: "p", DraftID: h.approvedDraft("p"), Body: "Hello (world)", Hashtags: []string{"Go"}, AltText: "a card", Image: testPNG}
 }
 
 func (h *harness) schedule(t *testing.T, in time.Duration) Job {
 	t.Helper()
 	at := h.clk.Add(in)
-	i := jobInput()
+	i := h.job()
 	i.ScheduledAt, i.Timezone = &at, "Europe/London"
 	j, err := h.p.Create(context.Background(), i)
 	if err != nil {
@@ -107,7 +119,7 @@ func status(t *testing.T, h *harness, id string) Job {
 
 func TestPublishNowRecordsThePostAndSendsTheEscapedText(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
-	j, err := h.p.Create(ctx, jobInput())
+	j, err := h.p.Create(ctx, h.job())
 	if err != nil || j.Status != JobPublishing {
 		t.Fatalf("%v %+v", err, j)
 	}
@@ -148,14 +160,14 @@ func TestValidation(t *testing.T) {
 		"past":           func(i *JobInput) { past := h.clk.Add(-time.Hour); i.ScheduledAt, i.Timezone = &past, "UTC" },
 		"too far":        func(i *JobInput) { i.ScheduledAt, i.Timezone = &far, "UTC" },
 	} {
-		in := jobInput()
+		in := h.job()
 		mut(&in)
 		if _, err := h.p.Create(ctx, in); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v, want ErrInvalid", name, err)
 		}
 	}
 	// a body that fits exactly, hashtags included, is accepted
-	in := jobInput()
+	in := h.job()
 	in.Body, in.Hashtags = strings.Repeat("a", maxBodyChars-2-1-3), []string{"tag"} // "\n\n" + "#tag"
 	if _, err := h.p.Create(ctx, in); err != nil {
 		t.Errorf("a post of exactly %d characters should be accepted: %v", maxBodyChars, err)
@@ -164,7 +176,7 @@ func TestValidation(t *testing.T) {
 
 func TestCannotCreateWithoutLinkedInCredentials(t *testing.T) {
 	h := newHarness(t, fakeCreds{"clientId": "x"})
-	if _, err := h.p.Create(context.Background(), jobInput()); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "Social accounts") {
+	if _, err := h.p.Create(context.Background(), h.job()); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "Social accounts") {
 		t.Fatalf("%v", err)
 	}
 }
@@ -203,7 +215,7 @@ func TestAFailureIsRecordedAndNeverRetriedByTheScheduler(t *testing.T) {
 func TestAnUnclearResultNeedsAHumanAndAnExplicitConfirmToRepeat(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
 	h.li.err = &linkedin.UnknownOutcomeError{Reason: "No answer came back."}
-	j, _ := h.p.Create(ctx, jobInput())
+	j, _ := h.p.Create(ctx, h.job())
 	h.p.Execute(ctx, j.ID)
 	got := status(t, h, j.ID)
 	if got.Status != JobNeedsReview || !strings.Contains(got.Error, "Check LinkedIn") {
@@ -316,7 +328,7 @@ func TestPublishNowClaimsAtomically(t *testing.T) {
 
 func TestStartupSettlesAnInterruptedPublish(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
-	j, _ := h.p.Create(ctx, jobInput()) // publishing, never executed: the server "died"
+	j, _ := h.p.Create(ctx, h.job()) // publishing, never executed: the server "died"
 	if err := h.p.RecoverOnStart(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +344,7 @@ func TestStartupSettlesAnInterruptedPublish(t *testing.T) {
 
 func TestAHungPublishBecomesNeedsReview(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
-	j, _ := h.p.Create(ctx, jobInput())
+	j, _ := h.p.Create(ctx, h.job())
 	h.advance(stalePublishing + time.Minute)
 	_ = h.p.RunDue(ctx)
 	if status(t, h, j.ID).Status != JobNeedsReview {
@@ -343,7 +355,7 @@ func TestAHungPublishBecomesNeedsReview(t *testing.T) {
 func TestAPanicWhilePublishingIsRecordedNotFatal(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
 	h.li.boom = true
-	j, _ := h.p.Create(ctx, jobInput())
+	j, _ := h.p.Create(ctx, h.job())
 	h.p.Execute(ctx, j.ID)
 	if got := status(t, h, j.ID); got.Status != JobNeedsReview || !strings.Contains(got.Error, "Check LinkedIn") {
 		t.Fatalf("%+v", got)
@@ -385,7 +397,7 @@ func TestCancelRescheduleAndDeleteRules(t *testing.T) {
 		t.Fatalf("a cancelled job can be scheduled again: %v", err)
 	}
 	// published jobs are history: cannot be cancelled, rescheduled or published again, but can be deleted
-	pub, _ := h.p.Create(ctx, jobInput())
+	pub, _ := h.p.Create(ctx, h.job())
 	h.p.Execute(ctx, pub.ID)
 	if _, err := h.p.Cancel(ctx, pub.ID); !errors.Is(err, ErrConflict) {
 		t.Fatal("cancelling a published post")
@@ -406,10 +418,10 @@ func TestCancelRescheduleAndDeleteRules(t *testing.T) {
 
 func TestListIsPerProfileNewestFirstAndOmitsImages(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
-	a, _ := h.p.Create(ctx, jobInput())
+	a, _ := h.p.Create(ctx, h.job())
 	h.advance(time.Second)
-	b, _ := h.p.Create(ctx, jobInput())
-	other := jobInput()
+	b, _ := h.p.Create(ctx, h.job())
+	other := h.job()
 	other.ProfileID = "q"
 	_, _ = h.p.Create(ctx, other)
 	list, err := h.p.List(ctx, "p")
@@ -424,8 +436,8 @@ func TestListIsPerProfileNewestFirstAndOmitsImages(t *testing.T) {
 func TestListAllShowsEveryBrandsPostsAndListShowsOne(t *testing.T) {
 	h, ctx := newHarness(t, nil), context.Background()
 	for _, brand := range []string{"a", "b", "b"} {
-		in := jobInput()
-		in.ProfileID = brand
+		in := h.job()
+		in.ProfileID, in.DraftID = brand, h.approvedDraft(brand)
 		at := h.clk.Add(time.Hour)
 		in.ScheduledAt, in.Timezone = &at, "Europe/London"
 		if _, err := h.p.Create(ctx, in); err != nil {
@@ -441,5 +453,43 @@ func TestListAllShowsEveryBrandsPostsAndListShowsOne(t *testing.T) {
 	}
 	if a, _ := h.p.List(ctx, "a"); len(a) != 1 || a[0].ProfileID != "a" {
 		t.Fatalf("a: %+v", a)
+	}
+}
+
+func TestEachTripToLinkedInIsRecordedAsAnAttempt(t *testing.T) {
+	h, ctx := newHarness(t, nil), context.Background()
+	j, err := h.p.Create(ctx, h.job())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.li.err = errors.New("LinkedIn refused this action.")
+	h.p.Execute(ctx, j.ID)
+	if got := status(t, h, j.ID); got.Status != JobFailed {
+		t.Fatalf("%+v", got)
+	}
+	// a person retries by hand, and this time it goes through
+	h.li.err = nil
+	if _, err := h.p.PublishNow(ctx, j.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	h.p.Execute(ctx, j.ID)
+	at, err := h.p.Attempts(ctx, j.ID)
+	if err != nil || len(at) != 2 {
+		t.Fatalf("%v %+v", err, at)
+	}
+	if at[0].Outcome != JobFailed || at[0].Error == "" || at[1].Outcome != JobPublished || at[1].StartedAt == "" || at[1].FinishedAt == "" {
+		t.Fatalf("%+v", at)
+	}
+	if _, err := h.p.Attempts(ctx, "nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("%v", err)
+	}
+	// deleting the job takes its attempts with it
+	if err := h.p.Delete(ctx, j.ID); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM publish_attempts WHERE job_id = ?`, j.ID).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d attempts left", n)
 	}
 }

@@ -1,6 +1,6 @@
 # Social accounts
 
-Open **Social accounts** from the gear icon in the header. It slides in from the right as a drawer, not a modal: nothing is dimmed or blocked, so you can keep using the studio while it is open. It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. **Esc** or the close button closes it; if you have unsaved changes it asks before discarding them (a dot on a tab shows which network has some).
+Open **Social accounts** from the account menu: click your brand at the bottom of the sidebar. It slides in from the right as a drawer, not a modal: nothing is dimmed or blocked, so you can keep using the studio while it is open. It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. **Esc** or the close button closes it; if you have unsaved changes it asks before discarding them (a dot on a tab shows which network has some).
 
 | Network | Fields | Status |
 |---|---|---|
@@ -14,7 +14,7 @@ You paste the values in. There is no sign-in flow in the studio yet, and tokens 
 
 - **Secrets are masked.** After saving, a secret shows as `••••` plus its last four characters (or only `••••` if it is short). The full value is never sent back to the browser, so it cannot be revealed later; type a new one to replace it. IDs and URNs are shown in full.
 - **Save** stores only the fields you changed. **Remove** (the bin icon, click twice to confirm) deletes one stored value.
-- **Test connection** (LinkedIn, enabled once every field is filled and saved) asks LinkedIn whether the access token is active and when it expires, then checks that the author URN is well formed and that the token's scopes allow posting as that author (`w_member_social` for a person, `w_organization_social` for a page). It reports valid, invalid, expired, incomplete, or "could not reach LinkedIn". Save your changes first.
+- **Test connection** (LinkedIn, enabled once every field is filled and saved) asks LinkedIn whether the access token is active and when it expires, then checks that the author URN is well formed and that the token's scopes allow posting as that author (`w_member_social` for a person, `w_organization_social` for a page). It reports valid, invalid, expired, incomplete, or "could not reach LinkedIn". When LinkedIn refuses the check it says which value it did not accept (the Client ID, the Client secret, or the access token), without repeating what you entered. The check is optional: publishing needs only the access token and the author URN. Save your changes first.
 
 ## How credentials are protected
 

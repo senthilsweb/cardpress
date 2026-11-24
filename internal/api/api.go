@@ -41,6 +41,16 @@ type Studio interface {
 	CreateDraft(ctx context.Context, in service.DraftInput) (service.Draft, error)
 	UpdateDraft(ctx context.Context, id string, in service.DraftInput) (service.Draft, error)
 	DeleteDraft(ctx context.Context, id string) error
+	Approve(ctx context.Context, id string) (service.Draft, error)
+	Unapprove(ctx context.Context, id string) (service.Draft, error)
+	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
+	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
+	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
+}
+
+// Library is the part of the library service the HTTP API needs.
+type Library interface {
+	List(ctx context.Context, q service.LibraryQuery) (service.LibraryPage, error)
 }
 
 // Publishing is the part of the publishing service the HTTP API needs.
@@ -50,6 +60,7 @@ type Publishing interface {
 	List(ctx context.Context, profileID string) ([]service.Job, error)
 	ListAll(ctx context.Context) ([]service.Job, error)
 	Image(ctx context.Context, id string) ([]byte, error)
+	Attempts(ctx context.Context, jobID string) ([]service.Attempt, error)
 	PublishNow(ctx context.Context, id string, acceptDuplicate bool) (service.Job, error)
 	Reschedule(ctx context.Context, id string, at time.Time, timezone string) (service.Job, error)
 	Cancel(ctx context.Context, id string) (service.Job, error)
@@ -83,6 +94,7 @@ type Options struct {
 	Studio       Studio
 	Settings     Settings
 	Publishing   Publishing
+	Library      Library
 	Chat         Chatting
 	Token        string   // empty: no bearer token required
 	CORSOrigins  []string // exact origins allowed to call the API from a browser
@@ -128,13 +140,20 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("GET "+prefix+"/drafts/{id}", s.getDraft)
 	mux.HandleFunc("PUT "+prefix+"/drafts/{id}", s.updateDraft)
 	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}", s.deleteDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/approve", s.approveDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/unapprove", s.unapproveDraft)
+	mux.HandleFunc("PUT "+prefix+"/drafts/{id}/plan", s.planDraft)
+	mux.HandleFunc("POST "+prefix+"/drafts/{id}/page", s.publishPage)
+	mux.HandleFunc("DELETE "+prefix+"/drafts/{id}/page", s.unpublishPage)
 	mux.HandleFunc("GET "+prefix+"/settings", s.getSettings)
 	mux.HandleFunc("GET "+prefix+"/settings/{network}", s.getNetwork)
 	mux.HandleFunc("PUT "+prefix+"/settings/{network}", s.putNetwork)
 	mux.HandleFunc("POST "+prefix+"/settings/{network}/test", s.testNetwork)
 	mux.HandleFunc("POST "+prefix+"/publish/jobs", s.createJob)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs", s.listJobs)
+	mux.HandleFunc("GET "+prefix+"/library", s.library)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}", s.getJob)
+	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/attempts", s.jobAttempts)
 	mux.HandleFunc("GET "+prefix+"/publish/jobs/{id}/image", s.jobImage)
 	mux.HandleFunc("POST "+prefix+"/publish/jobs/{id}/publish-now", s.publishNow)
 	mux.HandleFunc("PUT "+prefix+"/publish/jobs/{id}/schedule", s.rescheduleJob)
@@ -318,6 +337,86 @@ func (s *server) updateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.UpdateDraft(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) approveDraft(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.Approve(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) unapproveDraft(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.Unapprove(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// planDraft sets (or, with no scheduledAt, clears) an article's planned date.
+func (s *server) planDraft(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ScheduledAt *time.Time `json:"scheduledAt"`
+		Timezone    string     `json:"timezone"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	d, err := s.Studio.Plan(r.Context(), r.PathValue("id"), in.ScheduledAt, in.Timezone)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// publishPage puts an approved item's page on the public web. Multipart: `meta` (JSON: slug, summary, both optional) and
+// `cover` (the card as a PNG, optional).
+func (s *server) publishPage(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		writeError(w, r, http.StatusBadRequest, "bad_request", "expected a multipart form with a meta field and an optional cover image")
+		return
+	}
+	var meta struct {
+		Slug    string `json:"slug"`
+		Summary string `json:"summary"`
+	}
+	if raw := r.FormValue("meta"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &meta); err != nil {
+			writeError(w, r, http.StatusBadRequest, "bad_json", "meta is not valid JSON")
+			return
+		}
+	}
+	in := service.PageInput{Slug: meta.Slug, Summary: meta.Summary}
+	if f, _, err := r.FormFile("cover"); err == nil {
+		defer f.Close()
+		img, err := io.ReadAll(io.LimitReader(f, 3<<20+1))
+		if err != nil {
+			writeError(w, r, http.StatusBadRequest, "bad_request", "could not read the cover image")
+			return
+		}
+		in.Cover = img
+	}
+	d, err := s.Studio.PublishPage(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) unpublishPage(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.UnpublishPage(r.Context(), r.PathValue("id"))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -698,6 +797,21 @@ func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"jobs": jobs})
 }
 
+func (s *server) library(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	pageNo, _ := strconv.Atoi(q.Get("page"))
+	size, _ := strconv.Atoi(q.Get("pageSize"))
+	page, err := s.Library.List(r.Context(), service.LibraryQuery{
+		ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Kind: q.Get("kind"), Status: q.Get("status"),
+		Q: q.Get("q"), Page: pageNo, PageSize: size,
+	})
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
 func (s *server) getJob(w http.ResponseWriter, r *http.Request) {
 	j, err := s.Publishing.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -705,6 +819,15 @@ func (s *server) getJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, j)
+}
+
+func (s *server) jobAttempts(w http.ResponseWriter, r *http.Request) {
+	a, err := s.Publishing.Attempts(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"attempts": a})
 }
 
 func (s *server) jobImage(w http.ResponseWriter, r *http.Request) {

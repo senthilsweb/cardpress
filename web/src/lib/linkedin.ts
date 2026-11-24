@@ -98,7 +98,13 @@ function block(n: DocNode, ctx: Ctx, indent = ""): string[] {
     case "blockquote":
       return (n.content ?? []).flatMap((c) => block(c, ctx, indent));
     case "horizontalRule":
+    case "image":
       return [];
+    case "table":
+      // a table has no plain-text form: each row becomes a line, its cells joined with " | "
+      return (n.content ?? []).map((row) =>
+        indent + (row.content ?? []).map((cell) => (cell.content ?? []).map((p) => inline(p.content, ctx)).join(" ").trim()).join(" | "),
+      ).filter((l) => l.trim() !== "");
     default: {
       // paragraph, heading, code block and anything else that holds text
       const text = inline(n.content, ctx);

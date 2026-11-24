@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Moon, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Sun, Type, User, MessageSquareText, Sparkles, PanelLeftClose, PanelLeftOpen, Settings as SettingsIcon } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, MessageSquareText, Sparkles, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Card } from "@/card/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,11 @@ import { blankDesign, brandColor, move } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
+import { useTheme } from "@/lib/useTheme";
+import { AccountMenu } from "./AccountMenu";
+import { Logo } from "./Logo";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { useDrafts } from "@/lib/useDrafts";
 import { useJobs } from "@/lib/useJobs";
 import { useChat } from "@/lib/useChat";
@@ -33,37 +38,6 @@ import { BootScreen } from "./BootScreen";
 import { cardToBlob, copyBlob, downloadBlob } from "@/lib/export";
 import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/utils";
-
-/** Mark, wordmark and a small line under it. The line is hidden on narrow screens. */
-function Logo() {
-  return (
-    <a href={import.meta.env.BASE_URL} className="flex items-center gap-2.5" aria-label="CardPress home">
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden className="shrink-0">
-        <rect x="2.5" y="3.5" width="25" height="23" rx="7.5" className="fill-gold" />
-        <rect x="8" y="11" width="14" height="2.4" rx="1.2" className="fill-foreground" opacity="0.85" />
-        <rect x="8" y="16" width="9" height="2.4" rx="1.2" className="fill-foreground" opacity="0.55" />
-        <path d="M27 19Q27.9 25.1 34 26Q27.9 26.9 27 33Q26.1 26.9 20 26Q26.1 25.1 27 19Z" className="stroke-background fill-foreground" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" />
-      </svg>
-      <div className="flex flex-col leading-none">
-        <span className="text-[22px] font-bold tracking-tight text-foreground">CardPress</span>
-        <span className="mt-1 hidden text-[10.5px] text-muted-foreground md:block">Agentic AI for social media authoring and management</span>
-      </div>
-    </a>
-  );
-}
-
-function useTheme(saved?: "light" | "dark") {
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    saved ?? (typeof document !== "undefined" && document.documentElement.dataset.theme === "dark" ? "dark" : "light")
-  );
-  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
-  const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    api.putPreference("theme", next).catch(() => undefined); // a failed save only means the choice is not remembered
-  };
-  return [theme, toggle] as const;
-}
 
 function useBox<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -94,12 +68,20 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   // designs are keyed by profile id
   const [designs, setDesigns, saveError] = useSyncedState<Record<string, Design>>(initial.designs, (v) => api.putDesigns(v));
   const profile = profiles.find((p) => p.id === initial.activeId) ?? profiles[0] ?? DEFAULT_PROFILES[0];
-  const design: Design = useMemo(() => {
+  // the brand's design is where a new item starts; each item then keeps its own (see Draft.design)
+  const brandDesign: Design = useMemo(() => {
     const d = { ...DEFAULT_DESIGN, ...(designs[profile.id] ?? {}) };
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
     return d;
   }, [designs, profile]);
-  const store = useDrafts(profile.id, initial.drafts);
+  const store = useDrafts(profile.id, initial.drafts, () => brandDesign);
+  const design: Design = useMemo(() => {
+    const own = store.current?.design;
+    if (!own) return brandDesign;
+    const d = { ...DEFAULT_DESIGN, ...own };
+    if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
+    return d;
+  }, [brandDesign, store.current?.design, profile]);
   const jobs = useJobs(profile.id);
   const chat = useChat(profile.id);
   const [tab, setTab] = useState("design");
@@ -120,6 +102,18 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   }, [toggleSidebar]);
   // the right-hand drawers share one edge, so only one is open at a time
   const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | null>(null);
+  // the library can send someone straight to a draft's Full preview (to schedule it)
+  const [previewRequested, setPreviewRequested] = useState(false);
+  // another page (the library) can ask for a drawer or a draft: /studio/?open=accounts|brands, /studio/?draft=<id>
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const want = q.get("open"), draft = q.get("draft");
+    if (want === "accounts" || want === "brands") setPanel(want === "accounts" ? "accounts" : "manage");
+    if (want === "preview") setPreviewRequested(true);
+    if (draft) { void store.select(draft); setTab("post"); }
+    if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const settingsOpen = panel === "accounts", assistantOpen = panel === "assistant";
   const setSettingsOpen = (o: boolean) => setPanel(o ? "accounts" : null);
   const setAssistantOpen = (o: boolean) => setPanel(o ? "assistant" : null);
@@ -184,7 +178,13 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
 
-  const set = useCallback((patch: Partial<Design>) => setDesigns((all) => ({ ...all, [profile.id]: { ...design, ...patch } })), [design, profile.id, setDesigns]);
+  const waiting = store.current?.status === "scheduled";
+  const set = useCallback((patch: Partial<Design>) => {
+    if (waiting) { toast("A post is waiting to be sent from this draft", { description: "Cancel it in the queue to change the card." }); return; }
+    const next = { ...design, ...patch };
+    setDesigns((all) => ({ ...all, [profile.id]: next })); // the brand's starting point follows the latest card
+    store.update({ design: next });
+  }, [design, profile.id, setDesigns, store, waiting]);
   const updateProfile = (patch: Partial<Profile>) => setProfiles((all) => all.map((p) => (p.id === profile.id ? { ...p, ...patch } : p)));
 
   const [view, setView] = useState<"one" | "all">("one");
@@ -249,6 +249,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   return (
     <TooltipProvider delayDuration={250}>
      <LayoutContext.Provider value={layoutCtx}>
+      <Toaster theme={theme} />
       <div className="flex h-dvh flex-col">
         {/* header – mirrors senthilsweb.com: mono wordmark, thin bar */}
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border app-header px-4">
@@ -260,6 +261,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </TooltipTrigger>
             <TooltipContent>{sidebarHidden ? "Show sidebar" : "Hide sidebar"} (Ctrl/⌘ + \)</TooltipContent>
           </Tooltip>
+          {sidebarHidden && <AccountMenu variant="avatar" page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} />}
           <Logo />
           <div className="flex-1" />
           <BrandSwitcher brands={profiles} activeId={profile.id} colors={brandColors} busy={switching} onSwitch={(id) => void switchBrand(id)} onNew={() => { setCopyOf(undefined); setPanel("newBrand"); }} onManage={() => setPanel("manage")} />
@@ -271,18 +273,6 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               </Button>
             </TooltipTrigger>
             <TooltipContent>Assistant: draft a post from an article</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => setSettingsOpen(true)} aria-label="Social accounts"><SettingsIcon /></Button>
-            </TooltipTrigger>
-            <TooltipContent>Social accounts</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={toggleTheme} aria-label="Toggle theme">{theme === "dark" ? <Sun /> : <Moon />}</Button>
-            </TooltipTrigger>
-            <TooltipContent>{theme === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
           </Tooltip>
         </header>
 
@@ -308,7 +298,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -322,6 +312,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 </TabsContent>
               </div>
             </Tabs>
+            <div className="shrink-0 border-t border-border p-2">
+              <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} />
+            </div>
            </div>
           </aside>
 

@@ -1,5 +1,7 @@
 # Multiple brands (profiles)
 
+**Status:** Bolts 1 and 2 implemented. Bolt 3 is open: MCP and chat name the brand, the audit records it, and the demo is re-recorded.
+
 ## Why
 CardPress has one profile: a name, handle, logo, fonts and colours that every card, draft and post uses. Someone who writes for more than one brand (a personal account, a company page, a client) has to export and import profiles to switch, and the one LinkedIn connection posts as one account.
 

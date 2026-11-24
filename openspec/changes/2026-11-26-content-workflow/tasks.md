@@ -1,0 +1,32 @@
+# Tasks
+
+## Bolt 1: data model and approval
+- [x] Migration 0009 (`title`, `design`, `design_version`, `approved_at`, `scheduled_at`, `timezone`)
+- [x] `service.CardDesign` with validation, and tests
+- [x] Approve, unapprove, edit-resets-approval, schedule and cancel; the publish gate; tests
+- [x] `docs/data-model.md` updated
+
+## Bolt 2: editor
+- [x] Rich toolbar for articles: code, code block, divider, table, underline, strike, H1
+- [x] Images: upload, paste, drop; shrink to 1600 px; stored as base64 in the text
+- [x] The card design saved with the draft
+- [x] Approve and the approval gate in the editor and Full preview
+
+## Bolt 3: library
+- [x] Server-side pages with numbers and a total
+- [x] Full content and the card in the detail view
+- [x] Edit, Approve, Schedule, Delete
+
+## Bolt 4: test content
+- [x] `scripts/import-register`: Markdown to the editor's JSON, images embedded, designs varied
+- [x] Docs for the script; nothing of the content committed
+
+## Bolt 5: finish
+- [x] Docs: library, editor, publishing, workspace; data model complete
+- [ ] Re-record the demo (deferred: not part of this change)
+
+## Added while building
+- [x] Thumbnails in the library, drawn from each item's saved design
+- [x] The card shown above an article in its Full preview
+- [x] **For LinkedIn**: an article prepared for LinkedIn's article editor (title, body, pictures as files; tables become lists)
+- [x] Search covers the title and the whole text

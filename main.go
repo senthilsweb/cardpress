@@ -27,6 +27,7 @@ import (
 	"github.com/senthilsweb/cardpress/internal/config"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
+	"github.com/senthilsweb/cardpress/internal/pages"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
@@ -110,7 +111,7 @@ func main() {
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	opts := api.Options{
-		Studio: studio, Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
@@ -121,6 +122,11 @@ func main() {
 		mux.Handle("/mcp", api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv)))
 	}
 	mux.Handle("/api/v1/", api.New(opts))
+	// the public pages: articles and posts a person published, readable by anyone and by crawlers, so outside the token
+	public := pages.New(pages.Options{Reader: service.NewPages(db.DB), PublicURL: cfg.PublicURL, SiteName: cfg.SiteName, Version: version})
+	for _, p := range []string{"/articles", "/articles/", "/posts", "/posts/", "/sitemap.xml", "/robots.txt"} {
+		mux.Handle(p, public)
+	}
 	if cfg.ServeWeb {
 		site, err := fs.Sub(dist, "web/dist")
 		if err != nil {

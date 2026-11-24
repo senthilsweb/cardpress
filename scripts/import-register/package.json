@@ -1,0 +1,8 @@
+{
+  "name": "cardpress-import-register",
+  "private": true,
+  "type": "module",
+  "description": "Loads posts and articles from a folder of Markdown into a running CardPress, through its API",
+  "scripts": { "test": "node --test" },
+  "dependencies": { "marked": "15.0.12", "sharp": "0.34.2" }
+}

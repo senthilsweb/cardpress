@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, Eye, FileText, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import { AreaField, Field, Section } from "./fields";
 import { RichEditor } from "./RichEditor";
 import { FullPreview, linkedinSize } from "./FullPreview";
 import { PublishBar } from "./PublishBar";
+import { ArticleBar } from "./ArticleBar";
+import { PageBar } from "./PageBar";
 import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
@@ -20,13 +22,17 @@ import { useLayout } from "@/lib/layout";
 import { normalizeHashtag, type DraftKind } from "@/lib/draft";
 import { LINKEDIN_LIMIT, serializeDraft, serializeForLinkedIn } from "@/lib/linkedin";
 import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
-import type { Job } from "@/lib/jobs";
+import { formatInZone, type Job } from "@/lib/jobs";
+import { toast } from "sonner";
 import type { DraftStore } from "@/lib/useDrafts";
 import type { Design, Palette, Profile } from "@/lib/types";
 
+const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
 const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
 
-export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+  /** Open the Full preview as soon as this shows (asked for by the library). */
+  openPreview?: boolean;
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
@@ -42,6 +48,7 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
   const { editorHeight, setEditorHeight } = useLayout();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
+  useEffect(() => { if (openPreview) setPreview(true); }, [openPreview]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };
@@ -62,10 +69,18 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
     return () => window.removeEventListener("keydown", onKey, true);
   }, [expanded, preview, setExpanded]);
 
+  // a post sent from the open draft changes the draft behind the screen (scheduled, then published): look again when the queue moves
+  const queueKey = jobs.jobs.map((j) => `${j.id}:${j.status}`).join(",");
+  useEffect(() => { void store.refreshStatus(); }, [queueKey, draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const ser = useMemo(() => (draft ? serializeDraft(draft) : null), [draft]);
   const labels = useMemo(() => new Map(drafts.map((d) => [d.id, label(serializeDraft(d).text)])), [drafts]);
   if (!draft || !ser) return null;
   const isPost = draft.kind === "post";
+
+  // approving is the step between writing and publishing: only an approved draft can be sent
+  const approve = guard(async () => { await store.approve(); toast.success("Approved", { description: isPost ? "It can now be published or scheduled." : "It is marked final." }); });
+  const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
 
   const addTag = () => {
     const t = normalizeHashtag(tag);
@@ -78,7 +93,8 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
     jobs.add(job);
     setPreview(false);
     setExpanded(false);
-    flash(how === "now" ? "Sent to LinkedIn: see the queue below." : "Scheduled: see the queue below.");
+    if (how === "now") toast("Sending to LinkedIn…", { description: "You will be told when it is posted." });
+    else toast.success("Post scheduled", { description: job.scheduledAt ? formatInZone(job.scheduledAt, job.timezone) : undefined });
   };
   const html = () => (editor && !editor.isDestroyed ? editor.getHTML() : "");
   const copyNow = async () => {
@@ -107,6 +123,11 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
             ))}
           </SelectContent>
         </Select>
+        {!isPost && (
+          <Field label="Title" hint="Shown in the library and used for the file name.">
+            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={draft.status === "scheduled"} />
+          </Field>
+        )}
         <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
           <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) store.setKind(v as DraftKind); }}>
             <ToggleGroupItem value="post">Post</ToggleGroupItem>
@@ -141,7 +162,7 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
+            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={draft.id} kind={draft.kind} doc={draft.doc} onChange={(doc) => store.update({ doc })} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -191,6 +212,15 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
       )}
 
       <Section title="Review">
+        <div className="flex flex-wrap items-center gap-2" aria-label="Approval">
+          <Badge variant={draft.status === "draft" ? "outline" : "brand"}>{STATUS_NAME[draft.status]}</Badge>
+          {draft.status === "draft" && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
+          {(draft.status === "approved" || draft.status === "published") && (
+            <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
+          )}
+          {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
+          {draft.status === "scheduled" && <span className="text-[11px] text-muted-foreground">A post is waiting to be sent. Cancel it in the queue to edit.</span>}
+        </div>
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
         {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
         <div className="flex flex-wrap items-center gap-2">
@@ -207,12 +237,21 @@ export function Composer({ store, jobs, brandNames, renderPng, onOpenSettings, d
       <FullPreview
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={html()} design={design} profile={profile} palette={palette} size={size}
-        actions={
-          <PublishBar
-            draft={draft} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
-            onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
-          />
-        }
+        actions={(
+          <div className="space-y-3">
+            {draft.kind === "article" ? (
+              <ArticleBar draft={draft} html={html} onApprove={approve} onPlan={store.plan} />
+            ) : (
+              <PublishBar
+                draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
+                onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
+              />
+            )}
+            <div className="border-t border-border pt-3">
+              <PageBar draft={draft} renderCover={() => renderPng(linkedinSize(size))} onPublish={store.publishPage} onUnpublish={store.unpublishPage} />
+            </div>
+          </div>
+        )}
       />
 
       {expanded && host && createPortal(

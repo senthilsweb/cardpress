@@ -22,6 +22,15 @@ Settings come from environment variables, with a few command-line flags. With Do
 | `CARDPRESS_ALLOWED_HOSTS` | Extra host names accepted when there is no token (otherwise only `localhost` names) |
 | `CARDPRESS_CORS_ORIGINS` | Browser origins allowed when the web app is hosted separately |
 
+## Public pages
+
+| Variable | What it does |
+|---|---|
+| `CARDPRESS_PUBLIC_URL` | The address readers use, with no path (`https://example.com`). It is written into the canonical link, the social preview tags and the sitemap. Without it the request's own host is used, which is fine for a trial and wrong behind a proxy |
+| `CARDPRESS_SITE_NAME` | The name shown on the public pages and in previews. Empty uses the brand's display name |
+
+See [Public pages](public-pages.md).
+
 ## Stored credentials
 
 | Variable | What it does |

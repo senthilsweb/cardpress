@@ -101,7 +101,7 @@ func (s *Settings) Test(ctx context.Context, profileID, id string) (TestResult, 
 
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusBadRequest:
-		res.Status, res.Message = TestInvalid, "LinkedIn rejected the client ID or client secret."
+		res.Status, res.Message = TestInvalid, introspectRejection(body)
 		return res, nil
 	case resp.StatusCode >= 300:
 		res.Status, res.Message = TestError, "LinkedIn answered with an error ("+http.StatusText(resp.StatusCode)+"). Try again later."
@@ -160,4 +160,24 @@ func (s *Settings) Test(ctx context.Context, profileID, id string) (TestResult, 
 		res.Status, res.Message = TestInvalid, "The token works, but cannot post as this author."
 	}
 	return res, nil
+}
+
+// introspectRejection says why LinkedIn refused the check. LinkedIn names the cause in an error code; its description is
+// not shown because it repeats the value that was sent, and a secret pasted in the wrong box must not be echoed back.
+func introspectRejection(body []byte) string {
+	var e struct {
+		Error string `json:"error"`
+	}
+	_ = json.Unmarshal(body, &e)
+	switch e.Error {
+	case "invalid_client_id":
+		return "LinkedIn does not know this Client ID. Copy it again from the app's Auth tab (it is not the secret)."
+	case "invalid_client_secret":
+		return "The Client ID is right but the Client secret is not. Copy the Primary Client Secret again from the Auth tab."
+	case "invalid_client", "unauthorized_client":
+		return "LinkedIn did not accept the Client ID and secret together. Copy both again from the app's Auth tab."
+	case "invalid_token", "invalid_request":
+		return "LinkedIn did not accept the access token. It may belong to a different app or have been revoked: generate a new one for this app."
+	}
+	return "LinkedIn refused the check (the Client ID, secret or token is not accepted)."
 }

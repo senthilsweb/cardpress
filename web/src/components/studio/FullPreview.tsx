@@ -3,7 +3,7 @@ import { AlertTriangle, Check, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FeedFrame } from "./preview";
+import { FeedFrame, ScaledCard } from "./preview";
 import { copyFormatted } from "@/lib/clipboard";
 import { fold, FOLD_CHARS, FOLD_LINES, LINKEDIN_LIMIT, type Serialized } from "@/lib/linkedin";
 import { sizeById, SIZES, type Size } from "@/lib/sizes";
@@ -52,7 +52,7 @@ export function FullPreview(props: {
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Full preview · {isPost ? "LinkedIn post" : "Article"}</DialogTitle>
-          <DialogDescription>{isPost ? "This is exactly the text and image that would be sent." : "Articles are copied into LinkedIn's article editor or your blog; they are not sent by the API."}</DialogDescription>
+          <DialogDescription>{isPost ? "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
@@ -60,7 +60,12 @@ export function FullPreview(props: {
             {isPost ? (
               <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable />
             ) : (
-              <article className="article-html w-full max-w-xl rounded-lg border border-border bg-card p-5" dangerouslySetInnerHTML={{ __html: props.articleHtml || "<p>Nothing written yet.</p>" }} />
+              <div className="w-full max-w-xl space-y-4">
+                <div className="flex justify-center">
+                  <ScaledCard design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} maxW={560} maxH={320} />
+                </div>
+                <article className="article-html w-full rounded-lg border border-border bg-card p-5" dangerouslySetInnerHTML={{ __html: props.articleHtml || "<p>Nothing written yet.</p>" }} />
+              </div>
             )}
           </div>
 
@@ -76,7 +81,7 @@ export function FullPreview(props: {
                 <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />
               </>
             )}
-            {s.warnings.map((w) => <Check2 key={w.code} ok={false} text={w.message} />)}
+            {isPost && s.warnings.map((w) => <Check2 key={w.code} ok={false} text={w.message} />)}
           </aside>
         </div>
 

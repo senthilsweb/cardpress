@@ -46,7 +46,7 @@ The default assistant is a built-in demo, not an AI model. To use a real one, se
 
 ## Publish
 
-Publishing to LinkedIn needs a token. Add it under the gear icon (**Social accounts**); see [Social accounts](social-settings.md) and [Publishing](publishing.md). Until then you can copy the post text and image into LinkedIn yourself.
+Publishing to LinkedIn needs a token. Add it under **Social accounts**, in the account menu at the bottom left of the sidebar; see [Social accounts](social-settings.md) and [Publishing](publishing.md). Until then you can copy the post text and image into LinkedIn yourself.
 
 ## Next
 

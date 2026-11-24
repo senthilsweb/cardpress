@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CalendarClock, Check, ExternalLink, Loader2, Send, Trash2, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ChevronDown, ExternalLink, Loader2, Send, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { defaultTimezone, formatInZone, relative, STATUS_LABEL, toLocalInput, type Job } from "@/lib/jobs";
+import { defaultTimezone, formatInZone, relative, STATUS_LABEL, toLocalInput, type Attempt, type Job } from "@/lib/jobs";
 import type { JobsStore } from "@/lib/useJobs";
 import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /** A small preview of the image that will be (or was) posted. */
-function Thumb({ id }: { id: string }) {
+export function Thumb({ id }: { id: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let url: string | undefined;
@@ -39,6 +39,38 @@ function When({ j }: { j: Job }) {
   return <>Created {formatInZone(j.createdAt)}</>;
 }
 
+/** What LinkedIn answered for each try: the record behind a post's status. It never shows the access token. */
+export function Attempts({ id }: { id: string }) {
+  const [list, setList] = useState<Attempt[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.jobAttempts(id).then((a) => live && setList(a)).catch(() => live && setFailed(true));
+    return () => { live = false; };
+  }, [id]);
+  if (failed) return <p className="text-[11px] text-destructive">Could not load the details.</p>;
+  if (!list) return <p className="text-[11px] text-muted-foreground">Loading…</p>;
+  if (!list.length) return <p className="text-[11px] text-muted-foreground">No record of what LinkedIn answered.</p>;
+  return (
+    <div className="space-y-2 rounded-md bg-muted/50 p-2 text-[11px] leading-snug">
+      {list.map((a, i) => (
+        <div key={a.id} className="space-y-1">
+          <p className="font-medium">Try {i + 1}: {STATUS_LABEL[a.outcome] ?? a.outcome} <span className="font-normal text-muted-foreground">· {formatInZone(a.startedAt)}</span></p>
+          {a.steps.length === 0 && <p className="text-muted-foreground">No calls were made.</p>}
+          {a.steps.map((st, k) => (
+            <div key={k} className="border-l-2 border-border pl-2">
+              <p>{st.step} <span className="text-muted-foreground">· {st.status ? `${st.status}` : st.error || "no answer"} · {st.ms} ms</span></p>
+              {st.headers?.["X-Restli-Id"] && <p className="break-all text-muted-foreground">Post id: {st.headers["X-Restli-Id"]}</p>}
+              {st.headers?.["X-Li-Uuid"] && <p className="break-all text-muted-foreground">Request id: {st.headers["X-Li-Uuid"]}</p>}
+              {st.body && <pre className="mt-0.5 max-h-28 overflow-auto whitespace-pre-wrap break-all rounded bg-background p-1.5 text-muted-foreground">{st.body}</pre>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: string }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [resched, setResched] = useState(false);
@@ -46,6 +78,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
   const [local, setLocal] = useState(() => toLocalInput(new Date(Math.max(Date.now(), job.scheduledAt ? new Date(job.scheduledAt).getTime() : 0) + 3600_000), job.timezone || defaultTimezone()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [details, setDetails] = useState(false);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError(null); setConfirm(null);
@@ -78,6 +111,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
         <p className="flex gap-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-400"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{job.error}</p>
       )}
       {error && <p role="alert" className="text-[11px] text-destructive">{error}</p>}
+      {details && <Attempts id={job.id} />}
 
       {resched && (
         <div className="space-y-2 rounded-md border border-border p-2">
@@ -93,6 +127,11 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
+        {(s === "published" || s === "failed" || s === "needs_review") && (
+          <Button size="sm" variant="ghost" onClick={() => setDetails((v) => !v)} aria-expanded={details}>
+            <ChevronDown className={details ? "rotate-180" : ""} /> Details
+          </Button>
+        )}
         {s === "published" && job.postUrl && (
           <a href={job.postUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline">View on LinkedIn <ExternalLink className="h-3 w-3" /></a>
         )}
@@ -115,9 +154,9 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
         {s === "scheduled" && (
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => store.cancel(job.id))}><X /> Cancel</Button>
         )}
-        {s !== "scheduled" && s !== "publishing" && (
-          <Button size="sm" variant="ghost" disabled={busy} className="ml-auto" title={s === "published" ? "Remove from this list. The post stays on LinkedIn." : "Discard"} onClick={() => void run(() => store.remove(job.id))}>
-            <Trash2 /> {s === "published" ? "Remove" : "Discard"}
+        {s !== "scheduled" && s !== "publishing" && s !== "published" && (
+          <Button size="sm" variant="ghost" disabled={busy} className="ml-auto" title="Discard" onClick={() => void run(() => store.remove(job.id))}>
+            <Trash2 /> Discard
           </Button>
         )}
         {s === "published" && <Check className="h-3.5 w-3.5 text-brand" aria-hidden />}

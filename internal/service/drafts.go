@@ -1,14 +1,18 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -19,9 +23,14 @@ const (
 	KindPost    = "post"
 	KindArticle = "article"
 
-	StatusDraft = "draft"
+	// A draft is written, then approved, then sent. Editing an approved or published draft returns it to draft.
+	StatusDraft     = "draft"
+	StatusApproved  = "approved"
+	StatusScheduled = "scheduled" // a publish job is waiting for it, or running
+	StatusPublished = "published"
 
-	maxDocBytesDraft = 2 << 20
+	maxDocBytesDraft = 25 << 20 // an article keeps its images inside its text, as base64
+	maxTitle         = 200
 	maxHashtags      = 30
 	maxAltText       = 1000
 	draftTimeLayout  = "2006-01-02T15:04:05.000Z"
@@ -39,8 +48,19 @@ type Draft struct {
 	Hashtags      []string        `json:"hashtags"`
 	AltText       string          `json:"altText"`
 	UnicodeStyles bool            `json:"unicodeStyles"`
-	CreatedAt     string          `json:"createdAt"`
-	UpdatedAt     string          `json:"updatedAt"`
+	Title         string          `json:"title"`
+	// Design is the card this item was made with (see CardDesign); absent until one is saved.
+	Design      json.RawMessage `json:"design,omitempty"`
+	ApprovedAt  string          `json:"approvedAt,omitempty"`
+	ScheduledAt string          `json:"scheduledAt,omitempty"` // an article's planned date
+	Timezone    string          `json:"timezone,omitempty"`
+	// The public page: its address, description, when it went live, and whether it has a preview image.
+	Slug      string `json:"slug,omitempty"`
+	Summary   string `json:"summary,omitempty"`
+	PageAt    string `json:"pageAt,omitempty"`
+	HasCover  bool   `json:"hasCover"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 // DraftInput is what a caller may set. Status is controlled by the server.
@@ -51,6 +71,11 @@ type DraftInput struct {
 	Hashtags      []string        `json:"hashtags"`
 	AltText       string          `json:"altText"`
 	UnicodeStyles bool            `json:"unicodeStyles"`
+	Title         string          `json:"title"`
+	// Design is optional: on create it starts the item with a card, on update leaving it out keeps the saved one.
+	Design json.RawMessage `json:"design"`
+
+	design string // Design in its stored form, empty when none was sent
 }
 
 func (in *DraftInput) normalize() error {
@@ -77,6 +102,15 @@ func (in *DraftInput) normalize() error {
 		return err
 	}
 	in.Hashtags = tags
+	in.Title = strings.TrimSpace(in.Title)
+	if utf8.RuneCountInString(in.Title) > maxTitle {
+		return invalid("title is limited to %d characters", maxTitle)
+	}
+	if t := bytes.TrimSpace(in.Design); len(t) > 0 && string(t) != "null" {
+		if in.design, err = normalizeDesign(t); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -108,18 +142,27 @@ func newID() string {
 
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, created_at, updated_at`
+// draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), created_at, updated_at`
+
+// draftInsertCols are the columns a new draft sets; the rest start empty.
+const draftInsertCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_at, updated_at`
 
 type scanner interface{ Scan(...any) error }
 
 func scanDraft(r scanner) (Draft, error) {
 	var d Draft
-	var doc, tags string
-	var uni int
-	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.CreatedAt, &d.UpdatedAt); err != nil {
+	var doc, tags, design string
+	var uni, designVersion, cover int
+	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)
+	d.HasCover = cover != 0
+	if designVersion > 0 {
+		d.Design = json.RawMessage(design)
+	}
 	d.UnicodeStyles = uni != 0
 	if err := json.Unmarshal([]byte(tags), &d.Hashtags); err != nil || d.Hashtags == nil {
 		d.Hashtags = []string{}
@@ -134,27 +177,145 @@ func (s *Studio) CreateDraft(ctx context.Context, in DraftInput) (Draft, error) 
 	}
 	tags, _ := json.Marshal(in.Hashtags)
 	at := s.draftStamp()
-	d := Draft{ID: newID(), ProfileID: in.ProfileID, Kind: in.Kind, Status: StatusDraft, Doc: in.Doc, Hashtags: in.Hashtags,
-		AltText: in.AltText, UnicodeStyles: in.UnicodeStyles, CreatedAt: at, UpdatedAt: at}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.ProfileID, d.Kind, d.Status, string(d.Doc), string(tags), d.AltText, boolInt(d.UnicodeStyles), at, at)
-	return d, err
+	id, design, version := newID(), "{}", 0
+	if in.design != "" {
+		design, version = in.design, CardDesignVersion
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO drafts (`+draftInsertCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?)`,
+		id, in.ProfileID, in.Kind, StatusDraft, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version, at, at)
+	if err != nil {
+		return Draft{}, err
+	}
+	return s.GetDraft(ctx, id)
 }
 
-// UpdateDraft replaces a draft's content. Its profile and status do not change.
+// UpdateDraft replaces a draft's content. Its profile does not change. If the content changed, an approved or published
+// draft goes back to draft, so what was approved is always what goes out; saving the same content again changes nothing.
+// A draft with a post waiting to be sent cannot be edited: cancel it first.
 func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Draft, error) {
 	if err := in.normalize(); err != nil {
 		return Draft{}, err
 	}
-	tags, _ := json.Marshal(in.Hashtags)
-	res, err := s.db.ExecContext(ctx,
-		`UPDATE drafts SET kind = ?, doc = ?, hashtags = ?, alt_text = ?, unicode_styles = ?, updated_at = ? WHERE id = ?`,
-		in.Kind, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), s.draftStamp(), id)
+	cur, err := s.GetDraft(ctx, id)
 	if err != nil {
 		return Draft{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return Draft{}, ErrNotFound
+	if cur.Status == StatusScheduled {
+		return Draft{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it before editing", ErrConflict)
+	}
+	design := string(cur.Design)
+	version := 0
+	if len(cur.Design) > 0 {
+		version = CardDesignVersion
+	}
+	if in.design != "" {
+		design, version = in.design, CardDesignVersion
+	} else if version == 0 {
+		design = "{}"
+	}
+	changed := cur.Kind != in.Kind || cur.AltText != in.AltText || cur.UnicodeStyles != in.UnicodeStyles || cur.Title != in.Title ||
+		!reflect.DeepEqual(cur.Hashtags, in.Hashtags) || !sameJSON(cur.Doc, in.Doc) || (in.design != "" && !sameJSON(cur.Design, json.RawMessage(in.design)))
+	status, approved, planned, zone := cur.Status, cur.ApprovedAt, cur.ScheduledAt, cur.Timezone
+	takeOffline := false
+	if changed && (status == StatusApproved || status == StatusPublished) {
+		status, approved, planned, zone = StatusDraft, "", "", ""
+		takeOffline = true
+	}
+	tags, _ := json.Marshal(in.Hashtags)
+	at := s.draftStamp()
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE drafts SET kind = ?, doc = ?, hashtags = ?, alt_text = ?, unicode_styles = ?, title = ?, design = ?, design_version = ?,
+		        status = ?, approved_at = ?, scheduled_at = ?, timezone = ?, updated_at = ? WHERE id = ?`,
+		in.Kind, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version,
+		status, approved, planned, zone, at, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if takeOffline {
+		// the public page must always show the approved text: a change takes it down until it is approved and published again
+		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET page_at = '', cover = NULL WHERE id = ?`, id); err != nil {
+			return Draft{}, err
+		}
+	}
+	return s.GetDraft(ctx, id)
+}
+
+// sameJSON reports whether two JSON values mean the same, whatever their spacing or key order.
+func sameJSON(a, b json.RawMessage) bool {
+	var x, y any
+	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
+}
+
+// Approve marks a draft as final. Only an approved draft can be published or scheduled.
+func (s *Studio) Approve(ctx context.Context, id string) (Draft, error) {
+	d, err := s.GetDraft(ctx, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	switch d.Status {
+	case StatusApproved:
+		return d, nil
+	case StatusScheduled:
+		return Draft{}, fmt.Errorf("%w: a post is already waiting to be sent from this draft", ErrConflict)
+	case StatusPublished:
+		return Draft{}, fmt.Errorf("%w: this draft was already published; edit it to make a new version", ErrConflict)
+	}
+	if strings.TrimSpace(DraftText(d.Doc)) == "" {
+		return Draft{}, invalid("there is nothing to approve: the text is empty")
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		StatusApproved, s.draftStamp(), s.draftStamp(), id, StatusDraft)
+	if err != nil {
+		return Draft{}, err
+	}
+	return s.GetDraft(ctx, id)
+}
+
+// Unapprove returns an approved or published draft to draft, so it can be changed.
+func (s *Studio) Unapprove(ctx context.Context, id string) (Draft, error) {
+	d, err := s.GetDraft(ctx, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if d.Status == StatusScheduled {
+		return Draft{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it first", ErrConflict)
+	}
+	if d.Status == StatusDraft {
+		return d, nil
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET status = ?, approved_at = '', scheduled_at = '', timezone = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
+		StatusDraft, s.draftStamp(), id)
+	if err != nil {
+		return Draft{}, err
+	}
+	return s.GetDraft(ctx, id)
+}
+
+// Plan sets or clears the planned date of an approved article. Nothing is sent: CardPress cannot publish an article, so
+// the date is a reminder and a way to order the list. A post is scheduled by publishing it for later.
+func (s *Studio) Plan(ctx context.Context, id string, at *time.Time, timezone string) (Draft, error) {
+	d, err := s.GetDraft(ctx, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if d.Kind != KindArticle {
+		return Draft{}, invalid("only an article has a planned date; schedule a post from its preview")
+	}
+	if d.Status != StatusApproved {
+		return Draft{}, fmt.Errorf("%w: approve the article before planning a date", ErrConflict)
+	}
+	when, zone := "", ""
+	if at != nil {
+		if _, err := time.LoadLocation(timezone); err != nil || timezone == "" {
+			return Draft{}, invalid("timezone must be an IANA zone such as Europe/London")
+		}
+		when, zone = at.UTC().Format(time.RFC3339), timezone
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET scheduled_at = ?, timezone = ? WHERE id = ?`, when, zone, id); err != nil {
+		return Draft{}, err
 	}
 	return s.GetDraft(ctx, id)
 }
