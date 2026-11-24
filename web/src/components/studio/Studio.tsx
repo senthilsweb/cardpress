@@ -44,7 +44,7 @@ function Logo() {
       </svg>
       <div className="flex flex-col leading-none">
         <span className="text-[22px] font-bold tracking-tight text-brand">CardPress</span>
-        <span className="mt-1 hidden text-[10.5px] text-muted-foreground md:block">Social media cards for LinkedIn, X and more</span>
+        <span className="mt-1 hidden text-[10.5px] text-muted-foreground md:block">Free agentic AI for social media authoring and management</span>
       </div>
     </div>
   );
