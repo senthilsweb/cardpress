@@ -124,7 +124,16 @@ func main() {
 		opts.Audit = audit
 		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
-		mux.Handle("/mcp", api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv)))
+		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
+		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
+		// process on the same machine cannot use it to reach everyone's work without one.
+		mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if n, err := accounts.Count(r.Context()); (err != nil || n > 0) && cfg.APIToken == "" {
+				http.Error(w, "MCP over HTTP needs CARDPRESS_API_TOKEN once accounts exist (set it and send it as a bearer token)", http.StatusForbidden)
+				return
+			}
+			mcpHandler.ServeHTTP(w, r)
+		}))
 	}
 	mux.Handle("/api/v1/", api.New(opts))
 	// the public pages: articles and posts a person published, readable by anyone and by crawlers, so outside the token

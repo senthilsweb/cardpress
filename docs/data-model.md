@@ -34,7 +34,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `profiles` | 0001, 0007 | `id` (PK), `position`, `data` (JSON: name, handle, website, logo, fonts, colour sets), `updated_at`, `archived_at` (set when a brand is archived, empty otherwise) |
+| `profiles` | 0001, 0007, 0011 | `id` (PK), `position`, `data` (JSON: name, handle, website, logo, fonts, colour sets), `updated_at`, `archived_at` (set when a brand is archived, empty otherwise), `owner_id` (who made it; empty for brands that predate accounts, which the first account adopts) |
 | `designs` | 0001 | `profile_id` (PK), `data` (JSON: the brand's current card design), `updated_at` |
 | `preferences` | 0001 | `key` (PK), `value` (JSON), `updated_at`. Keys: `theme`, `layout`, `customFonts`, `activeProfile`, `envProfile` |
 
@@ -44,7 +44,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
+| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -52,7 +52,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `publish_jobs` | 0004 | `id` (PK), `profile_id`, `draft_id`, `network` (`linkedin`), `status`, `body`, `hashtags` (JSON), `alt_text`, `image` (BLOB, the card PNG), `scheduled_at`, `timezone`, `error`, `post_urn`, `post_url`, `created_at`, `updated_at`, `published_at`. Indexes `(status, scheduled_at)` and `(profile_id, created_at DESC)` |
+| `publish_jobs` | 0004 | `id` (PK), `profile_id`, `draft_id`, `network` (`linkedin`), `status`, `body`, `hashtags` (JSON), `alt_text`, `image` (BLOB, the card PNG), `scheduled_at`, `timezone`, `error`, `post_urn`, `post_url`, `created_by`, `created_at`, `updated_at`, `published_at`. Indexes `(status, scheduled_at)` and `(profile_id, created_at DESC)` |
 | `publish_attempts` | 0008 | `id` (PK), `job_id`, `started_at`, `finished_at`, `outcome`, `error`, `steps` (JSON). Index `(job_id, started_at)` |
 | `credentials` | 0003, 0007 | `profile_id`, `network`, `field`, `value` (sealed), `updated_at`. Primary key `(profile_id, network, field)` |
 
@@ -64,7 +64,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005 | `id` (PK), `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
+| `conversations` | 0005, 0011 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
 | `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`. Unique `(conversation_id, seq)` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 
@@ -88,6 +88,8 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0008 | `publish_attempts` |
 | 0009 | `drafts`: `title`, `design`, `design_version`, `approved_at`, `scheduled_at`, `timezone`; the status workflow |
 | 0010 | `drafts`: `slug`, `summary`, `page_at`, `cover`; the public pages |
+| 0011 | Accounts: `users`, `user_roles`, `sessions`, `user_preferences`; `profiles.owner_id`, `drafts.created_by` and `approved_by`, `publish_jobs.created_by`, `conversations.user_id` |
+| 0012 | `draft_versions` and `doc_blobs`: the history of an item |
 
 ## Draft status and approval
 
@@ -111,6 +113,21 @@ stateDiagram-v2
 ### The public page columns
 
 `slug` is the page's address within its kind (`/articles/<slug>` or `/posts/<slug>`) and is unique per kind. `page_at` is when the page went live; **empty means it is not public**. `summary` is the description for previews (empty: the first paragraph). `cover` is the card as a PNG (1200 × 627), the page's preview image, `NULL` when there is none. Only an item whose status is `approved`, `scheduled` or `published` can have a live page, and the public reader checks that again; any change to the item, or taking its approval back, clears `page_at` and `cover`. Taking a page down clears only `page_at`, so its address is kept. See [Public pages](public-pages.md).
+
+### Accounts
+
+| Table | Columns |
+|---|---|
+| `users` | `id` (PK), `email` (unique, lower-case), `first_name`, `last_name`, `phone`, `birth_date` (`YYYY-MM-DD` or empty), `password_hash` (argon2id), `status` (`active` or `disabled`), `created_at`, `last_login_at`. The full name is `first_name last_name`; it is not stored |
+| `user_roles` | `user_id`, `role` (`admin`, `editor` or `writer`); primary key `(user_id, role)`. One row each today, but a person may hold several: what they may do is everything any of their roles allows |
+| `sessions` | `token_hash` (PK, the hash of the cookie value), `user_id`, `created_at`, `last_seen_at`, `expires_at` |
+| `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, layout, the open brand, custom fonts. System-wide keys (such as `envProfile`) stay in `preferences` |
+
+A brand belongs to the person in `profiles.owner_id`, and everything keyed by `profile_id` (designs, drafts, posts, conversations, credentials) follows it. An admin sees all; anyone else sees only their own brands. See [Accounts and roles](accounts.md).
+
+### History
+
+`draft_versions` holds one row per saved state of an item: `draft_id`, `seq` (1, 2, 3… per item), `label` (`created`, `auto`, `manual`, `approved`, `sent`, `restored`), `note`, `kind`, `title`, `doc`, `hashtags`, `alt_text`, `unicode_styles`, `design`, `design_version`, `blobs`, `created_by`, `created_at`. Versions are taken when an item is created, approved, sent or restored, when saved by hand, and automatically after a change if ten minutes have passed since the last. At most 100 are kept per item (the oldest automatic ones go first). In a version's `doc` each picture is replaced by `blob:<hash>`; `doc_blobs` (`hash`, `mime`, `data`) holds each distinct picture once, so ten versions of an article with seven pictures store seven pictures, not seventy. Pictures no version refers to are removed.
 
 ### The design column
 

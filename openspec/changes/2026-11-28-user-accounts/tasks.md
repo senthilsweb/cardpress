@@ -1,24 +1,26 @@
 # Tasks
 
 ## Bolt 1: accounts and sessions
-- [ ] Migration 0011: `users`, `sessions`; argon2id hashing; sign-up, sign-in, sign-out, `me`, change password
-- [ ] The first account becomes admin and adopts today's brands and drafts
-- [ ] Sign-in rate limiting; sessions end on password change or disabling
-- [ ] The bearer token keeps working as an admin; local mode with no accounts is unchanged
-- [ ] `cardpress user reset-password <email>`
+- [x] Migration 0011: `users`, `user_roles`, `sessions`, `user_preferences`; argon2id; sign-up, sign-in, sign-out, `me`, change password
+- [x] The first account becomes admin and adopts today's brands, drafts and settings
+- [x] Sign-in rate limiting; sessions end on password change or disabling
+- [x] The bearer token keeps working as an admin; MCP over HTTP needs it once accounts exist
+- [x] `cardpress user reset-password <email>`
 
 ## Bolt 2: ownership and roles
-- [ ] `owner_id`, `created_by`, `approved_by`; per-person preferences
-- [ ] One principal check on every route; lists filtered by it
-- [ ] The role matrix enforced (approve, publish, social accounts, users)
-- [ ] The isolation test over every route, and the role test
+- [x] `owner_id`, `created_by`, `approved_by`; per-person preferences
+- [x] A route table with a rule for every route; lists filtered by what the person may see
+- [x] The role matrix enforced (approve, publish, social accounts, users); only a draft can be deleted
+- [x] The isolation test over every route, and the role test
 
 ## Bolt 3: screens
-- [ ] `/login` and `/signup` (centred), the first-run state
-- [ ] Account menu: name and role, Profile, Users, Sign out
-- [ ] Profile drawer (names, phone, date of birth drop-downs, password) and Users drawer
-- [ ] Role-aware screens (a writer has no Approve or Publish)
+- [x] `/login` and `/signup` (centred); every app page redirects to the first-run admin sign-up until an account exists
+- [x] Account menu: name and role, Account settings, Users, Sign out
+- [x] Account settings (names, phone, date of birth drop-downs, change password) and Users drawer
+- [x] Role-aware screens (a writer has no Approve, Publish, Schedule, page or Social accounts controls)
 
 ## Bolt 4: finish
-- [ ] Docs: accounts and roles, configuration, data model, security notes
-- [ ] Who approved, shown in the library
+- [x] Docs: accounts and roles, configuration, data model, deployment
+- [x] Who wrote and approved an item, shown in the library
+- [ ] Phone-width check of the new screens
+- [ ] Re-record the demo

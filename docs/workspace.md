@@ -41,7 +41,7 @@ The expanded post editor has a plain background, without the grid.
 
 ## Account menu
 
-The footer at the bottom of the sidebar shows the open brand (its initials, name and handle). Click it and a menu opens upward: **Library**, **Social accounts**, **Manage brands**, the light or dark mode, and these docs. It is where sign-in will go when there are user accounts. When the sidebar is hidden, a small round button with the brand's initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.
+The footer at the bottom of the sidebar shows **you** (your initials, name and role). Click it and a menu opens upward: **Library**, **Account settings** (your details and **Change password**), **Users** (admins), **Social accounts** (editors and admins), **Manage brands**, the light or dark mode, these docs, and **Sign out**. See [Accounts and roles](accounts.md). When the sidebar is hidden, a small round button with your initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.
 
 ## The article editor
 
@@ -65,3 +65,7 @@ The code for these is in `components/studio/RichEditor.tsx` (editor, menus, outl
 ### For LinkedIn
 
 LinkedIn cannot receive an article from outside, so you paste it into its article editor. **For LinkedIn** prepares it for that: the title (for LinkedIn's own title field) and the body each have a **Copy** button, and the pictures come as a **.zip**. The body keeps headings (two levels), bold, italic, underline, lists, quotes, links and code blocks. What LinkedIn's editor has no place for is changed, and the dialog says what changed: a **table** becomes a list of rows ("Layer: Bronze; Tables: 7"), a **divider** is dropped, strikethrough and inline code lose their styling, and each **picture** becomes a marker such as `[Picture 2: a chart]` to replace with the file. LinkedIn changes its editor from time to time, so check what it accepts if a paste looks different.
+
+## History
+
+The clock icon in the **Draft** section opens an item's history in the right drawer: what it said when it was created, approved, sent, restored, saved by hand, and after a stretch of editing (at most one automatic version every ten minutes). Open a version to read it, **Restore** it if it is the one you want, or **Save a version** with a note before a big rewrite. Restoring is an edit like any other: an approved item goes back to draft, and what it said just before is kept as a version too. Pictures in an article are stored once however many versions use them. See [Data model](data-model.md#history).

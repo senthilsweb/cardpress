@@ -1,26 +1,25 @@
 # Sign-in, roles and separate workspaces
 
-**Status:** Proposed. Not started. Two readings are marked "To confirm" in `design.md`.
+**Status:** Implemented. Not tested at phone width. An email service (verification, emailed reset) and single sign-on are out of scope.
 
 ## Why
-CardPress has no users. Access is one shared token (or none, on localhost), so everyone who can reach the server sees every brand, every draft and every stored LinkedIn credential. To let more than one person use one server, each person needs their own account, their own space, and a role that says what they may do.
+CardPress had no users. Access was one shared token (or none, on localhost), so everyone who could reach the server saw every brand, every draft and every stored LinkedIn credential. To let more than one person use one server, each person needs an account, a space of their own, and a role that says what they may do.
 
-## What changes
-1. **Accounts.** A person signs up with **first name, last name, email and a password**. Phone and date of birth are optional. The full name is made from first and last name. Date of birth is picked from three drop-downs.
-2. **A centred sign-in page** with a **Create an account** option, and the same style of page for sign-up.
-3. **Three roles:** **Admin**, **Editor**, **Writer**.
-4. **Separate workspaces.** Editors and writers see only what they authored. A person may create as many brands ("workspaces") as they like, and each brand keeps its own posts, cards, drafts and social accounts. Admins see everything.
-5. **Who did what.** Drafts, approvals and posts record the person.
-6. **Profile and Users screens** in the right-hand drawer, and a **Sign out**.
+## What changed
+1. **Accounts.** First name, last name, email and a password are required; phone and date of birth (three drop-downs) are optional. The full name is made from first and last name.
+2. **Nothing opens without an admin account.** Any app page except the landing page sends a visitor to **Create the admin account** until one exists, then to a centred **sign-in** page, which has a **Create an account** link. The first account becomes the admin and adopts what exists.
+3. **Roles.** Admin, **Editor (the default)**, Writer. Stored one row each, so a person could hold several later; the screens give one.
+   - **Editor:** writes, reviews, approves and publishes their own work.
+   - **Writer:** writes drafts, brings an item back to draft, deletes their own drafts. Cannot approve or publish.
+   - **Admin:** everything, on everyone's work.
+4. **Separate workspaces.** Editors and writers see only their own brands and what is in them, and may make as many brands as they like; a brand is the workspace. Admins see everything.
+5. **Delete rule.** Only a draft can be deleted. An approved or posted item is brought back to draft first.
+6. **Who did what** is recorded on drafts (written by, approved by) and posts.
+7. **Account settings** (profile and **Change password**), a **Users** panel for admins, and **Sign out**, in the account menu.
+8. `cardpress user reset-password <email>`; MCP over HTTP needs the token once any account exists.
 
 ## What stays
-- The bearer token stays for machines (MCP, scripts) and acts as an admin.
-- Public pages (`/articles`, `/posts`) stay open to everyone.
-- Local use on `127.0.0.1` with no accounts stays free of any login until the first account is created.
-- A brand is the workspace: no new concept is added.
+The bearer token still works for machines and acts as an admin. Public pages stay open to everyone.
 
 ## Out of scope
-Email verification and emailed password reset (there is no mail service), single sign-on, sharing a brand between people, teams, per-brand roles, billing.
-
-## Decisions
-See `design.md`, "Decisions".
+Email verification and emailed password reset, single sign-on, sharing a brand between people, teams, per-brand roles, billing.

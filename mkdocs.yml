@@ -41,6 +41,7 @@ nav:
       - Adding backgrounds: adding-backgrounds.md
       - Palettes: palettes.md
       - Fonts: fonts.md
+  - Accounts and roles: accounts.md
   - Assistant:
       - Chat: chat.md
       - Claude Managed Agent: cma-agent.md
