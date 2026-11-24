@@ -3,6 +3,8 @@ import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, withStandardPalettes } from "./profiles";
 import { brandColor, pickActive } from "./brands";
 import type { Design, Profile } from "./types";
+import { requireSession } from "./gate";
+import type { Session } from "./session";
 import { hydrateCustomFonts, type FontDef } from "./fonts";
 
 export interface LibraryBoot {
@@ -10,6 +12,7 @@ export interface LibraryBoot {
   activeId: string;
   theme?: "light" | "dark";
   colors: Record<string, string>;
+  session: Session;
   /** Each brand's own design: the card shown for an item that was never given one. */
   designs: Record<string, Design>;
 }
@@ -28,7 +31,9 @@ export function useLibraryBoot() {
     setBoot({ status: "loading" });
     try {
       const info = await api.info();
-      if (info.authRequired && !getToken()) return setBoot({ status: "auth" });
+      const session = await requireSession(info);
+      if (!session) return; // being sent to sign in
+      if (!info.accounts && info.authRequired && !getToken()) return setBoot({ status: "auth" });
       const state = await api.state();
       const profiles = (state.profiles as Profile[]).length ? withStandardPalettes(state.profiles as Profile[]) : DEFAULT_PROFILES;
       const activeId = pickActive(state.preferences.activeProfile, profiles) ?? profiles[0].id;
@@ -37,7 +42,7 @@ export function useLibraryBoot() {
       const theme = state.preferences.theme === "dark" || state.preferences.theme === "light" ? state.preferences.theme : undefined;
       const fonts = Array.isArray(state.preferences.customFonts) ? (state.preferences.customFonts as FontDef[]) : [];
       hydrateCustomFonts(fonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); });
-      setBoot({ status: "ready", data: { profiles, activeId, theme, colors, designs } });
+      setBoot({ status: "ready", data: { profiles, activeId, theme, colors, designs, session } });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { clearToken(); return setBoot({ status: "auth", error: "That token was not accepted." }); }
       setBoot({ status: "error", message: e instanceof Error ? e.message : "Something went wrong" });

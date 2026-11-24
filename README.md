@@ -24,7 +24,9 @@
 - **Posts**: a rich-text editor with hashtags and alt text, and a full preview of the LinkedIn feed.
 - **Assistant**: paste an article or a web address and it proposes a post. You approve, edit or reject it. It prepares content only.
 - **Publish**: post to LinkedIn now or at a chosen time, with a queue, per-post status and no automatic retries. A person confirms every post.
-- **MCP**: an outside agent can read drafts and propose content, never publish. Every call is audited.
+- **Accounts**: admin, editor and writer roles, a workspace for each person, approval before publishing, and a history of every item.
+- **Public pages**: approved articles and posts as server-rendered pages that social networks can preview.
+- **MCP**: an outside agent, with an API key of your own, can read your drafts and propose content, never publish. Every call is audited.
 
 Everything you save lives on your server (SQLite, or Turso); nothing is kept in the browser. Credentials are encrypted.
 

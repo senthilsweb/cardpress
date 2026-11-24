@@ -48,9 +48,11 @@ Migrations are embedded and run at startup. Back up the `data/` folder (or use T
 | `CARDPRESS_CORS_ORIGINS` | | | Comma-separated origins allowed to call the API from a browser. |
 | `CARDPRESS_INSECURE` | | `false` | Allow a non-loopback address without a token. |
 
-## Access guard (not authentication)
+## Access guard
 
-There are no user accounts yet. To stop an exposed API from being open to everyone, the server **refuses to start** on a non-loopback address (including `:8080`) unless `CARDPRESS_API_TOKEN` is set or `CARDPRESS_INSECURE=1`. With a token, every `/api/v1` call needs `Authorization: Bearer <token>`; `/healthz` and `/api/v1/info` stay open.
+The app has [accounts](accounts.md): nothing opens until the first (admin) account exists, and people sign in. On a server reachable from the internet, set `CARDPRESS_ADMIN_EMAIL` (or create the admin yourself first), because the first person to sign up becomes the admin.
+
+The guard below is a second layer, and the way machines (scripts, MCP over HTTP) get in. To stop an exposed API from being open to everyone, the server **refuses to start** on a non-loopback address (including `:8080`) unless `CARDPRESS_API_TOKEN` is set or `CARDPRESS_INSECURE=1`. With a token, every `/api/v1` call needs `Authorization: Bearer <token>`; `/healthz` and `/api/v1/info` stay open.
 
 With **no token**, the server also answers only to `localhost` host names and refuses cross-site browser requests that change things, which stops a website you visit from driving your local CardPress (see [MCP](mcp.md#access-rules-http-and-the-json-api)). If you reach it under another name, add it to `CARDPRESS_ALLOWED_HOSTS`.
 

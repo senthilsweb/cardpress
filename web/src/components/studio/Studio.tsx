@@ -22,6 +22,11 @@ import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
 import { useTheme } from "@/lib/useTheme";
 import { AccountMenu } from "./AccountMenu";
+import { AccountSettings } from "./AccountSettings";
+import { UsersDrawer } from "./UsersDrawer";
+import { VersionsDrawer } from "./VersionsDrawer";
+import { flushPendingEdits } from "@/lib/pendingEdits";
+import { SessionProvider } from "./SessionProvider";
 import { Logo } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -57,7 +62,7 @@ export default function Studio() {
   const { boot, retry, submitToken, importLegacy, discardLegacy, openBrand } = useBoot();
   if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={importLegacy} discardLegacy={discardLegacy} />;
   // keyed by brand: opening another brand starts the whole studio over for it, so nothing of the last one is left on screen
-  return <Workspace key={boot.data.activeId} initial={boot.data} openBrand={openBrand} />;
+  return <SessionProvider initial={boot.data.session}><Workspace key={boot.data.activeId} initial={boot.data} openBrand={openBrand} /></SessionProvider>;
 }
 
 function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: string) => Promise<void> }) {
@@ -101,7 +106,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
   // the right-hand drawers share one edge, so only one is open at a time
-  const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | null>(null);
+  const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
   // the library can send someone straight to a draft's Full preview (to schedule it)
   const [previewRequested, setPreviewRequested] = useState(false);
   // another page (the library) can ask for a drawer or a draft: /studio/?open=accounts|brands, /studio/?draft=<id>
@@ -109,6 +114,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     const q = new URLSearchParams(window.location.search);
     const want = q.get("open"), draft = q.get("draft");
     if (want === "accounts" || want === "brands") setPanel(want === "accounts" ? "accounts" : "manage");
+    if (want === "account" || want === "users") setPanel(want);
     if (want === "preview") setPreviewRequested(true);
     if (draft) { void store.select(draft); setTab("post"); }
     if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
@@ -261,7 +267,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </TooltipTrigger>
             <TooltipContent>{sidebarHidden ? "Show sidebar" : "Hide sidebar"} (Ctrl/⌘ + \)</TooltipContent>
           </Tooltip>
-          {sidebarHidden && <AccountMenu variant="avatar" page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} />}
+          {sidebarHidden && <AccountMenu variant="avatar" page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />}
           <Logo />
           <div className="flex-1" />
           <BrandSwitcher brands={profiles} activeId={profile.id} colors={brandColors} busy={switching} onSwitch={(id) => void switchBrand(id)} onNew={() => { setCopyOf(undefined); setPanel("newBrand"); }} onManage={() => setPanel("manage")} />
@@ -298,7 +304,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer onOpenHistory={() => setPanel("history")} openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -313,7 +319,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               </div>
             </Tabs>
             <div className="shrink-0 border-t border-border p-2">
-              <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} />
+              <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />
             </div>
            </div>
           </aside>
@@ -390,6 +396,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           </main>
         </div>
       </div>
+      <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
+      <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
+      <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />
       <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} profileId={profile.id} brandName={profile.name} />
       <NewBrandDrawer
         open={panel === "newBrand"} onClose={() => setPanel(null)} brands={profiles} current={profile} source={copyOf}

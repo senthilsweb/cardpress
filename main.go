@@ -45,6 +45,10 @@ func main() {
 		runMCP(os.Args[2:])
 		return
 	}
+	// `cardpress user reset-password <email>` sets a new random password for someone who is locked out
+	if len(os.Args) > 1 && os.Args[1] == "user" {
+		os.Exit(runUser(os.Args[2:]))
+	}
 	// `cardpress healthcheck` is for the container health check: the image has no shell or curl
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(runHealthcheck())
@@ -110,16 +114,39 @@ func main() {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
+	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
-		Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Accounts: accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
-		mux.Handle("/mcp", api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv)))
+		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
+		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
+		// process on the same machine cannot use it to reach everyone's work without one.
+		// An API key (cpk_...) makes the call act as the key's person, within its scope, so it reaches only that person's
+		// brands; the access rules above then do not apply to it (the key is the credential).
+		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
+		mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); got != r.Header.Get("Authorization") && strings.HasPrefix(got, service.KeyPrefix) {
+				u, id, scope, err := accounts.AuthenticateKey(r.Context(), got)
+				if err != nil {
+					w.Header().Set("WWW-Authenticate", `Bearer realm="cardpress"`)
+					http.Error(w, "that API key is not valid (it may have been revoked)", http.StatusUnauthorized)
+					return
+				}
+				keyedHandler.ServeHTTP(w, r.WithContext(service.WithPrincipal(r.Context(), service.Principal{User: &u, Key: id, Scope: scope})))
+				return
+			}
+			if n, err := accounts.Count(r.Context()); (err != nil || n > 0) && cfg.APIToken == "" {
+				http.Error(w, "MCP over HTTP needs an API key (made in Account settings) or CARDPRESS_API_TOKEN, now that accounts exist", http.StatusForbidden)
+				return
+			}
+			mcpHandler.ServeHTTP(w, r)
+		}))
 	}
 	mux.Handle("/api/v1/", api.New(opts))
 	// the public pages: articles and posts a person published, readable by anyone and by crawlers, so outside the token
@@ -318,4 +345,39 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// runUser is the command-line side of accounts: there is no email, so a forgotten password is reset here, on the server.
+func runUser(args []string) int {
+	if len(args) != 2 || args[0] != "reset-password" {
+		fmt.Fprintln(os.Stderr, "usage: cardpress user reset-password <email>")
+		return 2
+	}
+	cfg, err := config.Load(nil, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	ctx := context.Background()
+	db, err := store.Open(ctx, cfg.DBURL, cfg.DBToken)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer db.Close()
+	if err := db.Migrate(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	pw, err := service.NewAccounts(db.DB, service.AccountsOptions{}).ResetPasswordByEmail(ctx, args[1])
+	if errors.Is(err, service.ErrNotFound) {
+		fmt.Fprintln(os.Stderr, "there is no account with that email")
+		return 1
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("New password for %s: %s\nThey were signed out everywhere. Ask them to change it from Account settings.\n", args[1], pw)
+	return 0
 }

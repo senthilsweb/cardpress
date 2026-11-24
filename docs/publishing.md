@@ -28,6 +28,7 @@ A post is only sent from an **approved** draft. In the Review section of the Pos
 - While a post is **waiting** to be sent from a draft, the draft cannot be edited. Cancel the post in the queue first.
 - A **posted** draft shows **Edit again**, which makes a new version you can approve and post again.
 - The server enforces this, not only the screen: creating a job from a draft that is not approved is refused.
+- Who may approve and publish depends on the person's role: an editor approves and publishes their own work, a writer only writes, and an admin approves and publishes anyone's. See [Accounts and roles](accounts.md).
 
 Each draft keeps its **own card design**. Changing the card in the Design tab changes the open draft's card (and the brand's starting point for new drafts), and the card is saved with the draft.
 

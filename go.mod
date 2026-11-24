@@ -6,6 +6,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go/v2 v2.14.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/tursodatabase/libsql-client-go v0.0.0-20260528064733-9d5d30a29a60
+	golang.org/x/crypto v0.59.0
 	golang.org/x/net v0.63.0
 	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.63.0

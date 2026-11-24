@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarClock, Check, ChevronDown, ExternalLink, Loader2
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { defaultTimezone, formatInZone, relative, STATUS_LABEL, toLocalInput, type Attempt, type Job } from "@/lib/jobs";
 import type { JobsStore } from "@/lib/useJobs";
 import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
@@ -79,6 +80,8 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
+  const { can } = useSession();
+  const publisher = can("publish"); // a writer sees the queue but changes nothing in it
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError(null); setConfirm(null);
@@ -135,12 +138,12 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
         {s === "published" && job.postUrl && (
           <a href={job.postUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline">View on LinkedIn <ExternalLink className="h-3 w-3" /></a>
         )}
-        {(s === "scheduled" || s === "missed" || s === "failed") && (
+        {publisher && (s === "scheduled" || s === "missed" || s === "failed") && (
           <Button size="sm" variant={confirm === "now" ? "brand" : "outline"} disabled={busy} onClick={ask("now", () => store.publishNow(job.id))}>
             <Send /> {confirm === "now" ? "Confirm: post now" : s === "failed" ? "Publish again" : "Publish now"}
           </Button>
         )}
-        {s === "needs_review" && (
+        {publisher && s === "needs_review" && (
           <>
             <a href="https://www.linkedin.com/feed/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline">Open LinkedIn <ExternalLink className="h-3 w-3" /></a>
             <Button size="sm" variant={confirm === "dup" ? "destructive" : "outline"} disabled={busy} onClick={ask("dup", () => store.publishNow(job.id, true))}>
@@ -148,13 +151,13 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
             </Button>
           </>
         )}
-        {(s === "scheduled" || s === "missed" || s === "failed" || s === "cancelled") && !resched && (
+        {publisher && (s === "scheduled" || s === "missed" || s === "failed" || s === "cancelled") && !resched && (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setResched(true)}><CalendarClock /> {s === "cancelled" ? "Schedule again" : "Reschedule"}</Button>
         )}
-        {s === "scheduled" && (
+        {publisher && s === "scheduled" && (
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => store.cancel(job.id))}><X /> Cancel</Button>
         )}
-        {s !== "scheduled" && s !== "publishing" && s !== "published" && (
+        {publisher && s !== "scheduled" && s !== "publishing" && s !== "published" && (
           <Button size="sm" variant="ghost" disabled={busy} className="ml-auto" title="Discard" onClick={() => void run(() => store.remove(job.id))}>
             <Trash2 /> Discard
           </Button>

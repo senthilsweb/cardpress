@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CalendarClock, Check, Loader2, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import type { Draft } from "@/lib/draft";
 import { defaultTimezone, toLocalInput, type Job } from "@/lib/jobs";
 import type { Serialized } from "@/lib/linkedin";
@@ -32,6 +33,7 @@ export function PublishBar({ draft, onApprove, serialized, bodyOnly, size, rende
   onDone: (job: Job, how: "now" | "scheduled") => void;
   onOpenSettings: () => void;
 }) {
+  const { can } = useSession();
   const [step, setStep] = useState<Step>("idle");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,9 @@ export function PublishBar({ draft, onApprove, serialized, bodyOnly, size, rende
     }
   };
 
+  if (!can("publish")) {
+    return <p className="text-xs text-muted-foreground">{draft.status === "draft" ? "An editor or admin approves and publishes it." : "An editor or admin publishes it."}</p>;
+  }
   if (draft.status !== "approved") {
     return (
       <div className="flex flex-wrap items-center gap-2 text-xs">

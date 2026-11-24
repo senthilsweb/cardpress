@@ -11,6 +11,8 @@ import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
 import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog";
 import { Logo } from "@/components/studio/Logo";
+import { SessionProvider } from "@/components/studio/SessionProvider";
+import { useSession } from "@/lib/session";
 import { ScaledCard } from "@/components/studio/preview";
 import { ScheduleFields, resolveSchedule } from "@/components/studio/ScheduleFields";
 import { api } from "@/lib/api";
@@ -40,7 +42,7 @@ export default function Library() {
   if (boot.status !== "ready") {
     return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={() => undefined} discardLegacy={() => undefined} />;
   }
-  return <Page data={boot.data} />;
+  return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 
 function StatusBadge({ s }: { s: LibraryItem["status"] }) {
@@ -256,6 +258,7 @@ function CardView({ design, profile }: { design?: Design; profile?: Profile }) {
 
 /** A draft, in full: its card, its text, and what can be done with it. */
 function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data: LibraryBoot; onPatch: (p: Partial<LibraryItem>) => void; onGone: () => void }) {
+  const { can } = useSession();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -303,16 +306,19 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
       <CardView design={draft.design} profile={profile} />
       <div data-doc><DocView doc={draft.doc} kind={draft.kind} /></div>
       {!isArticle && draft.hashtags.length > 0 && <p className="text-brand">{draft.hashtags.map((h) => `#${h}`).join(" ")}</p>}
+      {(draft.createdByName || draft.approvedByName) && (
+        <p className="text-xs text-muted-foreground">{draft.createdByName && `Written by ${draft.createdByName}`}{draft.approvedByName && ` · approved by ${draft.approvedByName}`}</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {editable && <Button asChild size="sm" variant="brand"><a href={draftLink(base(), item)}><PenLine /> Edit</a></Button>}
         {pagePath(draft) && <Button asChild size="sm" variant="outline"><a href={pagePath(draft)!} target="_blank" rel="noopener noreferrer"><Globe /> View page</a></Button>}
-        {draft.status === "draft" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => api.approveDraft(draft.id))}><Check /> Approve</Button>}
+        {draft.status === "draft" && can("approve") && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => api.approveDraft(draft.id))}><Check /> Approve</Button>}
         {draft.status === "approved" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => api.unapproveDraft(draft.id))}><Undo2 /> Back to draft</Button>}
-        {draft.status === "approved" && !isArticle && (
+        {draft.status === "approved" && !isArticle && can("publish") && (
           <Button asChild size="sm" variant="outline"><a href={draftLink(base(), item) + "&open=preview"}><CalendarClock /> Schedule…</a></Button>
         )}
-        {draft.status === "approved" && isArticle && (
+        {draft.status === "approved" && isArticle && can("approve") && (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setPlanning((v) => !v)}><CalendarClock /> {draft.scheduledAt ? "Change date" : "Plan a date"}</Button>
         )}
         {isArticle && (
@@ -322,7 +328,7 @@ function DraftDetail({ item, data, onPatch, onGone }: { item: LibraryItem; data:
             <Button size="sm" variant="ghost" onClick={() => downloadBlob(new Blob([articleHtmlPage(draft.title || item.title, document.querySelector<HTMLElement>("[data-doc] .ProseMirror")?.innerHTML ?? "")], { type: "text/html;charset=utf-8" }), `${name}.html`)}><Download /> HTML</Button>
           </>
         )}
-        {draft.status !== "scheduled" && (
+        {draft.status === "draft" && (
           <Button size="sm" variant={confirm ? "destructive" : "ghost"} className="ml-auto" disabled={busy} onClick={() => void remove()}>
             <Trash2 /> {confirm ? "Confirm: delete" : "Delete"}
           </Button>
@@ -362,6 +368,7 @@ function Poster({ id }: { id: string }) {
 
 /** The whole record of a post: what was sent, when, and what LinkedIn answered. */
 function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGone: () => void }) {
+  const { can } = useSession();
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -384,7 +391,7 @@ function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGo
     setBusy(true);
     try { await api.deleteJob(id); onGone(); } catch (e) { setError(message(e)); setBusy(false); }
   };
-  const removable = job.status !== "scheduled" && job.status !== "publishing";
+  const removable = can("publish") && job.status !== "scheduled" && job.status !== "publishing";
   return (
     <div className="mt-3 space-y-3 rounded-md border border-border bg-card p-3 text-sm">
       <Poster id={id} />

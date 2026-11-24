@@ -25,7 +25,7 @@ cp .env.example .env       # edit it; see Configuration
 docker compose up -d       # http://localhost:8080
 ```
 
-The server listens on `127.0.0.1` only. Open <http://localhost:8080> for the landing page and click **Open editor** (or go straight to `/studio/`). Your data is saved in `data/cardpress.db`.
+The server listens on `127.0.0.1` only. Open <http://localhost:8080> for the landing page and click **Open editor** (or go straight to `/studio/`). The first time, you are asked to **create the admin account** (your name, email and a password); it becomes the admin and keeps anything already saved. After that, the app opens at a sign-in page, and others can use **Create an account** (an editor by default). See [Accounts and roles](accounts.md). Your data is saved in `data/cardpress.db`.
 
 ## Design a card
 

@@ -33,6 +33,12 @@ type Deps struct {
 	Proposals interface {
 		Propose(ctx context.Context, in service.ExternalProposal) (service.ProposalView, error)
 		Proposal(ctx context.Context, id string) (service.ProposalView, error)
+		ProposalBrand(ctx context.Context, proposalID string) (string, error)
+	}
+	// Access says who owns a brand. With a person (an API key) in the context, a tool only reaches that person's brands;
+	// with none (the machine token, or a local stdio process) it reaches all, as it always has.
+	Access interface {
+		BrandOwner(ctx context.Context, id string) (string, bool, error)
 	}
 	Jobs interface {
 		List(ctx context.Context, profileID string) ([]service.Job, error)

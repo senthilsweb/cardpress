@@ -23,6 +23,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const [drafts, setDrafts] = useState<Draft[]>(initial);
   const [currentId, setCurrentId] = useState(initial[0]?.id ?? "");
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [rev, setRev] = useState(0); // changes when the text is replaced from outside (a restore), so the editor loads it
   const ref = useRef(drafts);
   const idRef = useRef(currentId);
   const dirty = useRef<string | null>(null);
@@ -125,8 +126,17 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
     try { const saved = await api.getDraft(id); commit(ref.current.map((x) => (x.id === saved.id && dirty.current !== x.id ? meta(x, saved) : x))); } catch { /* the next look will do */ }
   }, []);
 
+  /** Put an old version back as the open draft's text. */
+  const restoreVersion = useCallback(async (seq: number) => {
+    await flush();
+    const id = idRef.current;
+    const d = await api.restoreVersion(id, seq);
+    commit(ref.current.map((x) => (x.id === d.id ? d : x)));
+    setRev((r) => r + 1);
+  }, [flush]);
+
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus };
+  return { drafts, current, rev, restoreVersion, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

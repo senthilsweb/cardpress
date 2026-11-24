@@ -1,14 +1,15 @@
 # Data model
 
-CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is, and notes what the next change adds. **It is updated with every migration.**
+CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0013). **It is updated with every migration.**
 
 ## Conventions
 
 - Ids are 16 hex characters made by the server (`newID`). A brand's id is chosen when it is created.
 - Times are UTC text in RFC 3339 (`2026-11-24T17:43:50Z`); drafts keep milliseconds. Text sorts correctly, so no date type is needed.
 - Structured values are JSON text (`hashtags`, `doc`, `data`, `steps`). The shape of each is below. The server validates them on the way in.
-- A brand owns its rows through `profile_id`. There are no database foreign keys: the services delete a brand's rows together (see `DeleteProfile`), inside one transaction.
-- Secrets are never stored in plain text: `credentials.value` is sealed with the secret key (AES-GCM, tied to its network and field).
+- A brand owns its rows through `profile_id`, and a person owns their brands through `profiles.owner_id`. There are no database foreign keys: the services delete rows together (see `DeleteProfile`), inside one transaction, and every read narrows by owner in the query itself, so a row that is not yours is never returned.
+- Person columns (`owner_id`, `created_by`, `approved_by`, `user_id`) hold a `users.id`. They are **empty for rows that predate accounts**, which the first account adopts.
+- Secrets are never stored in plain text: `credentials.value` is sealed with the secret key (AES-GCM, tied to its network and field). Passwords (`users.password_hash`, argon2id), session cookies (`sessions.token_hash`) and API keys (`api_keys.key_hash`, SHA-256) are stored only as hashes; the value itself cannot be read back.
 
 ## Relationships
 
@@ -24,9 +25,20 @@ erDiagram
     conversations ||--o{ chat_messages : contains
     conversations ||--o{ proposals : "proposes"
     proposals }o--o| drafts : "approved into (draft_id)"
+    drafts ||--o{ draft_versions : "history"
+    draft_versions }o--o{ doc_blobs : "pictures (by hash)"
+    users ||--o{ user_roles : "holds"
+    users ||--o{ sessions : "signs in"
+    users ||--o{ api_keys : "makes"
+    users ||--o{ user_preferences : "settings"
+    users ||--o{ profiles : "owns (owner_id)"
+    users ||--o{ drafts : "writes (created_by)"
+    users ||--o{ conversations : "chats (user_id)"
     preferences
     mcp_audit
 ```
+
+Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown as the `users` lines. `drafts.approved_by` and `publish_jobs.created_by` also hold a user id.
 
 ## Tables
 
@@ -34,7 +46,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `profiles` | 0001, 0007 | `id` (PK), `position`, `data` (JSON: name, handle, website, logo, fonts, colour sets), `updated_at`, `archived_at` (set when a brand is archived, empty otherwise) |
+| `profiles` | 0001, 0007, 0011 | `id` (PK), `position`, `data` (JSON: name, handle, website, logo, fonts, colour sets), `updated_at`, `archived_at` (set when a brand is archived, empty otherwise), `owner_id` (who made it; empty for brands that predate accounts, which the first account adopts) |
 | `designs` | 0001 | `profile_id` (PK), `data` (JSON: the brand's current card design), `updated_at` |
 | `preferences` | 0001 | `key` (PK), `value` (JSON), `updated_at`. Keys: `theme`, `layout`, `customFonts`, `activeProfile`, `envProfile` |
 
@@ -44,7 +56,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
+| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -52,7 +64,7 @@ erDiagram
 
 | Table | Migration | Columns |
 |---|---|---|
-| `publish_jobs` | 0004 | `id` (PK), `profile_id`, `draft_id`, `network` (`linkedin`), `status`, `body`, `hashtags` (JSON), `alt_text`, `image` (BLOB, the card PNG), `scheduled_at`, `timezone`, `error`, `post_urn`, `post_url`, `created_at`, `updated_at`, `published_at`. Indexes `(status, scheduled_at)` and `(profile_id, created_at DESC)` |
+| `publish_jobs` | 0004 | `id` (PK), `profile_id`, `draft_id`, `network` (`linkedin`), `status`, `body`, `hashtags` (JSON), `alt_text`, `image` (BLOB, the card PNG), `scheduled_at`, `timezone`, `error`, `post_urn`, `post_url`, `created_by`, `created_at`, `updated_at`, `published_at`. Indexes `(status, scheduled_at)` and `(profile_id, created_at DESC)` |
 | `publish_attempts` | 0008 | `id` (PK), `job_id`, `started_at`, `finished_at`, `outcome`, `error`, `steps` (JSON). Index `(job_id, started_at)` |
 | `credentials` | 0003, 0007 | `profile_id`, `network`, `field`, `value` (sealed), `updated_at`. Primary key `(profile_id, network, field)` |
 
@@ -64,7 +76,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005 | `id` (PK), `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
+| `conversations` | 0005, 0011 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
 | `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`. Unique `(conversation_id, seq)` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 
@@ -88,6 +100,9 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0008 | `publish_attempts` |
 | 0009 | `drafts`: `title`, `design`, `design_version`, `approved_at`, `scheduled_at`, `timezone`; the status workflow |
 | 0010 | `drafts`: `slug`, `summary`, `page_at`, `cover`; the public pages |
+| 0011 | Accounts: `users`, `user_roles`, `sessions`, `user_preferences`; `profiles.owner_id`, `drafts.created_by` and `approved_by`, `publish_jobs.created_by`, `conversations.user_id` |
+| 0012 | `draft_versions` and `doc_blobs`: the history of an item |
+| 0013 | `api_keys`: keys for programs (MCP, scripts), scoped and revocable |
 
 ## Draft status and approval
 
@@ -111,6 +126,35 @@ stateDiagram-v2
 ### The public page columns
 
 `slug` is the page's address within its kind (`/articles/<slug>` or `/posts/<slug>`) and is unique per kind. `page_at` is when the page went live; **empty means it is not public**. `summary` is the description for previews (empty: the first paragraph). `cover` is the card as a PNG (1200 × 627), the page's preview image, `NULL` when there is none. Only an item whose status is `approved`, `scheduled` or `published` can have a live page, and the public reader checks that again; any change to the item, or taking its approval back, clears `page_at` and `cover`. Taking a page down clears only `page_at`, so its address is kept. See [Public pages](public-pages.md).
+
+### Accounts
+
+| Table | Columns |
+|---|---|
+| `users` | `id` (PK), `email` (unique, lower-case), `first_name`, `last_name`, `phone`, `birth_date` (`YYYY-MM-DD` or empty), `password_hash` (argon2id), `status` (`active` or `disabled`), `created_at`, `last_login_at`. The full name is `first_name last_name`; it is not stored |
+| `user_roles` | `user_id`, `role` (`admin`, `editor` or `writer`); primary key `(user_id, role)`. One row each today, but a person may hold several: what they may do is everything any of their roles allows |
+| `sessions` | `token_hash` (PK, the hash of the cookie value), `user_id`, `created_at`, `last_seen_at`, `expires_at` |
+| `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, layout, the open brand, custom fonts. System-wide keys (such as `envProfile`) stay in `preferences` |
+| `api_keys` | `id` (PK), `user_id`, `name`, `prefix` (the key's first characters, to tell keys apart), `key_hash` (SHA-256 of the key; unique; **the key itself is never stored**), `scope` (`editor`), `created_at`, `last_used_at`, `revoked_at` (empty while the key works) |
+
+Indexes: `users.email` is unique; `user_roles` and `user_preferences` are keyed by their primary keys; `sessions` has `(user_id)` and `(expires_at)`; `api_keys` has `(user_id)` and a unique `key_hash`; `profiles` has `(owner_id)`.
+
+A brand belongs to the person in `profiles.owner_id`, and everything keyed by `profile_id` (designs, drafts, posts, conversations, credentials) follows it. An admin sees all; anyone else sees only their own brands. See [Accounts and roles](accounts.md).
+
+**What the roles are.** `user_roles.role` is the only place a role is kept. What a role may do (`write`, `approve`, `publish`, `social`, `users`) is code, not data: writer has `write`; editor adds `approve`, `publish` and `social`; admin has all five. A person with several rows may do everything any of them allows. An API key's scope (`api_keys.scope`, today `editor`) names a set of those permissions; the key may do what its scope **and** its person's roles both allow, and is never an admin.
+
+**Sessions and keys.** A session lasts 14 days from the last use (`expires_at` moves forward as it is used); expired rows are removed. A key is revoked by setting `revoked_at`; a revoked key, or a key whose person is `disabled`, is refused. `last_used_at` is written at most once a minute.
+
+**What is removed with what.** Deleting a brand removes its designs, drafts (with their versions), posts and attempts, conversations (with messages and proposals) and credentials. Deleting a draft removes its versions. Disabling a person keeps their rows and ends their sessions and keys.
+
+### History
+
+`draft_versions` holds one row per saved state of an item: `draft_id`, `seq` (1, 2, 3… per item), `label` (`created`, `auto`, `manual`, `approved`, `sent`, `restored`), `note`, `kind`, `title`, `doc`, `hashtags`, `alt_text`, `unicode_styles`, `design`, `design_version`, `blobs`, `created_by`, `created_at`. Versions are taken when an item is created, approved, sent or restored, when saved by hand, and automatically after a change if ten minutes have passed since the last. At most 100 are kept per item (the oldest automatic ones go first). In a version's `doc` each picture is replaced by `blob:<hash>`; `doc_blobs` (`hash`, `mime`, `data`) holds each distinct picture once, so ten versions of an article with seven pictures store seven pictures, not seventy. Pictures no version refers to are removed.
+
+| Table | Columns |
+|---|---|
+| `draft_versions` | `id` (PK), `draft_id`, `seq`, `label`, `note`, `kind`, `title`, `doc`, `hashtags`, `alt_text`, `unicode_styles`, `design`, `design_version`, `blobs` (JSON list of the picture hashes the version uses), `created_by`, `created_at`. Unique `(draft_id, seq)` |
+| `doc_blobs` | `hash` (PK, SHA-256 of the picture), `mime`, `data` (BLOB) |
 
 ### The design column
 

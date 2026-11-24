@@ -201,9 +201,9 @@ func (c *Chat) Start(ctx context.Context, profileID, rawURL, text string) (Conve
 	at := c.stamp()
 	id := newID()
 	_, err := c.db.ExecContext(ctx,
-		`INSERT INTO conversations (id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, profileID, title, kind, srcURL, srcTitle, srcText, boolInt(truncated), at, at)
+		`INSERT INTO conversations (id, user_id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, actorID(ctx), profileID, title, kind, srcURL, srcTitle, srcText, boolInt(truncated), at, at)
 	if err != nil {
 		return Conversation{}, err
 	}
@@ -604,8 +604,8 @@ func (c *Chat) Propose(ctx context.Context, in ExternalProposal) (ProposalView, 
 		}
 		at := c.stamp()
 		if _, err := c.db.ExecContext(ctx,
-			`INSERT INTO conversations (id, profile_id, title, source_kind, source_title, source_text, created_at, updated_at) VALUES (?, ?, ?, 'mcp', ?, '', ?, ?)`,
-			convID, in.ProfileID, title, caller, at, at); err != nil {
+			`INSERT INTO conversations (id, user_id, profile_id, title, source_kind, source_title, source_text, created_at, updated_at) VALUES (?, ?, ?, ?, 'mcp', ?, '', ?, ?)`,
+			convID, actorID(ctx), in.ProfileID, title, caller, at, at); err != nil {
 			return ProposalView{}, err
 		}
 	} else {
@@ -644,4 +644,14 @@ func (c *Chat) Proposal(ctx context.Context, id string) (ProposalView, error) {
 		return p, ErrNotFound
 	}
 	return p, err
+}
+
+// ProposalBrand returns the brand a proposal belongs to (through its conversation), for checking who may act on it.
+func (c *Chat) ProposalBrand(ctx context.Context, proposalID string) (string, error) {
+	var profileID string
+	err := c.db.QueryRowContext(ctx, `SELECT c.profile_id FROM proposals p JOIN conversations c ON c.id = p.conversation_id WHERE p.id = ?`, proposalID).Scan(&profileID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return profileID, err
 }
