@@ -27,7 +27,7 @@ Cards are drawn and exported in the browser. Your profile, drafts and preference
 
   These are common recommended sizes. Platforms change them from time to time, so edit `web/src/lib/sizes.ts` if needed.
 - **Post composer**: write the post or article in a rich-text editor (lists, hashtags, alt text), check it in a full preview of the LinkedIn feed, and copy it. Drafts are saved on the server. See [Post authoring](docs/post-authoring.md).
-- **Chat for content**: give it a web address or some text and it drafts a post or article for you to approve, edit or reject, then revise by replying. It prepares content only and never publishes. It uses a built-in demo agent for now (no AI model); the real agent plugs in later. See [Chat](docs/chat.md).
+- **Chat for content**: give it a web address or some text and it drafts a post or article for you to approve, edit or reject, then revise by replying. It prepares content only and never publishes. It uses a built-in demo agent by default, or a Claude Managed Agent when configured (see [Claude Managed Agent](docs/cma-agent.md)). See [Chat](docs/chat.md).
 - **MCP server**: an outside AI agent can read drafts and job status, read public web pages, and propose content that waits for your approval. It cannot publish, schedule, change drafts or touch credentials, and every call is audited. Over HTTP at `/mcp` or `cardpress mcp` over stdio. See [MCP](docs/mcp.md).
 - **Publish and schedule**: from the Full preview, post to LinkedIn now or at a chosen time (with the card image), with a queue, per-post status, and no automatic retries. See [Publishing](docs/publishing.md).
 - **Feed preview**: shows the card inside a plain post frame with your post text, plus a character count for each network.
@@ -72,6 +72,7 @@ Images are built by GitHub Actions. To build locally anyway:
 ```bash
 make docker
 make docker-run      # http://localhost:8080
+docker compose up -d # with a .env, see docs/deployment.md
 ```
 
 ### Serve under a sub-path

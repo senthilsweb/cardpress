@@ -23,6 +23,7 @@ import (
 
 	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/api"
+	"github.com/senthilsweb/cardpress/internal/cma"
 	"github.com/senthilsweb/cardpress/internal/config"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
@@ -41,6 +42,15 @@ func main() {
 	// `cardpress mcp` speaks the Model Context Protocol on stdin/stdout, for an agent running on this machine
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
 		runMCP(os.Args[2:])
+		return
+	}
+	// `cardpress healthcheck` is for the container health check: the image has no shell or curl
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck())
+	}
+	// `cardpress agent-setup` creates the Claude Managed Agent once; the user runs it on purpose
+	if len(os.Args) > 1 && os.Args[1] == "agent-setup" {
+		runAgentSetup(os.Args[2:])
 		return
 	}
 	cfg, err := config.Load(os.Args[1:], os.Getenv)
@@ -94,7 +104,11 @@ func main() {
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
 	studio := service.New(db.DB)
 	fetcher := source.New()
-	chat := service.NewChat(db.DB, &agent.Mock{Delay: 25 * time.Millisecond}, fetcher)
+	chatAgent, err := newAgent(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	opts := api.Options{
 		Studio: studio, Settings: settings, Publishing: publisher, Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
@@ -229,7 +243,11 @@ func runMCP(args []string) {
 	}
 	studio := service.New(db.DB)
 	fetcher := source.New()
-	chat := service.NewChat(db.DB, &agent.Mock{}, fetcher)
+	chatAgent, err := newAgent(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
 	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
@@ -237,4 +255,61 @@ func runMCP(args []string) {
 	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
 		log.Fatal(err)
 	}
+}
+
+// newAgent picks the chat's writer: the built-in demo, or a Claude Managed Agent.
+func newAgent(cfg config.Config) (agent.Client, error) {
+	if cfg.Agent != "cma" {
+		return &agent.Mock{Delay: 25 * time.Millisecond}, nil
+	}
+	return cma.New(cma.Config{AgentID: cfg.AgentID, AgentVersion: cfg.AgentVersion, EnvironmentID: cfg.AgentEnvID, BudgetCents: cfg.AgentBudget}, cfg.AgentTimeout)
+}
+
+// runAgentSetup creates the managed agent and environment in the Anthropic account behind ANTHROPIC_API_KEY, and prints
+// the settings to add to the environment.
+func runAgentSetup(args []string) {
+	fs := flag.NewFlagSet("agent-setup", flag.ExitOnError)
+	model := fs.String("model", cma.DefaultModel, "model the agent uses")
+	_ = fs.Parse(args)
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
+		log.Fatal("set ANTHROPIC_API_KEY first: this creates an agent and an environment in that Anthropic account")
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	created, err := cma.Setup(ctx, cma.Config{}, *model)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Created agent %s (version %d) and environment %s.\n\nAdd to the server's environment:\n\n  CARDPRESS_AGENT=cma\n  CARDPRESS_AGENT_ID=%s\n  CARDPRESS_AGENT_ENVIRONMENT_ID=%s\n  ANTHROPIC_API_KEY=...   (the same key)\n\nOptional: CARDPRESS_AGENT_BUDGET_CENTS=500 caps what one conversation can spend.\n",
+		created.AgentID, created.AgentVersion, created.EnvironmentID, created.AgentID, created.EnvironmentID)
+}
+
+// runHealthcheck asks the server on this machine whether it is up. It returns the exit code.
+func runHealthcheck() int {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:" + envOr("PORT", "8080")
+	}
+	if strings.HasPrefix(addr, ":") {
+		addr = "127.0.0.1" + addr
+	}
+	client := http.Client{Timeout: 4 * time.Second}
+	resp, err := client.Get("http://" + addr + "/healthz")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "unhealthy:", resp.Status)
+		return 1
+	}
+	return 0
+}
+
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
 }
