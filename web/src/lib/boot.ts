@@ -95,10 +95,13 @@ export function useBoot() {
     try {
       const info = await api.info();
       if (info.authRequired && !getToken()) return setBoot({ status: "auth" });
-      const state = await api.state();
+      let state = await api.state();
       if (!state.profiles.length) {
         const legacy = readLegacy();
         if (legacy) return setBoot({ status: "legacy", legacy });
+        // A fresh install: save the starting brand now, so the server knows it (accounts and posts are kept per brand).
+        await api.putProfiles(DEFAULT_PROFILES);
+        state = await api.state();
       }
       const pid = pickActive(state.preferences.activeProfile, state.profiles as Profile[]) ?? DEFAULT_PROFILES[0].id;
       const drafts = await loadDrafts(pid, state.designs[pid] as Design | undefined);
