@@ -45,7 +45,7 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
 - [x] Migration `chat_usage`; show a conversation's cost
 - [x] Read the session's usage after a reply
-- [ ] Also record usage after a stopped or failed reply (the next successful reply includes it)
+- Not planned: recording usage after a stopped or failed reply (the owner reads costs in the Claude console)
 - [x] Tests with a scripted fake; a local run against a stand-in service with the real library and MCP
 - [ ] Try it against the real account (ask first: it costs money)
 
