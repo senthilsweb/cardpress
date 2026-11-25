@@ -65,6 +65,6 @@ To enable the assistant later: run `cardpress agent-setup` on your machine with 
 
 - **Access**: the app is on the public internet. The token is a single shared guard, not user accounts: anyone with it has full access. For stricter access put Fly private networking or an access proxy in front. Fly serves HTTPS.
 - **Volume**: it belongs to one machine in one region. Fly takes daily snapshots; `backup` takes one on demand. The image runs as root in this setup because a Fly volume is mounted root-owned (the Compose and Turso setups run as a non-root user).
-- **Size**: `shared-cpu-1x` with 256 MB is enough for one person. Change it in `fly.toml`.
+- **Size**: `shared-cpu-1x` with 256 MB is enough for one person. Change it in `fly.toml`. A password check needs 64 MB, so `fly.toml` sets `GOMEMLIMIT` to keep Go's memory under the machine size, and the server checks one password at a time. If you raise the machine size, raise `GOMEMLIMIT` with it (about 60% of the memory).
 - **Region**: pass `--region` on the first `up`; the volume and machine must be in the same region.
 - **Destroying**: `scripts/deploy-fly.sh destroy --app my-cardpress` asks you to type the app name. It deletes the data.
