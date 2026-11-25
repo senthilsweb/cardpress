@@ -27,7 +27,7 @@ func TestAPostCanCarrySeveralPictures(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if d.Attachment != AttachImages || len(d.Images) != 3 || d.Status != StatusDraft {
+	if d.Attachment != AttachImages || len(d.Images) != 3 || d.Status != StatusDraft || d.Images[0].Size != int64(len(pngN(1))) || d.AttachmentSize != 0 {
 		t.Fatalf("%+v", d)
 	}
 	if _, _, err := st.AttachmentFile(ctx, id); !errors.Is(err, ErrNotFound) {

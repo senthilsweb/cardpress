@@ -66,6 +66,8 @@ type Draft struct {
 	// VideoURL is the public address of a post whose attachment is "video", and VideoSize the file's size when checked.
 	VideoURL  string `json:"videoUrl,omitempty"`
 	VideoSize int64  `json:"videoSize,omitempty"`
+	// AttachmentSize is the bytes of a post's own picture or document.
+	AttachmentSize int64 `json:"attachmentSize,omitempty"`
 	// Images are the pictures of a post whose attachment is "images", in order.
 	Images []DraftImage `json:"images,omitempty"`
 	// Who wrote it and who approved it (ids, and the names for showing).
@@ -157,7 +159,7 @@ func newID() string {
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
 // draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, created_by, approved_by,
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, COALESCE(length(attachment), 0), created_by, approved_by,
 	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
@@ -170,7 +172,7 @@ func scanDraft(r scanner) (Draft, error) {
 	var doc, tags, design string
 	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.AttachmentSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)

@@ -82,6 +82,22 @@ One video is sent at a time, in the background, so other posts that are due do n
 | `DELETE /api/v1/drafts/{id}/images/{image}` | Remove one image |
 | `PUT /api/v1/drafts/{id}/video` | `{"url": "https://…/video.mp4"}`: the post's video, by its public address. `PUT .../attachment/title` sets its title, `DELETE .../attachment` goes back to the card |
 
+## What other networks accept
+
+CardPress publishes to LinkedIn only. The previews for X, Instagram and Facebook follow what each network's developer documentation says one post can carry (checked 2026-11-25):
+
+| Post carries | LinkedIn | X | Instagram | Facebook |
+|---|---|---|---|---|
+| The card | Yes | Yes | Yes | Yes |
+| One image | Yes | Up to 5 MB | Up to 8 MB | Up to 10 MB |
+| Several images | Up to 10 here | Up to 4, 5 MB each | Carousel up to 20, 8 MB each | Yes, 10 MB each |
+| PDF | Yes | No | No | No |
+| Video | Yes | Yes | Up to 300 MB | Yes |
+
+With **Feed preview** on, a network that cannot take the post is struck through, cannot be selected, shows no preview and is left out of **All sizes**; the Attachment section says why, and its character count is hidden there. With Feed preview off, the canvas is the card itself, and every size can still be designed and downloaded.
+
+Not checked: video length, image dimensions and aspect ratios (Instagram asks for 4:5 to 1.91:1), and file formats beyond the ones CardPress accepts (Instagram's publishing API takes JPEG only). Meta's pages do not mention documents at all, and X's help pages could not be read, so its figures come from its API documentation.
+
 ## Approve first
 
 A post is only sent from an **approved** draft. In the Review section of the Post tab, a draft shows its status and an **Approve** button; the Full preview offers the same button instead of Publish until it is approved. Approving is a deliberate step between writing and sending.

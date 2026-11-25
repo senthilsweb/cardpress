@@ -23,11 +23,12 @@ type DraftImage struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
 	AltText string `json:"altText"`
+	Size    int64  `json:"size"` // bytes
 }
 
 // imagesOf lists the pictures of the given drafts, in order, keyed by draft.
 func imagesOf(ctx context.Context, db *sql.DB, where string, args ...any) (map[string][]DraftImage, error) {
-	rows, err := db.QueryContext(ctx, `SELECT draft_id, id, type, alt_text FROM draft_images WHERE `+where+` ORDER BY draft_id, position, id`, args...)
+	rows, err := db.QueryContext(ctx, `SELECT draft_id, id, type, alt_text, length(data) FROM draft_images WHERE `+where+` ORDER BY draft_id, position, id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +36,7 @@ func imagesOf(ctx context.Context, db *sql.DB, where string, args ...any) (map[s
 	for rows.Next() {
 		var draft string
 		var im DraftImage
-		if err := rows.Scan(&draft, &im.ID, &im.Type, &im.AltText); err != nil {
+		if err := rows.Scan(&draft, &im.ID, &im.Type, &im.AltText, &im.Size); err != nil {
 			rows.Close()
 			return nil, err
 		}

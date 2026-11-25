@@ -43,3 +43,8 @@
 - [ ] Memory check: the largest allowed video on a 256 MB machine (by design one part is held; not measured)
 - [ ] A real public video address, and one real post
 - [ ] Not done: the waiting for processing is inside the "publishing" state, not a job state of its own; duration is not checked; no thumbnail or captions; the library shows no picture for a video job
+
+## Other networks (previews only)
+- [x] Rules per network from X's and Meta's developer documentation (`web/src/lib/media.ts`)
+- [x] Feed preview shows the post's own file; a network that cannot take it is not selectable and has no preview; the editor says why
+- [ ] Not done: video length, image dimensions and aspect ratio are not checked; publishing to these networks is not built

@@ -17,7 +17,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "@/lib/profiles";
 import { blankDesign, brandColor, move } from "@/lib/brands";
-import { NETWORKS, SIZES, sizeById, type Size } from "@/lib/sizes";
+import { NETWORKS, SIZES, sizeById, type Network, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
 import { useSyncedState } from "@/lib/store";
 import { useTheme } from "@/lib/useTheme";
@@ -31,6 +31,8 @@ import { BuiltWith, Logo } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useDrafts } from "@/lib/useDrafts";
+import { usePostMedia } from "@/lib/usePostMedia";
+import { leftOut, whyNot } from "@/lib/media";
 import { useJobs } from "@/lib/useJobs";
 import { useChat } from "@/lib/useChat";
 import { docFromAgentText, type ProposalEdit } from "@/lib/chat";
@@ -251,6 +253,10 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const maxW = Math.max(200, box.w - 64), maxH = Math.max(200, box.h - 72);
 
   const cardProps = { design, profile, palette };
+  // a feed preview shows what the post carries, and only for the networks that can take it
+  const media = usePostMedia(store.current);
+  const cannot = (net: Network) => (feed ? whyNot(net, media.media) : null);
+  const excluded = feed ? leftOut(media.media) : [];
 
   return (
     <TooltipProvider delayDuration={250}>
@@ -304,7 +310,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer onOpenHistory={() => setPanel("history")} openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -337,18 +343,20 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                   <span className="mr-1 text-xs font-semibold">{net}</span>
                   {SIZES.filter((s) => s.net === net).map((s) => {
                     const on = view === "one" && s.id === size.id;
+                    const why = cannot(net);
                     return (
                       <Tooltip key={s.id}>
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            onClick={() => { set({ sizeId: s.id }); setView("one"); }}
-                            className={cn("cursor-pointer rounded px-2 py-1 text-xs", on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                            aria-disabled={!!why}
+                            onClick={() => { if (why) return; set({ sizeId: s.id }); setView("one"); }}
+                            className={cn("rounded px-2 py-1 text-xs", why ? "cursor-not-allowed text-muted-foreground/45 line-through" : on ? "cursor-pointer bg-primary text-primary-foreground" : "cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground")}
                           >
                             {s.name}
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent>{s.w} × {s.h}</TooltipContent>
+                        <TooltipContent>{why ? `${net}: ${why}` : `${s.w} × ${s.h}`}</TooltipContent>
                       </Tooltip>
                     );
                   })}
@@ -360,7 +368,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 <Switch id="feed" checked={feed} onCheckedChange={setFeed} />
                 <Label htmlFor="feed" className="flex items-center gap-1 text-foreground"><Eye className="h-3.5 w-3.5" /> Feed preview</Label>
               </div>
-              <span className="eyebrow ml-2 hidden md:inline">{view === "one" ? `${size.net} · ${size.name} · ${size.w}×${size.h}` : `${SIZES.length} sizes`}</span>
+              <span className="eyebrow ml-2 hidden md:inline">{view === "one" ? `${size.net} · ${size.name} · ${size.w}×${size.h}` : `${SIZES.filter((s) => !cannot(s.net)).length} sizes`}</span>
               <div className="flex-1" />
               {note && <span className="flex items-center gap-1 text-xs text-brand"><Check className="h-3.5 w-3.5" />{note}</span>}
               {saveError && <span className="text-xs text-destructive">Could not save to the server – will retry on your next change</span>}
@@ -373,20 +381,23 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             <div ref={canvasRef} className="canvas-grid min-h-0 flex-1 overflow-auto">
               {view === "one" ? (
                 <div className="flex min-h-full items-center justify-center p-8">
-                  {feed ? (
-                    <FeedFrame {...cardProps} size={size} caption={caption} width={Math.min(maxW, size.w / size.h < 1 ? 470 : 560)} />
+                  {cannot(size.net) ? (
+                    <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {size.net} preview: {cannot(size.net)}.</p>
+                  ) : feed ? (
+                    <FeedFrame {...cardProps} {...media.frame} size={size} caption={caption} width={Math.min(maxW, size.w / size.h < 1 ? 470 : 560)} />
                   ) : (
                     <ScaledCard {...cardProps} size={size} maxW={maxW} maxH={maxH} />
                   )}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-start justify-center gap-6 p-8">
-                  {SIZES.map((s) => (
+                  {excluded.length > 0 && <p role="status" className="w-full text-center text-xs text-muted-foreground">Left out: {excluded.map((l) => `${l.net} (${l.why})`).join(", ")}</p>}
+                  {SIZES.filter((s) => !cannot(s.net)).map((s) => (
                     <button key={s.id} type="button" className="group cursor-pointer text-left" onClick={() => { set({ sizeId: s.id }); setView("one"); }}>
                       <div className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground group-hover:text-brand">
                         <b className="text-foreground">{s.net}</b> · {s.name} · {s.w}×{s.h}
                       </div>
-                      {feed ? <FeedFrame {...cardProps} size={s} caption={caption} width={320} /> : <ScaledCard {...cardProps} size={s} maxW={330} maxH={420} />}
+                      {feed ? <FeedFrame {...cardProps} {...media.frame} size={s} caption={caption} width={320} /> : <ScaledCard {...cardProps} size={s} maxW={330} maxH={420} />}
                     </button>
                   ))}
                 </div>

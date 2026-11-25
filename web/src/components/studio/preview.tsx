@@ -101,7 +101,12 @@ export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentT
       <video key={videoSrc} src={videoSrc} controls preload="metadata" playsInline aria-label={`Video: ${videoTitle ?? ""}`} className="block w-full" style={{ aspectRatio: "16 / 9" }} />
       <div className="truncate bg-white px-3.5 py-2 text-[13px] font-semibold">{videoTitle}</div>
     </div>
-  ) : mediaList && mediaList.length > 1 ? <PictureGrid urls={mediaList} /> : !mediaSrc ? null : documentTitle !== undefined ? (
+  ) : mediaList && mediaList.length > 1 ? (net === "Instagram" ? (
+    <div className="relative">
+      <img src={mediaList[0]} alt="" className="block aspect-square w-full object-cover" />
+      <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-0.5 text-[12px] font-medium text-white">1/{mediaList.length}</span>
+    </div>
+  ) : <PictureGrid urls={mediaList} />) : !mediaSrc ? null : documentTitle !== undefined ? (
     <div className="border-y border-neutral-200 bg-neutral-100">
       <div className="flex items-center gap-2 bg-neutral-800 px-3 py-2 text-[12.5px] font-medium text-white">
         <span className="min-w-0 flex-1 truncate">{documentTitle}</span><span className="shrink-0 text-neutral-300">PDF</span>

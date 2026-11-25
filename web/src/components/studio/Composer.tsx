@@ -27,7 +27,8 @@ import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
 import { formatInZone, type Job } from "@/lib/jobs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { usePictures } from "@/lib/usePictures";
+import { leftOut, whyNot } from "@/lib/media";
+import type { PostMediaView } from "@/lib/usePostMedia";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { cn } from "@/lib/utils";
 import type { DraftStore } from "@/lib/useDrafts";
@@ -53,7 +54,9 @@ const labelOf = (d: Draft) => {
 const loadPref = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
 const savePref = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* not remembered */ } };
 
-export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ media, onOpenHistory, openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+  /** What the open post carries. */
+  media: PostMediaView;
   /** Open the item's history (versions). */
   onOpenHistory?: () => void;
   /** Open the Full preview as soon as this shows (asked for by the library). */
@@ -95,18 +98,10 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   const collapse = () => { flushPendingEdits(); setExpanded(false); };
   useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
   const [tag, setTag] = useState("");
-  // the post's own picture, when it has one, as an address the page can show
-  const own = draft?.kind === "post" && (draft.attachment === "image" || draft.attachment === "document" || draft.attachment === "images" || draft.attachment === "video") ? draft.attachment : undefined;
+  const own = draft?.kind === "post" && media.media.kind !== "card" ? media.media.kind : undefined;
   const pics = own === "images" ? draft?.images ?? [] : [];
-  const picUrls = usePictures(own === "images" ? draft?.id : undefined, pics.map((p) => p.id));
-  const [ownSrc, setOwnSrc] = useState<string | undefined>();
+  const { picUrls, file: ownSrc } = media;
   const fileRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!own || own === "images" || own === "video" || !draft) { setOwnSrc(undefined); return; }
-    let live = true, url: string | undefined;
-    api.attachmentImage(draft.id).then((b) => { if (live) { url = URL.createObjectURL(b); setOwnSrc(url); } }).catch(() => undefined);
-    return () => { live = false; if (url) URL.revokeObjectURL(url); };
-  }, [own, draft?.id, draft?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };
   const [busy, setBusy] = useState<string | null>(null);
@@ -293,7 +288,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
           {isPost ? (
-            NETWORKS.map((net) => (
+            NETWORKS.filter((net) => !whyNot(net, media.media)).map((net) => (
               <Badge key={net} variant={ser.length > CAPTION_LIMITS[net] ? "warn" : "outline"}>{net} {ser.length}/{CAPTION_LIMITS[net].toLocaleString()}</Badge>
             ))
           ) : (
@@ -387,6 +382,9 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
                 </form>
               )}
             </div>
+            {leftOut(media.media).length > 0 && (
+              <p className="text-[11px] leading-snug text-muted-foreground" aria-label="Networks left out">Not for {leftOut(media.media).map((l) => `${l.net} (${l.why})`).join(", ")}.</p>
+            )}
             {own === "document" || own === "video" ? (
               <Field label={own === "video" ? "Video title" : "Document title"} hint={own === "video" ? "Shown with the video on LinkedIn." : "Shown above the pages on LinkedIn."}>
                 <Input key={`${draft.id}:${draft.attachmentTitle}`} defaultValue={draft.attachmentTitle ?? ""} maxLength={150} disabled={locked} aria-label={own === "video" ? "Video title" : "Document title"}
@@ -434,8 +432,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
       </Section>
 
       <FullPreview
-        image={own === "images" ? (pics.length === 1 ? picUrls[pics[0].id] : undefined) : own ? ownSrc : undefined}
-        images={own === "images" && pics.length > 1 ? pics.map((p) => picUrls[p.id]).filter(Boolean) : undefined}
+        media={media.frame}
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={preview ? html() : ""} design={design} profile={profile} palette={palette} size={size}
         actions={(

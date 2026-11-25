@@ -59,3 +59,14 @@ The system SHALL send documents and videos without holding the whole file in mem
 
 ### Requirement: Unchanged safeguards
 The system SHALL keep human confirmation, no automatic retries, and "needs review" for unclear outcomes for every attachment kind.
+
+### Requirement: Previews only where a network can take the post
+The system SHALL show a feed preview of a post for a network only when that network accepts what the post carries.
+
+#### Scenario: Unsupported attachment
+- **WHEN** a post carries something a network cannot take (such as a PDF on X, Instagram or Facebook)
+- **THEN** with feed preview on, that network cannot be selected and shows no preview, and the editor says why
+
+#### Scenario: Card design
+- **WHEN** feed preview is off
+- **THEN** every card size can be designed and exported

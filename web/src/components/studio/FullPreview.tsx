@@ -8,6 +8,7 @@ import { copyFormatted } from "@/lib/clipboard";
 import { fold, FOLD_CHARS, FOLD_LINES, LINKEDIN_LIMIT, type Serialized } from "@/lib/linkedin";
 import { sizeById, SIZES, type Size } from "@/lib/sizes";
 import type { Draft } from "@/lib/draft";
+import type { PostMediaView } from "@/lib/usePostMedia";
 import type { Design, Palette, Profile } from "@/lib/types";
 
 /** The LinkedIn size to show: the current one when it is a LinkedIn size, otherwise the standard post image. */
@@ -32,9 +33,7 @@ export function FullPreview(props: {
   size: Size;
   actions?: ReactNode;
   /** The post's own file, when it has one: shown in place of the card. */
-  image?: string;
-  /** The post's own pictures, when it has several, in order. */
-  images?: string[];
+  media?: PostMediaView["frame"];
 }) {
   const { draft, serialized: s } = props;
   const [copied, setCopied] = useState<string | null>(null);
@@ -63,7 +62,7 @@ export function FullPreview(props: {
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
           <div className="flex justify-center">
             {isPost ? (
-              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable mediaSrc={props.image} mediaList={props.images} documentTitle={draft.attachment === "document" ? draft.attachmentTitle ?? "" : undefined} videoSrc={draft.attachment === "video" ? draft.videoUrl : undefined} videoTitle={draft.attachmentTitle} />
+              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable {...props.media} />
             ) : (
               <div className="w-full max-w-xl space-y-4">
                 <div className="flex justify-center">

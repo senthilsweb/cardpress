@@ -10,7 +10,7 @@ export interface DocNode {
 }
 
 /** One picture of a post with several. Its bytes are fetched separately. */
-export interface DraftPicture { id: string; type: string; altText: string }
+export interface DraftPicture { id: string; type: string; altText: string; size?: number }
 
 export type DraftKind = "post" | "article";
 /** draft, then approved, then scheduled (a post is waiting) and published. An edit returns approved or published to draft. */
@@ -43,6 +43,8 @@ export interface Draft {
   /** The public address of a post's video, and the file's size when it was checked. */
   videoUrl?: string;
   videoSize?: number;
+  /** Bytes of a post's own picture or document. */
+  attachmentSize?: number;
   /** The pictures of a post whose attachment is "images", in order. */
   images?: DraftPicture[];
   /** Who wrote it and who approved it, for showing. */
