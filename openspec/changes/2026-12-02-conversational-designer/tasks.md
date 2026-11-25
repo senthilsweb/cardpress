@@ -9,16 +9,16 @@ Build order across this change and `2026-12-03-chat-workspace`:
 
 ## 1. Drafts and designs over MCP
 - [ ] Migration: `drafts.revision`
-- [ ] Service: partial draft update and `PatchDesign(draftID, changes)` with the field list, preset checks, one transaction, brand starting design, version before a body write
+- [ ] Service: partial draft update and `PatchCardText(draftID, text)` taking only the eight text fields, one transaction, brand starting design, version before a body write
 - [ ] `PUT /drafts/{id}` takes and returns the revision; the browser re-applies its unsaved fields on a refusal
-- [ ] Tools `get_design`, `update_design`, `create_draft`, `update_draft`, `set_attachment`; `get_draft` returns the contract's fields
-- [ ] `list_design_presets` returns font roles and fonts; preset test also compares them with the web app
+- [ ] Tools `get_design`, `update_card_text` (refuses every non-text field), `create_draft`, `update_draft`, `set_attachment`; `get_draft` returns the contract's fields
+- [ ] `list_design_presets` stays as it is
 
 ## 2. Live canvas
 - [ ] Hub in the service layer; draft writes and job changes publish to it
 - [ ] `GET /api/v1/events` (server-sent events, heartbeat, same access rules as the API)
 - [ ] Studio subscribes and applies `draft` and `job` events; unsaved typing is kept
-- [ ] Run for real: change a design from an MCP client and watch an open studio follow
+- [ ] Run for real: change a card's title from an MCP client and watch an open studio follow
 
 ## 3. Memory and connections over MCP
 - [ ] Migration `agent_memories`; service with the limits; tools `list_memories`, `save_memory`, `delete_memory`
@@ -32,7 +32,7 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 
 ## 5. The chat on the managed agents
-- [ ] Read the manifest (version 2); remove `agent-setup` and the two id settings
+- [ ] Read the manifest (version 3); remove `agent-setup` and the two id settings
 - [ ] `CARDPRESS_PUBLIC_URL` check; fall back to the demo agent with a clear message
 - [ ] Per-person vault and agent key, created on first chat; single vault when accounts are off
 - [ ] Adapter: MCP tool events as progress and recorded changes, outcomes in turn, sub-agent thread events, `requires_action` and `user.tool_confirmation`
@@ -44,4 +44,4 @@ Build order across this change and `2026-12-03-chat-workspace`:
 
 ## 6. Docs
 - [ ] `docs/mcp.md`, `docs/chat.md`, `docs/cma-agent.md`, `docs/configuration.md`, `docs/data-model.md`
-- [ ] `openspec/project.md`: the LLM may design and may post with confirmation; remove "blocked on the agent repo"
+- [ ] `openspec/project.md`: the LLM writes the card's words and the post, never the look, and may post with confirmation; remove "blocked on the agent repo"

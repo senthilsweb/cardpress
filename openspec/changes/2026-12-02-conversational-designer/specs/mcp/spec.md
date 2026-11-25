@@ -11,7 +11,7 @@ Replaced by "Tools that act are scoped and listed".
 ## ADDED Requirements
 
 ### Requirement: Tools that act are scoped and listed
-The system SHALL expose tools that change the design, write a draft, keep notes and publish a post, and SHALL give them only the methods those tools need.
+The system SHALL expose tools that change the words on a card, write a draft, keep notes and publish a post, and SHALL give them only the methods those tools need.
 
 #### Scenario: Reachable methods
 - **WHEN** the tools are built
@@ -21,20 +21,28 @@ The system SHALL expose tools that change the design, write a draft, keep notes 
 - **WHEN** a key calls any tool with another person's brand
 - **THEN** the answer is the same as for a brand that does not exist
 
-### Requirement: Design by tool
-The system SHALL let an agent read and change the card design of a draft.
+### Requirement: Card text by tool
+The system SHALL let an agent read the card design of a draft and change only the words on it.
 
 #### Scenario: Partial change
-- **WHEN** an agent calls `update_design` with `{"background": "mesh", "titleScale": 1.2}`
+- **WHEN** an agent calls `update_card_text` with `{"title": "Ship less, learn more", "tag": "Field notes"}`
 - **THEN** only those two fields of that draft change, the brand's starting design follows, and the whole design is returned
 
 #### Scenario: Draft with its own design
-- **WHEN** a draft has its own design and `update_design` succeeds
+- **WHEN** a draft has its own design and `update_card_text` succeeds
 - **THEN** the canvas showing that draft changes
 
-#### Scenario: Invalid value
-- **WHEN** a change names a layout, background, size, colour set or font that the brand cannot use, or a value out of range
-- **THEN** nothing is stored and the message says which values are allowed
+#### Scenario: Aesthetics are refused
+- **WHEN** a change names `layout`, `background`, `paletteId`, `sizeId`, `seed`, `titleScale`, `intensity`, `bottomFade`, `showLogo`, `showFooter` or `fonts`
+- **THEN** nothing is stored, including any text field in the same call, and the message says the person sets it in the studio
+
+#### Scenario: No path to aesthetics
+- **WHEN** the tools are built
+- **THEN** the pinned test shows no reachable method that can set a non-text design field
+
+#### Scenario: Too long
+- **WHEN** a text field is over the editor's limit
+- **THEN** nothing is stored and the message gives the limit
 
 #### Scenario: Images
 - **WHEN** a change names `photos`, `screenshot` or `bgImage`

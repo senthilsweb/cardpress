@@ -3,7 +3,7 @@
 The only things the two repositories share. This file is authoritative; `social-card-agent` keeps a copy in
 `openspec/changes/2026-11-26-studio-contract/contract.md`. Change it here first, then copy it.
 
-Version 2.
+Version 3. (Version 3: the agent changes the words on a card, never how it looks. `update_design` is replaced by `update_card_text`.)
 
 ## 1. MCP tools
 
@@ -13,7 +13,7 @@ Tools that work on a draft take `draftId`; the brand is found from the draft and
 | Tool | Input | Result | Needs |
 |---|---|---|---|
 | `list_profiles` | | brands | read |
-| `list_design_presets` | `profileId` | layouts, backgrounds, sizes, colour sets, font roles, fonts | read |
+| `list_design_presets` | `profileId` | as today. For outside agents; the managed agent does not use it | read |
 | `list_drafts` | `profileId` | drafts with a preview | read |
 | `get_draft` | `id` | kind, status, revision, `title`, `body`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles`, `attachment`, `videoUrl`, `hasPictures` | read |
 | `get_design` | `draftId` | `design`, `revision`. Images are reported as present or absent, never as bytes | read |
@@ -23,25 +23,29 @@ Tools that work on a draft take `draftId`; the brand is found from the draft and
 | `fetch_source` | `url` | readable text, marked untrusted | read |
 | `create_draft` | `profileId`, `kind` | `draftId`, `revision`. Starts with the brand's design | write |
 | `update_draft` | `draftId`, `revision?`, any of `body`, `title`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles` | the draft. Only named fields change. `revision` is required with `body` | write |
-| `update_design` | `draftId`, `changes` | the whole design and `revision`. Only named fields change | write |
+| `update_card_text` | `draftId`, `changes` | the whole design and `revision`. Only named text fields change | write |
 | `set_attachment` | `draftId`, `type` (`card` or `video`), `videoUrl?`, `title?` | the draft | write |
 | `save_memory` | `profileId`, `key`, `content` | the note | write |
 | `delete_memory` | `profileId`, `key` | | write |
 | `propose_content`, `get_proposal` | as today | for outside agents that should not write | write / read |
 | `publish_post` | `draftId`, `network` | the job | key scope `agent` |
 
-`update_design.changes` fields: `sizeId`, `layout`, `background`, `paletteId`, `seed`, `eyebrow`, `title`, `subtitle`, `footer`,
-`footerLeft`, `tag`, `quoteAuthor`, `statValue`, `titleScale`, `intensity`, `bottomFade`, `showLogo`, `showFooter`,
-`fonts` (role to family; an empty family clears the role). `photos`, `screenshot` and `bgImage` are refused.
+`update_card_text.changes` fields, the words drawn on the card: `eyebrow`, `title`, `subtitle`, `footer`, `footerLeft`, `tag`, `quoteAuthor`, `statValue`.
 
-Two different titles: `update_draft.title` is the item's name (and an article's headline); `update_design.changes.title` is the headline drawn on the card.
+**No tool changes how a card looks.** Layout, background, colour set, size, pattern seed, title size, art strength, fade,
+logo and footer switches, fonts and images are set by the person in the studio. `update_card_text` refuses any other field
+(`sizeId`, `layout`, `background`, `paletteId`, `seed`, `titleScale`, `intensity`, `bottomFade`, `showLogo`, `showFooter`,
+`fonts`, `photos`, `screenshot`, `bgImage`) with a message saying where the person sets it. `get_design` still returns the
+whole design, so the agent can write words that fit the layout the person chose.
+
+Two different titles: `update_draft.title` is the item's name (and an article's headline); `update_card_text.changes.title` is the headline drawn on the card.
 
 Refusals the agent must expect, each with a message to repeat to the person:
 
 - the draft has a post waiting to be sent;
 - `revision` is old (read again, then retry once);
 - `body` on an article that contains pictures (they would be lost);
-- a value the brand cannot use;
+- a field that is not card text (how the card looks is the person's to set);
 - `publish_post`: card image not ready, network not connected, daily limit reached.
 
 A change to an approved or published draft returns it to draft, and takes an article's public page offline. The result says so
@@ -63,7 +67,7 @@ write: post | article | (none)
 <notes>
 - key: content
 </notes>
-<card draftId="…" revision="12">{ every update_design field; photos, screenshot, bgImage as true or false }</card>
+<card draftId="…" revision="12">{ the whole design, read-only except the text fields; photos, screenshot, bgImage as true or false }</card>
 <changes draftId="…" revision="14">
 background: "mesh"
 body: changed
@@ -92,11 +96,12 @@ The person's message.
 
 - The first draft **of each kind**, when the person ticked it, is sent as `user.define_outcome` with that kind's rubric from the manifest (`max_iterations` 3). The message above is the start of its `description`, followed by the manifest's description for the kind.
 - One outcome runs at a time. When both are ticked, CardPress sends the post, waits for it to end, then sends the article.
+- In an outcome, `write` names that outcome's kind only.
 - Everything else is `user.message`.
 - The agent writes the record it stored to `/mnt/session/outputs/post.json` or `/mnt/session/outputs/article.json`. A rubric reads its own file, with the whole body in it.
 
 ## 4. Manifest
 
-As built by `scripts/build-manifest.sh`: `version` (2), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
+As built by `scripts/build-manifest.sh`: `version` (3), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
 `mcp_server_url`, `confirm_tools`, `outcomes.post`, `outcomes.article` (`description`, `rubric`, `max_iterations`).
 CardPress refuses a manifest whose `version` it does not know.

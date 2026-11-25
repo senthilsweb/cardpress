@@ -13,7 +13,7 @@
 │                    │            ┌───────────────────┐                │
 │ You: shorter title │            │   live preview    │                │
 │ ✓ Changed title,   │            └───────────────────┘                │
-│   font    · Undo   │            Post text under the card             │
+│   tag     · Undo   │            Post text under the card             │
 │ ✓ Article created  │                                                 │
 ├────────────────────┤                                                 │
 │ [Post] [Article]   │                                                 │
@@ -67,7 +67,7 @@ Table `conversation_sources (id, conversation_id, message_id, kind, name, url, c
 ## Changes and Undo
 Table `chat_changes (id, conversation_id, message_id, draft_id, before, after, created_at, undone_at)`, holding only the fields a turn changed.
 
-- The turn's card in the thread names them: "Changed title, font · Undo", "Article created · View".
+- The turn's card in the thread names them: "Changed title, tag · Undo", "Article created · View".
 - Undo restores `before` for each field that still equals `after`. A field the person has since changed is left, and the card says so.
 - Undo does not call the agent. The next message reports the restored values in `changes`.
 - A created item is not deleted by Undo. A post that was sent cannot be undone, and its card has no Undo.

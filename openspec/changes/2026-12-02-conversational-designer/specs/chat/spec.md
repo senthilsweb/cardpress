@@ -3,11 +3,19 @@
 ## MODIFIED Requirements
 
 ### Requirement: The agent prepares content only
-The agent in the chat MAY change a card design, write a post or an article and, with the person's confirmation, publish a post. It SHALL NOT schedule, cancel or delete anything, or change a brand's profile or credentials.
+The agent in the chat MAY change the words on a card, write a post or an article and, with the person's confirmation, publish a post. It SHALL NOT change how a card looks (layout, colours, background, fonts, sizes, branding), schedule, cancel or delete anything, or change a brand's profile or credentials.
 
-#### Scenario: Design by conversation
-- **WHEN** the person writes "use the quote layout and make the title smaller"
-- **THEN** the canvas changes while the reply is being written, and the reply says what was changed
+#### Scenario: Words by conversation
+- **WHEN** the person writes "change the title to Ship less, learn more"
+- **THEN** the title on the canvas changes while the reply is being written, and the reply says what was changed
+
+#### Scenario: Asked for a look
+- **WHEN** the person writes "use the quote layout and make the title bigger"
+- **THEN** nothing about the look changes, and the reply says these are set in Edit, Design
+
+#### Scenario: Too long for the look
+- **WHEN** the person says the title does not fit
+- **THEN** the agent offers shorter wording and does not change the title size
 
 #### Scenario: Undo
 - **WHEN** the person writes "undo that"
@@ -27,8 +35,8 @@ The system SHALL send the linked drafts, the item on screen and what to write wi
 - **THEN** the message says the background changed
 
 #### Scenario: Viewing the article
-- **WHEN** the article is on screen and the person writes "make the title bigger"
-- **THEN** the article's card changes
+- **WHEN** the article is on screen and the person writes "shorten the title"
+- **THEN** the title on the article's card changes
 
 ### Requirement: Agents from the agent repository
 The system SHALL run the chat on the agents described by the manifest of `social-card-agent`.
