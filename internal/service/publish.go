@@ -14,6 +14,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/senthilsweb/cardpress/internal/linkedin"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // Job statuses. A person acts on every status except scheduled and publishing; nothing is retried automatically.
@@ -616,6 +619,18 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 	}
 	started := p.now()
 	var notReady *linkedin.NotReadyError
+	ctx, span := telemetry.Start(ctx, "publish job", oteltrace.WithAttributes(attribute.String("cardpress.job.id", id), attribute.String("cardpress.attachment", kind)))
+	begun := time.Now()
+	defer func() {
+		outcome := JobNeedsReview
+		_ = p.db.QueryRowContext(context.WithoutCancel(ctx), `SELECT status FROM publish_jobs WHERE id = ?`, id).Scan(&outcome)
+		span.SetAttributes(attribute.String("cardpress.outcome", outcome))
+		if outcome != JobPublished {
+			telemetry.Fail(span, outcome) // the reason stays in the job: it can quote what LinkedIn answered
+		}
+		span.End()
+		telemetry.PublishDone(context.WithoutCancel(ctx), kind, outcome, time.Since(begun))
+	}()
 	tctx, trace := linkedin.WithTrace(ctx)
 	urn, err := p.li.Publish(tctx, c["accessToken"], post)
 	switch {

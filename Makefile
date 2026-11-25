@@ -7,11 +7,14 @@ PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
 
 .PHONY: dev api web build run release test docker docker-run clean
 
+# only the telemetry settings are taken from .env: the other lines there are for Docker Compose
+TELEMETRY_ENV = if [ -f .env ]; then eval "$$(grep -E '^(OTEL|ARIZE)_[A-Z0-9_]*=' .env | sed 's/^/export /')"; fi
+
 api:            ## Go API only, on http://127.0.0.1:8080 (no embedded web app)
-	CARDPRESS_SERVE_WEB=false go run . -addr 127.0.0.1:8080
+	@$(TELEMETRY_ENV); CARDPRESS_SERVE_WEB=false go run . -addr 127.0.0.1:8080
 
 dev:            ## API + Astro dev server with hot reload (http://localhost:4321, /api proxied to :8080)
-	@trap 'kill 0' INT TERM EXIT; \
+	@$(TELEMETRY_ENV); trap 'kill 0' INT TERM EXIT; \
 	CARDPRESS_SERVE_WEB=false go run . -addr 127.0.0.1:8080 & \
 	cd web && npm run dev & \
 	wait

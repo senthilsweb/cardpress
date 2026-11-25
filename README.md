@@ -17,6 +17,7 @@
 | X, Instagram and Facebook | Card sizes and feed previews. Publishing is not built (X and Instagram credentials can be stored) |
 | Assistant | Works with a built-in demo agent (no AI model). The Claude Managed Agent adapter is built and tested against a fake API, **not yet against a real Anthropic account** |
 | MCP server | Built and tested |
+| Telemetry (traces, metrics, logs over OTLP) | Built and tested against a fake receiver. See [Telemetry](docs/telemetry.md) |
 
 ## What it does
 

@@ -1,0 +1,8 @@
+- [x] `internal/telemetry`: setup from the environment, three signals, request spans and duration, publish counters, log bridge
+- [x] Spans for LinkedIn calls, publish jobs and assistant turns
+- [x] Collector configuration and Compose profile
+- [x] Tests against a fake receiver, including that request content is not sent; docs
+- [ ] Run the collector (needs Docker)
+- [x] Arize accepted traces sent from this machine (a wrong key is refused with 403)
+- [ ] See them in the Arize project
+- [ ] Memory with telemetry on, on a 256 MB machine

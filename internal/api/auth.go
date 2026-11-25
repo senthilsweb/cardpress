@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/senthilsweb/cardpress/internal/service"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
 )
 
 // Accounts is the part of the accounts service the HTTP API needs. With none, the API works as it did before accounts
@@ -72,6 +73,7 @@ func (s *server) add(mux *http.ServeMux, d routeDef) {
 		d.handler = s.off
 	}
 	mux.HandleFunc(d.method+" "+prefix+d.path, func(w http.ResponseWriter, r *http.Request) {
+		telemetry.SetRoute(r.Context(), prefix+d.path)
 		if s.Accounts == nil || d.rule.scope == scopeOpen { // no accounts: the bearer guard in front did the work
 			d.handler(w, r)
 			return

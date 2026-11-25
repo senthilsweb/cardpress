@@ -14,6 +14,9 @@ import (
 
 	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/source"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -356,7 +359,7 @@ func (c *Chat) unlock(id string) { c.mu.Lock(); delete(c.busy, id); c.mu.Unlock(
 // Send adds the person's message, gets the agent's reply, and stores both. Progress goes to emit: the stored user
 // message, text as it is written ("delta"), the proposal, and the stored reply. The person's message is kept even if
 // the agent then fails, so nothing they typed is lost. Invalid agent output is an error and is never stored.
-func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) error {
+func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) (err error) {
 	conv, srcText, err := c.load(ctx, id)
 	if err != nil {
 		return err
@@ -383,6 +386,16 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 		}
 		content = defaultFirstTurn
 	}
+	// one span per turn of the assistant: which agent answered, never what was said
+	info := c.Agent()
+	ctx, span := telemetry.Start(ctx, "assistant turn", trace.WithAttributes(
+		attribute.String("openinference.span.kind", "AGENT"), attribute.String("cardpress.agent.name", info.Name), attribute.Bool("cardpress.agent.ai", info.AI)))
+	defer func() {
+		if err != nil {
+			telemetry.Fail(span, "the turn failed")
+		}
+		span.End()
+	}()
 	user, err := c.addMessage(ctx, id, len(prior)+1, "user", content)
 	if err != nil {
 		return err

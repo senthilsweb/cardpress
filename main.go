@@ -32,6 +32,7 @@ import (
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
 )
 
 //go:embed all:web/dist
@@ -75,6 +76,21 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	signals, stopTelemetry, err := telemetry.Setup(context.Background(), version, os.Getenv)
+	if err != nil {
+		log.Printf("%v. Telemetry is off or incomplete; the server runs as usual.", err)
+	}
+	defer func() { // send what is still waiting
+		flush, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stopTelemetry(flush); err != nil {
+			log.Printf("telemetry: could not send what was left: %v", err)
+		}
+	}()
+	if len(signals) > 0 {
+		log.Printf("telemetry: sending %s over OTLP", strings.Join(signals, ", "))
+	}
 
 	db, err := store.Open(ctx, cfg.DBURL, cfg.DBToken)
 	if err != nil {
@@ -170,7 +186,7 @@ func main() {
 		}
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: logRequests(mux), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: telemetry.HTTP(logRequests(mux)), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
