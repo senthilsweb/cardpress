@@ -344,6 +344,19 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     if (v === "both") setTab("post"); // the card tabs show one card, so leave them
     else if (pair[v]) void openItem(pair[v]!.id);
   };
+  // an item of this conversation changed by the assistant while another is on screen is marked
+  const revisions = useRef(new Map<string, number>());
+  useEffect(() => {
+    const changed: string[] = [];
+    // the list knows the items made for the message being answered, the open conversation may not yet
+    const mine = chat.list.find((c) => c.id === chat.current?.id) ?? chat.current;
+    for (const d of store.drafts) {
+      const was = revisions.current.get(d.id);
+      if (chat.busy && was !== undefined && d.revision > was && d.id !== store.current?.id && mine && linksDraft(mine, d.id)) changed.push(d.id);
+      revisions.current.set(d.id, d.revision);
+    }
+    if (changed.length) setUnseen((u) => [...new Set([...u, ...changed])]);
+  }, [store.drafts]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { // what is on screen has been seen
     const shown = [store.current?.id, ...(showBoth ? [pair.post?.id, pair.article?.id] : [])];
     setUnseen((u) => (u.some((id) => shown.includes(id)) ? u.filter((id) => !shown.includes(id)) : u));
@@ -418,7 +431,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </div>
             {/* the chat stays mounted, so an unsent message is not lost by switching */}
             <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
-              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
             {mode === "edit" && <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">

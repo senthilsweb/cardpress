@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
-import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { AgentInfo, ChatMessage, ChatRequest, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
@@ -17,6 +17,7 @@ export function useChat(profileId: string) {
   const [loaded, setLoaded] = useState(false);
   const [streaming, setStreaming] = useState<string | null>(null); // the reply so far, while it is written
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null); // what the assistant is doing
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   // read inside timers, which would otherwise see stale values
@@ -64,8 +65,8 @@ export function useChat(profileId: string) {
   const patch = (id: string, fn: (c: Conversation) => Conversation) => setCurrent((c) => (c && c.id === id ? fn(c) : c));
 
   /** Send a message and show the reply as it arrives. An empty message sends the waiting sources. */
-  const send = useCallback(async (convId: string, content: string) => {
-    setBusy(true); setError(null); setStreaming("");
+  const send = useCallback(async (convId: string, content: string, request?: ChatRequest) => {
+    setBusy(true); setError(null); setStreaming(""); setProgress(null);
     const ctl = new AbortController();
     abort.current = ctl;
     try {
@@ -75,12 +76,16 @@ export function useChat(profileId: string) {
           sources: (c.sources ?? []).map((s) => (s.messageId ? s : { ...s, messageId: m.id })),
         })),
         onDelta: (t) => setStreaming((s) => (s ?? "") + t),
+        onProgress: (t) => {
+          setProgress(t);
+          refreshList().catch(() => undefined); // an item made for this message belongs to the conversation from the start
+        },
         onProposal: (p: Proposal) => patch(convId, (c) => ({
           ...c,
           proposals: [...(c.proposals ?? []).map((x) => (x.status === "pending" ? { ...x, status: "superseded" as const } : x)), p],
         })),
         onMessage: (m) => { patch(convId, (c) => ({ ...c, messages: [...(c.messages ?? []), m] })); setStreaming(null); },
-      }, ctl.signal);
+      }, ctl.signal, request);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError(message(e));
     } finally {
@@ -94,7 +99,7 @@ export function useChat(profileId: string) {
         } catch { /* the next look will do */ }
         break;
       }
-      setStreaming(null); setBusy(false);
+      setStreaming(null); setProgress(null); setBusy(false);
       refreshList().catch(() => undefined);
     }
   }, [refreshList]);
@@ -106,7 +111,7 @@ export function useChat(profileId: string) {
    * Send words and attachments, starting a conversation about `draftId` if none is open. Resolves true once everything
    * attached was accepted and the message is on its way; false leaves the box as it was, with the reason in `error`.
    */
-  const submit = useCallback(async (content: string, attachments: Attachment[], draftId?: string): Promise<boolean> => {
+  const submit = useCallback(async (content: string, attachments: Attachment[], draftId?: string, request?: ChatRequest): Promise<boolean> => {
     setBusy(true); setError(null);
     let conv = live.current.current;
     const created = !conv;
@@ -126,7 +131,7 @@ export function useChat(profileId: string) {
       setBusy(false);
       return false;
     }
-    void send(conv.id, content);
+    void send(conv.id, content, request);
     return true;
   }, [profileId, send]);
 
@@ -159,7 +164,7 @@ export function useChat(profileId: string) {
   }, [refreshList]);
 
   const pendingCount = list.reduce((n, c) => n + (c.pending ?? 0), 0);
-  return { agent, list, current, loaded, pendingCount, streaming, busy, error, setError, send, submit, stop, removeSource, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
+  return { agent, list, current, loaded, pendingCount, streaming, progress, busy, error, setError, send, submit, stop, removeSource, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
 }
 
 export type ChatStore = ReturnType<typeof useChat>;

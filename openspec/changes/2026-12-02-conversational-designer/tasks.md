@@ -33,18 +33,22 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 
 ## 5. The chat on the managed agents
-- [ ] Read the manifest (version 5); remove `agent-setup` and the two id settings
-- [ ] `CARDPRESS_PUBLIC_URL` check; fall back to the demo agent with a clear message
-- [ ] Per-person vault and agent key, created on first chat; single vault when accounts are off
-- [ ] Adapter: MCP tool events as progress and recorded changes, outcomes in turn, sub-agent thread events, `requires_action` and `user.tool_confirmation`
-- [ ] The message blocks of the contract, with escaping (the `history` block exists); every source in every outcome; revision last sent kept per draft
-- [ ] Chat stream events `progress`, `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`
-- [ ] Web: the grader's verdict and the Post / Cancel card (notes are in the drawer already)
+- [x] Read the manifest (version 5), pin its agent version; remove `agent-setup` and the id settings
+- [x] `CARDPRESS_PUBLIC_URL` must match the manifest's MCP address, or the server refuses to start
+- [x] Remove the demo assistant; with none set up the chat says so (the stand-in lives in `internal/agent/agenttest`)
+- [x] Single vault: admin only, in brands the admin owns
+- [ ] Per-person vault and agent key, created on first chat
+- [x] Adapter: tool and sub-agent events as progress, outcomes in turn, verdict in the reply
+- [ ] Recorded changes per reply; `requires_action` and `user.tool_confirmation` (with `publish_post`)
+- [x] The message blocks of the contract, with escaping; every source in every outcome; what was last seen kept per draft
+- [x] Chat stream event `progress`
+- [ ] Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
 - [x] Migration `chat_usage`; show a conversation's cost
-- [ ] Read the session's usage after each turn (also when stopped or failed)
-- [ ] Tests: state machine and scripted fake for the new events
-- [ ] Try it against a real account (ask first: it costs money)
+- [x] Read the session's usage after a reply
+- Not planned: recording usage after a stopped or failed reply (the owner reads costs in the Claude console)
+- [x] Tests with a scripted fake; a local run against a stand-in service with the real library and MCP
+- [ ] Try it against the real account (ask first: it costs money)
 
 ## 6. Docs
-- [ ] `docs/mcp.md`, `docs/chat.md`, `docs/cma-agent.md`, `docs/configuration.md`, `docs/data-model.md`
+- [x] `docs/chat.md`, `docs/cma-agent.md`, `docs/configuration.md`, `docs/data-model.md` (`docs/mcp.md` with step 4)
 - [ ] `openspec/project.md`: the LLM writes the card's words and the post, never the look, and may post with confirmation; remove "blocked on the agent repo"

@@ -14,7 +14,7 @@ internal/
   secrets/               encryption for stored credentials
   linkedin/              LinkedIn client and text escaping
   source/                fetching web pages safely (SSRF guard) and extracting text
-  agent/                 the Client interface for the assistant, proposals, the built-in demo agent
+  agent/                 the Client interface for the assistant and proposals (agenttest/ is a stand-in for tests)
   cma/                   the Claude Managed Agent adapter
   mcpserver/             the MCP tools, the audit trail
 web/
@@ -50,7 +50,7 @@ openspec/                one change proposal per piece of work
 ## Patterns
 
 - **Narrow interfaces.** The MCP server and the assistant get small interfaces (read drafts, propose content), not the whole service. Tests pin which tools exist and what they can reach.
-- **The agent boundary.** `agent.Client` is the only thing the chat knows about its writer. The demo agent and the managed-agent adapter implement it. A proposal carries content fields only (kind, title, body, hashtags, alt text, rationale), and `ParseProposal` validates it the same way for every source.
+- **The agent boundary.** `agent.Client` is the only thing the chat knows about its writer. The managed-agent adapter implements it. A proposal carries content fields only (kind, title, body, hashtags, alt text, rationale), and `ParseProposal` validates it the same way for every source.
 - **Untrusted text.** Source text is data. It is kept apart from messages, and sent to a model inside tags marked untrusted.
 - **A person publishes.** Nothing in `agent`, `cma` or `mcpserver` can call the publisher. Publishing is a separate, explicit request from the browser.
 - **No hidden state in the browser.** The browser keeps only the open tab; profiles, drafts, designs and preferences are on the server.

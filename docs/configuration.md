@@ -53,13 +53,12 @@ Credentials can also come from environment variables instead of the app; see [So
 
 | Variable | Default | What it does |
 |---|---|---|
-| `CARDPRESS_AGENT` | `mock` | `mock` (built-in demo) or `cma` (Claude Managed Agent) |
-| `CARDPRESS_AGENT_ID` | | The agent id from `cardpress agent-setup` |
-| `CARDPRESS_AGENT_ENVIRONMENT_ID` | | The environment id from `cardpress agent-setup` |
-| `CARDPRESS_AGENT_VERSION` | latest | Pin an agent version |
-| `CARDPRESS_AGENT_BUDGET_CENTS` | none | Spend cap per conversation, in US cents |
-| `CARDPRESS_AGENT_TIMEOUT` | `4m` | Longest wait for one reply (10s to 30m) |
-| `ANTHROPIC_API_KEY` | | Used by the adapter and by `agent-setup` |
+| `CARDPRESS_AGENT` | `off` | `off` or `cma` ([Claude Managed Agent](cma-agent.md)) |
+| `CARDPRESS_AGENT_MANIFEST` | | The agent manifest: a file, an https address or the JSON |
+| `CARDPRESS_AGENT_BUDGET_CENTS` | `200` | Spend cap per conversation, in US cents; `0` = none |
+| `CARDPRESS_AGENT_TIMEOUT` | `12m` | Longest wait for one reply (10s to 30m) |
+| `ANTHROPIC_API_KEY` | | Used to reach the agents |
+| `ANTHROPIC_WORKSPACE_ID` | | For a key that covers several workspaces |
 
 See [Claude Managed Agent](cma-agent.md).
 
@@ -87,6 +86,5 @@ See [Claude Managed Agent](cma-agent.md).
 |---|---|
 | `cardpress` | Run the server |
 | `cardpress mcp` | Serve MCP over stdio for an agent on this machine; see [MCP](mcp.md) |
-| `cardpress agent-setup` | Create the managed agent and environment (needs `ANTHROPIC_API_KEY`) |
 | `cardpress healthcheck` | Exit 0 if the local server is up (used by the container health check) |
 | `cardpress -version` | Print the version |

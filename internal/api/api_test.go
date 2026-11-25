@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/senthilsweb/cardpress/internal/agent"
+	"github.com/senthilsweb/cardpress/internal/agent/agenttest"
 	"github.com/senthilsweb/cardpress/internal/linkedin"
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/secrets"
@@ -532,7 +532,7 @@ func chatHandler(t *testing.T, token string, f service.SourceFetcher) http.Handl
 	if err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	return New(Options{Studio: service.New(db.DB), Chat: service.NewChat(db.DB, &agent.Mock{}, f), Token: token, Version: "t", DBDriver: db.Driver})
+	return New(Options{Studio: service.New(db.DB), Chat: service.NewChat(db.DB, &agenttest.Mock{}, f), Token: token, Version: "t", DBDriver: db.Driver})
 }
 
 type sse struct{ Name, Data string }
@@ -683,7 +683,7 @@ func TestChatNeedsTheTokenAndInfoShowsTheAgent(t *testing.T) {
 			t.Errorf("%s %s without a token: %d", c[0], c[1], r.Code)
 		}
 	}
-	if r := do(h, "GET", "/api/v1/info", "", nil); !strings.Contains(r.Body.String(), `"agent":{"name":"Demo agent","ai":false}`) {
+	if r := do(h, "GET", "/api/v1/info", "", nil); !strings.Contains(r.Body.String(), `"agent":{"name":"Demo agent","ai":false,"ready":true}`) {
 		t.Fatalf("%s", r.Body)
 	}
 }

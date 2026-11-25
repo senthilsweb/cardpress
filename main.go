@@ -54,11 +54,6 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(runHealthcheck())
 	}
-	// `cardpress agent-setup` creates the Claude Managed Agent once; the user runs it on purpose
-	if len(os.Args) > 1 && os.Args[1] == "agent-setup" {
-		runAgentSetup(os.Args[2:])
-		return
-	}
 	cfg, err := config.Load(os.Args[1:], os.Getenv)
 	if errors.Is(err, flag.ErrHelp) {
 		return
@@ -130,16 +125,18 @@ func main() {
 	events := service.NewHub()
 	studio.Events = events
 	fetcher := source.New()
-	chatAgent, err := newAgent(cfg)
+	chatAgent, err := newAgent(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
+	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
 	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
-		Events:   events,
-		Notes:    studio,
-		Accounts: accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Events:             events,
+		Notes:              studio,
+		AssistantAdminOnly: cfg.Agent == "cma", // its tools act as one account, so only the admin may use it
+		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
@@ -332,11 +329,12 @@ func runMCP(args []string) {
 	}
 	studio := service.New(db.DB)
 	fetcher := source.New()
-	chatAgent, err := newAgent(cfg)
+	chatAgent, err := newAgent(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
+	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
 	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)
@@ -348,31 +346,21 @@ func runMCP(args []string) {
 	}
 }
 
-// newAgent picks the chat's writer: the built-in demo, or a Claude Managed Agent.
-func newAgent(cfg config.Config) (agent.Client, error) {
+// newAgent picks what answers in the chat: the Claude Managed Agents described by the manifest, or nothing.
+func newAgent(ctx context.Context, cfg config.Config) (agent.Client, error) {
 	if cfg.Agent != "cma" {
-		return &agent.Mock{Delay: 25 * time.Millisecond}, nil
+		return agent.None{}, nil
 	}
-	return cma.New(cma.Config{AgentID: cfg.AgentID, AgentVersion: cfg.AgentVersion, EnvironmentID: cfg.AgentEnvID, BudgetCents: cfg.AgentBudget}, cfg.AgentTimeout)
-}
-
-// runAgentSetup creates the managed agent and environment in the Anthropic account behind ANTHROPIC_API_KEY, and prints
-// the settings to add to the environment.
-func runAgentSetup(args []string) {
-	fs := flag.NewFlagSet("agent-setup", flag.ExitOnError)
-	model := fs.String("model", cma.DefaultModel, "model the agent uses")
-	_ = fs.Parse(args)
-	if os.Getenv("ANTHROPIC_API_KEY") == "" {
-		log.Fatal("set ANTHROPIC_API_KEY first: this creates an agent and an environment in that Anthropic account")
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	created, err := cma.Setup(ctx, cma.Config{}, *model)
+	m, err := cma.LoadManifest(ctx, cfg.AgentManifest)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	fmt.Printf("Created agent %s (version %d) and environment %s.\n\nAdd to the server's environment:\n\n  CARDPRESS_AGENT=cma\n  CARDPRESS_AGENT_ID=%s\n  CARDPRESS_AGENT_ENVIRONMENT_ID=%s\n  ANTHROPIC_API_KEY=...   (the same key)\n\nOptional: CARDPRESS_AGENT_BUDGET_CENTS=500 caps what one conversation can spend.\n",
-		created.AgentID, created.AgentVersion, created.EnvironmentID, created.AgentID, created.EnvironmentID)
+	// the agents write to the studio at the manifest's address, so it has to be this server
+	if cfg.PublicURL == "" || !strings.EqualFold(strings.TrimRight(m.MCPServerURL, "/"), cfg.PublicURL+"/mcp") {
+		return nil, fmt.Errorf("the agents write to %q, which is not this server: set CARDPRESS_PUBLIC_URL to the address they reach it at, or rebuild the manifest", m.MCPServerURL)
+	}
+	log.Printf("assistant: Claude agent %s; it reaches the studio at %s", m.AgentID, m.MCPServerURL)
+	return cma.New(cma.Config{Manifest: m, BudgetCents: cfg.AgentBudget, WorkspaceID: cfg.AgentWorkspace}, cfg.AgentTimeout)
 }
 
 // runHealthcheck asks the server on this machine whether it is up. It returns the exit code.

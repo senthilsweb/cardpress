@@ -1,40 +1,58 @@
 # Claude Managed Agent
 
-By default the chat uses a built-in demo agent (no AI). You can switch it to a [Claude Managed Agent](https://docs.anthropic.com) so a real model writes the posts. Everything else is unchanged: it only prepares content, you approve, edit or reject each proposal, and nothing is published without you.
+The chat is answered by Claude Managed Agents: a coordinator with a post writer and an article writer. Without them the **Chat** panel says no assistant is set up, and writing, design and publishing work as usual.
 
-> When this is on, the conversation (and any web page or text you give the chat) is sent to Anthropic. The chat shows that it is an AI agent.
+The agents are defined and deployed from a separate repository (agent files, writing skills and grading rubrics). CardPress only starts sessions with them.
 
-## Set up (once)
+> When this is on, your messages, attached sources and the drafts the agent reads are sent to Anthropic.
 
-1. Create an API key in the Anthropic console and export it: `export ANTHROPIC_API_KEY=...`
-2. Run `cardpress agent-setup` (optionally `-model claude-opus-5-5`). It creates one agent and one environment in that account and prints the ids. It is the only thing that creates anything there, and it runs only when you run it.
-3. Start the server with:
+## What you need
+
+| Thing | Where it comes from |
+|---|---|
+| Deployed agents, an environment and a vault | The agent repository's deploy steps |
+| The **manifest** (`manifest.json`: ids, rubrics, the MCP address; no secret) | The agent repository's `scripts/build-manifest.sh` |
+| A CardPress API key stored in the vault | Create it in CardPress, then store it with the agent repository's vault script |
+| An Anthropic API key | The Anthropic console |
+| A CardPress address the agents can reach over https | Your deployment |
+
+## Settings
 
 ```
 CARDPRESS_AGENT=cma
-CARDPRESS_AGENT_ID=agent_...
-CARDPRESS_AGENT_ENVIRONMENT_ID=env_...
+CARDPRESS_AGENT_MANIFEST=/path/to/manifest.json   # or an https address, or the JSON itself
+CARDPRESS_PUBLIC_URL=https://cards.example.com    # must match the manifest's MCP address
 ANTHROPIC_API_KEY=...
+ANTHROPIC_WORKSPACE_ID=...                        # only for a key that covers several workspaces
 ```
 
-Optional: `CARDPRESS_AGENT_VERSION` (pin an agent version; default latest), `CARDPRESS_AGENT_BUDGET_CENTS` (spend cap per conversation, e.g. `500` = $5), `CARDPRESS_AGENT_TIMEOUT` (longest wait for one reply, default `4m`).
+Optional: `CARDPRESS_AGENT_BUDGET_CENTS` (spend cap per conversation, default `200` = $2, `0` = none) and `CARDPRESS_AGENT_TIMEOUT` (longest wait for one reply, default `12m`).
 
-## What the agent can and cannot do
+The server refuses to start if the manifest's version is not the one it speaks, or if the manifest's MCP address is not `CARDPRESS_PUBLIC_URL` + `/mcp`, because the agents would then be writing to a different server.
 
-- It has one tool, `propose_content`, whose input is the proposal: kind, title, body, hashtags, alt text and a short rationale. No layout, colours, scheduling or publishing.
-- It has none of the built-in tools (no shell, files or web), and its environment has no network. CardPress fetches web pages itself, with its own safeguards, and passes the text in once.
-- Source text is wrapped in `<source untrusted="true">` tags and the agent is told to treat it as data. This lowers the chance that a hostile page steers it; the real protection is that the agent has nothing dangerous to do: the worst outcome is a bad draft that you reject.
-- An invalid proposal is returned to the agent with the reason so it can fix it (three tries).
+On Fly, a file path on your machine does not exist there: give the manifest as an https address, or store the JSON itself with `fly secrets set CARDPRESS_AGENT_MANIFEST="$(cat manifest.json)"`.
 
-## Behaviour
+## Who can use it
 
-- One session per conversation; only your newest message is sent each turn because the session remembers the thread.
-- The reply streams in as it is written. If the connection drops, the adapter reconnects and catches up from the session history.
-- If a reply takes longer than the timeout, or you leave, the session is interrupted so it stops spending. If the spend cap is reached, the chat says so and you start a new conversation.
-- Conversations created with the demo agent cannot continue under the managed agent (and the other way round); start a new one.
-- Changing the agent's instructions means creating a new agent version; existing conversations keep the version they started with unless you pin one.
+With accounts on, **only the admin** can send messages, and only in **brands the admin owns**. The vault holds one key, which acts as that one account, so store a key of the admin who will chat. Per-person keys are not built yet.
+
+## What happens in a conversation
+
+- Tick **Post**, **Article** or both. CardPress creates the draft if the conversation has none and tells the agent which one to write.
+- The **first** draft of each kind is graded against its rubric and revised up to three times. The reply ends with the verdict. Later messages are ordinary requests.
+- The agents save through [MCP](mcp.md). Every save is a new version, so you can go back. Published and scheduled items are locked.
+- The agents can change the words on the card, never its look. They cannot publish.
+- If you edit a draft or card yourself, the next message tells the agent what changed.
+- Progress shows while it works. A graded article can take several minutes.
+- **Stop** interrupts the session so it stops spending. The spend cap does the same.
+- The cost at list price is shown per conversation in the history drawer.
+- If the session is gone, a new one starts from your saved messages and sources.
 
 ## Troubleshooting
 
-- "could not start a session": check `ANTHROPIC_API_KEY`, the ids, and that the account has Managed Agents access.
-- "the agent kept failing and gave up": an upstream error; try again.
+| Message | Check |
+|---|---|
+| could not start a session | The API key, workspace id and manifest ids |
+| the agent finished without saying anything / cannot reach a tool | The vault key is valid and the environment allows the MCP host |
+| reached its spending limit | Start a new conversation, or raise the cap |
+| asked to do something that needs your confirmation | A tool in the agent files is set to ask first; the app cannot confirm yet |

@@ -1,7 +1,6 @@
 package cma
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,21 +8,23 @@ import (
 	"github.com/senthilsweb/cardpress/internal/agent"
 )
 
-// maxFixes is how many times the agent may send an invalid proposal in one turn before the turn fails.
-const maxFixes = 3
-
 // wireEvent is the small part of a session event this adapter reads. Events are decoded from their raw JSON, so the
 // adapter does not depend on how the SDK models each event type.
 type wireEvent struct {
-	Type    string          `json:"type"`
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Input   json.RawMessage `json:"input"`
+	Type    string `json:"type"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
 	Content []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"content"`
-	StopReason *struct {
+	IsError   bool   `json:"is_error"`
+	AgentName string `json:"agent_name"`
+	// the grader's verdict on an outcome
+	Result      string `json:"result"`
+	Explanation string `json:"explanation"`
+	Iteration   int    `json:"iteration"`
+	StopReason  *struct {
 		Type     string   `json:"type"`
 		EventIDs []string `json:"event_ids"`
 	} `json:"stop_reason"`
@@ -31,7 +32,6 @@ type wireEvent struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error"`
-	CustomToolUseID string `json:"custom_tool_use_id"`
 	// stream-only previews of an agent message being written
 	EventID string `json:"event_id"`
 	Event   *struct {
@@ -55,50 +55,50 @@ func (e wireEvent) text() string {
 	return strings.Join(parts, "")
 }
 
-// toolResult is what to send back for a custom tool call.
-type toolResult struct {
-	ToolUseID string
-	Text      string
-	IsError   bool
-}
-
-// turn follows one exchange: the person's message goes in, events come out until the agent is done. It ignores everything
-// up to and including the echo of the message that was sent (those events belong to earlier turns, which matters because
-// the same session is used for the whole conversation and the history is replayed after a reconnect).
+// turn follows one request: it goes in, events come out until the agent is done (and, for a graded request, the grader
+// has finished). It ignores everything up to and including the echo of what was sent: those events belong to earlier
+// turns, which matters because the same session is used for the whole conversation and history is replayed after a
+// reconnect.
 type turn struct {
-	sentID   string // the id the server gave our user.message
-	sentText string // used to recognise the echo if ids ever differ
+	sentID   string // the id the server gave what we sent
+	graded   bool   // an outcome: finished only once the grader has said so
+	kind     string // what is graded, "post" or "article"
 	sentSeen bool
 
 	seen     map[string]bool   // event ids already handled (a replay must not repeat work)
-	answered map[string]bool   // custom tool calls that already have a result
 	streamed map[string]string // agent message id -> text already passed on through live previews
 	replies  []string
-	proposal *agent.Proposal
-	fixes    int
+	verdict  string // the grader's final word
 	lastErr  string
 	done     bool
 
 	emit func(agent.Event)
 }
 
-func newTurn(sentID, sentText string, emit func(agent.Event)) *turn {
-	return &turn{sentID: sentID, sentText: sentText, seen: map[string]bool{}, answered: map[string]bool{}, streamed: map[string]string{}, emit: emit}
+func newTurn(sentID string, graded bool, emit func(agent.Event)) *turn {
+	return &turn{sentID: sentID, graded: graded, seen: map[string]bool{}, streamed: map[string]string{}, emit: emit}
 }
 
 func (t *turn) isOurEcho(e wireEvent) bool {
-	if e.Type != "user.message" {
-		return false
+	want := "user.message"
+	if t.graded {
+		want = "user.define_outcome"
 	}
-	if t.sentID != "" {
-		return e.ID == t.sentID
-	}
-	return strings.TrimSpace(e.text()) == strings.TrimSpace(t.sentText)
+	return e.Type == want && (t.sentID == "" || e.ID == t.sentID)
 }
 
-// handle processes one event. It returns a tool result to send, if the agent is waiting for one, or an error that ends
-// the turn. t.done becomes true when the agent has finished.
-func (t *turn) handle(e wireEvent) (*toolResult, error) {
+// progressFor says in a few words what a studio tool call is doing.
+var progressFor = map[string]string{
+	"get_draft": "Reading the draft", "get_design": "Reading the card", "list_drafts": "Looking at the drafts",
+	"update_draft": "Saving the draft", "update_card_text": "Changing the words on the card", "create_draft": "Starting a draft",
+	"set_attachment": "Changing what the post carries", "fetch_source": "Reading a page", "list_memories": "Reading your notes",
+	"save_memory": "Keeping a note", "delete_memory": "Removing a note", "list_connections": "Checking connections",
+}
+
+func (t *turn) progress(text string) { t.emit(agent.Event{Type: "progress", Text: text}) }
+
+// handle processes one event, or returns an error that ends the turn. t.done becomes true when the agent has finished.
+func (t *turn) handle(e wireEvent) error {
 	// live previews have no id of their own, so they are not de-duplicated
 	switch e.Type {
 	case "event_start":
@@ -110,7 +110,7 @@ func (t *turn) handle(e wireEvent) (*toolResult, error) {
 				}
 			}
 		}
-		return nil, nil
+		return nil
 	case "event_delta":
 		if t.sentSeen && e.Delta != nil && e.Delta.Content != nil && e.Delta.Content.Text != "" {
 			if _, ok := t.streamed[e.EventID]; ok {
@@ -118,12 +118,12 @@ func (t *turn) handle(e wireEvent) (*toolResult, error) {
 				t.emit(agent.Event{Type: "delta", Text: e.Delta.Content.Text})
 			}
 		}
-		return nil, nil
+		return nil
 	}
 
 	if e.ID != "" {
 		if t.seen[e.ID] {
-			return nil, nil
+			return nil
 		}
 		t.seen[e.ID] = true
 	}
@@ -131,17 +131,14 @@ func (t *turn) handle(e wireEvent) (*toolResult, error) {
 		if t.isOurEcho(e) {
 			t.sentSeen = true
 		}
-		return nil, nil
+		return nil
 	}
 
 	switch e.Type {
-	case "user.custom_tool_result":
-		t.answered[e.CustomToolUseID] = true
-
 	case "agent.message":
 		txt := e.text()
 		if strings.TrimSpace(txt) == "" {
-			return nil, nil
+			return nil
 		}
 		already := t.streamed[e.ID]
 		switch {
@@ -157,8 +154,29 @@ func (t *turn) handle(e wireEvent) (*toolResult, error) {
 		}
 		t.replies = append(t.replies, txt)
 
-	case "agent.custom_tool_use":
-		return t.toolUse(e)
+	case "agent.mcp_tool_use":
+		if p := progressFor[e.Name]; p != "" {
+			t.progress(p)
+		}
+	case "session.thread_created":
+		switch e.AgentName {
+		case "post-writer":
+			t.progress("The post writer is working")
+		case "article-writer":
+			t.progress("The article writer is working")
+		}
+	case "span.outcome_evaluation_start":
+		t.progress("Checking the draft")
+	case "span.outcome_evaluation_end":
+		switch e.Result {
+		case "needs_revision":
+			t.progress("Revising after the check")
+		case "satisfied":
+			t.verdict = fmt.Sprintf("%s check passed (round %d).", t.label(), e.Iteration+1)
+		case "interrupted":
+		default:
+			t.verdict = t.label() + " check not passed: " + shorten(e.Explanation, 600)
+		}
 
 	case "session.error":
 		if e.Error != nil && e.Error.Message != "" {
@@ -174,21 +192,37 @@ func (t *turn) handle(e wireEvent) (*toolResult, error) {
 		}
 		switch reason {
 		case "requires_action":
-			// waiting on us: the tool result was already returned when the call arrived
+			// nothing this server offers needs a confirmation yet, so there is nothing to answer it with
+			return errors.New("the agent asked to do something that needs your confirmation, which this app cannot give yet")
 		case "retries_exhausted":
-			return nil, fmt.Errorf("the agent kept failing and gave up%s", t.errSuffix())
+			return fmt.Errorf("the agent kept failing and gave up%s", t.errSuffix())
 		case "budget_reached":
-			return nil, errors.New("this conversation reached its spending limit, so the agent stopped. Start a new conversation")
+			return errors.New("this conversation reached its spending limit, so the agent stopped. Start a new conversation")
 		default: // end_turn, or anything that means "finished"
-			t.done = true
+			t.done = !t.graded || t.verdict != ""
 		}
 
 	case "session.status_terminated":
 		if !t.done {
-			return nil, fmt.Errorf("the agent's session ended unexpectedly%s", t.errSuffix())
+			return fmt.Errorf("the agent's session ended unexpectedly%s", t.errSuffix())
 		}
 	}
-	return nil, nil
+	return nil
+}
+
+func (t *turn) label() string {
+	if t.kind == "article" {
+		return "Article"
+	}
+	return "Post"
+}
+
+func shorten(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
 }
 
 func (t *turn) hasStreamedBefore(id string) bool {
@@ -207,37 +241,11 @@ func (t *turn) errSuffix() string {
 	return ""
 }
 
-// toolUse validates the agent's proposal. A valid one is kept (a later one replaces it: that is a revision). An invalid one
-// is answered with an error that says what is wrong, so the agent can send a corrected version, a few times at most.
-func (t *turn) toolUse(e wireEvent) (*toolResult, error) {
-	if e.Name != ToolName {
-		return t.answer(e.ID, toolResult{ToolUseID: e.ID, Text: "There is no tool named " + e.Name + ". Use propose_content.", IsError: true}), nil
+// reply is what the agent said, with the grader's word after it.
+func (t *turn) reply() string {
+	parts := append([]string(nil), t.replies...)
+	if t.verdict != "" {
+		parts = append(parts, t.verdict)
 	}
-	p, err := agent.ParseProposal(e.Input)
-	if err != nil {
-		if t.answered[e.ID] {
-			return nil, nil // replayed, and already handled before
-		}
-		t.fixes++
-		if t.fixes > maxFixes {
-			return nil, fmt.Errorf("the agent could not produce a valid proposal after %d tries (%v)", maxFixes, err)
-		}
-		return t.answer(e.ID, toolResult{ToolUseID: e.ID, Text: ToolResultInvalid(err), IsError: true}), nil
-	}
-	t.proposal = &p
-	return t.answer(e.ID, toolResult{ToolUseID: e.ID, Text: ToolResultOK}), nil
-}
-
-// answer returns the result to send unless that call already has one.
-func (t *turn) answer(id string, r toolResult) *toolResult {
-	if t.answered[id] {
-		return nil
-	}
-	t.answered[id] = true
-	return &r
-}
-
-// output is the finished turn.
-func (t *turn) output(sessionID string) agent.Output {
-	return agent.Output{SessionID: sessionID, Reply: agent.CleanReply(strings.Join(t.replies, "\n\n")), Proposal: t.proposal}
+	return strings.Join(parts, "\n\n")
 }

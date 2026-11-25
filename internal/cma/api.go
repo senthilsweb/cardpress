@@ -9,16 +9,19 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
+
+	"github.com/senthilsweb/cardpress/internal/agent"
 )
 
 // sessionAPI is the part of the Managed Agents API the client uses. The real one wraps the SDK; tests use a scripted fake.
 type sessionAPI interface {
 	newSession(ctx context.Context, title string) (string, error)
 	sendMessage(ctx context.Context, sessionID, text string) (eventID string, err error)
-	sendToolResult(ctx context.Context, sessionID string, r toolResult) error
+	sendOutcome(ctx context.Context, sessionID, description, rubric string, iterations int) (eventID string, err error)
 	interrupt(ctx context.Context, sessionID string) error
 	history(ctx context.Context, sessionID string) ([]wireEvent, error)
 	stream(ctx context.Context, sessionID string) (eventStream, error)
+	usage(ctx context.Context, sessionID string) (agent.Usage, error)
 }
 
 // eventStream is a live event stream, already open (and so already buffering) when stream returns.
@@ -32,20 +35,22 @@ type eventStream interface {
 // errSessionGone means the session id is not one this agent knows.
 var errSessionGone = errors.New("the session does not exist")
 
-// Config says which agent to use. AgentID and EnvironmentID come from `cardpress agent-setup`.
+// Config says how to reach the agents.
 type Config struct {
-	AgentID       string
-	AgentVersion  int // 0 = the latest version
-	EnvironmentID string
-	BudgetCents   int    // spend cap per conversation, in US cents; 0 = none
-	APIKey        string // empty: the SDK reads ANTHROPIC_API_KEY (or a logged-in profile)
-	BaseURL       string // empty: Anthropic's API. For tests and proxies.
+	Manifest    Manifest
+	BudgetCents int    // spend cap per conversation, in US cents; 0 = none
+	APIKey      string // empty: the SDK reads ANTHROPIC_API_KEY (or a logged-in profile)
+	WorkspaceID string // for a key that can act on more than one workspace
+	BaseURL     string // empty: Anthropic's API. For tests and proxies.
 }
 
 func newSDK(cfg Config) anthropic.Client {
 	var opts []option.RequestOption
 	if cfg.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(cfg.APIKey))
+	}
+	if cfg.WorkspaceID != "" {
+		opts = append(opts, option.WithHeader("anthropic-workspace-id", cfg.WorkspaceID))
 	}
 	if cfg.BaseURL != "" {
 		opts = append(opts, option.WithBaseURL(cfg.BaseURL))
@@ -70,15 +75,16 @@ func gone(err error) error {
 }
 
 func (a *sdkAPI) newSession(ctx context.Context, title string) (string, error) {
+	m := a.cfg.Manifest
 	p := anthropic.BetaSessionNewParams{
-		EnvironmentID: a.cfg.EnvironmentID,
+		Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(m.AgentID)},
+		EnvironmentID: m.EnvironmentID,
+		VaultIDs:      []string{m.VaultID},
 		Title:         anthropic.String(title),
 		Metadata:      map[string]string{"app": "cardpress"},
 	}
-	if a.cfg.AgentVersion > 0 {
-		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: a.cfg.AgentID, Version: anthropic.Int(int64(a.cfg.AgentVersion))}}
-	} else {
-		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(a.cfg.AgentID)}
+	if v, err := strconv.Atoi(m.AgentVersion); err == nil {
+		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: m.AgentID, Version: anthropic.Int(int64(v))}}
 	}
 	if a.cfg.BudgetCents > 0 {
 		p.Budget = anthropic.BetaManagedAgentsBudgetLimitParam{MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: strconv.Itoa(a.cfg.BudgetCents), Currency: "USD"}}
@@ -90,14 +96,8 @@ func (a *sdkAPI) newSession(ctx context.Context, title string) (string, error) {
 	return s.ID, nil
 }
 
-func (a *sdkAPI) sendMessage(ctx context.Context, sid, text string) (string, error) {
-	res, err := a.c.Beta.Sessions.Events.Send(ctx, sid, anthropic.BetaSessionEventSendParams{
-		Events: []anthropic.BetaManagedAgentsEventParamsUnion{{
-			OfUserMessage: &anthropic.BetaManagedAgentsUserMessageEventParams{
-				Content: []anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion{{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: text}}},
-			},
-		}},
-	})
+func (a *sdkAPI) send(ctx context.Context, sid string, e anthropic.BetaManagedAgentsEventParamsUnion) (string, error) {
+	res, err := a.c.Beta.Sessions.Events.Send(ctx, sid, anthropic.BetaSessionEventSendParams{Events: []anthropic.BetaManagedAgentsEventParamsUnion{e}})
 	if err != nil {
 		return "", gone(err)
 	}
@@ -107,25 +107,38 @@ func (a *sdkAPI) sendMessage(ctx context.Context, sid, text string) (string, err
 	return res.Data[0].ID, nil
 }
 
-func (a *sdkAPI) sendToolResult(ctx context.Context, sid string, r toolResult) error {
-	params := &anthropic.BetaManagedAgentsUserCustomToolResultEventParams{
-		CustomToolUseID: r.ToolUseID,
-		Content:         []anthropic.BetaManagedAgentsUserCustomToolResultEventParamsContentUnion{{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: r.Text}}},
+func (a *sdkAPI) sendMessage(ctx context.Context, sid, text string) (string, error) {
+	return a.send(ctx, sid, anthropic.BetaManagedAgentsEventParamsUnion{OfUserMessage: &anthropic.BetaManagedAgentsUserMessageEventParams{
+		Content: []anthropic.BetaManagedAgentsUserMessageEventParamsContentUnion{{OfText: &anthropic.BetaManagedAgentsTextBlockParam{Text: text}}},
+	}})
+}
+
+func (a *sdkAPI) sendOutcome(ctx context.Context, sid, description, rubric string, iterations int) (string, error) {
+	p := &anthropic.BetaManagedAgentsUserDefineOutcomeEventParams{
+		Description: description,
+		Rubric:      anthropic.BetaManagedAgentsUserDefineOutcomeEventParamsRubricUnion{OfText: &anthropic.BetaManagedAgentsTextRubricParams{Content: rubric}},
 	}
-	if r.IsError {
-		params.IsError = anthropic.Bool(true)
+	if iterations > 0 {
+		p.MaxIterations = anthropic.Int(int64(iterations))
 	}
-	_, err := a.c.Beta.Sessions.Events.Send(ctx, sid, anthropic.BetaSessionEventSendParams{
-		Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserCustomToolResult: params}},
-	})
-	return err
+	return a.send(ctx, sid, anthropic.BetaManagedAgentsEventParamsUnion{OfUserDefineOutcome: p})
 }
 
 func (a *sdkAPI) interrupt(ctx context.Context, sid string) error {
-	_, err := a.c.Beta.Sessions.Events.Send(ctx, sid, anthropic.BetaSessionEventSendParams{
-		Events: []anthropic.BetaManagedAgentsEventParamsUnion{{OfUserInterrupt: &anthropic.BetaManagedAgentsUserInterruptEventParams{}}},
-	})
+	_, err := a.send(ctx, sid, anthropic.BetaManagedAgentsEventParamsUnion{OfUserInterrupt: &anthropic.BetaManagedAgentsUserInterruptEventParams{}})
 	return err
+}
+
+func (a *sdkAPI) usage(ctx context.Context, sid string) (agent.Usage, error) {
+	s, err := a.c.Beta.Sessions.Get(ctx, sid, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return agent.Usage{}, gone(err)
+	}
+	cents, err := strconv.Atoi(s.Usage.ListCost.Amount)
+	if err != nil {
+		return agent.Usage{}, errors.New("the session reports no cost")
+	}
+	return agent.Usage{TotalCents: cents, ActiveSeconds: s.Usage.ActiveSeconds}, nil
 }
 
 func (a *sdkAPI) history(ctx context.Context, sid string) ([]wireEvent, error) {

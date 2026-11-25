@@ -45,6 +45,8 @@ type SourceFetcher interface {
 type AgentInfo struct {
 	Name string `json:"name"`
 	AI   bool   `json:"ai"`
+	// Ready is false on a server with no assistant set up.
+	Ready bool `json:"ready"`
 }
 
 // ChatMessage is one turn.
@@ -131,10 +133,14 @@ func agentErr(format string, a ...any) error { return &AgentError{fmt.Sprintf(fo
 // Chat prepares post content with an agent. It never saves, publishes or schedules: a proposal ends at a person's
 // approval, and applying it to a draft is done by the person's browser.
 type Chat struct {
-	db    *sql.DB
-	agent agent.Client
-	fetch SourceFetcher
-	now   func() time.Time
+	// Studio, when set, lets an assistant work in the studio: drafts are made for what is ticked, and changes reported.
+	Studio ChatStudio
+	// OwnBrandsOnly is for an assistant whose key sees only its owner's brands: a person may ask it to work in those only.
+	OwnBrandsOnly bool
+	db            *sql.DB
+	agent         agent.Client
+	fetch         SourceFetcher
+	now           func() time.Time
 
 	mu   sync.Mutex
 	busy map[string]bool
@@ -146,7 +152,9 @@ func NewChat(db *sql.DB, a agent.Client, f SourceFetcher) *Chat {
 }
 
 // Agent describes what answers.
-func (c *Chat) Agent() AgentInfo { return AgentInfo{Name: c.agent.Name(), AI: c.agent.IsAI()} }
+func (c *Chat) Agent() AgentInfo {
+	return AgentInfo{Name: c.agent.Name(), AI: c.agent.IsAI(), Ready: c.agent.Ready()}
+}
 
 func (c *Chat) stamp() string { return c.now().UTC().Format(draftTimeLayout) }
 
@@ -404,7 +412,12 @@ func (c *Chat) unlock(id string) { c.mu.Lock(); delete(c.busy, id); c.mu.Unlock(
 // Send adds the person's message, gets the agent's reply, and stores both. Progress goes to emit: the stored user
 // message, text as it is written ("delta"), the proposal, and the stored reply. The person's message is kept even if
 // the agent then fails, so nothing they typed is lost. Invalid agent output is an error and is never stored.
-func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) (err error) {
+func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) error {
+	return c.SendWith(ctx, id, content, ChatRequest{}, emit)
+}
+
+// SendWith is Send with what the person ticked and is looking at, for an assistant that works in the studio.
+func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest, emit func(ChatEvent)) (err error) {
 	conv, err := c.load(ctx, id)
 	if err != nil {
 		return err
@@ -415,6 +428,12 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	}
 	if conv.SourceKind == "mcp" {
 		return invalid("this conversation was started by an outside agent, so ask that agent for changes")
+	}
+	if !c.agent.Ready() {
+		return agentErr("No assistant is set up on this server.")
+	}
+	if err := c.mayAsk(ctx, conv.ProfileID); err != nil {
+		return err
 	}
 	if !c.lock(id) {
 		return fmt.Errorf("%w: a reply is already being written for this conversation", ErrConflict)
@@ -478,13 +497,19 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	if err != nil {
 		return err
 	}
-	in := agent.Input{SessionID: session, Sources: sources}
+	var studio *agent.Studio
+	if c.Studio != nil {
+		if studio, err = c.prepare(ctx, conv, req); err != nil {
+			return err
+		}
+	}
+	in := agent.Input{SessionID: session, Sources: sources, Studio: studio}
 	for _, m := range history {
 		in.Messages = append(in.Messages, agent.Message{Role: m.Role, Content: m.Content})
 	}
 	progress := func(e agent.Event) {
-		if e.Type == "delta" {
-			emit(ChatEvent{"delta", map[string]string{"text": e.Text}})
+		if e.Type == "delta" || e.Type == "progress" {
+			emit(ChatEvent{e.Type, map[string]string{"text": e.Text}})
 		}
 	}
 	out, err := c.agent.Respond(ctx, in, progress)
@@ -497,6 +522,15 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 			return err
 		}
 		in.SessionID, in.Restarted = session, true
+		if studio != nil { // the new session has seen nothing, so it is told about the items afresh
+			if _, derr := c.db.ExecContext(ctx, `UPDATE conversations SET seen = '' WHERE id = ?`, id); derr != nil {
+				return derr
+			}
+			if studio, err = c.prepare(ctx, conv, req); err != nil {
+				return err
+			}
+			in.Studio = studio
+		}
 		in.Sources = append([]agent.Source(nil), sources...)
 		for i := range in.Sources {
 			in.Sources[i].New = true
@@ -536,6 +570,11 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	for _, sid := range fresh {
 		if _, err := c.db.ExecContext(ctx, `UPDATE conversation_sources SET delivered = 1 WHERE id = ?`, sid); err != nil {
 			return err
+		}
+	}
+	if studio != nil {
+		if err := c.remember(ctx, id, studio); err != nil {
+			log.Printf("chat: could not record what the assistant has seen: %v", err)
 		}
 	}
 	if prop != nil {

@@ -1,4 +1,4 @@
-import { useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
 import { FileText, Link2, Loader2, Paperclip, Send, Square, Type, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export const SourceChip = ({ source, onRemove }: { source: ChatSource; onRemove?
  * The one box a person talks to the assistant through: words, with files, links and long text beside them. The send
  * button becomes a stop button while a reply is being written.
  */
-export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaiting, onSend, onStop }: {
+export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaiting, onSend, onStop, disabled, ticks }: {
   placeholder: string;
   /** A reply is being written: the button stops it. */
   replying: boolean;
@@ -42,6 +42,10 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
   /** Resolves true once the words and attachments were taken; the box is then cleared. */
   onSend: (text: string, attachments: Attachment[]) => Promise<boolean>;
   onStop: () => void;
+  /** Nothing can be sent, for instance because no assistant is set up. */
+  disabled?: boolean;
+  /** Shown above the button row: what to write. */
+  ticks?: ReactNode;
 }) {
   const [text, setText] = useState("");
   const [items, setItems] = useState<Attachment[]>([]);
@@ -87,7 +91,7 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
     addFiles(Array.from(e.dataTransfer.files));
   };
 
-  const ready = !replying && !busy && !sending && (text.trim() !== "" || items.length > 0 || waiting.length > 0);
+  const ready = !disabled && !replying && !busy && !sending && (text.trim() !== "" || items.length > 0 || waiting.length > 0);
   const send = async () => {
     if (!ready) return;
     setSending(true); setProblem(null);
@@ -114,7 +118,7 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
           </div>
         )}
         <textarea
-          ref={area} rows={3} value={text} disabled={sending} aria-label="Message" placeholder={over ? "Drop the files here" : placeholder}
+          ref={area} rows={3} value={text} disabled={sending || disabled} aria-label="Message" placeholder={over ? "Drop the files here" : placeholder}
           onChange={(e) => setText(e.target.value)} onPaste={onPaste}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }}
           className="block max-h-48 min-h-[4.5rem] w-full resize-none bg-transparent px-3 py-2.5 text-[13px] leading-snug outline-none placeholder:text-muted-foreground [field-sizing:content] disabled:opacity-60"
@@ -135,9 +139,10 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
         <div className="flex items-center justify-between px-1.5 pb-1.5">
           <input ref={file} type="file" multiple accept={FILE_TYPES} className="hidden" aria-label="Choose files"
             onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+          <div className="flex items-center gap-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Attach" title="Attach a file, a link or text" disabled={sending}><Paperclip /></Button>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Attach" title="Attach a file, a link or text" disabled={sending || disabled}><Paperclip /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start">
               <DropdownMenuItem onSelect={() => file.current?.click()}><FileText /> Attach a file</DropdownMenuItem>
@@ -145,6 +150,8 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
               <DropdownMenuItem onSelect={() => { setEntry(""); setAdding("text"); }}><Type /> Paste text</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {ticks}
+          </div>
           {replying
             ? <Button type="button" variant="brand" size="icon-sm" onClick={onStop} aria-label="Stop" title="Stop"><Square className="fill-current" /></Button>
             : <Button type="button" variant={ready ? "brand" : "ghost"} size="icon-sm" disabled={!ready} onClick={() => void send()} aria-label="Send" title="Send (Enter)">{sending || busy ? <Loader2 className="animate-spin" /> : <Send />}</Button>}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/senthilsweb/cardpress/internal/agent/agenttest"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -39,6 +40,7 @@ type spyAgent struct {
 
 func (a *spyAgent) Name() string { return "Spy" }
 func (a *spyAgent) IsAI() bool   { return false }
+func (a *spyAgent) Ready() bool  { return true }
 func (a *spyAgent) CreateSession(context.Context) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -354,7 +356,7 @@ func TestListIsPerProfileNewestFirstAndDeleteRemovesEverything(t *testing.T) {
 }
 
 func TestEndToEndWithTheDemoAgent(t *testing.T) {
-	c, ctx := newChat(t, &agent.Mock{}, &fakeFetcher{}), context.Background()
+	c, ctx := newChat(t, &agenttest.Mock{}, &fakeFetcher{}), context.Background()
 	conv, _ := c.Start(ctx, "p", "", "Databases are everywhere in modern software. Teams choose Postgres because it handles many workloads well. "+
 		"Migrations take planning and patience across several weeks. Backups and restores should be tested regularly by every team.")
 	ev, emit := collect()

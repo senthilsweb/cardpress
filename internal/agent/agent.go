@@ -39,6 +39,9 @@ type Message struct {
 // Source is the article the conversation is about. Its text came from the internet or was pasted: it is DATA to read,
 // never instructions to follow. Implementations must keep it apart from the user's own messages.
 type Source struct {
+	// ID names the source for the whole conversation ("s1", "s2", …); Kind is url, text, md, docx or pdf.
+	ID        string
+	Kind      string
 	URL       string
 	Title     string
 	Text      string
@@ -56,8 +59,38 @@ type Usage struct {
 	ActiveSeconds float64
 }
 
+// Studio is what an assistant that works in the studio is told with a message.
+type Studio struct {
+	ProfileID      string
+	ConversationID string
+	Viewing        string // "post" or "article": the item on screen
+	PostID         string // the conversation's post, or empty
+	ArticleID      string
+	Write          []string // the kinds the person ticked for this message
+	Grade          []string // those of Write that are first drafts, to be written as graded outcomes, in this order
+	Cards          []Card   // items the assistant has not seen yet
+	Changes        []Change // what the person changed since it last saw an item
+	Notes          []string // the brand's notes as "key: content", for a session's first message
+}
+
+// Card is a draft's card as the assistant first sees it; Design is JSON with pictures as present or absent.
+type Card struct {
+	DraftID  string
+	Revision int
+	Design   string
+}
+
+// Change says what the person changed in a draft: lines such as `background: "mesh"` or `body: changed`.
+type Change struct {
+	DraftID  string
+	Revision int
+	Lines    []string
+}
+
 // Input is what the agent is given for one reply.
 type Input struct {
+	// Studio is where the conversation stands in the studio; nil for an assistant that only proposes.
+	Studio    *Studio
 	SessionID string
 	Messages  []Message // oldest first; the last is the person's newest message
 	Sources   []Source  // everything the conversation draws on, oldest first
@@ -67,7 +100,7 @@ type Input struct {
 
 // Event is progress while a reply is being written.
 type Event struct {
-	Type string // "delta"
+	Type string // "delta" (text of the reply) or "progress" (what is being done)
 	Text string
 }
 
@@ -83,6 +116,8 @@ type Output struct {
 // Client is the port the chat uses. CreateSession starts a conversation on the agent's side; Respond sends the next
 // message, reports progress through emit, and returns the reply with an optional proposal.
 type Client interface {
+	// Ready reports whether an assistant is set up at all.
+	Ready() bool
 	Name() string
 	// IsAI says whether a language model is behind it (the demo is not), so the screen can be honest about it.
 	IsAI() bool
@@ -205,4 +240,19 @@ func CleanReply(s string) string {
 		s = string([]rune(s)[:maxReply])
 	}
 	return s
+}
+
+// None is the assistant of a server that has none set up. Conversations can be read, but nothing answers.
+type None struct{}
+
+func (None) Name() string { return "No assistant" }
+func (None) IsAI() bool   { return false }
+func (None) Ready() bool  { return false }
+
+// ErrNoAssistant is the answer to a message when no assistant is set up.
+var ErrNoAssistant = errors.New("no assistant is set up on this server")
+
+func (None) CreateSession(context.Context) (string, error) { return "", ErrNoAssistant }
+func (None) Respond(context.Context, Input, func(Event)) (Output, error) {
+	return Output{}, ErrNoAssistant
 }

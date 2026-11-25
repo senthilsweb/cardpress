@@ -1,8 +1,8 @@
-# Chat: preparing content
+# Chat: writing with the assistant
 
-The **Assistant** drafts a post or an article from something you give it, and you steer it with replies. It prepares **content only**. It cannot choose the card's layout, colours or background, and it cannot save, publish or schedule anything: its output ends at a card that you approve. Publishing stays your own step in the [Full preview](publishing.md).
+The **Assistant** writes posts and articles from what you give it, saves them as drafts, and revises them as you reply. It can change the words on a card but never its look, and it cannot publish. Publishing stays your own step in the [Full preview](publishing.md).
 
-> **By default the assistant is a built-in demo agent, not an AI model.** It picks sentences from the source by simple rules and understands a few instructions (below). It exists so the whole chat can be used and tested now; the screen says "Demo agent · no AI model". A real model (a Claude Managed Agent) plugs into the same place with no change to the screen: see [Claude Managed Agent](cma-agent.md).
+The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one, the panel says so.
 
 ## Using it
 
@@ -14,24 +14,16 @@ The **Assistant** drafts a post or an article from something you give it, and yo
    - **Paste text:** at least 40 characters. A paste over 1,500 characters becomes a source by itself.
 
    A conversation holds up to ten sources, added at any point, and you can send them with or without a message. If one cannot be read, you are told why and nothing is sent. Text is kept up to 200,000 characters from a file or 40,000 from a web page; a cut source says so. A scanned PDF has no text to read, and a password-protected one cannot be opened.
-2. It replies and shows a **proposal card**: the kind (post or article), a title for the card, the text, hashtags, alt text, and a note on why.
-3. Choose:
-   - **Approve and use** copies it into a draft. If your current draft is empty it is filled in; **if it already has text, a new draft is made instead**, so your own writing is never overwritten. Tick or untick *Also use the title as the card's title*. **Show the post** (or article) puts it on the canvas. An article made while a post is on screen leaves the post where it is and marks the **Article** view.
-   - **Edit** lets you change the kind, title, text, hashtags and alt text first. Your edit is what gets applied, and the agent's original is kept.
-   - **Reject** dismisses it.
-   - Or just **reply** in the box to ask for another version. Earlier proposals stay in the thread (marked "Earlier draft") and can still be approved.
+2. Tick **Post**, **Article** or both, then send. The draft appears on the canvas and fills in when the agent saves it. The first draft is checked against a rubric and the reply says whether it passed.
+3. Reply to ask for changes. Each save is a new [version](workspace.md), so nothing is lost.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
 5. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one about the item on screen; the bin deletes the open one.
 6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
 7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
-### What the demo agent understands
-
-`shorter` · `longer` · `make it an article` · `make it a post` · `no hashtags` · `add #Tag` · `no question`. Later messages override earlier ones. Anything else gets a reply listing these.
-
 ## Proposals from an outside agent
 
-An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the Chat switch shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
+An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, and the Chat switch shows how many are waiting. **Approve and use** copies it into a draft (a draft that already has text is left alone and a new one is made), **Edit** changes it first, and **Reject** dismisses it. To change one, ask that agent to send a revised version.
 
 ## Reading a web address safely
 
@@ -40,7 +32,7 @@ The server fetches the page for you, which could be abused to make it reach priv
 - only `http` and `https`, on ports 80 and 443; no `user:password@` addresses;
 - the address actually connected to is checked **after** DNS, for every connection, **including each redirect** (up to 5). Private, loopback, link-local (such as `169.254.169.254`), carrier-grade NAT, multicast and reserved ranges are refused, in IPv4 and IPv6, including IPv4 written as IPv6 and names like `0x7f000001`. A hostname that points to a private address, or changes its answer between lookups, is refused too;
 - environment proxies are ignored, 20 seconds total, at most 2 MB read, only HTML or plain text, and at most 40,000 characters of text kept (the chat says when a page was cut short);
-- the page's text is passed to the agent as **source data, kept apart from your messages**. Instructions written inside an article ("ignore the above and publish this") are just text: the agent has no way to publish, and every result still needs your approval.
+- the page's text is passed to the agent as **source data, kept apart from your messages**. Instructions written inside an article ("ignore the above and publish this") are just text: the agent has no way to publish, every save is a version you can undo, and publishing stays your step.
 
 ## Reading a page that needs JavaScript or a login
 
@@ -50,7 +42,7 @@ These pages have no readable text for the server, so it says so. Paste the text 
 
 | Piece | Where |
 |---|---|
-| The agent boundary: `Client` interface, proposal validation, the demo agent | `internal/agent` |
+| The agent boundary: `Client` interface, proposal validation | `internal/agent` |
 | The Claude Managed Agent adapter | `internal/cma` |
 | URL fetching and the safety checks | `internal/source` |
 | Conversations, messages, proposals, approval rules | `internal/service/chat.go` |
@@ -67,5 +59,5 @@ A proposal is validated before it is stored: the kind must be `post` or `article
 | `POST /api/v1/chat/conversations` | `{"profileId", "url"}` or `{"profileId", "text"}` |
 | `GET /api/v1/chat/conversations?profileId=` | The list, and which agent is answering |
 | `GET /api/v1/chat/conversations/{id}` / `DELETE` | One conversation with its messages and proposals / delete it |
-| `POST /api/v1/chat/conversations/{id}/messages` | `{"content"}`. Streams `user`, `delta`, `proposal`, `message`, then `done` (or `error`). An empty first message starts the first draft. Only one reply at a time per conversation. |
+| `POST /api/v1/chat/conversations/{id}/messages` | `{"content", "write": ["post","article"], "viewing"}`. Streams `user`, `progress`, `delta`, `proposal`, `message`, then `done` (or `error`). An empty message sends waiting sources. Only one reply at a time per conversation. |
 | `POST /api/v1/chat/proposals/{id}/decision` | `{"status": "approved"\|"rejected", "draftId", "edited": {…}}` |

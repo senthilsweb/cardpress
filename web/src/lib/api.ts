@@ -51,7 +51,7 @@ import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage } from "./library";
-import type { AgentInfo, ChatMessage, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
 export interface ApiInfo {
@@ -94,6 +94,8 @@ export interface ApiState {
 export interface ChatStreamHandlers {
   onUser?: (m: ChatMessage) => void;
   onDelta?: (text: string) => void;
+  /** What the assistant is doing, while it works. */
+  onProgress?: (text: string) => void;
   onProposal?: (p: Proposal) => void;
   onMessage?: (m: ChatMessage) => void;
 }
@@ -132,13 +134,13 @@ async function listen(profileId: string, onEvent: (e: ServerEvent) => void, onOp
  * Send a chat message and read the reply as it is written (server-sent events over a POST, so the token can go in a
  * header, which EventSource cannot do). Resolves when the reply is complete; throws with the reason if it fails.
  */
-async function streamMessage(id: string, content: string, h: ChatStreamHandlers, signal?: AbortSignal): Promise<void> {
+async function streamMessage(id: string, content: string, h: ChatStreamHandlers, signal?: AbortSignal, request?: ChatRequest): Promise<void> {
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "text/event-stream" };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/chat/conversations/${encodeURIComponent(id)}/messages`, { method: "POST", headers, body: JSON.stringify({ content }), signal });
+    res = await fetch(`${API_BASE}/chat/conversations/${encodeURIComponent(id)}/messages`, { method: "POST", headers, body: JSON.stringify({ content, ...request }), signal });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     throw new ApiError(0, "network", `Cannot reach the API at ${API_BASE}`);
@@ -160,6 +162,7 @@ async function streamMessage(id: string, content: string, h: ChatStreamHandlers,
     const v = data ? JSON.parse(data) : {};
     if (name === "user") h.onUser?.(v);
     else if (name === "delta") h.onDelta?.(v.text ?? "");
+    else if (name === "progress") h.onProgress?.(v.text ?? "");
     else if (name === "proposal") h.onProposal?.(v);
     else if (name === "message") h.onMessage?.(v);
     else if (name === "error") throw new ApiError(502, v.code ?? "agent_error", v.message ?? "The reply failed");

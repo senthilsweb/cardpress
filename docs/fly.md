@@ -43,7 +43,7 @@ This uses `fly.turso.toml`: no volume, and the database settings are secrets.
 |---|---|
 | `CARDPRESS_API_TOKEN` | `.env`, or an existing Fly secret, or a new random one |
 | `CARDPRESS_SECRET_KEY` | the same rule. It encrypts stored social credentials. **Do not lose it**: without it they cannot be read |
-| `CARDPRESS_AGENT`, `CARDPRESS_AGENT_ID`, `CARDPRESS_AGENT_ENVIRONMENT_ID`, `ANTHROPIC_API_KEY`, budget and timeout | `.env`, if present. See [Claude Managed Agent](cma-agent.md) |
+| `CARDPRESS_AGENT`, `CARDPRESS_AGENT_MANIFEST`, `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID`, budget and timeout | `.env`, if present. See [Claude Managed Agent](cma-agent.md) |
 | `CARDPRESS_MCP`, `CARDPRESS_MISSED_GRACE`, `CARDPRESS_LINKEDIN_*`, `CARDPRESS_CORS_ORIGINS` | `.env`, if present |
 | `CARDPRESS_DB_URL`, `CARDPRESS_DB_TOKEN` | `.env` (with `--turso`) |
 
@@ -59,7 +59,7 @@ scripts/deploy-fly.sh logs    --app my-cardpress
 scripts/deploy-fly.sh backup  --app my-cardpress             # volume snapshot (Turso has its own backups)
 ```
 
-To enable the assistant later: run `cardpress agent-setup` on your machine with `ANTHROPIC_API_KEY` exported (it creates the agent in your Anthropic account), add the printed ids and the key to `.env`, then run `secrets` and `deploy`.
+To enable the assistant, set the values in [Claude Managed Agent](cma-agent.md) as Fly secrets or in `.env`, then deploy.
 
 ## Notes
 

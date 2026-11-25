@@ -15,7 +15,7 @@
 | LinkedIn publishing: a post with its card | Built. A real post from a live server has succeeded |
 | LinkedIn publishing: your own image, several images, a PDF, a video | Tested against a local fake of LinkedIn's API, **not yet against a real account**. Treat the first real post of each as a trial. See [Publishing](docs/publishing.md) |
 | X, Instagram and Facebook | Card sizes and feed previews. Publishing is not built (X and Instagram credentials can be stored) |
-| Assistant | Works with a built-in demo agent (no AI model). The Claude Managed Agent adapter is built and tested against a fake API, **not yet against a real Anthropic account** |
+| Assistant | [Claude Managed Agents](docs/cma-agent.md) write posts and articles from your sources; optional, off until set up |
 | MCP server | Built and tested |
 | Telemetry (traces, metrics, logs over OTLP) | Built and tested against a fake receiver. See [Telemetry](docs/telemetry.md) |
 

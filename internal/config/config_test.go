@@ -117,29 +117,28 @@ func TestMCPAndAllowedHosts(t *testing.T) {
 }
 
 func TestAgentSettings(t *testing.T) {
-	c, err := Load(nil, env(nil))
-	if err != nil || c.Agent != "mock" || c.AgentTimeout != 4*time.Minute || c.Validate() != nil {
-		t.Fatalf("the demo agent is the default: %v %+v", err, c)
+	load := func(env map[string]string) (Config, error) {
+		return Load(nil, func(k string) string { return env[k] })
 	}
-	good := map[string]string{"CARDPRESS_AGENT": "CMA", "CARDPRESS_AGENT_ID": "agent_1", "CARDPRESS_AGENT_ENVIRONMENT_ID": "env_1",
-		"CARDPRESS_AGENT_VERSION": "3", "CARDPRESS_AGENT_BUDGET_CENTS": "500", "CARDPRESS_AGENT_TIMEOUT": "90s"}
-	c, err = Load(nil, env(good))
-	if err != nil || c.Validate() != nil || c.Agent != "cma" || c.AgentVersion != 3 || c.AgentBudget != 500 || c.AgentTimeout != 90*time.Second {
-		t.Fatalf("%v %+v", err, c)
-	}
-	// choosing cma without ids, or an unknown agent, stops the server from starting
-	for name, m := range map[string]map[string]string{
-		"no ids":  {"CARDPRESS_AGENT": "cma"},
-		"unknown": {"CARDPRESS_AGENT": "gpt"},
-	} {
-		c, err := Load(nil, env(m))
-		if err != nil || c.Validate() == nil {
-			t.Errorf("%s should be refused: %v", name, err)
+	for _, off := range []map[string]string{{}, {"CARDPRESS_AGENT": "mock"}} {
+		c, err := load(off)
+		if err != nil || c.Agent != "off" || c.AgentTimeout != 12*time.Minute || c.AgentBudget != 200 || c.Validate() != nil {
+			t.Fatalf("%v %+v", err, c)
 		}
 	}
-	for _, m := range []map[string]string{{"CARDPRESS_AGENT_VERSION": "x"}, {"CARDPRESS_AGENT_BUDGET_CENTS": "-1"}, {"CARDPRESS_AGENT_TIMEOUT": "1s"}} {
-		if _, err := Load(nil, env(m)); err == nil {
-			t.Errorf("%v should be refused", m)
+	c, err := load(map[string]string{"CARDPRESS_AGENT": "CMA", "CARDPRESS_AGENT_MANIFEST": "m.json", "CARDPRESS_AGENT_BUDGET_CENTS": "500",
+		"CARDPRESS_AGENT_TIMEOUT": "90s", "ANTHROPIC_WORKSPACE_ID": "wrkspc_1"})
+	if err != nil || c.Validate() != nil || c.Agent != "cma" || c.AgentManifest != "m.json" || c.AgentBudget != 500 || c.AgentTimeout != 90*time.Second || c.AgentWorkspace != "wrkspc_1" {
+		t.Fatalf("%v %+v", err, c)
+	}
+	for _, bad := range []map[string]string{{"CARDPRESS_AGENT": "gpt"}, {"CARDPRESS_AGENT": "cma"}} {
+		if c, err := load(bad); err == nil && c.Validate() == nil {
+			t.Errorf("accepted %v", bad)
+		}
+	}
+	for _, bad := range []map[string]string{{"CARDPRESS_AGENT_BUDGET_CENTS": "-1"}, {"CARDPRESS_AGENT_TIMEOUT": "1s"}} {
+		if _, err := load(bad); err == nil {
+			t.Errorf("accepted %v", bad)
 		}
 	}
 }

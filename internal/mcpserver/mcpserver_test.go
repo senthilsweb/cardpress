@@ -16,7 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/senthilsweb/cardpress/internal/agent"
+	"github.com/senthilsweb/cardpress/internal/agent/agenttest"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
@@ -58,7 +58,7 @@ func newRig(t *testing.T, f service.SourceFetcher) *rig {
 		t.Fatal(err)
 	}
 	studio := service.New(db.DB)
-	chat := service.NewChat(db.DB, &agent.Mock{}, f)
+	chat := service.NewChat(db.DB, &agenttest.Mock{}, f)
 	audit := NewAuditor(db.DB)
 	r := &rig{studio: studio, chat: chat, audit: audit, db: db.DB}
 	r.deps = Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: service.NewSettings(db.DB, nil, func(string) string { return "" }), Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {

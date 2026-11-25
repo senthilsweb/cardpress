@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/senthilsweb/cardpress/internal/agent/agenttest"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/secrets"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
@@ -29,6 +29,7 @@ type rig struct {
 type rigOpts struct {
 	token        string
 	signupClosed bool
+	adminOnly    bool
 }
 
 func newRig(t *testing.T, o rigOpts) *rig {
@@ -48,9 +49,9 @@ func newRig(t *testing.T, o rigOpts) *rig {
 	t.Cleanup(pub.Wait)
 	opts := Options{
 		Studio: studio, Settings: service.NewSettings(db.DB, box, func(string) string { return "" }), Publishing: pub, Library: service.NewLibrary(db.DB),
-		Chat:     service.NewChat(db.DB, &agent.Mock{}, stubFetcher{src: source.Source{Title: "T", Text: article}}),
+		Chat:     service.NewChat(db.DB, &agenttest.Mock{}, stubFetcher{src: source.Source{Title: "T", Text: article}}),
 		Accounts: service.NewAccounts(db.DB, service.AccountsOptions{SignupClosed: o.signupClosed}),
-		Token:    o.token, Version: "t", DBDriver: db.Driver,
+		Token:    o.token, AssistantAdminOnly: o.adminOnly, Version: "t", DBDriver: db.Driver,
 	}
 	return &rig{h: New(opts), db: db.DB, srv: &server{Options: opts}}
 }
@@ -607,5 +608,30 @@ func TestAPIKeysAreMadeShownOnceAndActAsTheirPersonWithinTheirScope(t *testing.T
 	var list struct{ Keys []service.APIKey }
 	if ed.json("GET", "/api/v1/api-keys", "", &list); len(list.Keys) != 0 {
 		t.Fatalf("%+v", list.Keys)
+	}
+}
+
+// With one shared key behind it, the assistant acts as one account, so only the admin may send it messages.
+func TestASharedAssistantIsTheAdminsOnly(t *testing.T) {
+	r := newRig(t, rigOpts{adminOnly: true})
+	admin, other := r.browser(t), r.browser(t)
+	admin.mustSignup("ada@example.com", "Ada")
+	other.mustSignup("bob@example.com", "Bob")
+	for name, c := range map[string]struct {
+		who  *client
+		want int
+	}{"admin": {admin, 200}, "someone else": {other, 403}} {
+		brand := "brand-" + strings.Fields(name)[0]
+		if code := c.who.json("POST", "/api/v1/profiles", `{"id":"`+brand+`","name":"B"}`, nil); code >= 300 {
+			t.Fatalf("%s: brand %d", name, code)
+		}
+		var conv service.Conversation
+		if code := c.who.json("POST", "/api/v1/chat/conversations", `{"profileId":"`+brand+`","text":"`+article+`"}`, &conv); code != 201 {
+			t.Fatalf("%s: start %d", name, code)
+		}
+		res := c.who.do("POST", "/api/v1/chat/conversations/"+conv.ID+"/messages", `{"content":"","write":["post"]}`)
+		if res.Code != c.want {
+			t.Errorf("%s: %d %s", name, res.Code, res.Body)
+		}
 	}
 }

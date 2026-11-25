@@ -174,6 +174,18 @@ func (c *Chat) sources(ctx context.Context, convID string) ([]SourceView, error)
 }
 
 // agentSources is every source of a conversation with its text, for the agent; New marks those it has not answered yet.
+// sourceKind says what a stored source was made from.
+func sourceKind(name, url string) string {
+	if url != "" {
+		return "url"
+	}
+	switch ext := strings.ToLower(path.Ext(name)); ext {
+	case ".md", ".docx", ".pdf":
+		return ext[1:]
+	}
+	return "text"
+}
+
 func agentSources(ctx context.Context, db *sql.DB, convID string) ([]agent.Source, []string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, name, url, text, truncated, delivered FROM conversation_sources WHERE conversation_id = ? ORDER BY created_at, id`, convID)
 	if err != nil {
@@ -193,6 +205,7 @@ func agentSources(ctx context.Context, db *sql.DB, convID string) ([]agent.Sourc
 		if s.New {
 			fresh = append(fresh, id)
 		}
+		s.ID, s.Kind = fmt.Sprintf("s%d", len(out)+1), sourceKind(s.Title, s.URL)
 		out = append(out, s)
 	}
 	return out, fresh, closeRows(rows)

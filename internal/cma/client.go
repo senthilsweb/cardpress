@@ -4,74 +4,50 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/agent"
 )
 
-// Client is the chat's agent when a Claude Managed Agent is configured. It implements agent.Client.
+// Client is the chat's assistant when the managed agents are configured. It implements agent.Client.
 type Client struct {
 	api     sessionAPI
+	m       Manifest
 	timeout time.Duration
 }
 
-// DefaultTimeout bounds one reply, so a stuck session cannot leave the chat waiting for ever.
-const DefaultTimeout = 4 * time.Minute
+// DefaultTimeout bounds one reply. A graded article takes several minutes.
+const DefaultTimeout = 12 * time.Minute
 
 const maxReconnects = 3
 
-// New returns a Client for the agent and environment in cfg. It makes no network call: a wrong id is found on first use.
+// New returns a Client for the agents in cfg's manifest. It makes no network call: a wrong id is found on first use.
 func New(cfg Config, timeout time.Duration) (*Client, error) {
-	if cfg.AgentID == "" || cfg.EnvironmentID == "" {
-		return nil, errors.New("the managed agent needs both an agent id and an environment id (run `cardpress agent-setup` to create them)")
+	if cfg.Manifest.AgentID == "" {
+		return nil, errors.New("no agent manifest")
 	}
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	return &Client{api: newSDKAPI(cfg), timeout: timeout}, nil
+	return &Client{api: newSDKAPI(cfg), m: cfg.Manifest, timeout: timeout}, nil
 }
 
 // Name and IsAI let the screen say what is answering, and that the conversation goes to Anthropic.
-func (c *Client) Name() string { return "Claude Managed Agent" }
+func (c *Client) Name() string { return "Claude agent" }
 func (c *Client) IsAI() bool   { return true }
+func (c *Client) Ready() bool  { return true }
 
 // CreateSession starts a managed session for one conversation.
 func (c *Client) CreateSession(ctx context.Context) (string, error) {
 	return c.api.newSession(ctx, "CardPress conversation")
 }
 
-// lastUserMessage is the person's newest message: the only one to send, because the session remembers the rest.
-func lastUserMessage(msgs []agent.Message) string {
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i].Role == "user" {
-			return msgs[i].Content
-		}
-	}
-	return ""
-}
-
-// settle answers any custom tool call that never got a result (an earlier turn was cut off). A session waiting on a result
-// refuses new messages, so without this a conversation could be stuck for good.
-func (c *Client) settle(ctx context.Context, sid string, hist []wireEvent) error {
-	answered := map[string]bool{}
-	for _, e := range hist {
-		if e.Type == "user.custom_tool_result" {
-			answered[e.CustomToolUseID] = true
-		}
-	}
-	for _, e := range hist {
-		if e.Type == "agent.custom_tool_use" && !answered[e.ID] {
-			if err := c.api.sendToolResult(ctx, sid, toolResult{ToolUseID: e.ID, Text: "The previous attempt was interrupted. Ignore this call.", IsError: true}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// Respond sends the person's newest message and follows the session until the agent has finished, reporting the reply as it
-// is written. The proposal comes from the agent calling the propose_content tool.
+// Respond sends the person's newest message with its context and follows the session until the agent has finished. Each
+// kind to be graded is sent as an outcome, one after the other; otherwise it is an ordinary message. The agents write to
+// the studio themselves, so the answer is what they say and what it cost.
 func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Event)) (agent.Output, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -83,12 +59,22 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return agent.Output{}, fmt.Errorf("could not start a session: %w", err)
 		}
 	}
-	text := lastUserMessage(in.Messages)
-	if strings.TrimSpace(text) == "" {
+	at := -1
+	for i := len(in.Messages) - 1; i >= 0; i-- {
+		if in.Messages[i].Role == "user" {
+			at = i
+			break
+		}
+	}
+	if at < 0 || strings.TrimSpace(in.Messages[at].Content) == "" {
 		return agent.Output{}, errors.New("there is no message to send")
 	}
+	text := in.Messages[at].Content
+	if strings.HasPrefix(sid, "demo-") { // a conversation begun with the demo assistant, which no longer exists
+		return agent.Output{}, agent.ErrSessionGone
+	}
 
-	// the session's own history says whether the source has been sent already, and whether an earlier turn left a tool call unanswered
+	// the session's own history says whether it has been given anything yet
 	hist, err := c.api.history(ctx, sid)
 	if err != nil {
 		if errors.Is(err, errSessionGone) {
@@ -96,46 +82,77 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		}
 		return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
 	}
-	if err := c.settle(ctx, sid, hist); err != nil {
-		return agent.Output{}, fmt.Errorf("could not settle the previous turn: %w", err)
+	fresh := !slices.ContainsFunc(hist, func(e wireEvent) bool { return e.Type == "user.message" || e.Type == "user.define_outcome" })
+	var earlier []agent.Message
+	if fresh && in.Restarted {
+		earlier = in.Messages[:at]
 	}
-	hasMessage := false
-	for _, e := range hist {
-		if e.Type == "user.message" {
-			hasMessage = true
+	var unsent []agent.Source
+	for _, s := range in.Sources {
+		if fresh || s.New {
+			unsent = append(unsent, s)
+		}
+	}
+
+	var replies []string
+	run := func(send func() (string, error), kind string) error { // kind: what is graded, or empty
+		// open the stream first, so nothing the agent does is missed, then send
+		st, err := c.api.stream(ctx, sid)
+		if err != nil {
+			return fmt.Errorf("could not open the event stream: %w", err)
+		}
+		defer func() { st.Close() }()
+		sentID, err := send()
+		if err != nil {
+			if errors.Is(err, errSessionGone) {
+				return agent.ErrSessionGone
+			}
+			return fmt.Errorf("could not send the message: %w", err)
+		}
+		t := newTurn(sentID, kind != "", emit)
+		t.kind = kind
+		if err := c.follow(ctx, sid, st, t, &st); err != nil {
+			return err
+		}
+		if r := t.reply(); r != "" {
+			if t.verdict != "" {
+				emit(agent.Event{Type: "delta", Text: "\n\n" + t.verdict})
+			}
+			replies = append(replies, r)
+		}
+		return nil
+	}
+
+	var grade []string
+	if in.Studio != nil {
+		grade = in.Studio.Grade
+	}
+	if len(grade) == 0 {
+		var write []string
+		if in.Studio != nil {
+			write = in.Studio.Write
+		}
+		msg := contextBlocks(in, write, unsent, earlier, true, fresh) + "\n" + text
+		err = run(func() (string, error) { return c.api.sendMessage(ctx, sid, msg) }, "")
+	}
+	for i, kind := range grade {
+		o, ok := c.m.Outcomes[kind]
+		if !ok {
+			return agent.Output{}, fmt.Errorf("the agent has no rubric for %q", kind)
+		}
+		// the grader sees only this description, so every source goes with every outcome
+		h := earlier
+		if i > 0 {
+			h = nil
+		}
+		description := contextBlocks(in, []string{kind}, in.Sources, h, i == 0, i == 0 && fresh) + "\n" + text + "\n\n" + o.Description
+		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, o.Rubric, o.MaxIterations) }, kind); err != nil {
 			break
 		}
 	}
-	// a session with no message yet needs every source; otherwise only the ones it has not had
-	var send []agent.Source
-	for _, s := range in.Sources {
-		if !hasMessage || s.New {
-			send = append(send, s)
-		}
-	}
-	text = WithSources(send, text)
-	if !hasMessage && in.Restarted {
-		text = WithHistory(in.Messages[:len(in.Messages)-1], text)
-	}
 
-	// open the stream first, so nothing the agent does is missed, then send
-	st, err := c.api.stream(ctx, sid)
-	if err != nil {
-		return agent.Output{}, fmt.Errorf("could not open the event stream: %w", err)
-	}
-	defer func() { st.Close() }()
-	sentID, err := c.api.sendMessage(ctx, sid, text)
-	if err != nil {
-		if errors.Is(err, errSessionGone) {
-			return agent.Output{}, agent.ErrSessionGone
-		}
-		return agent.Output{}, fmt.Errorf("could not send the message: %w", err)
-	}
-
-	t := newTurn(sentID, text, emit)
-	err = c.follow(ctx, sid, st, t, &st)
 	if err != nil && ctx.Err() != nil {
-		// we gave up (timeout or the person left): tell the agent to stop, so it does not keep running and spending
+		// we gave up (timeout or the person pressed stop): tell the agent to stop, so it does not keep running and spending
 		ic, icancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		_ = c.api.interrupt(ic, sid)
 		icancel()
@@ -147,27 +164,28 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 	if err != nil {
 		return agent.Output{}, err
 	}
-	out := t.output(sid)
-	if out.Reply == "" && out.Proposal == nil {
-		return agent.Output{}, errors.New("the agent finished without writing anything")
+	out := agent.Output{SessionID: sid, Reply: agent.CleanReply(strings.Join(replies, "\n\n"))}
+	if out.Reply == "" {
+		return agent.Output{}, errors.New("the agent finished without saying anything")
+	}
+	uc, ucancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer ucancel()
+	if u, err := c.api.usage(uc, sid); err == nil {
+		out.Usage = &u
+	} else {
+		log.Printf("agent: could not read what the conversation cost: %v", err)
 	}
 	return out, nil
 }
 
-// follow reads events until the agent is done, answering tool calls as they arrive. If the stream drops it reconnects and
-// replays the session's history (de-duplicated by the turn), so no event is lost.
+// follow reads events until the agent is done. If the stream drops it reconnects and replays the session's history
+// (de-duplicated by the turn), so no event is lost.
 func (c *Client) follow(ctx context.Context, sid string, st eventStream, t *turn, cur *eventStream) error {
 	reconnects := 0
 	for {
 		for st.Next() {
-			res, err := t.handle(st.Event())
-			if err != nil {
+			if err := t.handle(st.Event()); err != nil {
 				return err
-			}
-			if res != nil {
-				if err := c.api.sendToolResult(ctx, sid, *res); err != nil {
-					return fmt.Errorf("could not answer the agent's tool call: %w", err)
-				}
 			}
 			if t.done {
 				return nil
@@ -194,14 +212,8 @@ func (c *Client) follow(ctx context.Context, sid string, st eventStream, t *turn
 			return fmt.Errorf("could not catch up after reconnecting: %w", err)
 		}
 		for _, e := range hist {
-			res, herr := t.handle(e)
-			if herr != nil {
-				return herr
-			}
-			if res != nil {
-				if err := c.api.sendToolResult(ctx, sid, *res); err != nil {
-					return fmt.Errorf("could not answer the agent's tool call: %w", err)
-				}
+			if err := t.handle(e); err != nil {
+				return err
 			}
 			if t.done {
 				return nil

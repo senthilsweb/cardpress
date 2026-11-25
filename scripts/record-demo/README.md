@@ -22,5 +22,5 @@ Frames are captured at 2x and scaled down to 1200 px, and every frame after the 
 ## Options
 - **Your own article**: `SOURCE_FILE=/path/to/article.txt ./run.sh`. `source.txt` is only a stand-in.
 - **Review frames**: `DUMP=1 ./run.sh` also writes each frame to `out/frames/`.
-- **Assistant**: it uses whatever agent the server runs; with the built-in demo agent the "no AI model" badge is visible. Start the server with a real agent configured to record that instead (`CARDPRESS_BIN` picks the binary).
+- **Assistant**: the chat scene was written for the removed demo assistant and its proposal cards. It needs rewriting before the script runs to the end.
 - Needs Chrome installed and Node 20+. Nothing here is part of the app build.

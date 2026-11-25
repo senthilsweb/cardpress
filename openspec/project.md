@@ -23,4 +23,4 @@ Self-hosted studio for LinkedIn and blog social cards in my brand colours and fo
 6. mcp-server
 7. agent-cma-adapter
 
-UI work done alongside: workspace-panels (collapsible sidebar and sections, grid canvas). (blocked on the agent repo)
+UI work done alongside: workspace-panels (collapsible sidebar and sections, grid canvas).

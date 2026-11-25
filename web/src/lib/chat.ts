@@ -34,7 +34,9 @@ export interface ChatSource {
 }
 
 export interface ChatMessage { id: string; seq: number; role: "user" | "assistant"; content: string; createdAt: string }
-export interface AgentInfo { name: string; ai: boolean }
+export interface AgentInfo { name: string; ai: boolean; /** False on a server with no assistant set up. */ ready: boolean }
+/** What goes with a message besides its words. */
+export interface ChatRequest { write: DraftKind[]; viewing?: DraftKind }
 
 export interface Conversation {
   id: string;

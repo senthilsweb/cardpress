@@ -42,7 +42,7 @@ The tabs are under **Edit** in the left column. Set your name, handle, logo and 
 2. Read the proposal. **Approve and use** copies it into a draft, **Edit** changes it first, **Reject** dismisses it.
 3. In **Edit**, **Write**, refine the text, hashtags and alt text. **Full preview** shows the LinkedIn feed as it will look.
 
-The default assistant is a built-in demo, not an AI model. To use a real one, see [Claude Managed Agent](cma-agent.md).
+No assistant is set up by default. To add one, see [Claude Managed Agent](cma-agent.md).
 
 ## Publish
 

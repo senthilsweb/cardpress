@@ -76,7 +76,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005, 0011, 0017 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `created_at`, `updated_at` |
+| `conversations` | 0005, 0011, 0017, 0022 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `graded` (kinds whose first draft was checked), `seen` (each item as the assistant last saw it), `created_at`, `updated_at` |
 | `agent_memories` | 0019 | `profile_id`, `key` (PK together), `content`, `created_by`, `created_at`, `updated_at` |
 | `draft_versions.revision` | 0021 | the state of the draft a version holds |
 | `chat_usage` | 0020 | `id` (PK), `conversation_id`, `message_id`, `session_id`, `total_cents` (the session's running total), `added_cents`, `active_seconds`, `created_at` |
@@ -110,6 +110,12 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0014 | `drafts`: `attachment_kind`, `attachment`, `attachment_type`, `attachment_title`; `publish_jobs`: `attachment_kind`, `image_type`, `attachment_title`. A post can carry its own image or PDF in place of the card |
 | 0015 | `draft_images`, `job_images`: a post can carry several pictures, one row each |
 | 0016 | `drafts` and `publish_jobs`: `video_url`, `video_size`. A post can carry a video by its public address |
+| 0017 | `conversations`: the post and article a conversation is about |
+| 0018 | `conversation_sources` |
+| 0019 | `agent_memories` |
+| 0020 | `chat_usage` |
+| 0021 | `draft_versions.revision` |
+| 0022 | `conversations`: `graded`, `seen` |
 
 ## A post's own file
 
