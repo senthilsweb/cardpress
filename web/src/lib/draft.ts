@@ -18,6 +18,8 @@ export type DraftStatus = "draft" | "approved" | "scheduled" | "published";
 
 export interface Draft {
   id: string;
+  /** Moves with every change to what the draft says or shows; a save based on an older one is refused. */
+  revision: number;
   profileId: string;
   kind: DraftKind;
   status: DraftStatus;

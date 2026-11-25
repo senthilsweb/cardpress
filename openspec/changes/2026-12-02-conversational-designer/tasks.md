@@ -8,21 +8,22 @@ Build order across this change and `2026-12-03-chat-workspace`:
 4. Step 5 here (managed agents), then step 6.
 
 ## 1. Drafts and designs over MCP
-- [ ] Migration: `drafts.revision`
-- [ ] Service: partial draft update and `PatchCardText(draftID, text)` taking only the eight text fields, one transaction, brand starting design, version before a body write
-- [ ] `PUT /drafts/{id}` takes and returns the revision; the browser re-applies its unsaved fields on a refusal
-- [ ] Tools `get_design`, `update_card_text` (refuses every non-text field), `create_draft`, `update_draft`, `set_attachment`; `get_draft` returns the contract's fields
-- [ ] `list_design_presets` stays as it is
+- [x] Migration: `drafts.revision`
+- [x] Service: partial draft update and `PatchCardText(draftID, text)` taking only the eight text fields, one transaction, brand starting design, version before a body write
+- [x] `PUT /drafts/{id}` takes and returns the revision; the browser re-applies its unsaved fields on a refusal
+- [x] Tools `get_design`, `update_card_text` (refuses every non-text field), `create_draft`, `update_draft`, `set_attachment`; `get_draft` returns the contract's fields
+- [x] `list_design_presets` stays as it is
 
 ## 2. Live canvas
-- [ ] Hub in the service layer; draft writes and job changes publish to it
-- [ ] `GET /api/v1/events` (server-sent events, heartbeat, same access rules as the API)
-- [ ] Studio subscribes and applies `draft` and `job` events; unsaved typing is kept
-- [ ] Run for real: change a card's title from an MCP client and watch an open studio follow
+- [x] Hub in the service layer; draft writes publish to it
+- [ ] Job changes publish to it (the studio still checks jobs on its own)
+- [x] `GET /api/v1/events` (server-sent events, heartbeat, same access rules as the API)
+- [x] Studio subscribes and applies `draft` and `job` events; unsaved typing is kept
+- [x] Run for real: change a card's title from an MCP client and watch an open studio follow
 
 ## 3. Memory and connections over MCP
-- [ ] Migration `agent_memories`; service with the limits; tools `list_memories`, `save_memory`, `delete_memory`
-- [ ] Tool `list_connections`
+- [x] Migration `agent_memories`; service with the limits; tools `list_memories`, `save_memory`, `delete_memory`
+- [x] Tool `list_connections`
 
 ## 4. Posting over MCP
 - [ ] API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
@@ -39,6 +40,7 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] The message blocks of the contract, with escaping; revision last sent kept per draft
 - [ ] Chat stream events `progress`, `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`
 - [ ] Web: the grader's verdict, the Post / Cancel card, saved notes in the right drawer
+- [ ] Migration `chat_usage`; read the session's usage after each turn; show a conversation's cost
 - [ ] Tests: state machine and scripted fake for the new events
 - [ ] Try it against a real account (ask first: it costs money)
 

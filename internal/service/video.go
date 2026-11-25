@@ -53,12 +53,16 @@ func (s *Studio) SetVideo(ctx context.Context, id, address string) (Draft, error
 	case info.Name == "":
 		title = "Video"
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = ?, video_url = ?, video_size = ?, `+backToDraft+`, updated_at = ? WHERE id = ?`,
+	if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = ?, video_url = ?, video_size = ?, `+backToDraft+`, revision = revision + 1, updated_at = ? WHERE id = ?`,
 		AttachVideo, title, info.URL, info.Size, s.draftStamp(), id); err != nil {
 		return Draft{}, err
 	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
 		return Draft{}, fmt.Errorf("remove the pictures: %w", err)
 	}
-	return s.GetDraft(ctx, id)
+	after, err := s.GetDraft(ctx, id)
+	if err == nil {
+		s.changed(after)
+	}
+	return after, err
 }

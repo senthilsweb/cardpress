@@ -127,6 +127,8 @@ func main() {
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
 	studio := service.New(db.DB)
 	studio.Videos = videos
+	events := service.NewHub()
+	studio.Events = events
 	fetcher := source.New()
 	chatAgent, err := newAgent(cfg)
 	if err != nil {
@@ -135,13 +137,14 @@ func main() {
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
+		Events:   events,
 		Accounts: accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
 		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
@@ -187,6 +190,7 @@ func main() {
 	}
 
 	srv := &http.Server{Addr: cfg.Addr, Handler: telemetry.HTTP(logRequests(mux)), ReadHeaderTimeout: 10 * time.Second}
+	srv.RegisterOnShutdown(events.Close) // open studios stop listening, so the server can stop
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -334,7 +338,9 @@ func runMCP(args []string) {
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
-	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
+	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)
+	connections := service.NewSettings(db.DB, nil, os.Getenv) // only says what is filled in; reads no secret
+	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
 	log.Printf("cardpress MCP over stdio is ready (%s database)", db.Driver)
 	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
 		log.Fatal(err)

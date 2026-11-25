@@ -1,22 +1,31 @@
 # MCP: letting an outside agent help
 
-CardPress can be used by an AI agent through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). The agent can **read** your drafts and job status, **read public web pages**, and **propose** content. It cannot publish, schedule, change a draft, or reach credentials. Every proposal waits for you in the Assistant drawer.
+CardPress can be used by an AI agent through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). The agent can **read** your drafts, cards and job status, **read public web pages**, **write** your drafts and the words on their cards, keep notes about a brand, and **propose** content. It cannot publish, schedule, cancel or delete anything, change how a card looks, or reach credentials. A change it makes shows in an open studio at once.
 
 ## What an agent can do
 
 | Tool | What it does | Changes anything? |
 |---|---|---|
 | `list_profiles` | Profile ids, names, handles (no images) | No |
-| `list_drafts`, `get_draft` | Read your drafts as plain text | No |
+| `list_drafts`, `get_draft` | Read your drafts as plain text, with their revision (`get_draft` returns the text as `body`) | No |
 | `list_jobs`, `get_job` | Read publishing jobs: status, time, error, LinkedIn link | No |
 | `list_design_presets` | The layouts, backgrounds, image sizes and your saved colour sets. Read-only: you choose the design, not the agent. | No |
 | `fetch_source` | Fetch a **public** web page and return its text, marked untrusted. Private and local addresses are refused ([how](chat.md#reading-a-web-address-safely)). | No |
 | `propose_content` | Suggest a post or an article. It becomes a **pending proposal**. | Adds a proposal, nothing else |
 | `get_proposal` | See whether a proposal was approved, edited or rejected, and the final text | No |
+| `get_design` | A draft's card: every design field and the draft's revision. Images only as present or absent | No |
+| `update_card_text` | Change the words on a card: eyebrow, title, subtitle, the two footers, tag, quote author, stat | Yes, those words |
+| `create_draft` | An empty post or article with the brand's starting card | Adds a draft |
+| `update_draft` | Change the named fields of a draft: text, title, summary, page address, hashtags, alt text, bold and italic. Replacing the text needs the revision that was read | Yes |
+| `set_attachment` | Send a post with its card, or with a video at a public address | Yes |
+| `list_connections` | Which networks are connected. No credential values; posting is not available | No |
+| `list_memories`, `save_memory`, `delete_memory` | Notes about a brand, up to 50 of 2,000 characters | The notes only |
 
-**Not available to an agent, by design:** publishing, scheduling, rescheduling, cancelling, creating or editing drafts, anything about credentials or settings. This is enforced in the code, not just left out of the list: the tools are handed narrow interfaces that contain only the read and propose methods above, so there is nothing for a tool to call, and a test pins that list. Adding a tool that can do more would be a deliberate, reviewed change (and the [publishing](publishing.md) rule that a person confirms every post would still have to be decided first).
+**Not available to an agent, by design:** publishing, scheduling, rescheduling, cancelling, approving, deleting a draft, anything about how a card looks (layout, colours, background, size, fonts, images, brand), uploading files, putting a page online, credentials and settings. This is enforced in the code, not just left out of the list: the tools are handed narrow interfaces, a test pins every method they can call, and `update_card_text` refuses any field that is not text.
 
-An agent that reads your drafts and jobs can see what is in them, so connect only agents you trust with that, and use a token (below) if the server can be reached by anything else.
+**Writes are checked like yours.** A draft with a post waiting to be sent cannot change. Changing an approved or published item returns it to draft, and takes an article's page offline; the tool says so. An article that holds pictures cannot have its text replaced. The text from before a replacement is kept in History. Each draft has a revision, so you and an agent do not overwrite each other: what you are typing wins in your field, and the rest of the agent's change is kept.
+
+An agent that reads your drafts and jobs can see what is in them, and one that can write can change them, so connect only agents you trust, and use an API key or token if the server can be reached by anything else.
 
 ## How a proposal reaches you
 

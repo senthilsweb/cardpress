@@ -236,6 +236,7 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 		`DELETE FROM draft_versions WHERE draft_id IN (SELECT id FROM drafts WHERE profile_id = ?)`,
 		`DELETE FROM drafts WHERE profile_id = ?`,
 		`DELETE FROM designs WHERE profile_id = ?`,
+		`DELETE FROM agent_memories WHERE profile_id = ?`,
 		`DELETE FROM credentials WHERE profile_id = ?`,
 		`DELETE FROM profiles WHERE id = ?`,
 	} {

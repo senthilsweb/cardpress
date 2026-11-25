@@ -96,6 +96,36 @@ export interface ChatStreamHandlers {
   onMessage?: (m: ChatMessage) => void;
 }
 
+/** Something of a brand changed on the server. */
+export interface ServerEvent { type: string; profileId: string; draftId: string; revision: number }
+
+/**
+ * Listen for a brand's changes. `onOpen` runs once the server is listening. Resolves when the stream ends; the caller
+ * decides whether to listen again. (Read with fetch, so the token can go in a header.)
+ */
+async function listen(profileId: string, onEvent: (e: ServerEvent) => void, onOpen: () => void, signal: AbortSignal): Promise<void> {
+  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/events?profileId=${encodeURIComponent(profileId)}`, { headers, signal });
+  if (!res.ok || !res.body) throw new ApiError(res.status, "events", `Live updates are not available (${res.status})`);
+  onOpen();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buf += decoder.decode(value, { stream: !done });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const data = buf.slice(0, i).split("\n").filter((l) => l.startsWith("data: ")).map((l) => l.slice(6)).join("");
+      buf = buf.slice(i + 2);
+      if (data) onEvent(JSON.parse(data) as ServerEvent);
+    }
+    if (done) return;
+  }
+}
+
 /**
  * Send a chat message and read the reply as it is written (server-sent events over a POST, so the token can go in a
  * header, which EventSource cannot do). Resolves when the reply is complete; throws with the reason if it fails.
@@ -172,8 +202,9 @@ export const api = {
   putPreference: (key: "theme" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
-  updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
+  updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
+  listen,
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
   /** Put an approved item's page on the public web. `cover` is the card as a PNG, used as the preview image. */
   publishPage: (id: string, meta: { slug?: string; summary?: string }, cover?: Blob) => {

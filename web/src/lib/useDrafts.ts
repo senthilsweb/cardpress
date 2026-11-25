@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api";
+import { api, ApiError } from "./api";
+import { merge, note, union, untouched, type Touched } from "./merge";
+import { flushPendingEdits } from "./pendingEdits";
 import { flattenForPost, EMPTY_DOC, type Draft, type DraftInput, type DraftKind } from "./draft";
 import { toCardDesign } from "./cardDesign";
 import type { Design } from "./types";
@@ -13,7 +15,7 @@ const toInput = (d: Draft): DraftInput => ({
 });
 
 /** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
-const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, updatedAt: s.updatedAt });
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, revision: s.revision, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, updatedAt: s.updatedAt });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;
@@ -28,26 +30,94 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const idRef = useRef(currentId);
   const dirty = useRef<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const edits = useRef(new Map<string, Touched>()); // changed and not yet sent
+  const sending = useRef(new Map<string, Touched>()); // sent and not yet confirmed
+  const saving = useRef<Promise<void>>(Promise.resolve()); // saves go one after another
+  const unconfirmed = (id: string) => union(sending.current.get(id) ?? untouched(), edits.current.get(id) ?? untouched());
   ref.current = drafts;
   idRef.current = currentId;
 
-  const flush = useCallback(async () => {
-    window.clearTimeout(timer.current);
+  /** Put a draft that came from the server in place, keeping what the person changed and has not saved. */
+  const receive = (server: Draft) => {
+    const local = ref.current.find((d) => d.id === server.id);
+    if (!local) { commit([server, ...ref.current]); return; }
+    if (server.revision < local.revision) return;
+    const next = merge(server, local, unconfirmed(server.id));
+    const replaced = JSON.stringify(next.doc) !== JSON.stringify(local.doc);
+    commit(ref.current.map((d) => (d.id === server.id ? next : d)));
+    if (replaced && server.id === idRef.current) setRev((r) => r + 1); // the editor loads the new text
+  };
+
+  const save = async () => {
     const id = dirty.current;
     const d = id ? ref.current.find((x) => x.id === id) : undefined;
-    if (!d) { dirty.current = null; return; }
+    if (!id || !d) { dirty.current = null; return; }
     dirty.current = null;
+    sending.current.set(id, edits.current.get(id) ?? untouched());
+    edits.current.delete(id);
     setSaveState("saving");
     try {
-      const saved = await api.updateDraft(d.id, toInput(d));
+      let saved: Draft;
+      try {
+        saved = await api.updateDraft(id, { ...toInput(d), revision: d.revision });
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.code !== "stale") throw e;
+        // someone else changed it (the assistant): lay this change over theirs and save again
+        receive(await api.getDraft(id));
+        const mine = ref.current.find((x) => x.id === id)!;
+        saved = await api.updateDraft(id, { ...toInput(mine), revision: mine.revision });
+      }
+      sending.current.delete(id);
       // an edit made while this was saving will be saved next, and will say what the server should now know
-      if (!dirty.current) commit(ref.current.map((x) => (x.id === saved.id ? meta(x, saved) : x)));
+      commit(ref.current.map((x) => (x.id !== saved.id ? x : dirty.current === saved.id ? { ...x, revision: saved.revision } : meta(x, saved))));
       setSaveState(dirty.current ? "saving" : "saved");
     } catch {
-      dirty.current = dirty.current ?? d.id; // keep it pending so the next change retries
+      edits.current.set(id, unconfirmed(id));
+      sending.current.delete(id);
+      dirty.current = dirty.current ?? id; // keep it pending so the next change retries
       setSaveState("error");
     }
+  };
+
+  const flush = useCallback(() => {
+    window.clearTimeout(timer.current);
+    saving.current = saving.current.then(save);
+    return saving.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // changes made elsewhere (the assistant, another tab) arrive as they happen
+  useEffect(() => {
+    const stop = new AbortController();
+    const look = async (id: string, revision?: number) => {
+      const local = ref.current.find((d) => d.id === id);
+      if (local && revision !== undefined && revision <= local.revision) return;
+      const server = await api.getDraft(id);
+      if (stop.signal.aborted || server.profileId !== profileId) return;
+      flushPendingEdits(); // what is being typed reaches the store first, so it is kept
+      receive(server);
+    };
+    const catchUp = async () => {
+      for (const d of await api.listDrafts(profileId)) {
+        const local = ref.current.find((x) => x.id === d.id);
+        if (!local || d.revision > local.revision) await look(d.id);
+      }
+    };
+    void (async () => {
+      let wait = 1000;
+      while (!stop.signal.aborted) {
+        try {
+          await api.listen(profileId, (e) => { if (e.type === "draft") void look(e.draftId, e.revision).catch(() => undefined); },
+            () => { wait = 1000; void catchUp().catch(() => undefined); }, stop.signal);
+        } catch { /* try again below */ }
+        if (stop.signal.aborted) return;
+        await new Promise((r) => window.setTimeout(r, wait));
+        wait = Math.min(wait * 2, 30_000);
+      }
+    })();
+    return () => stop.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -56,7 +126,9 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const update = useCallback((patch: Patch) => {
     const id = idRef.current;
     // a draft waiting to be sent is not edited (the server refuses it too); a changed approved draft goes back to draft
-    if (ref.current.find((d) => d.id === id)?.status === "scheduled") return;
+    const before = ref.current.find((d) => d.id === id);
+    if (!before || before.status === "scheduled") return;
+    edits.current.set(id, note(edits.current.get(id) ?? untouched(), before, patch as Record<string, unknown>));
     commit(ref.current.map((d) => (d.id === id
       ? { ...d, ...patch, ...(d.status === "approved" || d.status === "published" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined, pageAt: undefined, hasCover: false } : {}), updatedAt: new Date().toISOString() }
       : d)));

@@ -112,6 +112,8 @@ type Settings interface {
 
 // Options configure the handler.
 type Options struct {
+	// Events carries changes to open studios; nil turns live updates off.
+	Events       *service.Hub
 	Studio       Studio
 	Settings     Settings
 	Publishing   Publishing
@@ -199,6 +201,7 @@ func (s *server) table() []routeDef {
 		{"POST", "/import/legacy", rule{scope: scopeAdmin, perm: service.PermUsers}, s.importLegacy},
 
 		{"GET", "/drafts", write(scopeBrandQuery), s.listDrafts},
+		{"GET", "/events", write(scopeBrandQuery), s.events},
 		{"POST", "/drafts", write(scopeBrandBody), s.createDraft},
 		{"GET", "/drafts/{id}", write(scopeDraft), s.getDraft},
 		{"PUT", "/drafts/{id}", write(scopeDraft), s.updateDraft},
@@ -941,6 +944,52 @@ func (s *server) deleteConversation(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+const eventsHeartbeat = 25 * time.Second
+
+// events streams a brand's changes to an open studio (server-sent events) until it leaves or the server stops.
+func (s *server) events(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok || s.Events == nil {
+		writeError(w, r, http.StatusNotImplemented, "not_supported", "live updates are not available here")
+		return
+	}
+	events, cancel, ok := s.Events.Subscribe(profileID)
+	if !ok {
+		writeError(w, r, http.StatusServiceUnavailable, "busy", "too many open studios; try again shortly")
+		return
+	}
+	defer cancel()
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, ": listening\n\n")
+	flusher.Flush()
+	beat := time.NewTicker(eventsHeartbeat)
+	defer beat.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-beat.C:
+			fmt.Fprint(w, ": still here\n\n")
+		case e, open := <-events:
+			if !open {
+				return
+			}
+			b, _ := json.Marshal(e)
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, b)
+		}
+		flusher.Flush()
+	}
+}
+
 // addSource takes a web address or pasted text as JSON, or a file as a multipart form with one "file" field.
 func (s *server) addSource(w http.ResponseWriter, r *http.Request) {
 	var in service.SourceInput
@@ -1270,6 +1319,8 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotImplemented, "not_supported", "this is not supported for that network yet")
 	case errors.Is(err, service.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "not found")
+	case errors.Is(err, service.ErrStale):
+		writeError(w, r, http.StatusConflict, "stale", service.UserMessage(err))
 	case errors.Is(err, service.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
 	case errors.Is(err, service.ErrForbidden):

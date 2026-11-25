@@ -72,6 +72,14 @@ Table `agent_memories (id, profile_id, key, content, created_by, created_at, upd
 
 Managed Agents has its own memory stores. They are not used: the requirement is that memory lives in the app's database, and notes there are visible to the person and travel with a backup.
 
+## Cost of a conversation
+One conversation is one managed session, so its cost is the session's `usage`: `list_cost` (public rates, to the cent, including running time), `active_seconds` and tokens. Per-thread figures show the coordinator, the writers and so on, and do not add up to the session's.
+
+- After each turn the adapter reads the session's usage and stores a row in `chat_usage (conversation_id, message_id, list_cost_cents, active_seconds, usage, created_at)`: the cumulative figures, so a turn's cost is the difference from the row before. Because figures are rounded to the cent, a single small turn can read as zero.
+- The chat shows the conversation's cost so far under its title; an admin can list conversations with their costs.
+- Until the chat is connected, `social-card-agent/scripts/session-cost.sh` measures test sessions.
+- List cost is not the billed price where discounts apply.
+
 ## Safety
 
 - Source text is still data. A fetched page that says "post this now" meets two barriers: the confirmation click, and the server-side permission evaluation, which gives tool results and fetched text no weight.

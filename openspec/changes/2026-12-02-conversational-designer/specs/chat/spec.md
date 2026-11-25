@@ -60,6 +60,17 @@ The system SHALL have the first draft of each kind the person ticks graded again
 - **WHEN** the person replies after a first draft
 - **THEN** the reply is an ordinary turn and is not graded
 
+### Requirement: Cost is measured
+The system SHALL record what each conversation with the managed agent costs.
+
+#### Scenario: After a turn
+- **WHEN** a turn ends, also when it was stopped or failed
+- **THEN** the session's cumulative cost, running time and tokens are stored for that conversation
+
+#### Scenario: Shown
+- **WHEN** a conversation has a recorded cost
+- **THEN** the chat shows it
+
 ### Requirement: Confirmation before posting
 The system SHALL ask the person before a post is sent from the chat, unless the server is set to post without asking.
 

@@ -54,7 +54,7 @@ type presetsOut struct {
 
 func (t tools) listPresets(ctx context.Context, _ *mcp.CallToolRequest, in presetsIn) (*mcp.CallToolResult, presetsOut, error) {
 	out := presetsOut{Layouts: layouts, Backgrounds: backgrounds, Sizes: sizes, Palettes: []service.PaletteInfo{},
-		Note: "These are options the person can pick. You cannot select them: your proposals carry content only."}
+		Note: "These are options the person picks in the studio. No tool selects them."}
 	ps, err := t.d.Profiles.Profiles(ctx)
 	if err != nil {
 		return nil, out, toolError(err)
@@ -110,26 +110,37 @@ type idIn struct {
 }
 
 type draftOut struct {
-	ID        string   `json:"id"`
-	ProfileID string   `json:"profileId"`
-	Kind      string   `json:"kind"`
-	Status    string   `json:"status"`
-	Text      string   `json:"text"`
-	Hashtags  []string `json:"hashtags"`
-	AltText   string   `json:"altText"`
-	CreatedAt string   `json:"createdAt"`
-	UpdatedAt string   `json:"updatedAt"`
+	ID            string   `json:"id"`
+	ProfileID     string   `json:"profileId"`
+	Kind          string   `json:"kind"`
+	Status        string   `json:"status"`
+	Revision      int      `json:"revision"`
+	Title         string   `json:"title"`
+	Body          string   `json:"body"`
+	Summary       string   `json:"summary"`
+	Slug          string   `json:"slug"`
+	Hashtags      []string `json:"hashtags"`
+	AltText       string   `json:"altText"`
+	UnicodeStyles bool     `json:"unicodeStyles"`
+	Attachment    string   `json:"attachment"`
+	VideoURL      string   `json:"videoUrl,omitempty"`
+	HasPictures   bool     `json:"hasPictures"`
+	CreatedAt     string   `json:"createdAt"`
+	UpdatedAt     string   `json:"updatedAt"`
+}
+
+func describe(d service.Draft) draftOut {
+	return draftOut{ID: d.ID, ProfileID: d.ProfileID, Kind: d.Kind, Status: d.Status, Revision: d.Revision, Title: d.Title,
+		Body: service.DraftText(d.Doc), Summary: d.Summary, Slug: d.Slug, Hashtags: d.Hashtags, AltText: d.AltText, UnicodeStyles: d.UnicodeStyles,
+		Attachment: d.Attachment, VideoURL: d.VideoURL, HasPictures: service.HasPictures(d.Doc), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 
 func (t tools) getDraft(ctx context.Context, _ *mcp.CallToolRequest, in idIn) (*mcp.CallToolResult, draftOut, error) {
-	d, err := t.d.Drafts.GetDraft(ctx, in.ID)
-	if err == nil {
-		err = t.brand(ctx, d.ProfileID)
-	}
+	d, err := t.draft(ctx, in.ID)
 	if err != nil {
 		return nil, draftOut{}, toolError(err)
 	}
-	return nil, draftOut{d.ID, d.ProfileID, d.Kind, d.Status, service.DraftText(d.Doc), d.Hashtags, d.AltText, d.CreatedAt, d.UpdatedAt}, nil
+	return nil, describe(d), nil
 }
 
 /* ------------------------------------------------------------------ proposals */

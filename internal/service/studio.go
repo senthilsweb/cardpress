@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -55,8 +56,12 @@ type Legacy struct {
 
 // Studio manages profiles, designs and preferences.
 type Studio struct {
-	db  *sql.DB
-	now func() time.Time
+	// Events, when set, tells open studios about changes.
+	Events *Hub
+	// writing makes a read, a check and a write of a draft one step.
+	writing sync.Mutex
+	db      *sql.DB
+	now     func() time.Time
 	// Videos checks a post's video address; without it a post cannot be given a video.
 	Videos VideoChecker
 }

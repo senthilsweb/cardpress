@@ -40,7 +40,9 @@ var hashtagRe = regexp.MustCompile(`^[\p{L}\p{N}_]{1,100}$`)
 
 // Draft is the content of one post or article.
 type Draft struct {
-	ID            string          `json:"id"`
+	ID string `json:"id"`
+	// Revision moves with every change to what the draft says or shows.
+	Revision      int             `json:"revision"`
 	ProfileID     string          `json:"profileId"`
 	Kind          string          `json:"kind"`
 	Status        string          `json:"status"`
@@ -90,6 +92,8 @@ type DraftInput struct {
 	Title         string          `json:"title"`
 	// Design is optional: on create it starts the item with a card, on update leaving it out keeps the saved one.
 	Design json.RawMessage `json:"design"`
+	// Revision, when given on update, is the one the writer read: an older one is refused.
+	Revision int `json:"revision"`
 
 	design string // Design in its stored form, empty when none was sent
 }
@@ -159,7 +163,7 @@ func newID() string {
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
 // draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, COALESCE(length(attachment), 0), created_by, approved_by,
+const draftCols = `id, revision, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, COALESCE(length(attachment), 0), created_by, approved_by,
 	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
@@ -171,7 +175,7 @@ func scanDraft(r scanner) (Draft, error) {
 	var d Draft
 	var doc, tags, design string
 	var uni, designVersion, cover int
-	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
+	if err := r.Scan(&d.ID, &d.Revision, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
 		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.AttachmentSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
@@ -204,13 +208,29 @@ func (s *Studio) CreateDraft(ctx context.Context, in DraftInput) (Draft, error) 
 		return Draft{}, err
 	}
 	_ = snapshotDraft(ctx, s.db, id, VersionCreated, "") // history is a convenience: it never blocks saving
-	return s.GetDraft(ctx, id)
+	d, err := s.GetDraft(ctx, id)
+	if err == nil {
+		s.changed(d)
+	}
+	return d, err
 }
 
 // UpdateDraft replaces a draft's content. Its profile does not change. If the content changed, an approved or published
 // draft goes back to draft, so what was approved is always what goes out; saving the same content again changes nothing.
 // A draft with a post waiting to be sent cannot be edited: cancel it first.
 func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Draft, error) {
+	s.writing.Lock()
+	defer s.writing.Unlock()
+	return s.updateDraft(ctx, id, in)
+}
+
+// changed tells open studios about a draft.
+func (s *Studio) changed(d Draft) {
+	s.Events.Publish(Event{Type: "draft", ProfileID: d.ProfileID, DraftID: d.ID, Revision: d.Revision})
+}
+
+// updateDraft is UpdateDraft for a caller that holds the writing lock.
+func (s *Studio) updateDraft(ctx context.Context, id string, in DraftInput) (Draft, error) {
 	if err := in.normalize(); err != nil {
 		return Draft{}, err
 	}
@@ -220,6 +240,9 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 	}
 	if cur.Status == StatusScheduled {
 		return Draft{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it before editing", ErrConflict)
+	}
+	if in.Revision != 0 && in.Revision != cur.Revision {
+		return Draft{}, ErrStale
 	}
 	design := string(cur.Design)
 	version := 0
@@ -243,9 +266,9 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 	at := s.draftStamp()
 	_, err = s.db.ExecContext(ctx,
 		`UPDATE drafts SET kind = ?, doc = ?, hashtags = ?, alt_text = ?, unicode_styles = ?, title = ?, design = ?, design_version = ?,
-		        status = ?, approved_at = ?, scheduled_at = ?, timezone = ?, updated_at = ? WHERE id = ?`,
+		        status = ?, approved_at = ?, scheduled_at = ?, timezone = ?, updated_at = ?, revision = revision + ? WHERE id = ?`,
 		in.Kind, string(in.Doc), string(tags), in.AltText, boolInt(in.UnicodeStyles), in.Title, design, version,
-		status, approved, planned, zone, at, id)
+		status, approved, planned, zone, at, boolInt(changed), id)
 	if err != nil {
 		return Draft{}, err
 	}
@@ -258,7 +281,11 @@ func (s *Studio) UpdateDraft(ctx context.Context, id string, in DraftInput) (Dra
 			return Draft{}, err
 		}
 	}
-	return s.GetDraft(ctx, id)
+	d, err := s.GetDraft(ctx, id)
+	if err == nil && changed {
+		s.changed(d)
+	}
+	return d, err
 }
 
 // sameJSON reports whether two JSON values mean the same, whatever their spacing or key order.
