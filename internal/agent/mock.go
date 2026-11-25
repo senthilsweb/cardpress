@@ -216,8 +216,17 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 
 	// material: the source, or failing that the person's own longest message
 	var material, srcTitle string
-	if in.Source != nil {
-		material, srcTitle = in.Source.Text, in.Source.Title
+	added := false
+	if len(in.Sources) > 0 {
+		var all []string
+		for _, s := range in.Sources {
+			all = append(all, s.Text)
+			added = added || s.New
+		}
+		material = strings.Join(all, "\n\n")
+		if len(in.Sources) == 1 {
+			srcTitle = in.Sources[0].Title
+		}
 	} else {
 		for _, msg := range in.Messages {
 			if msg.Role == "user" && len(msg.Content) > len(material) {
@@ -231,8 +240,8 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 	out.SessionID = sid
 	switch {
 	case len(sents) == 0:
-		out.Reply = "I could not find enough text in the source to write from. Paste the article text, or try another address."
-	case !o.understood:
+		out.Reply = "I could not find enough text to write from. Attach a file, add a link, or paste the text."
+	case !o.understood && !added: // a new source is reason enough to redraft
 		out.Reply = "I am a demo agent with no AI model behind me, so I only understand a few instructions: shorter, longer, make it an article, make it a post, no hashtags, add #YourTag, no question. Say one of those and I will redraft."
 	default:
 		p := draft(o, sents, srcTitle, material)

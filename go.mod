@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go/v2 v2.14.0
+	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/tursodatabase/libsql-client-go v0.0.0-20260528064733-9d5d30a29a60
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.72.0

@@ -2,6 +2,11 @@
 
 ## ADDED Requirements
 
+### Requirement: Stop a reply
+#### Scenario: Stop
+- **WHEN** the person presses Stop while a reply is being written
+- **THEN** no proposal is stored, the thread says the reply was stopped, also after a reload, and the next message is answered
+
 ### Requirement: Several kinds of source
 The system SHALL accept a web address, pasted text, and PDF, DOCX, Markdown and text files, up to ten per conversation, at any point.
 

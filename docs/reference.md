@@ -31,6 +31,7 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST /publish/jobs/{id}/publish-now`, `PUT .../schedule`, `POST .../cancel` | Job actions |
 | `POST/GET /chat/conversations`, `GET/DELETE /chat/conversations/{id}` | Conversations |
 | `POST /chat/conversations/{id}/messages` | Send a message; the reply streams as server-sent events |
+| `POST /chat/conversations/{id}/sources`, `DELETE …/sources/{sid}` | Add a source (`{"url"}`, `{"text"}` or a multipart `file`); take back one not yet sent |
 | `POST /chat/proposals/{id}/decision` | Approve, edit or reject a proposal |
 | `GET /mcp/audit` | The MCP audit trail (admin only) |
 | `GET/PUT /settings...` | The older, first-brand credential routes (admin only) |

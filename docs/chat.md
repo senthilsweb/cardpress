@@ -7,7 +7,13 @@ The **Assistant** drafts a post or an article from something you give it, and yo
 ## Using it
 
 1. The assistant is the **Chat** side of the left column, and is what opens first. **Edit** holds the Design, Text, Write and Brand tabs. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
-   Give it a **web address** or **paste the text** (one or the other, at least 40 characters), and press **Draft from this**. The conversation is then about the item on screen.
+   Type what you want in the message box and send it with the **rocket** (or Enter; Shift+Enter adds a line). While a reply is being written the rocket becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
+   To give it something to write from, use the **paperclip** in the box:
+   - **Attach a file:** PDF, Word (`.docx`), Markdown or text, up to 10 MB. You can also drop files onto the box.
+   - **Add a link:** a public web page. Pasting only an address into an empty box does the same.
+   - **Paste text:** at least 40 characters. A paste over 1,500 characters becomes a source by itself.
+
+   A conversation holds up to ten sources, added at any point, and you can send them with or without a message. If one cannot be read, you are told why and nothing is sent. Text is kept up to 200,000 characters from a file or 40,000 from a web page; a cut source says so. A scanned PDF has no text to read, and a password-protected one cannot be opened.
 2. It replies and shows a **proposal card**: the kind (post or article), a title for the card, the text, hashtags, alt text, and a note on why.
 3. Choose:
    - **Approve and use** copies it into a draft. If your current draft is empty it is filled in; **if it already has text, a new draft is made instead**, so your own writing is never overwritten. Tick or untick *Also use the title as the card's title*. **Show the post** (or article) puts it on the canvas. An article made while a post is on screen leaves the post where it is and marks the **Article** view.

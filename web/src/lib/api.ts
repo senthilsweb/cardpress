@@ -51,7 +51,8 @@ import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage } from "./library";
-import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { AgentInfo, ChatMessage, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { Attachment } from "./compose";
 
 export interface ApiInfo {
   name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo;
@@ -245,6 +246,13 @@ export const api = {
   },
   listConversations: (profileId: string) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}`),
   startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
+  addSource: (conversationId: string, a: Attachment) => {
+    let body: FormData | { url: string } | { text: string };
+    if (a.kind === "file") { body = new FormData(); body.set("file", a.file, a.file.name); }
+    else body = a.kind === "url" ? { url: a.url } : { text: a.text };
+    return call<ChatSource>("POST", `/chat/conversations/${encodeURIComponent(conversationId)}/sources`, body);
+  },
+  removeSource: (conversationId: string, sourceId: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(conversationId)}/sources/${encodeURIComponent(sourceId)}`),
   getConversation: (id: string) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`),
   deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
   streamMessage,

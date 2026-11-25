@@ -1,6 +1,6 @@
 # Chat workspace: talk on the left, see the post and the article
 
-**Status:** part A (layout and linked drafts) is built; sources and Undo are not.
+**Status:** parts A (layout and linked drafts) and B (sources and the message box) are built; Undo is not.
 
 ## Why
 - The assistant is a drawer that covers part of the canvas.

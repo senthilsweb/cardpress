@@ -76,7 +76,8 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005, 0011 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
+| `conversations` | 0005, 0011, 0017 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `created_at`, `updated_at` |
+| `conversation_sources` | 0018 | `id` (PK), `conversation_id`, `message_id`, `kind` (`url`, `text`, `md`, `docx`, `pdf`), `name`, `url`, `chars`, `truncated`, `text`, `data` (a PDF as attached), `delivered`, `created_at` |
 | `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`. Unique `(conversation_id, seq)` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 

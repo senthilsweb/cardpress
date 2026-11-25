@@ -645,7 +645,7 @@ func TestChatErrorsAreNormalJSONBeforeAnythingStreams(t *testing.T) {
 		method, path, body string
 		want               int
 	}{
-		{"POST", "/api/v1/chat/conversations", `{"profileId":"p"}`, 400},
+		{"POST", "/api/v1/chat/conversations", `{"profileId":""}`, 400},
 		{"POST", "/api/v1/chat/conversations", `{"profileId":"p","url":"https://a.io","text":"` + article + `"}`, 400},
 		{"POST", "/api/v1/chat/conversations", `{"profileId":"p","text":"tiny"}`, 400},
 		{"POST", "/api/v1/chat/conversations", `not json`, 400},
@@ -1153,4 +1153,35 @@ func TestSeveralPicturesThroughTheAPI(t *testing.T) {
 		t.Fatalf("%d %s", r.Code, r.Body)
 	}
 	waitStatus(t, h, j.ID, service.JobPublished)
+}
+
+func TestAttachingAFileOverTheAPI(t *testing.T) {
+	h := chatHandler(t, "", stubFetcher{})
+	r := do(h, "POST", "/api/v1/chat/conversations", `{"profileId":"p"}`, nil) // a conversation can start with nothing
+	var conv service.Conversation
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &conv) != nil {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	upload := func(name string, data []byte) *httptest.ResponseRecorder {
+		var b bytes.Buffer
+		w := multipart.NewWriter(&b)
+		f, _ := w.CreateFormFile("file", name)
+		f.Write(data)
+		w.Close()
+		return do(h, "POST", "/api/v1/chat/conversations/"+conv.ID+"/sources", b.String(), map[string]string{"Content-Type": w.FormDataContentType()})
+	}
+	ok := upload("notes.md", []byte(article))
+	var src service.SourceView
+	if ok.Code != 201 || json.Unmarshal(ok.Body.Bytes(), &src) != nil || src.Kind != "md" || src.Name != "notes.md" || strings.Contains(ok.Body.String(), article[:20]) {
+		t.Fatalf("a stored file is listed without its text: %d %s", ok.Code, ok.Body)
+	}
+	if r := upload("a.exe", []byte("x")); r.Code != 400 || !strings.Contains(r.Body.String(), "Attach a PDF") {
+		t.Errorf("wrong type: %d %s", r.Code, r.Body)
+	}
+	if r := upload("big.txt", make([]byte, source.MaxFileBytes+100<<10)); r.Code != 413 {
+		t.Errorf("too big: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "DELETE", "/api/v1/chat/conversations/"+conv.ID+"/sources/"+src.ID, ``, nil); r.Code != 204 {
+		t.Errorf("remove: %d %s", r.Code, r.Body)
+	}
 }

@@ -12,10 +12,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/service"
+	"github.com/senthilsweb/cardpress/internal/source"
 )
 
 const (
@@ -91,6 +93,8 @@ type Chatting interface {
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
 	Link(ctx context.Context, id, draftID string) (service.Conversation, error)
+	AddSource(ctx context.Context, id string, in service.SourceInput) (service.SourceView, error)
+	RemoveSource(ctx context.Context, id, sourceID string) error
 	Delete(ctx context.Context, id string) error
 	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
@@ -240,6 +244,8 @@ func (s *server) table() []routeDef {
 		{"GET", "/chat/conversations/{id}", write(scopeConversation), s.getConversation},
 		{"DELETE", "/chat/conversations/{id}", write(scopeConversation), s.deleteConversation},
 		{"POST", "/chat/conversations/{id}/messages", write(scopeConversation), s.sendMessage},
+		{"POST", "/chat/conversations/{id}/sources", write(scopeConversation), s.addSource},
+		{"DELETE", "/chat/conversations/{id}/sources/{sid}", write(scopeConversation), s.removeSource},
 		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
@@ -929,6 +935,54 @@ func (s *server) getConversation(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) deleteConversation(w http.ResponseWriter, r *http.Request) {
 	if err := s.Chat.Delete(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// addSource takes a web address or pasted text as JSON, or a file as a multipart form with one "file" field.
+func (s *server) addSource(w http.ResponseWriter, r *http.Request) {
+	var in service.SourceInput
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.Body = http.MaxBytesReader(w, r.Body, source.MaxFileBytes+64<<10)
+		f, head, err := r.FormFile("file")
+		if err != nil {
+			var tooBig *http.MaxBytesError
+			if errors.As(err, &tooBig) {
+				writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("That file is over %d MB.", source.MaxFileBytes>>20))
+				return
+			}
+			writeError(w, r, http.StatusBadRequest, "bad_form", "expected a multipart form with a file field")
+			return
+		}
+		defer f.Close()
+		defer r.MultipartForm.RemoveAll() //nolint:errcheck
+		if in.Data, err = io.ReadAll(f); err != nil {
+			fail(w, r, err)
+			return
+		}
+		in.FileName = head.Filename
+	} else {
+		var body struct {
+			URL  string `json:"url"`
+			Text string `json:"text"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		in.URL, in.Text = body.URL, body.Text
+	}
+	v, err := s.Chat.AddSource(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, v)
+}
+
+func (s *server) removeSource(w http.ResponseWriter, r *http.Request) {
+	if err := s.Chat.RemoveSource(r.Context(), r.PathValue("id"), r.PathValue("sid")); err != nil {
 		fail(w, r, err)
 		return
 	}

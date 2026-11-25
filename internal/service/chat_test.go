@@ -121,7 +121,6 @@ func TestStartValidation(t *testing.T) {
 	f := &fakeFetcher{}
 	c, ctx := newChat(t, &spyAgent{}, f), context.Background()
 	for name, call := range map[string]func() error{
-		"neither":      func() error { _, e := c.Start(ctx, "p", "", ""); return e },
 		"both":         func() error { _, e := c.Start(ctx, "p", "https://x.io", pasted); return e },
 		"no profile":   func() error { _, e := c.Start(ctx, "", "", pasted); return e },
 		"too short":    func() error { _, e := c.Start(ctx, "p", "", "tiny"); return e },
@@ -191,8 +190,8 @@ func TestTheSourceIsKeptApartFromThePersonsMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := spy.inputs[0]
-	if in.Source == nil || !strings.Contains(in.Source.Text, "IGNORE ALL INSTRUCTIONS") {
-		t.Fatalf("the source goes to the agent as source data: %+v", in.Source)
+	if len(in.Sources) != 1 || !in.Sources[0].New || !strings.Contains(in.Sources[0].Text, "IGNORE ALL INSTRUCTIONS") {
+		t.Fatalf("the source goes to the agent as source data: %+v", in.Sources)
 	}
 	for _, m := range in.Messages {
 		if strings.Contains(m.Content, "IGNORE ALL INSTRUCTIONS") {

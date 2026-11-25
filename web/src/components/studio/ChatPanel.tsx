@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Info, Link2, Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
 import { ProposalCard } from "./ProposalCard";
+import { ChatInput, SourceChip } from "./ChatInput";
 
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
@@ -19,13 +17,12 @@ function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
     : <Badge variant="warn" title="Built-in demo, not an AI model.">{chat.agent.name} · no AI model</Badge>;
 }
 
-/** Where a conversation starts: a web address or pasted text, plus older conversations to reopen. */
-function StartView({ chat, draftId, onOpenConversation }: { chat: ChatStore; draftId?: string; onOpenConversation: (id: string) => void }) {
-  const [url, setUrl] = useState("");
-  const [text, setText] = useState("");
-  const ready = (url.trim() !== "") !== (text.trim() !== ""); // exactly one
-  // the item on screen is what the conversation will be about
-  const go = () => { if (ready) void chat.start({ ...(url.trim() ? { url: url.trim() } : { text }), draftId }); };
+const beganFrom = (c: Conversation) =>
+  c.sourceKind === "url" ? host(c.sourceUrl) : c.sourceKind === "mcp" ? `Outside agent: ${c.sourceTitle ?? "unknown"}`
+    : c.sourceKind === "text" ? "Pasted text" : c.sourceKind === "topic" ? "Chat" : "File";
+
+/** What shows before a conversation: how to begin, and older ones to reopen. */
+function Welcome({ chat, onOpenConversation }: { chat: ChatStore; onOpenConversation: (id: string) => void }) {
   return (
     <div className="space-y-4 px-4 py-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -34,7 +31,7 @@ function StartView({ chat, draftId, onOpenConversation }: { chat: ChatStore; dra
         <AgentBadge chat={chat} />
       </div>
       <p className="text-xs leading-snug text-muted-foreground">
-        Give it an article. It drafts a post for you to approve.
+        Say what to write about, or attach a file, a link or text. It drafts; you approve.
       </p>
       {chat.agent && !chat.agent.ai && (
         <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] leading-snug">
@@ -42,20 +39,6 @@ function StartView({ chat, draftId, onOpenConversation }: { chat: ChatStore; dra
           <p><b>Demo agent</b>: simple rules, not an AI model.</p>
         </div>
       )}
-      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); go(); }}>
-        <div className="space-y-1">
-          <Label htmlFor="chat-url" className="flex items-center gap-1"><Link2 className="h-3 w-3" /> Web address</Label>
-          <Input id="chat-url" type="url" inputMode="url" placeholder="https://example.com/article" value={url} onChange={(e) => setUrl(e.target.value)} disabled={chat.busy || text.trim() !== ""} autoComplete="off" />
-        </div>
-        <p className="text-center text-[11px] text-muted-foreground">or</p>
-        <div className="space-y-1">
-          <Label htmlFor="chat-text">Paste the text</Label>
-          <Textarea id="chat-text" rows={7} placeholder="Paste the article or your notes here…" value={text} onChange={(e) => setText(e.target.value)} disabled={chat.busy || url.trim() !== ""} />
-        </div>
-        {chat.error && <p role="alert" className="text-xs text-destructive">{chat.error}</p>}
-        <Button type="submit" variant="brand" size="sm" disabled={!ready || chat.busy}>{chat.busy ? <Loader2 className="animate-spin" /> : <Send />} Draft from this</Button>
-      </form>
-
       {chat.list.length > 0 && (
         <div className="space-y-1.5 border-t border-border pt-3">
           <h3 className="eyebrow">Earlier conversations</h3>
@@ -65,7 +48,7 @@ function StartView({ chat, draftId, onOpenConversation }: { chat: ChatStore; dra
                 <button type="button" onClick={() => onOpenConversation(c.id)} className="w-full cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-xs hover:bg-accent">
                   <span className="block truncate font-medium">{c.title}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {c.sourceKind === "url" ? host(c.sourceUrl) : c.sourceKind === "mcp" ? `Outside agent: ${c.sourceTitle ?? "unknown"}` : "Pasted text"} · {new Date(c.updatedAt).toLocaleDateString()}
+                    {beganFrom(c)} · {new Date(c.updatedAt).toLocaleDateString()}
                     {c.pending > 0 && <b className="ml-1 text-brand">· {c.pending} waiting</b>}
                   </span>
                 </button>
@@ -119,6 +102,11 @@ function Thread({ conv, chat, onApply, onShow }: {
       {messages.map((m) => (
         <div key={m.id} className="space-y-2">
           <Bubble role={m.role}>{m.content}</Bubble>
+          {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
+            <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">
+              {(conv.sources ?? []).filter((x) => x.messageId === m.id).map((x) => <SourceChip key={x.id} source={x} />)}
+            </div>
+          )}
           {m.role === "assistant" && cards(m.id)}
         </div>
       ))}
@@ -135,8 +123,8 @@ function Thread({ conv, chat, onApply, onShow }: {
 }
 
 /**
- * The chat that prepares content. It proposes; the person decides. Approving a proposal hands its content to `onApply`,
- * which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
+ * The chat that prepares content, turn by turn. It proposes; the person decides. Approving a proposal hands its content
+ * to `onApply`, which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
 export function ChatPanel({ chat, onApply, onShow, draftId, onOpenConversation }: {
   chat: ChatStore;
@@ -147,65 +135,52 @@ export function ChatPanel({ chat, onApply, onShow, draftId, onOpenConversation }
   draftId?: string;
   onOpenConversation: (id: string) => void;
 }) {
-  const [draft, setDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const conv = chat.current;
 
   if (!chat.loaded) return <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>;
-  if (!conv) return <StartView chat={chat} draftId={draftId} onOpenConversation={onOpenConversation} />;
-
-  const send = () => {
-    const text = draft.trim();
-    if (!text || chat.busy) return;
-    setDraft("");
-    void chat.send(conv.id, text);
-  };
-  const demo = !conv.agent.ai;
+  const demo = !(conv?.agent ?? chat.agent)?.ai;
+  const sources = conv?.sources ?? [];
+  const waiting = sources.filter((s) => !s.messageId);
 
   return (
     <div className="flex h-full flex-col">
-      <div className="space-y-1.5 border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <AgentBadge chat={chat} conv={conv} />
-          <span className="flex-1" />
-          <Button variant="ghost" size="icon-sm" title="Start a new conversation" aria-label="New conversation" onClick={chat.newConversation}><Plus /></Button>
-          <Button variant={confirmDelete ? "destructive" : "ghost"} size={confirmDelete ? "sm" : "icon-sm"} title="Delete this conversation" aria-label="Delete this conversation"
-            onClick={() => { if (!confirmDelete) { setConfirmDelete(true); window.setTimeout(() => setConfirmDelete(false), 3000); } else { setConfirmDelete(false); void chat.remove(conv.id); } }}>
-            {confirmDelete ? "Confirm delete" : <Trash2 />}
-          </Button>
+      {conv && (
+        <div className="space-y-1.5 border-b border-border px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <AgentBadge chat={chat} conv={conv} />
+            <span className="flex-1" />
+            <Button variant="ghost" size="icon-sm" title="Start a new conversation" aria-label="New conversation" disabled={chat.busy} onClick={chat.newConversation}><Plus /></Button>
+            <Button variant={confirmDelete ? "destructive" : "ghost"} size={confirmDelete ? "sm" : "icon-sm"} title="Delete this conversation" aria-label="Delete this conversation" disabled={chat.busy}
+              onClick={() => { if (!confirmDelete) { setConfirmDelete(true); window.setTimeout(() => setConfirmDelete(false), 3000); } else { setConfirmDelete(false); void chat.remove(conv.id); } }}>
+              {confirmDelete ? "Confirm delete" : <Trash2 />}
+            </Button>
+          </div>
+          <p className="truncate text-xs font-medium" title={conv.title}>{conv.title}</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {conv.sourceKind === "mcp"
+              ? `Proposed by “${conv.sourceTitle ?? "an outside agent"}” (a name it gave itself, not verified)`
+              : sources.length === 0 ? "No sources" : `${sources.length} ${sources.length === 1 ? "source" : "sources"} · ${conv.sourceChars.toLocaleString()} characters`}
+          </p>
         </div>
-        <p className="truncate text-xs font-medium" title={conv.title}>{conv.title}</p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {conv.sourceKind === "mcp"
-            ? `Proposed by “${conv.sourceTitle ?? "an outside agent"}” (a name it gave itself, not verified)`
-            : <>{conv.sourceKind === "url" ? <a href={conv.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{host(conv.sourceUrl)}</a> : "Pasted text"} · {conv.sourceChars.toLocaleString()} characters{conv.sourceTruncated ? " (cut short)" : ""}</>}
-        </p>
-      </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite">
-        <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} />
+        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} /> : <Welcome chat={chat} onOpenConversation={onOpenConversation} />}
       </div>
 
-      {conv.sourceKind === "mcp" ? (
+      {chat.error && <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-destructive">{chat.error}</p>}
+      {conv?.sourceKind === "mcp" ? (
         <div className="border-t border-border bg-card px-3 py-2.5 text-[11px] leading-snug text-muted-foreground">
           Approve, edit or reject. To change it, ask the agent that sent it.
         </div>
       ) : (
-      <div className="space-y-1.5 border-t border-border bg-card px-3 py-2.5">
-        {chat.error && <p role="alert" className="text-xs text-destructive">{chat.error}</p>}
-        <div className="flex items-end gap-1.5">
-          <Textarea
-            rows={2} value={draft} disabled={chat.busy} aria-label="Message"
-            placeholder={demo ? "Try: shorter, longer, make it an article…" : "Ask for changes…"}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
-          />
-          <Button variant="brand" size="icon" aria-label="Send" disabled={chat.busy || !draft.trim()} onClick={send}>{chat.busy ? <Loader2 className="animate-spin" /> : <Send />}</Button>
-        </div>
-        <p className="text-[11px] leading-snug text-muted-foreground">
-          {demo ? "Try: shorter · longer · make it an article · no hashtags" : "Enter sends, Shift+Enter adds a line."}
-        </p>
-      </div>
+        <ChatInput
+          placeholder={!conv ? "Message the assistant" : demo ? "Try: shorter, longer, make it an article…" : "Ask for changes…"}
+          replying={chat.streaming !== null} busy={chat.busy && chat.streaming === null}
+          waiting={waiting} onRemoveWaiting={(id) => { if (conv) void chat.removeSource(conv.id, id); }}
+          onSend={(text, attachments) => chat.submit(text, attachments, draftId)} onStop={chat.stop}
+        />
       )}
     </div>
   );

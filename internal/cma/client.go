@@ -106,9 +106,14 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			break
 		}
 	}
-	if !hasMessage {
-		text = FirstMessage(in.Source, text)
+	// a session with no message yet needs every source; otherwise only the ones it has not had
+	var send []agent.Source
+	for _, s := range in.Sources {
+		if !hasMessage || s.New {
+			send = append(send, s)
+		}
 	}
+	text = WithSources(send, text)
 
 	// open the stream first, so nothing the agent does is missed, then send
 	st, err := c.api.stream(ctx, sid)

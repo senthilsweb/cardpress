@@ -63,14 +63,16 @@ Table `conversation_sources (id, conversation_id, message_id, kind, name, url, c
 | `text` | **+ Text**, or pasting more than 1,500 characters | the text | 200,000 characters |
 | `md` | file (`.md`, `.txt`) | the text | 10 MB file, 200,000 characters kept |
 | `docx` | file | extracted text | 10 MB file; unpacked size capped against crafted archives |
-| `pdf` | file | the file | 10 MB, checked as PDF |
+| `pdf` | file | extracted text and the file | 10 MB, checked as PDF, 300 pages |
 
 - At most 10 sources per conversation. A cut source says so.
 - DOCX text is read in Go (zip and XML), no new service.
-- PDFs are not read by the server. The managed agent gets the file, mounted in its session. Adding a file to a running session, and a writer reading it there, must be tried first; if that fails, PDF text is extracted in the server and the table gets the text instead.
-- The demo agent says it cannot read a PDF.
+- PDF text is read in the server too (a Go library, with a time limit and a page limit), so any assistant can use it. The file is also kept, so a managed agent can be given the pages themselves later; whether that works must be tried first. A PDF with no text (a scan) is refused.
 - Files are kept in the database. SQLite is the supported choice for large files; a local libSQL server refuses values over about 4.7 MB.
 - `POST /chat/conversations/{id}/sources` (JSON for url and text, multipart for files), `DELETE …/sources/{sid}` for one not yet sent.
+
+## Message box
+One box for the whole chat, also before a conversation exists. Attach (paperclip) at the lower left, send (rocket) at the lower right; while a reply is written the send button is **Stop**. Attachments are staged in the box and sent with the message; if one is refused, none is added and the box keeps its contents. Stopping cancels the request, which cancels the agent's work (a managed session is interrupted), and the thread records that the reply was stopped.
 
 ## Changes and Undo
 Table `chat_changes (id, conversation_id, message_id, draft_id, before, after, created_at, undone_at)`, holding only the fields a turn changed.

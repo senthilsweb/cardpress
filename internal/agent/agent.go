@@ -42,13 +42,15 @@ type Source struct {
 	Title     string
 	Text      string
 	Truncated bool
+	// New marks a source the agent has not been given yet.
+	New bool
 }
 
 // Input is what the agent is given for one reply.
 type Input struct {
 	SessionID string
 	Messages  []Message // oldest first; the last is the person's newest message
-	Source    *Source
+	Sources   []Source  // everything the conversation draws on, oldest first
 }
 
 // Event is progress while a reply is being written.

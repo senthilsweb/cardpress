@@ -21,6 +21,18 @@ export interface Proposal {
   decidedAt?: string;
 }
 
+/** Something a conversation writes from. Its text stays on the server. */
+export interface ChatSource {
+  id: string;
+  /** The message it went with; empty until sent. */
+  messageId?: string;
+  kind: "url" | "text" | "md" | "docx" | "pdf";
+  name: string;
+  url?: string;
+  chars: number;
+  truncated: boolean;
+}
+
 export interface ChatMessage { id: string; seq: number; role: "user" | "assistant"; content: string; createdAt: string }
 export interface AgentInfo { name: string; ai: boolean }
 
@@ -28,8 +40,8 @@ export interface Conversation {
   id: string;
   profileId: string;
   title: string;
-  /** "mcp": started by an outside agent that proposed content through MCP. */
-  sourceKind: "url" | "text" | "mcp";
+  /** How it began: from a source of this kind, from a message alone ("topic"), or from an outside agent ("mcp"). */
+  sourceKind: "url" | "text" | "topic" | "md" | "docx" | "pdf" | "mcp";
   sourceUrl?: string;
   sourceTitle?: string;
   sourceChars: number;
@@ -44,6 +56,7 @@ export interface Conversation {
   updatedAt: string;
   messages?: ChatMessage[];
   proposals?: Proposal[];
+  sources?: ChatSource[];
 }
 
 /** What the person may change before approving. */
