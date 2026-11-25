@@ -8,7 +8,7 @@ Settings come from environment variables, with a few command-line flags. With Do
 |---|---|---|---|
 | `ADDR` / `PORT` | `-addr` | `127.0.0.1:8080` | Listen address. `PORT` alone sets the port on loopback |
 | `BASE_PATH` | `-base` | `/` | URL prefix the app is served under. Must match the web build |
-| `CARDPRESS_DB_URL` | `-db` | `file:./data/cardpress.db` | SQLite file, or `libsql://...` for Turso |
+| `CARDPRESS_DB_URL` | `-db` | `file:./data/cardpress.db` | SQLite file, `libsql://...` for Turso, or `http://127.0.0.1:<port>` for a libSQL server on this machine ([file size limit](deployment.md#large-files-on-libsql)) |
 | `CARDPRESS_DB_TOKEN` | | | Auth token for a hosted libSQL database |
 | `CARDPRESS_SERVE_WEB` | `-serve-web` | `true` | Serve the embedded web app. Turn off for an API-only server |
 | `CARDPRESS_MCP` | `-mcp` | `true` | Serve the MCP endpoint at `/mcp` |
@@ -69,6 +69,7 @@ See [Claude Managed Agent](cma-agent.md).
 |---|---|---|
 | `CARDPRESS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
 | `CARDPRESS_LINKEDIN_VERSION` | built in | The `LinkedIn-Version` header |
+| `CARDPRESS_VIDEO_MAX_MB` | `500` | The largest video a post may carry (1 to 500) |
 | `CARDPRESS_LINKEDIN_API_BASE` | LinkedIn | API address; for tests and proxies only. Must be https (http only for localhost) |
 
 ## Docker Compose only

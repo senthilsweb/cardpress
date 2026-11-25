@@ -1,4 +1,5 @@
-// Package linkedin publishes an image post: it reserves an image upload, uploads the PNG, then creates the post.
+// Package linkedin publishes a post with a picture, several pictures, a document or a video: it reserves an upload,
+// sends the file, then creates the post.
 package linkedin
 
 import (
@@ -33,6 +34,9 @@ type Client struct {
 	AllowUploadHost func(host string) bool
 	// AllowHTTP permits a plain-http upload address. For tests against a local fake only.
 	AllowHTTP bool
+	// How long to wait for LinkedIn to process a video, and how often to ask (defaults if zero). BlindWait is the wait
+	// when the token may not read the video's status.
+	VideoWait, VideoPoll, VideoBlindWait time.Duration
 }
 
 // New returns a client for the real LinkedIn API. It never follows redirects, so the token is not forwarded.
@@ -82,6 +86,17 @@ type Post struct {
 	// Document posts the file as a document (a PDF, shown as pages to swipe through) with Title above it.
 	Document bool
 	Title    string
+	// Pictures, when there are two or more, are posted together as a multi-image post and Image is not used.
+	Pictures []Picture
+	// Video, when set, is posted with Title above it, and Image is not used.
+	Video *Video
+}
+
+// Picture is one picture of a multi-image post. Load reads its bytes when it is its turn to be uploaded, so the
+// pictures are never all in memory together.
+type Picture struct {
+	AltText string
+	Load    func() ([]byte, error)
 }
 
 // APIError is a failure where LinkedIn answered, or a step failed before anything was posted.
@@ -164,20 +179,109 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	if token == "" || p.AuthorURN == "" {
 		return "", &APIError{Message: "The LinkedIn access token and author URN are required."}
 	}
-	// a picture and a document are sent the same way, to different addresses, and named differently in the answer
-	what, path := "image", "/rest/images"
-	if p.Document {
-		what, path = "document", "/rest/documents"
-	}
-	if len(p.Image) == 0 {
-		return "", &APIError{Message: "There is no " + what + " to upload."}
-	}
 	if p.Document && strings.TrimSpace(p.Title) == "" {
 		return "", &APIError{Message: "The document needs a title."}
 	}
+	if p.Video != nil && strings.TrimSpace(p.Title) == "" {
+		return "", &APIError{Message: "The video needs a title."}
+	}
 
-	// 1. reserve an upload
-	initBody, _ := json.Marshal(map[string]any{"initializeUploadRequest": map[string]string{"owner": p.AuthorURN}})
+	// 1 and 2. upload what the post carries: one picture, a document, or several pictures one after another
+	var content map[string]any
+	switch {
+	case p.Video != nil:
+		id, err := c.uploadVideo(ctx, token, p.AuthorURN, p.Video)
+		if err != nil {
+			return "", err
+		}
+		content = map[string]any{"media": map[string]string{"id": id, "title": strings.TrimSpace(p.Title)}}
+	case len(p.Pictures) >= 2:
+		images := make([]map[string]string, 0, len(p.Pictures))
+		for i, pic := range p.Pictures {
+			what := fmt.Sprintf("image %d of %d", i+1, len(p.Pictures))
+			data, err := pic.Load()
+			if err != nil {
+				return "", &APIError{Message: "Could not read " + what + ". Nothing was posted."}
+			}
+			id, err := c.upload(ctx, token, p.AuthorURN, what, false, data)
+			if err != nil {
+				return "", err
+			}
+			im := map[string]string{"id": id}
+			if pic.AltText != "" {
+				im["altText"] = pic.AltText
+			}
+			images = append(images, im)
+		}
+		content = map[string]any{"multiImage": map[string]any{"images": images}}
+	case p.Document:
+		id, err := c.upload(ctx, token, p.AuthorURN, "document", true, p.Image)
+		if err != nil {
+			return "", err
+		}
+		content = map[string]any{"media": map[string]string{"id": id, "title": strings.TrimSpace(p.Title)}}
+	default:
+		id, err := c.upload(ctx, token, p.AuthorURN, "image", false, p.Image)
+		if err != nil {
+			return "", err
+		}
+		media := map[string]string{"id": id}
+		if p.AltText != "" {
+			media["altText"] = p.AltText
+		}
+		content = map[string]any{"media": media}
+	}
+
+	// 3. create the post. From here on a lost answer leaves the outcome unknown.
+	payload, _ := json.Marshal(map[string]any{
+		"author":     p.AuthorURN,
+		"commentary": p.Commentary,
+		"visibility": "PUBLIC",
+		"distribution": map[string]any{
+			"feedDistribution":               "MAIN_FEED",
+			"targetEntities":                 []any{},
+			"thirdPartyDistributionChannels": []any{},
+		},
+		"content":                   content,
+		"lifecycleState":            "PUBLISHED",
+		"isReshareDisabledByAuthor": false,
+	})
+	post, err := http.NewRequestWithContext(ctx, http.MethodPost, c.APIBase+"/rest/posts", bytes.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	c.headers(post, token)
+	post.Header.Set("Content-Type", "application/json")
+	resp, body, err := c.do("Create the post", post)
+	if err != nil {
+		return "", &UnknownOutcomeError{Reason: "The request to create the post was sent but no answer came back, so it may or may not have been posted."}
+	}
+	switch {
+	case resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK:
+		id := resp.Header.Get("x-restli-id")
+		if id == "" {
+			return "", &UnknownOutcomeError{Reason: "LinkedIn accepted the post but did not return its id, so it may be live."}
+		}
+		return id, nil
+	case resp.StatusCode >= 500:
+		return "", &UnknownOutcomeError{Reason: fmt.Sprintf("LinkedIn answered with a server error (%d) while creating the post, so it may or may not have been posted.", resp.StatusCode)}
+	default:
+		return "", friendly(resp.StatusCode, body, "create the post")
+	}
+}
+
+// upload reserves an upload with LinkedIn and sends one file to the address it returns, which must be a LinkedIn host.
+// It returns the id to name in the post. `what` says what the file is, for the messages ("image", "image 2 of 3",
+// "document"). Nothing has been posted when it fails.
+func (c *Client) upload(ctx context.Context, token, owner, what string, document bool, data []byte) (string, error) {
+	path := "/rest/images"
+	if document {
+		path = "/rest/documents"
+	}
+	if len(data) == 0 {
+		return "", &APIError{Message: "There is no " + what + " to upload."}
+	}
+	initBody, _ := json.Marshal(map[string]any{"initializeUploadRequest": map[string]string{"owner": owner}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.APIBase+path+"?action=initializeUpload", bytes.NewReader(initBody))
 	if err != nil {
 		return "", err
@@ -201,21 +305,19 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	if err := json.Unmarshal(body, &init); err != nil {
 		init.Value.UploadURL = ""
 	}
-	mediaID := init.Value.Image
-	if p.Document {
-		mediaID = init.Value.Document
+	id := init.Value.Image
+	if document {
+		id = init.Value.Document
 	}
-	if init.Value.UploadURL == "" || mediaID == "" {
+	if init.Value.UploadURL == "" || id == "" {
 		return "", &APIError{Message: "LinkedIn's answer to the " + what + " upload request was not understood. Nothing was posted."}
 	}
 
-	// 2. upload the file, only to a LinkedIn address
-	u, err := url.Parse(init.Value.UploadURL)
-	schemeOK := err == nil && (u.Scheme == "https" || (c.AllowHTTP && u.Scheme == "http"))
-	if !schemeOK || c.AllowUploadHost == nil || !c.AllowUploadHost(u.Hostname()) {
+	u, ok := c.uploadAddress(init.Value.UploadURL)
+	if !ok {
 		return "", &APIError{Message: "LinkedIn returned an upload address that is not a LinkedIn host, so the " + what + " was not sent. Nothing was posted."}
 	}
-	up, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(p.Image))
+	up, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(data))
 	if err != nil {
 		return "", err
 	}
@@ -227,49 +329,16 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	if resp.StatusCode/100 != 2 {
 		return "", friendly(resp.StatusCode, body, "accept the "+what)
 	}
+	return id, nil
+}
 
-	// 3. create the post. From here on a lost answer leaves the outcome unknown.
-	media := map[string]string{"id": mediaID}
-	if p.Document {
-		media["title"] = strings.TrimSpace(p.Title)
-	} else if p.AltText != "" {
-		media["altText"] = p.AltText
+// uploadAddress accepts an upload address LinkedIn returned only when it is a LinkedIn host.
+func (c *Client) uploadAddress(raw string) (*url.URL, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !(u.Scheme == "https" || (c.AllowHTTP && u.Scheme == "http")) || c.AllowUploadHost == nil || !c.AllowUploadHost(u.Hostname()) {
+		return nil, false
 	}
-	payload, _ := json.Marshal(map[string]any{
-		"author":     p.AuthorURN,
-		"commentary": p.Commentary,
-		"visibility": "PUBLIC",
-		"distribution": map[string]any{
-			"feedDistribution":               "MAIN_FEED",
-			"targetEntities":                 []any{},
-			"thirdPartyDistributionChannels": []any{},
-		},
-		"content":                   map[string]any{"media": media},
-		"lifecycleState":            "PUBLISHED",
-		"isReshareDisabledByAuthor": false,
-	})
-	post, err := http.NewRequestWithContext(ctx, http.MethodPost, c.APIBase+"/rest/posts", bytes.NewReader(payload))
-	if err != nil {
-		return "", err
-	}
-	c.headers(post, token)
-	post.Header.Set("Content-Type", "application/json")
-	resp, body, err = c.do("Create the post", post)
-	if err != nil {
-		return "", &UnknownOutcomeError{Reason: "The request to create the post was sent but no answer came back, so it may or may not have been posted."}
-	}
-	switch {
-	case resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK:
-		id := resp.Header.Get("x-restli-id")
-		if id == "" {
-			return "", &UnknownOutcomeError{Reason: "LinkedIn accepted the post but did not return its id, so it may be live."}
-		}
-		return id, nil
-	case resp.StatusCode >= 500:
-		return "", &UnknownOutcomeError{Reason: fmt.Sprintf("LinkedIn answered with a server error (%d) while creating the post, so it may or may not have been posted.", resp.StatusCode)}
-	default:
-		return "", friendly(resp.StatusCode, body, "create the post")
-	}
+	return u, true
 }
 
 // PostURL is the public address of a post URN.

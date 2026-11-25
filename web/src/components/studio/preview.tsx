@@ -69,13 +69,44 @@ const Act = ({ icon, label }: { icon: ReactNode; label?: string }) => (
   <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-neutral-500 [&_svg]:h-4 [&_svg]:w-4">{icon}{label}</span>
 );
 
+/** Several pictures as a feed shows them: two side by side; more with the first large and the rest in a row, "+N" on the last. */
+function PictureGrid({ urls }: { urls: string[] }) {
+  const cell = (u: string, cls: string, more = 0) => (
+    <div key={u} className={`relative overflow-hidden bg-neutral-200 ${cls}`}>
+      <img src={u} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      {more > 0 && <span className="absolute inset-0 grid place-items-center bg-black/55 text-2xl font-semibold text-white">+{more}</span>}
+    </div>
+  );
+  if (urls.length === 2) return <div className="grid grid-cols-2 gap-0.5">{urls.map((u) => cell(u, "aspect-square"))}</div>;
+  const rest = urls.slice(1, 4);
+  return (
+    <div className="space-y-0.5">
+      {cell(urls[0], "aspect-[16/10]")}
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${rest.length}, minmax(0, 1fr))` }}>
+        {rest.map((u, i) => cell(u, "aspect-square", i === rest.length - 1 ? urls.length - 4 : 0))}
+      </div>
+    </div>
+  );
+}
+
 /** A neutral, unbranded post frame so the card can be judged in a feed context. */
-export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string }) {
+export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, mediaList, videoSrc, videoTitle, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string; /** Several pictures, shown as LinkedIn shows them: a grid in place of the card. */ mediaList?: string[]; /** A video at its public address, with its title, shown in place of the card. */ videoSrc?: string; videoTitle?: string }) {
   const { profile, palette, size } = p;
   const net = size.net;
   const handle = profile.handle || "@you";
   const name = profile.displayName || profile.name;
-  const own = !mediaSrc ? null : documentTitle !== undefined ? (
+  const own = videoSrc ? (
+    <div className="border-y border-neutral-200 bg-black">
+      {/* played straight from its address, as it will be read when the post is sent */}
+      <video key={videoSrc} src={videoSrc} controls preload="metadata" playsInline aria-label={`Video: ${videoTitle ?? ""}`} className="block w-full" style={{ aspectRatio: "16 / 9" }} />
+      <div className="truncate bg-white px-3.5 py-2 text-[13px] font-semibold">{videoTitle}</div>
+    </div>
+  ) : mediaList && mediaList.length > 1 ? (net === "Instagram" ? (
+    <div className="relative">
+      <img src={mediaList[0]} alt="" className="block aspect-square w-full object-cover" />
+      <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-0.5 text-[12px] font-medium text-white">1/{mediaList.length}</span>
+    </div>
+  ) : <PictureGrid urls={mediaList} />) : !mediaSrc ? null : documentTitle !== undefined ? (
     <div className="border-y border-neutral-200 bg-neutral-100">
       <div className="flex items-center gap-2 bg-neutral-800 px-3 py-2 text-[12.5px] font-medium text-white">
         <span className="min-w-0 flex-1 truncate">{documentTitle}</span><span className="shrink-0 text-neutral-300">PDF</span>

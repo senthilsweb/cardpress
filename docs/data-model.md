@@ -1,6 +1,6 @@
 # Data model
 
-CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0014). **It is updated with every migration.**
+CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0016). **It is updated with every migration.**
 
 ## Conventions
 
@@ -56,7 +56,7 @@ Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009, 0014 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `attachment_kind` (`card`, `image` or `document`), `attachment` (BLOB, the post's own file), `attachment_type`, `attachment_title`, `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
+| `drafts` | 0002, 0009, 0014 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `attachment_kind` (`card`, `image`, `document`, `images` or `video`), `attachment` (BLOB, the post's own file), `attachment_type`, `attachment_title`, `video_url`, `video_size`, `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -104,10 +104,22 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0012 | `draft_versions` and `doc_blobs`: the history of an item |
 | 0013 | `api_keys`: keys for programs (MCP, scripts), scoped and revocable |
 | 0014 | `drafts`: `attachment_kind`, `attachment`, `attachment_type`, `attachment_title`; `publish_jobs`: `attachment_kind`, `image_type`, `attachment_title`. A post can carry its own image or PDF in place of the card |
+| 0015 | `draft_images`, `job_images`: a post can carry several pictures, one row each |
+| 0016 | `drafts` and `publish_jobs`: `video_url`, `video_size`. A post can carry a video by its public address |
 
 ## A post's own file
 
 `drafts.attachment_kind` says what a post goes out with: `card` (the designed card, the default), `image` or `document`. For the last two, `attachment` holds the file (a PNG or JPEG of at most 10 MB, or a PDF of at most 20 MB) and `attachment_type` its media type; a document also has `attachment_title`. The server decides the kind from the file's first bytes, not from its name. The card design is kept, so going back to the card loses nothing. Setting, changing or removing the file, or changing the title, returns an approved or published post to `draft`. When a post is published or scheduled, the file is copied into the job (`publish_jobs.image`, with `image_type`, `attachment_kind` and `attachment_title`), so a scheduled post sends what was approved.
+
+## A post's set of pictures
+
+When `drafts.attachment_kind` is `images`, the pictures are rows of `draft_images`: `id` (PK), `draft_id`, `position` (the order), `data` (BLOB, PNG or JPEG, at most 10 MB), `type`, `alt_text`, `created_at`; index `(draft_id, position)`. A post has at most 10. Each picture is its own row so that no single statement carries more than one file, which matters on a hosted database.
+
+When the post is published or scheduled, the rows are copied to `job_images` (`job_id`, `position`, `data`, `type`, `alt_text`; PK `(job_id, position)`) with one `INSERT … SELECT` inside the database, so the pictures do not pass through the server's memory. `publish_jobs.image` holds the first picture, as the job's thumbnail. Deleting a draft, a job or a brand removes its rows.
+
+## A post's video
+
+When `attachment_kind` is `video`, only the address is stored: `video_url`, `video_size` (the file's size when it was checked) and the title in `attachment_title`. The file is never stored. A job copies the three; its `image` is empty.
 
 ## Draft status and approval
 

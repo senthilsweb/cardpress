@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,7 +27,8 @@ type DB struct {
 	Driver string // "sqlite" or "libsql"
 }
 
-// Open connects to rawURL: "file:path" for a local SQLite file, or a libsql://, https:// or wss:// URL for Turso.
+// Open connects to rawURL: "file:path" for a local SQLite file, a libsql://, https:// or wss:// URL for Turso, or
+// http:// or ws:// on this machine for a local libSQL server (`turso dev`).
 // token is the libSQL auth token and is ignored for files.
 func Open(ctx context.Context, rawURL, token string) (*DB, error) {
 	var (
@@ -55,11 +57,17 @@ func Open(ctx context.Context, rawURL, token string) (*DB, error) {
 			return nil, err
 		}
 		db.SetMaxOpenConns(1) // one writer; keeps a local file free of "database is locked"
-	case strings.HasPrefix(rawURL, "libsql://"), strings.HasPrefix(rawURL, "https://"), strings.HasPrefix(rawURL, "wss://"):
+	case strings.HasPrefix(rawURL, "libsql://"), strings.HasPrefix(rawURL, "https://"), strings.HasPrefix(rawURL, "wss://"),
+		strings.HasPrefix(rawURL, "http://"), strings.HasPrefix(rawURL, "ws://"):
 		driver = "libsql"
 		u, perr := url.Parse(rawURL)
 		if perr != nil {
 			return nil, fmt.Errorf("bad database URL: %w", perr)
+		}
+		// plain http or ws is for a libSQL server on this machine (`turso dev`); anywhere else the data and the token
+		// would cross the network unencrypted
+		if (u.Scheme == "http" || u.Scheme == "ws") && !isLoopbackHost(u.Hostname()) {
+			return nil, fmt.Errorf("unsupported database URL %q: plain %s is only for a libSQL server on this machine; use libsql:// or https://", redact(rawURL), u.Scheme)
 		}
 		if token != "" {
 			q := u.Query()
@@ -70,7 +78,7 @@ func Open(ctx context.Context, rawURL, token string) (*DB, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("unsupported database URL %q: use file:./data/cardpress.db or libsql://...", redact(rawURL))
+		return nil, fmt.Errorf("unsupported database URL %q: use file:./data/cardpress.db, libsql://..., or http://127.0.0.1:PORT for a local libSQL server", redact(rawURL))
 	}
 	pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -79,6 +87,14 @@ func Open(ctx context.Context, rawURL, token string) (*DB, error) {
 		return nil, fmt.Errorf("connect to %s database: %w", driver, err)
 	}
 	return &DB{DB: db, Driver: driver}, nil
+}
+
+func isLoopbackHost(h string) bool {
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
 }
 
 func redact(s string) string {

@@ -325,3 +325,43 @@ func TestPublishADocument(t *testing.T) {
 		t.Fatalf("no title: %v, calls %v", err, f2.calls)
 	}
 }
+
+func TestPublishSeveralImages(t *testing.T) {
+	f := newFake(t)
+	loaded := 0
+	pic := func(alt string) Picture {
+		return Picture{AltText: alt, Load: func() ([]byte, error) { loaded++; return png, nil }}
+	}
+	p := Post{AuthorURN: "urn:li:person:Ab_1", Commentary: "Hello", Pictures: []Picture{pic("first"), pic(""), pic("third")}}
+	urn, err := f.client().Publish(context.Background(), "TOKEN-XYZ", p)
+	if err != nil || urn != "urn:li:share:123" || loaded != 3 {
+		t.Fatalf("%q %v loaded %d", urn, err, loaded)
+	}
+	if got := strings.Join(f.calls, ", "); got != "POST /rest/images, PUT /upload/abc, POST /rest/images, PUT /upload/abc, POST /rest/images, PUT /upload/abc, POST /rest/posts" {
+		t.Fatalf("steps: %s", got)
+	}
+	content := f.postBody["content"].(map[string]any)
+	if _, has := content["media"]; has {
+		t.Fatal("a multi-image post has no single media")
+	}
+	images := content["multiImage"].(map[string]any)["images"].([]any)
+	if len(images) != 3 || images[0].(map[string]any)["altText"] != "first" || images[0].(map[string]any)["id"] != "urn:li:image:IMG1" {
+		t.Fatalf("images: %v", images)
+	}
+	if _, has := images[1].(map[string]any)["altText"]; has {
+		t.Fatal("empty alt text should not be sent")
+	}
+
+	// a picture that fails to upload stops the post before it is created
+	f2 := newFake(t)
+	f2.uploadStatus = 500
+	if _, err := f2.client().Publish(context.Background(), "t", p); err == nil || IsUnknownOutcome(err) || strings.Contains(strings.Join(f2.calls, ","), "/rest/posts") {
+		t.Fatalf("failed upload: %v, calls %v", err, f2.calls)
+	}
+	// one that cannot be read does too, and says which
+	f3 := newFake(t)
+	p.Pictures[1].Load = func() ([]byte, error) { return nil, fmt.Errorf("gone") }
+	if _, err := f3.client().Publish(context.Background(), "t", p); err == nil || !strings.Contains(err.Error(), "image 2 of 3") || strings.Contains(strings.Join(f3.calls, ","), "/rest/posts") {
+		t.Fatalf("unreadable picture: %v", err)
+	}
+}

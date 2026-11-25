@@ -105,9 +105,12 @@ func main() {
 	})
 	settings := service.NewSettings(db.DB, box, os.Getenv)
 	publisher := service.NewPublisher(db.DB, settings, linkedin.New(cfg.LinkedInAPIBase, cfg.LinkedInVersion), cfg.MissedGrace)
+	videos := source.NewVideos(cfg.VideoMaxBytes)
+	publisher.Videos = videos
 	schedulerDone := make(chan struct{})
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
 	studio := service.New(db.DB)
+	studio.Videos = videos
 	fetcher := source.New()
 	chatAgent, err := newAgent(cfg)
 	if err != nil {

@@ -57,6 +57,8 @@ type Legacy struct {
 type Studio struct {
 	db  *sql.DB
 	now func() time.Time
+	// Videos checks a post's video address; without it a post cannot be given a video.
+	Videos VideoChecker
 }
 
 // New returns a Studio over db.

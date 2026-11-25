@@ -45,8 +45,14 @@ type Studio interface {
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
 	SetAttachment(ctx context.Context, id string, data []byte, name string) (service.Draft, error)
 	SetAttachmentTitle(ctx context.Context, id, title string) (service.Draft, error)
+	SetVideo(ctx context.Context, id, url string) (service.Draft, error)
 	ClearAttachment(ctx context.Context, id string) (service.Draft, error)
 	AttachmentFile(ctx context.Context, id string) ([]byte, string, error)
+	AddImage(ctx context.Context, id string, data []byte) (service.Draft, error)
+	RemoveImage(ctx context.Context, id, imageID string) (service.Draft, error)
+	SetImageAlt(ctx context.Context, id, imageID, alt string) (service.Draft, error)
+	OrderImages(ctx context.Context, id string, ids []string) (service.Draft, error)
+	ImageFile(ctx context.Context, id, imageID string) ([]byte, string, error)
 	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
 	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
 	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
@@ -198,6 +204,12 @@ func (s *server) table() []routeDef {
 		{"PUT", "/drafts/{id}/attachment", write(scopeDraft), s.setAttachment},
 		{"DELETE", "/drafts/{id}/attachment", write(scopeDraft), s.clearAttachment},
 		{"PUT", "/drafts/{id}/attachment/title", write(scopeDraft), s.setAttachmentTitle},
+		{"PUT", "/drafts/{id}/video", write(scopeDraft), s.setVideo},
+		{"POST", "/drafts/{id}/images", write(scopeDraft), s.addImage},
+		{"PUT", "/drafts/{id}/images/order", write(scopeDraft), s.orderImages},
+		{"GET", "/drafts/{id}/images/{image}", write(scopeDraft), s.getImage},
+		{"PUT", "/drafts/{id}/images/{image}", write(scopeDraft), s.setImageAlt},
+		{"DELETE", "/drafts/{id}/images/{image}", write(scopeDraft), s.removeImage},
 		{"PUT", "/drafts/{id}/plan", rule{scopeDraft, service.PermApprove}, s.planDraft},
 		{"POST", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.publishPage},
 		{"DELETE", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.unpublishPage},
@@ -470,6 +482,87 @@ func (s *server) setAttachmentTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// setVideo gives a post a video by its public https address: {"url": "..."}. The file is not uploaded here or stored.
+func (s *server) setVideo(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	d, err := s.Studio.SetVideo(r.Context(), r.PathValue("id"), body.URL)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// addImage adds a picture (the request body, PNG or JPEG) to a post's set of pictures.
+func (s *server) addImage(w http.ResponseWriter, r *http.Request) {
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 11<<20))
+	if err != nil {
+		writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", "the picture is too large")
+		return
+	}
+	d, err := s.Studio.AddImage(r.Context(), r.PathValue("id"), data)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, d)
+}
+
+// setImageAlt sets one picture's description: {"altText": "..."}.
+func (s *server) setImageAlt(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		AltText string `json:"altText"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	d, err := s.Studio.SetImageAlt(r.Context(), r.PathValue("id"), r.PathValue("image"), body.AltText)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// orderImages puts the pictures in order: {"ids": ["...", "..."]}, every picture once.
+func (s *server) orderImages(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	d, err := s.Studio.OrderImages(r.Context(), r.PathValue("id"), body.IDs)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) removeImage(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.RemoveImage(r.Context(), r.PathValue("id"), r.PathValue("image"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) getImage(w http.ResponseWriter, r *http.Request) {
+	b, typ, err := s.Studio.ImageFile(r.Context(), r.PathValue("id"), r.PathValue("image"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	servePicture(w, b, typ)
 }
 
 // clearAttachment goes back to the card.

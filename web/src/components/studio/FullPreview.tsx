@@ -8,6 +8,7 @@ import { copyFormatted } from "@/lib/clipboard";
 import { fold, FOLD_CHARS, FOLD_LINES, LINKEDIN_LIMIT, type Serialized } from "@/lib/linkedin";
 import { sizeById, SIZES, type Size } from "@/lib/sizes";
 import type { Draft } from "@/lib/draft";
+import type { PostMediaView } from "@/lib/usePostMedia";
 import type { Design, Palette, Profile } from "@/lib/types";
 
 /** The LinkedIn size to show: the current one when it is a LinkedIn size, otherwise the standard post image. */
@@ -32,13 +33,14 @@ export function FullPreview(props: {
   size: Size;
   actions?: ReactNode;
   /** The post's own file, when it has one: shown in place of the card. */
-  image?: string;
+  media?: PostMediaView["frame"];
 }) {
   const { draft, serialized: s } = props;
   const [copied, setCopied] = useState<string | null>(null);
   const flash = (m: string) => { setCopied(m); window.setTimeout(() => setCopied(null), 2200); };
   const isPost = draft.kind === "post";
   const empty = !s.text.trim();
+  const noAlt = (draft.images ?? []).filter((im) => !im.altText.trim()).length;
 
   const copy = async () => {
     try {
@@ -54,13 +56,13 @@ export function FullPreview(props: {
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Full preview · {isPost ? "LinkedIn post" : "Article"}</DialogTitle>
-          <DialogDescription>{isPost ? draft.attachment === "document" ? "This is exactly the text and document that would be sent." : "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
+          <DialogDescription>{isPost ? draft.attachment === "document" ? "This is exactly the text and document that would be sent." : draft.attachment === "images" ? "This is exactly the text and images that would be sent." : draft.attachment === "video" ? "This is the text that would be sent. The video is read from its address at that time." : "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
           <div className="flex justify-center">
             {isPost ? (
-              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable mediaSrc={props.image} documentTitle={draft.attachment === "document" ? draft.attachmentTitle ?? "" : undefined} />
+              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable {...props.media} />
             ) : (
               <div className="w-full max-w-xl space-y-4">
                 <div className="flex justify-center">
@@ -80,9 +82,11 @@ export function FullPreview(props: {
               <>
                 <Check2 ok={!s.overLimit} text={s.overLimit ? `Over LinkedIn's ${LINKEDIN_LIMIT.toLocaleString()} character limit` : "Within the length limit"} />
                 <Check2 ok={!empty && !fold(s.text).truncated} text={empty ? "The post has no text" : fold(s.text).truncated ? `Cut after about ${FOLD_LINES} lines or ${FOLD_CHARS} characters (“…see more”)` : "Fits without a “see more” cut"} />
-                {draft.attachment === "document"
-                  ? <Check2 ok={!!draft.attachmentTitle?.trim()} text={draft.attachmentTitle?.trim() ? "Document has a title" : "The document needs a title"} />
-                  : <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />}
+                {draft.attachment === "document" || draft.attachment === "video"
+                  ? <Check2 ok={!!draft.attachmentTitle?.trim()} text={draft.attachmentTitle?.trim() ? `${draft.attachment === "video" ? "Video" : "Document"} has a title` : `The ${draft.attachment} needs a title`} />
+                  : draft.attachment === "images"
+                    ? <Check2 ok={noAlt === 0} text={noAlt === 0 ? "Every image has alt text" : `${noAlt} of ${draft.images?.length ?? 0} images have no alt text`} />
+                    : <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />}
               </>
             )}
             {isPost && s.warnings.map((w) => <Check2 key={w.code} ok={false} text={w.message} />)}

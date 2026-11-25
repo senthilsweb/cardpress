@@ -63,6 +63,13 @@ type Draft struct {
 	// "document" (a PDF of its own, which has a title).
 	Attachment      string `json:"attachment"`
 	AttachmentTitle string `json:"attachmentTitle,omitempty"`
+	// VideoURL is the public address of a post whose attachment is "video", and VideoSize the file's size when checked.
+	VideoURL  string `json:"videoUrl,omitempty"`
+	VideoSize int64  `json:"videoSize,omitempty"`
+	// AttachmentSize is the bytes of a post's own picture or document.
+	AttachmentSize int64 `json:"attachmentSize,omitempty"`
+	// Images are the pictures of a post whose attachment is "images", in order.
+	Images []DraftImage `json:"images,omitempty"`
 	// Who wrote it and who approved it (ids, and the names for showing).
 	CreatedBy      string `json:"createdBy,omitempty"`
 	CreatedByName  string `json:"createdByName,omitempty"`
@@ -152,7 +159,7 @@ func newID() string {
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
 // draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, created_by, approved_by,
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, COALESCE(length(attachment), 0), created_by, approved_by,
 	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
@@ -165,7 +172,7 @@ func scanDraft(r scanner) (Draft, error) {
 	var doc, tags, design string
 	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.AttachmentSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)
@@ -341,7 +348,17 @@ func (s *Studio) GetDraft(ctx context.Context, id string) (Draft, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return Draft{}, ErrNotFound
 	}
-	return d, err
+	if err != nil {
+		return d, err
+	}
+	if d.Attachment == AttachImages {
+		ims, err := imagesOf(ctx, s.db, `draft_id = ?`, id)
+		if err != nil {
+			return d, err
+		}
+		d.Images = ims[id]
+	}
+	return d, nil
 }
 
 // ListDrafts returns a profile's drafts, most recently changed first.
@@ -359,7 +376,17 @@ func (s *Studio) ListDrafts(ctx context.Context, profileID string) ([]Draft, err
 		}
 		out = append(out, d)
 	}
-	return out, closeRows(rows)
+	if err := closeRows(rows); err != nil {
+		return nil, err
+	}
+	ims, err := imagesOf(ctx, s.db, `draft_id IN (SELECT id FROM drafts WHERE profile_id = ?)`, profileID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].Images = ims[out[i].ID]
+	}
+	return out, nil
 }
 
 // DeleteDraft removes a draft and its history. An item that is approved, waiting to be sent or posted must be brought
@@ -373,6 +400,9 @@ func (s *Studio) DeleteDraft(ctx context.Context, id string) error {
 		return fmt.Errorf("%w: bring this %s back to draft before deleting it", ErrConflict, d.Kind)
 	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM drafts WHERE id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
 		return err
 	}
 	return dropVersions(ctx, s.db, id)
@@ -465,9 +495,12 @@ func (s *Studio) SetAttachment(ctx context.Context, id string, data []byte, name
 	if kind == AttachDocument {
 		title = documentTitle(name)
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = ?, attachment_type = ?, attachment_title = ?, `+backToDraft+`, updated_at = ? WHERE id = ?`,
+	_, err := s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = ?, attachment_type = ?, attachment_title = ?, video_url = '', video_size = 0, `+backToDraft+`, updated_at = ? WHERE id = ?`,
 		kind, data, typ, title, s.draftStamp(), id)
 	if err != nil {
+		return Draft{}, err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil { // a single file replaces a set
 		return Draft{}, err
 	}
 	return s.GetDraft(ctx, id)
@@ -496,14 +529,14 @@ func documentTitle(name string) string {
 	return name
 }
 
-// SetAttachmentTitle changes a document's title, the line LinkedIn shows above its pages.
+// SetAttachmentTitle changes a document's or a video's title, the line LinkedIn shows with it.
 func (s *Studio) SetAttachmentTitle(ctx context.Context, id, title string) (Draft, error) {
 	d, err := s.attachmentChange(ctx, id)
 	if err != nil {
 		return Draft{}, err
 	}
-	if d.Attachment != AttachDocument {
-		return Draft{}, invalid("only a document has a title")
+	if d.Attachment != AttachDocument && d.Attachment != AttachVideo {
+		return Draft{}, invalid("only a document or a video has a title")
 	}
 	title = strings.TrimSpace(title)
 	if title == "" || utf8.RuneCountInString(title) > maxAttachmentTitle || strings.ContainsAny(title, "\r\n") {
@@ -527,9 +560,12 @@ func (s *Studio) ClearAttachment(ctx context.Context, id string) (Draft, error) 
 	if d.Attachment == AttachCard {
 		return d, nil
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = '', `+backToDraft+`, updated_at = ? WHERE id = ?`,
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = '', video_url = '', video_size = 0, `+backToDraft+`, updated_at = ? WHERE id = ?`,
 		AttachCard, s.draftStamp(), id)
 	if err != nil {
+		return Draft{}, err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
 		return Draft{}, err
 	}
 	return s.GetDraft(ctx, id)
@@ -542,20 +578,26 @@ const backToDraft = `status = 'draft', approved_at = '', approved_by = '', sched
 type ownFile struct {
 	Kind, Type, Title string
 	Data              []byte
+	VideoURL          string
+	VideoSize         int64
 }
 
 // AttachmentFile returns a post's own file and its media type.
 func (s *Studio) AttachmentFile(ctx context.Context, id string) ([]byte, string, error) {
 	f, err := attachmentOf(ctx, s.db, id)
+	if err == nil && len(f.Data) == 0 { // a set of pictures has no single file, and a video is not stored
+		return nil, "", ErrNotFound
+	}
 	return f.Data, f.Type, err
 }
 
 // attachmentOf reads a post's own file; ErrNotFound when the post uses the card.
 func attachmentOf(ctx context.Context, db *sql.DB, id string) (ownFile, error) {
 	var f ownFile
-	err := db.QueryRowContext(ctx, `SELECT attachment_kind, attachment, attachment_type, attachment_title FROM drafts WHERE id = ?`, id).Scan(&f.Kind, &f.Data, &f.Type, &f.Title)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && (f.Kind == AttachCard || len(f.Data) == 0)) {
+	err := db.QueryRowContext(ctx, `SELECT attachment_kind, attachment, attachment_type, attachment_title, video_url, video_size FROM drafts WHERE id = ?`, id).
+		Scan(&f.Kind, &f.Data, &f.Type, &f.Title, &f.VideoURL, &f.VideoSize)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && f.Kind != AttachImages && f.Kind != AttachVideo && (f.Kind == AttachCard || len(f.Data) == 0)) {
 		return ownFile{}, ErrNotFound
 	}
-	return f, err
+	return f, err // a set of pictures has no Data (the pictures are in draft_images), and neither has a video (only its address)
 }

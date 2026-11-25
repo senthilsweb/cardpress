@@ -15,36 +15,88 @@ What is sent is a **snapshot** taken at that moment: the text, the hashtags, the
 Three calls, made by the server with the stored access token:
 
 1. reserve an image upload (`POST /rest/images?action=initializeUpload`, owner = the author URN),
-2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else). A post with a PDF uses the document calls instead, described below,
+2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else). A post with a PDF or a video uses the document or video calls instead, described below,
 3. create the post (`POST /rest/posts`): the text, the image and its alt text, public, main feed.
 
 The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ] { } < > @ | ~ _ * # \`), so it reads exactly as previewed. Hashtags go on a last line as LinkedIn hashtag templates, so they become real hashtags.
 
-## Your own image or PDF in place of the card
+## Your own images or PDF in place of the card
 
-In the Post tab, under **Attachment**, choose **Use an image or PDF** and pick a file. It goes out with the post, not the card. The card design is kept: **Use the card** goes back to it.
+In the Post tab, under **Attachment**, choose **Use images or a PDF** and pick one file or several images. They go out with the post, not the card. The card design is kept: **Use the card** goes back to it.
 
 | File | Limit | How LinkedIn shows it |
 |---|---|---|
 | Image: PNG or JPEG | 10 MB | One image, with your alt text |
+| Several images: PNG or JPEG | 10 MB each, up to 10 (LinkedIn allows 20) | A grid, each image with its own alt text |
 | Document: PDF | 20 MB (LinkedIn allows 100 MB and 300 pages; CardPress holds the file in memory, so its limit is lower) | Pages to swipe through, under the document title |
 
 A document has a **title**, shown above its pages. It starts as the file name and can be changed. A document has no alt text.
 
-The full preview shows the image, or the PDF's pages in the browser's own viewer. The queue marks the post **Own image** or **Document**.
+With several images, the Attachment section lists them in order. Each has its own alt text, arrows to move it up or down, and a button to remove it. **Add images** adds more. One image left in the list is sent as an ordinary image post; removing the last one goes back to the card.
 
-Changing the file or the title of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its attachment; cancel it first.
+The full preview shows the image, the grid of images, or the PDF's pages in the browser's own viewer. The queue marks the post **Own image**, **N images** or **Document**.
+
+Changing the file, the title, an image's alt text or the order of the images of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its attachment; cancel it first.
 
 For a document the server calls `POST /rest/documents?action=initializeUpload`, uploads the PDF to the address LinkedIn returns, and creates the post with the document and its title. The post is created straight after the upload: a member token cannot read a document's processing status, so CardPress does not wait for it.
 
-Several images and video are not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
+For several images the server uploads each image in turn (`POST /rest/images?action=initializeUpload`, then the upload) and creates one post that names them all (`content.multiImage.images`, each with its `id` and `altText`). The images are read from the database one at a time, so they are never all in memory together, and the job gets 30 more seconds for each image.
+
+## A video from a public address
+
+Choose **Use a video** and paste a direct link to an MP4 that anyone can open. **CardPress takes no video upload from your computer and does not keep the video.** Only the address is stored, with the file's size.
+
+| Rule | Limit |
+|---|---|
+| Address | `https` on the standard port, a public host, also after every redirect (at most 5). No user name or password in it. A page on a video sharing site is not a video file |
+| File | MP4, from 75 KB to 500 MB (`CARDPRESS_VIDEO_MAX_MB` lowers the upper limit). LinkedIn also asks for 3 seconds to 30 minutes, which CardPress does not check |
+| Server | It must state the file's size |
+
+The address is checked when you add it (CardPress reads the first bytes) and the file is read again when the post is sent. If it no longer answers, is no longer an MP4, or has a different size, the post fails before anything is posted, and says why. A file replaced by another of exactly the same size is not noticed. The video has a **title**, which starts as the file name. The full preview plays the video from its address.
+
+When the post is sent, the server:
+
+1. opens the address,
+2. reserves the upload (`POST /rest/videos?action=initializeUpload` with the size), which says how to cut the file into parts,
+3. sends each part (`PUT` to the address given, a LinkedIn host only, without the access token), holding one part (about 4 MB) in memory and nothing on disk,
+4. finishes the upload (`action=finalizeUpload` with the parts' ids),
+5. asks every 5 seconds whether LinkedIn has processed the video, for at most 10 minutes,
+6. creates the post.
+
+If processing fails, the post fails. If it is still processing after 10 minutes, no post is created and it is marked **needs review**. LinkedIn's documentation does not say whether a member's token may read the processing status; if LinkedIn refuses that, CardPress waits 30 seconds and creates the post, which LinkedIn may refuse if the video is not ready.
+
+One video is sent at a time, in the background, so other posts that are due do not wait for it. A video post has 45 minutes in all.
+
+**You are responsible for having the right to post the video.**
 
 | Route | Purpose |
 |---|---|
 | `PUT /api/v1/drafts/{id}/attachment?name=` | The file as the request body (PNG, JPEG or PDF). `name` is the file name, which a document's title starts from. Returns the draft |
 | `PUT /api/v1/drafts/{id}/attachment/title` | `{"title": "…"}`: a document's title, one line of at most 150 characters |
 | `GET /api/v1/drafts/{id}/attachment` | The file. `404` when the post uses the card |
-| `DELETE /api/v1/drafts/{id}/attachment` | Back to the card |
+| `DELETE /api/v1/drafts/{id}/attachment` | Back to the card (also removes a set of images) |
+| `POST /api/v1/drafts/{id}/images` | Add an image (the request body) to the post's set. The first one turns the attachment into a set |
+| `GET /api/v1/drafts/{id}/images/{image}` | One image of the set |
+| `PUT /api/v1/drafts/{id}/images/{image}` | `{"altText": "…"}` |
+| `PUT /api/v1/drafts/{id}/images/order` | `{"ids": [...]}`: every image once, in the new order |
+| `DELETE /api/v1/drafts/{id}/images/{image}` | Remove one image |
+| `PUT /api/v1/drafts/{id}/video` | `{"url": "https://…/video.mp4"}`: the post's video, by its public address. `PUT .../attachment/title` sets its title, `DELETE .../attachment` goes back to the card |
+
+## What other networks accept
+
+CardPress publishes to LinkedIn only. The previews for X, Instagram and Facebook follow what each network's developer documentation says one post can carry (checked 2026-11-25):
+
+| Post carries | LinkedIn | X | Instagram | Facebook |
+|---|---|---|---|---|
+| The card | Yes | Yes | Yes | Yes |
+| One image | Yes | Up to 5 MB | Up to 8 MB | Up to 10 MB |
+| Several images | Up to 10 here | Up to 4, 5 MB each | Carousel up to 20, 8 MB each | Yes, 10 MB each |
+| PDF | Yes | No | No | No |
+| Video | Yes | Yes | Up to 300 MB | Yes |
+
+With **Feed preview** on, a network that cannot take the post is struck through, cannot be selected, shows no preview and is left out of **All sizes**; the Attachment section says why, and its character count is hidden there. With Feed preview off, the canvas is the card itself, and every size can still be designed and downloaded.
+
+Not checked: video length, image dimensions and aspect ratios (Instagram asks for 4:5 to 1.91:1), and file formats beyond the ones CardPress accepts (Instagram's publishing API takes JPEG only). Meta's pages do not mention documents at all, and X's help pages could not be read, so its figures come from its API documentation.
 
 ## Approve first
 

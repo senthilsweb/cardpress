@@ -23,15 +23,28 @@
 - [ ] Not done, and different from the proposal: the PDF is held in memory and kept in the draft and job rows (hence the 20 MB limit), not streamed and not in `doc_blobs`. The page count is not checked. Only PDF is accepted. The post is created without waiting for LinkedIn to process the document (a member token cannot read the status); whether LinkedIn accepts that is unknown until a real post
 
 ## Bolt 3: images
-- [ ] Several pictures with order and alt text each; count limit
-- [ ] Multi-image post
-- [ ] Preview as a grid
-- [ ] Tests, docs, one real post
+- [x] Confirmed against LinkedIn's documentation: `content.multiImage.images` with `id` and `altText` each; 2 to 20 images; each uploaded through the Images API
+- [x] Several pictures with an order and alt text each; at most 10, 10 MB each
+- [x] Multi-image post; each picture uploaded in turn and read from the database when it is its turn
+- [x] One picture left in a set is sent as an ordinary image post; none goes back to the card
+- [x] Preview as a grid; the queue shows how many
+- [x] Tests (service, API, LinkedIn client against the fake); docs
+- [ ] One real post
+- [ ] Not done: reordering is by arrows, not by dragging; the version history does not record the pictures; the library and the public page still show the card
 
 ## Bolt 4: video from a public address
-- [ ] Address field; check on paste (https, public host, answers, is a video, size within the limit)
-- [ ] Guarded streaming fetch at send time (shared guard with `internal/source`), no storage, bounded memory
-- [ ] Upload in parts; waiting state until LinkedIn has processed it; time limit; "needs review" when unclear
-- [ ] A failure before anything is posted says what was wrong with the address
-- [ ] Memory check: the largest allowed video on a 256 MB machine
-- [ ] Tests (fake LinkedIn, fake video host, private-address and redirect refusals), docs, one real post
+- [x] Confirmed against LinkedIn's documentation: initializeUpload (size) → PUT each part → finalizeUpload (part ids) → status → post with `content.media` `{title, id}`; MP4. It gives two size limits (500 MB and 5 GB; CardPress uses 500 MB), and does not say whether a member token can read the status or whether the upload address needs the token (not sent)
+- [x] Address field; check on entry (https, public host also after redirects, answers, MP4 by its first bytes, size known and within the limit)
+- [x] Guarded streaming fetch at send time (same address guard as articles), no storage, one part in memory; a changed size is refused
+- [x] Upload in parts; wait for processing (10 minutes), then "needs review"; fixed 30 s wait when the status cannot be read
+- [x] One video at a time, in the background, marked alive so it is not taken for a hung publish
+- [x] A failure before anything is posted says what was wrong with the address
+- [x] Tests (fake LinkedIn, test video host, private-address and redirect refusals), docs
+- [ ] Memory check: the largest allowed video on a 256 MB machine (by design one part is held; not measured)
+- [ ] A real public video address, and one real post
+- [ ] Not done: the waiting for processing is inside the "publishing" state, not a job state of its own; duration is not checked; no thumbnail or captions; the library shows no picture for a video job
+
+## Other networks (previews only)
+- [x] Rules per network from X's and Meta's developer documentation (`web/src/lib/media.ts`)
+- [x] Feed preview shows the post's own file; a network that cannot take it is not selectable and has no preview; the editor says why
+- [ ] Not done: video length, image dimensions and aspect ratio are not checked; publishing to these networks is not built

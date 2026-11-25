@@ -1014,6 +1014,19 @@ func TestPublishingAPageThroughTheAPI(t *testing.T) {
 	}
 }
 
+func TestAPostsVideoThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	id := approvedDraft(h, nil)
+	// this handler has no video reader, as a server without one would answer
+	r := do(h, "PUT", "/api/v1/drafts/"+id+"/video", `{"url":"https://example.com/a.mp4"}`, nil)
+	if r.Code != 400 || !strings.Contains(r.Body.String(), "not available") {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/drafts/nope/video", `{"url":"https://example.com/a.mp4"}`, nil); r.Code != 404 {
+		t.Fatalf("unknown draft: %d %s", r.Code, r.Body)
+	}
+}
+
 func TestAPostsOwnPictureThroughTheAPI(t *testing.T) {
 	h, _ := publishHandler(t, "", nil)
 	id := approvedDraft(h, nil)
@@ -1087,4 +1100,57 @@ func TestAPostsOwnPictureThroughTheAPI(t *testing.T) {
 	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &j) != nil || j.Attachment != "document" || j.Title != "Our deck" {
 		t.Fatalf("%d %s", r.Code, r.Body)
 	}
+}
+
+func TestSeveralPicturesThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	id := approvedDraft(h, nil)
+	base := "/api/v1/drafts/" + id + "/images"
+	pic := func(n string) string { return "\x89PNG\r\n\x1a\n" + n }
+
+	var d service.Draft
+	for _, n := range []string{"one", "two", "three"} {
+		r := do(h, "POST", base, pic(n), nil)
+		if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &d) != nil {
+			t.Fatalf("%d %s", r.Code, r.Body)
+		}
+		if strings.Contains(r.Body.String(), n) {
+			t.Fatal("the draft must not carry the pictures")
+		}
+	}
+	if d.Attachment != "images" || len(d.Images) != 3 {
+		t.Fatalf("%+v", d)
+	}
+	if r := do(h, "POST", base, "not a picture", nil); r.Code != 400 {
+		t.Fatalf("not a picture: %d", r.Code)
+	}
+	a, b, c := d.Images[0].ID, d.Images[1].ID, d.Images[2].ID
+	if got := do(h, "GET", base+"/"+b, "", nil); got.Code != 200 || got.Header().Get("Content-Type") != "image/png" || got.Body.String() != pic("two") {
+		t.Fatalf("%d %q", got.Code, got.Header().Get("Content-Type"))
+	}
+	if r := do(h, "GET", base+"/nope", "", nil); r.Code != 404 {
+		t.Fatalf("unknown picture: %d", r.Code)
+	}
+	if r := do(h, "PUT", base+"/"+a, `{"altText":"the first"}`, nil); r.Code != 200 {
+		t.Fatalf("alt: %d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", base+"/order", `{"ids":["`+a+`"]}`, nil); r.Code != 400 {
+		t.Fatalf("short order: %d", r.Code)
+	}
+	r := do(h, "PUT", base+"/order", `{"ids":["`+c+`","`+a+`","`+b+`"]}`, nil)
+	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &d) != nil || d.Images[0].ID != c || d.Images[1].AltText != "the first" {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	if r := do(h, "DELETE", base+"/"+b, "", nil); r.Code != 200 {
+		t.Fatalf("remove: %d", r.Code)
+	}
+	if a := do(h, "POST", "/api/v1/drafts/"+id+"/approve", "", nil); a.Code != 200 {
+		t.Fatal(a.Body.String())
+	}
+	var j service.Job
+	r = postJobRaw(h, `{"profileId":"p","draftId":"`+id+`","body":"Hello"}`, nil, nil)
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &j) != nil || j.Attachment != "images" || j.ImageCount != 2 {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	waitStatus(t, h, j.ID, service.JobPublished)
 }

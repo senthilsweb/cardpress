@@ -185,11 +185,23 @@ export const api = {
   /** Give a post a file of its own in place of the card (a PNG or JPEG picture, or a PDF), or go back to the card. */
   setAttachment: (id: string, file: Blob, name = "") => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment?name=${encodeURIComponent(name)}`, file),
   setAttachmentTitle: (id: string, title: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment/title`, { title }),
+  setVideo: (id: string, url: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/video`, { url }),
   clearAttachment: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/attachment`),
   attachmentImage: async (id: string): Promise<Blob> => {
     const token = getToken();
     const res = await fetch(`${API_BASE}/drafts/${encodeURIComponent(id)}/attachment`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!res.ok) throw new ApiError(res.status, "http", `Could not load the file (${res.status})`);
+    return res.blob();
+  },
+  /** A post's set of pictures: add one, describe one, order them, remove one. Each returns the draft. */
+  addImage: (id: string, file: Blob) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/images`, file),
+  setImageAlt: (id: string, imageId: string, altText: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`, { altText }),
+  orderImages: (id: string, ids: string[]) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/images/order`, { ids }),
+  removeImage: (id: string, imageId: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`),
+  draftImage: async (id: string, imageId: string): Promise<Blob> => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/drafts/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
     return res.blob();
   },
   approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),

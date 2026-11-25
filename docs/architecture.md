@@ -28,7 +28,7 @@ flowchart LR
 
 ## Data
 
-Profiles (brands), designs, preferences, drafts and their versions, credentials, publish jobs and attempts, conversations, accounts (users, roles, sessions, API keys) and the MCP audit log are in one database. Drafts, designs, jobs, conversations and credentials are keyed by brand; a brand belongs to the person who made it. The schema is built by numbered migrations at start (`0001` to `0014`); see [Data model](data-model.md). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
+Profiles (brands), designs, preferences, drafts and their versions, credentials, publish jobs and attempts, conversations, accounts (users, roles, sessions, API keys) and the MCP audit log are in one database. Drafts, designs, jobs, conversations and credentials are keyed by brand; a brand belongs to the person who made it. The schema is built by numbered migrations at start (`0001` to `0015`); see [Data model](data-model.md). Credentials are encrypted with a key from `CARDPRESS_SECRET_KEY` or a key file; the API only ever returns the last four characters of a secret.
 
 ## The assistant
 
