@@ -181,8 +181,13 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 		return d, Effects{}, err
 	}
 	if slug != cur.Slug || summary != cur.Summary {
+		saved := d.Revision
 		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET slug = ?, summary = ?, revision = revision + 1, status = CASE WHEN status = 'scheduled' THEN status ELSE 'draft' END, approved_at = '', approved_by = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
 			slug, summary, s.draftStamp(), id); err != nil {
+			return d, Effects{}, err
+		}
+		// neither is part of a version, so the version just saved still holds the draft as it stands
+		if _, err := s.db.ExecContext(ctx, `UPDATE draft_versions SET revision = revision + 1 WHERE draft_id = ? AND revision = ?`, id, saved); err != nil {
 			return d, Effects{}, err
 		}
 		if d, err = s.GetDraft(ctx, id); err != nil {

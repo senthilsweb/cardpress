@@ -68,19 +68,30 @@ func TestEveryAssistantChangeAndEveryRestoreIsAVersion(t *testing.T) {
 	if got := write("From the assistant, two."); got.Version != 3 {
 		t.Fatalf("%+v", got)
 	}
+	// saving an article's summary with its text is one version, and it is the current one
+	summary, body, title := "One line.", "With a summary.", "Card"
+	cur0, _ := s.GetDraft(ctx, d.ID)
+	with, _, err := s.PatchDraft(ctx, d.ID, DraftPatch{Revision: cur0.Revision, Body: &body, Summary: &summary})
+	if err != nil || with.Version != 4 || !with.VersionIsCurrent {
+		t.Fatalf("%v %+v", err, with)
+	}
+	if _, after, _, err := s.PatchCardText(ctx, d.ID, CardText{Title: &title}); err != nil || after.Version != 5 {
+		t.Fatalf("no extra version before the next change: %v %+v", err, after)
+	}
+	write("From the assistant, two.")
 	// a hand edit within ten minutes makes no version of its own, so the newest one is no longer what is on screen
 	cur, _ := s.GetDraft(ctx, d.ID)
 	hand := inputOf(cur)
 	hand.Doc = DocFromText("Typed by hand.", KindPost)
 	edited, err := s.UpdateDraft(ctx, d.ID, hand)
-	if err != nil || edited.Version != 3 || edited.VersionIsCurrent {
+	if err != nil || edited.Version != 6 || edited.VersionIsCurrent {
 		t.Fatalf("%v %+v", err, edited)
 	}
-	if got := write("From the assistant, three."); got.Version != 5 { // the hand edit is kept first, then the new text
+	if got := write("From the assistant, three."); got.Version != 8 { // the hand edit is kept first, then the new text
 		t.Fatalf("%+v", got)
 	}
 	back, err := s.RestoreVersion(ctx, d.ID, 2)
-	if err != nil || back.Version != 6 || !back.VersionIsCurrent || !strings.Contains(DraftText(back.Doc), "one") {
+	if err != nil || back.Version != 9 || !back.VersionIsCurrent || !strings.Contains(DraftText(back.Doc), "one") {
 		t.Fatalf("%v %+v", err, back)
 	}
 	list, _ := s.Versions(ctx, d.ID)
@@ -88,7 +99,7 @@ func TestEveryAssistantChangeAndEveryRestoreIsAVersion(t *testing.T) {
 	for _, v := range list {
 		labels = append(labels, v.Label)
 	}
-	if got := strings.Join(labels, ","); got != "restored,assistant,manual,assistant,assistant,created" || list[0].Revision != back.Revision {
+	if got := strings.Join(labels, ","); got != "restored,assistant,manual,assistant,assistant,assistant,assistant,assistant,created" || list[0].Revision != back.Revision {
 		t.Fatalf("%s", got)
 	}
 }
