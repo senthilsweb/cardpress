@@ -13,7 +13,7 @@ const toInput = (d: Draft): DraftInput => ({
 });
 
 /** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
-const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, updatedAt: s.updatedAt });
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, updatedAt: s.updatedAt });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;
@@ -119,7 +119,8 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const publishPage = useCallback((m: { slug?: string; summary?: string }, cover?: Blob) => decide((id) => api.publishPage(id, m, cover)), [decide]);
   const unpublishPage = useCallback(() => decide((id) => api.unpublishPage(id)), [decide]);
   /** Give the open post a picture of its own in place of the card, or go back to the card. */
-  const setAttachment = useCallback((file: Blob) => decide((id) => api.setAttachment(id, file)), [decide]);
+  const setAttachment = useCallback((file: Blob, name = "") => decide((id) => api.setAttachment(id, file, name)), [decide]);
+  const setAttachmentTitle = useCallback((title: string) => decide((id) => api.setAttachmentTitle(id, title)), [decide]);
   const clearAttachment = useCallback(() => decide((id) => api.clearAttachment(id)), [decide]);
   const plan = useCallback((p: { scheduledAt?: string; timezone?: string }) => decide((id) => api.planDraft(id, p)), [decide]);
   /** Re-read the open draft's status: a post sent from it changes it behind the screen. */
@@ -139,7 +140,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush]);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, rev, restoreVersion, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus, setAttachment, clearAttachment };
+  return { drafts, current, rev, restoreVersion, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

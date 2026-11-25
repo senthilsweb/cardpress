@@ -1062,4 +1062,29 @@ func TestAPostsOwnPictureThroughTheAPI(t *testing.T) {
 	if r := do(h, "DELETE", path, "", nil); r.Code != 409 && r.Code != 200 {
 		t.Fatalf("clear: %d %s", r.Code, r.Body)
 	}
+
+	// a document: the title starts as the file name, can be changed, and the file is served as a PDF
+	doc := approvedDraft(h, nil)
+	dpath := "/api/v1/drafts/" + doc + "/attachment"
+	pdf := []byte("%PDF-1.7 pages")
+	set = do(h, "PUT", dpath+"?name=Deck%20v2.pdf", string(pdf), nil)
+	if set.Code != 200 || json.Unmarshal(set.Body.Bytes(), &d) != nil || d.Attachment != "document" || d.AttachmentTitle != "Deck v2" {
+		t.Fatalf("%d %s", set.Code, set.Body)
+	}
+	if r := do(h, "PUT", dpath+"/title", `{"title":""}`, nil); r.Code != 400 {
+		t.Fatalf("empty title: %d", r.Code)
+	}
+	if r := do(h, "PUT", dpath+"/title", `{"title":"Our deck"}`, nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"attachmentTitle":"Our deck"`) {
+		t.Fatalf("title: %d %s", r.Code, r.Body)
+	}
+	if got := do(h, "GET", dpath, "", nil); got.Code != 200 || got.Header().Get("Content-Type") != "application/pdf" || !bytes.Equal(got.Body.Bytes(), pdf) {
+		t.Fatalf("%d %q", got.Code, got.Header().Get("Content-Type"))
+	}
+	if a := do(h, "POST", "/api/v1/drafts/"+doc+"/approve", "", nil); a.Code != 200 {
+		t.Fatal(a.Body.String())
+	}
+	r = postJobRaw(h, `{"profileId":"p","draftId":"`+doc+`","body":"Hello"}`, nil, nil)
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &j) != nil || j.Attachment != "document" || j.Title != "Our deck" {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
 }

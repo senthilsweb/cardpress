@@ -50,9 +50,10 @@ type Job struct {
 	Hashtags    []string `json:"hashtags"`
 	PreviewText string   `json:"previewText"` // the body and hashtag line as the preview showed it
 	AltText     string   `json:"altText"`
-	Attachment  string   `json:"attachment"`            // what it carries: "card" or "image" (a picture of the post's own)
-	ScheduledAt string   `json:"scheduledAt,omitempty"` // UTC; empty for publish-now
-	Timezone    string   `json:"timezone,omitempty"`    // IANA zone to display the time in
+	Attachment  string   `json:"attachment"`                // what it carries: "card", "image" or "document" (a file of the post's own)
+	Title       string   `json:"attachmentTitle,omitempty"` // a document's title
+	ScheduledAt string   `json:"scheduledAt,omitempty"`     // UTC; empty for publish-now
+	Timezone    string   `json:"timezone,omitempty"`        // IANA zone to display the time in
 	Error       string   `json:"error,omitempty"`
 	PostURN     string   `json:"postUrn,omitempty"`
 	PostURL     string   `json:"postUrl,omitempty"`
@@ -63,12 +64,14 @@ type Job struct {
 
 // JobInput is a confirmed post to publish now (ScheduledAt nil) or later.
 type JobInput struct {
-	ProfileID   string
-	DraftID     string
-	Body        string // the text without the hashtag line
-	Hashtags    []string
-	AltText     string
-	Image       []byte // the card as a PNG; not needed when the draft carries a picture of its own
+	ProfileID string
+	DraftID   string
+	Body      string // the text without the hashtag line
+	Hashtags  []string
+	AltText   string
+	Image     []byte // the card as a PNG; not needed when the draft carries a file of its own
+
+	kind, title string // set by Create from the draft's own file
 	ScheduledAt *time.Time
 	Timezone    string
 }
@@ -131,8 +134,20 @@ func (p *Publisher) validate(in *JobInput) error {
 	if utf8.RuneCountInString(in.AltText) > maxAltText {
 		return invalid("altText is limited to %d characters", maxAltText)
 	}
-	if imageType(in.Image) == "" || len(in.Image) > maxImageBytes {
-		return invalid("the image must be a PNG or JPEG of at most %d MB", maxImageBytes>>20)
+	// the card is a picture; a draft's own file was checked when it was stored and is checked again here
+	kind, limit := attachmentKind(fileType(in.Image))
+	if in.kind == "" {
+		in.kind = AttachCard
+	}
+	wantImage := in.kind != AttachDocument
+	if kind == "" || len(in.Image) > limit || (wantImage && kind != AttachImage) || (!wantImage && kind != AttachDocument) {
+		if wantImage {
+			return invalid("the image must be a PNG or JPEG of at most %d MB", maxImageBytes>>20)
+		}
+		return invalid("the document must be a PDF of at most %d MB", maxDocumentBytes>>20)
+	}
+	if in.kind == AttachDocument && strings.TrimSpace(in.title) == "" {
+		return invalid("the document needs a title")
 	}
 	if in.ScheduledAt != nil {
 		if _, err := time.LoadLocation(in.Timezone); err != nil || in.Timezone == "" {
@@ -181,10 +196,10 @@ func (p *Publisher) ready(ctx context.Context, profileID string) error {
 // Create stores a confirmed post. With no ScheduledAt it is claimed for immediate publishing (status publishing) and the
 // caller must run Execute; otherwise it waits as scheduled.
 func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
-	// a post with a picture of its own sends that picture, as it was approved, whatever the caller sent
-	kind := AttachCard
-	if own, _, err := attachmentOf(ctx, p.db, in.DraftID); err == nil {
-		in.Image, kind = own, AttachImage
+	// a post with a file of its own sends that file, as it was approved, whatever the caller sent
+	in.kind, in.title = AttachCard, ""
+	if own, err := attachmentOf(ctx, p.db, in.DraftID); err == nil {
+		in.Image, in.kind, in.title = own.Data, own.Kind, own.Title
 	} else if !errors.Is(err, ErrNotFound) {
 		return Job{}, err
 	}
@@ -205,9 +220,9 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	}
 	id := newID()
 	_, err := p.db.ExecContext(ctx,
-		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, image_type, attachment_kind, scheduled_at, timezone, created_by, created_at, updated_at)
-		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, imageType(in.Image), kind, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
+		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, image_type, attachment_kind, attachment_title, scheduled_at, timezone, created_by, created_at, updated_at)
+		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, fileType(in.Image), in.kind, in.title, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
 	if err != nil {
 		return Job{}, err
 	}
@@ -269,13 +284,13 @@ func (p *Publisher) releaseDrafts(ctx context.Context) {
 
 /* ------------------------------------------------------------------ read */
 
-const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, attachment_kind, scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
+const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, attachment_kind, attachment_title, scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
 
 func scanJob(r scanner) (Job, error) {
 	var j Job
 	var tags string
 	var sched sql.NullString
-	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &j.Attachment, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
+	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &j.Attachment, &j.Title, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
 		return j, err
 	}
 	j.ScheduledAt = sched.String
@@ -332,7 +347,7 @@ func (p *Publisher) list(ctx context.Context, where string, args ...any) ([]Job,
 	return out, closeRows(rows)
 }
 
-// Image returns the picture a job will post and its media type.
+// Image returns the file a job will post (the card, a picture or a document) and its media type.
 func (p *Publisher) Image(ctx context.Context, id string) ([]byte, string, error) {
 	var b []byte
 	var typ string
@@ -467,9 +482,10 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 		}
 	}()
 
-	var status, body, tags, alt, profileID, imgType string
+	var status, body, tags, alt, profileID, imgType, kind, title string
 	var img []byte
-	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image, image_type, profile_id FROM publish_jobs WHERE id = ?`, id).Scan(&status, &body, &tags, &alt, &img, &imgType, &profileID)
+	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image, image_type, attachment_kind, attachment_title, profile_id FROM publish_jobs WHERE id = ?`, id).
+		Scan(&status, &body, &tags, &alt, &img, &imgType, &kind, &title, &profileID)
 	if err != nil || status != JobPublishing {
 		return // not ours to run
 	}
@@ -487,7 +503,7 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 	started := p.now()
 	tctx, trace := linkedin.WithTrace(ctx)
 	urn, err := p.li.Publish(tctx, c["accessToken"], linkedin.Post{
-		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: imgType,
+		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: imgType, Document: kind == AttachDocument, Title: title,
 	})
 	switch {
 	case err == nil:

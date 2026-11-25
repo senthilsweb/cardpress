@@ -70,12 +70,20 @@ const Act = ({ icon, label }: { icon: ReactNode; label?: string }) => (
 );
 
 /** A neutral, unbranded post frame so the card can be judged in a feed context. */
-export function FeedFrame({ width, caption = "", expandable, mediaSrc, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string }) {
+export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string }) {
   const { profile, palette, size } = p;
   const net = size.net;
   const handle = profile.handle || "@you";
   const name = profile.displayName || profile.name;
-  const own = mediaSrc ? <img src={mediaSrc} alt="" className="block w-full" /> : null;
+  const own = !mediaSrc ? null : documentTitle !== undefined ? (
+    <div className="border-y border-neutral-200 bg-neutral-100">
+      <div className="flex items-center gap-2 bg-neutral-800 px-3 py-2 text-[12.5px] font-medium text-white">
+        <span className="min-w-0 flex-1 truncate">{documentTitle}</span><span className="shrink-0 text-neutral-300">PDF</span>
+      </div>
+      {/* the browser's own PDF viewer: the pages as they are, to scroll through */}
+      <iframe src={`${mediaSrc}#toolbar=0&navpanes=0&view=FitH`} title={`Document: ${documentTitle}`} className="block w-full border-0" style={{ height: Math.round(width * 1.05) }} />
+    </div>
+  ) : <img src={mediaSrc} alt="" className="block w-full" />;
   const media = own ?? <ScaledCard {...p} maxW={width} maxH={99999} rounded={false} />;
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-[0_8px_30px_rgba(0,0,0,0.08)]" style={{ width }}>

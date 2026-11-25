@@ -15,23 +15,35 @@ What is sent is a **snapshot** taken at that moment: the text, the hashtags, the
 Three calls, made by the server with the stored access token:
 
 1. reserve an image upload (`POST /rest/images?action=initializeUpload`, owner = the author URN),
-2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else),
+2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else). A post with a PDF uses the document calls instead, described below,
 3. create the post (`POST /rest/posts`): the text, the image and its alt text, public, main feed.
 
 The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ] { } < > @ | ~ _ * # \`), so it reads exactly as previewed. Hashtags go on a last line as LinkedIn hashtag templates, so they become real hashtags.
 
-## Your own image in place of the card
+## Your own image or PDF in place of the card
 
-In the Post tab, under **Image**, choose **Use your own image** and pick a PNG or JPEG (at most 10 MB). That picture goes out with the post, not the card. The card design is kept: **Use the card** goes back to it. The full preview shows the picture, and the queue marks the post **Own image**.
+In the Post tab, under **Attachment**, choose **Use an image or PDF** and pick a file. It goes out with the post, not the card. The card design is kept: **Use the card** goes back to it.
 
-Changing the image of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its image; cancel it first.
+| File | Limit | How LinkedIn shows it |
+|---|---|---|
+| Image: PNG or JPEG | 10 MB | One image, with your alt text |
+| Document: PDF | 20 MB (LinkedIn allows 100 MB and 300 pages; CardPress holds the file in memory, so its limit is lower) | Pages to swipe through, under the document title |
 
-Several images, documents and video are not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
+A document has a **title**, shown above its pages. It starts as the file name and can be changed. A document has no alt text.
+
+The full preview shows the image, or the PDF's pages in the browser's own viewer. The queue marks the post **Own image** or **Document**.
+
+Changing the file or the title of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its attachment; cancel it first.
+
+For a document the server calls `POST /rest/documents?action=initializeUpload`, uploads the PDF to the address LinkedIn returns, and creates the post with the document and its title. The post is created straight after the upload: a member token cannot read a document's processing status, so CardPress does not wait for it.
+
+Several images and video are not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
 
 | Route | Purpose |
 |---|---|
-| `PUT /api/v1/drafts/{id}/attachment` | The picture as the request body (PNG or JPEG). Returns the draft |
-| `GET /api/v1/drafts/{id}/attachment` | The picture. `404` when the post uses the card |
+| `PUT /api/v1/drafts/{id}/attachment?name=` | The file as the request body (PNG, JPEG or PDF). `name` is the file name, which a document's title starts from. Returns the draft |
+| `PUT /api/v1/drafts/{id}/attachment/title` | `{"title": "…"}`: a document's title, one line of at most 150 characters |
+| `GET /api/v1/drafts/{id}/attachment` | The file. `404` when the post uses the card |
 | `DELETE /api/v1/drafts/{id}/attachment` | Back to the card |
 
 ## Approve first
@@ -100,7 +112,7 @@ On start, any post left "publishing" by a previous run becomes **Check LinkedIn*
 
 | Request | Purpose |
 |---|---|
-| `POST /api/v1/publish/jobs` | Multipart: `meta` (JSON: `profileId`, `draftId`, `body`, `hashtags`, `altText`, and for later `scheduledAt` + `timezone`) and `image` (the card as a PNG; leave it out when the post has a picture of its own, which the server sends instead). Publish-now jobs return at once and run in the background. |
+| `POST /api/v1/publish/jobs` | Multipart: `meta` (JSON: `profileId`, `draftId`, `body`, `hashtags`, `altText`, and for later `scheduledAt` + `timezone`) and `image` (the card as a PNG; leave it out when the post has a file of its own, which the server sends instead). Publish-now jobs return at once and run in the background. |
 | `GET /api/v1/publish/jobs?profileId=` | The list (no images) |
 | `GET /api/v1/publish/jobs/{id}`, `/image` and `/attempts` | One job, its PNG, and what LinkedIn answered on each try |
 | `POST /api/v1/publish/jobs/{id}/publish-now` | `{"acceptDuplicate": true}` is required for a Check LinkedIn job |

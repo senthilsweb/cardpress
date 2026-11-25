@@ -18,9 +18,9 @@ const suggested = (tz: string) => toLocalInput(new Date(Math.ceil((Date.now() + 
  * Publish or schedule the post being previewed. It lives inside the full preview, so what is confirmed here is what was
  * just shown. Nothing is sent until a second, explicit confirmation.
  */
-export function PublishBar({ ownImage = false, draft, onApprove, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
-  /** The post carries a picture of its own, so no card is rendered or sent. */
-  ownImage?: boolean;
+export function PublishBar({ own, draft, onApprove, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
+  /** The post carries a file of its own, so no card is rendered or sent. */
+  own?: "image" | "document";
   draft: Draft;
   /** Approve the draft (a post is only sent from an approved draft). */
   onApprove: () => void | Promise<void>;
@@ -62,7 +62,7 @@ export function PublishBar({ ownImage = false, draft, onApprove, serialized, bod
   const submit = async (when?: { at: Date; tz: string }) => {
     setBusy(true); setError(null);
     try {
-      const png = ownImage ? undefined : await renderPng(size);
+      const png = own ? undefined : await renderPng(size);
       const job = await api.createJob({
         profileId: draft.profileId, draftId: draft.id, body: bodyOnly, hashtags: draft.hashtags, altText: draft.altText,
         ...(when ? { scheduledAt: when.at.toISOString().replace(/\.\d{3}Z$/, "Z"), timezone: when.tz } : {}),
@@ -116,7 +116,7 @@ export function PublishBar({ ownImage = false, draft, onApprove, serialized, bod
       {step === "confirm" && (
         <div role="alertdialog" aria-label="Confirm publishing" className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
           <p className="font-medium">Post as <b>{brandName}</b> now?</p>
-          <p className="text-muted-foreground">Goes live now{setup.author ? <> from <code className="font-mono">{setup.author}</code></> : ""} with the {ownImage ? "image" : "card"} above. This cannot be undone here.</p>
+          <p className="text-muted-foreground">Goes live now{setup.author ? <> from <code className="font-mono">{setup.author}</code></> : ""} with the {own ?? "card"} above. This cannot be undone here.</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setStep("idle")}>Back</Button>
             <Button size="sm" variant="brand" disabled={busy} onClick={() => void submit()}>{busy ? <Loader2 className="animate-spin" /> : <Send />} Yes, publish now</Button>

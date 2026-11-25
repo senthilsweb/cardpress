@@ -43,9 +43,10 @@ type Studio interface {
 	DeleteDraft(ctx context.Context, id string) error
 	Approve(ctx context.Context, id string) (service.Draft, error)
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
-	SetAttachment(ctx context.Context, id string, data []byte) (service.Draft, error)
+	SetAttachment(ctx context.Context, id string, data []byte, name string) (service.Draft, error)
+	SetAttachmentTitle(ctx context.Context, id, title string) (service.Draft, error)
 	ClearAttachment(ctx context.Context, id string) (service.Draft, error)
-	AttachmentImage(ctx context.Context, id string) ([]byte, string, error)
+	AttachmentFile(ctx context.Context, id string) ([]byte, string, error)
 	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
 	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
 	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
@@ -196,6 +197,7 @@ func (s *server) table() []routeDef {
 		{"GET", "/drafts/{id}/attachment", write(scopeDraft), s.getAttachment},
 		{"PUT", "/drafts/{id}/attachment", write(scopeDraft), s.setAttachment},
 		{"DELETE", "/drafts/{id}/attachment", write(scopeDraft), s.clearAttachment},
+		{"PUT", "/drafts/{id}/attachment/title", write(scopeDraft), s.setAttachmentTitle},
 		{"PUT", "/drafts/{id}/plan", rule{scopeDraft, service.PermApprove}, s.planDraft},
 		{"POST", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.publishPage},
 		{"DELETE", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.unpublishPage},
@@ -438,14 +440,31 @@ func (s *server) unapproveDraft(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
-// setAttachment gives a post a picture of its own, sent as the request body (PNG or JPEG). It goes out in place of the card.
+// setAttachment gives a post a file of its own, sent as the request body: a picture (PNG or JPEG) or a document (PDF).
+// It goes out in place of the card. `?name=` is the file's name, which a document's title starts from.
 func (s *server) setAttachment(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 11<<20))
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 21<<20))
 	if err != nil {
-		writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", "the picture is too large")
+		writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", "the file is too large")
 		return
 	}
-	d, err := s.Studio.SetAttachment(r.Context(), r.PathValue("id"), data)
+	d, err := s.Studio.SetAttachment(r.Context(), r.PathValue("id"), data, r.URL.Query().Get("name"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// setAttachmentTitle changes a document's title: {"title": "..."}.
+func (s *server) setAttachmentTitle(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Title string `json:"title"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	d, err := s.Studio.SetAttachmentTitle(r.Context(), r.PathValue("id"), body.Title)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -464,7 +483,7 @@ func (s *server) clearAttachment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) getAttachment(w http.ResponseWriter, r *http.Request) {
-	b, typ, err := s.Studio.AttachmentImage(r.Context(), r.PathValue("id"))
+	b, typ, err := s.Studio.AttachmentFile(r.Context(), r.PathValue("id"))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -472,10 +491,10 @@ func (s *server) getAttachment(w http.ResponseWriter, r *http.Request) {
 	servePicture(w, b, typ)
 }
 
-// servePicture sends a stored picture. Only the two types the server accepts are ever named, and the browser is told not
-// to guess another.
+// servePicture sends a stored file. Only the types the server accepts are ever named, and the browser is told not to
+// guess another.
 func servePicture(w http.ResponseWriter, b []byte, typ string) {
-	if typ != "image/jpeg" {
+	if typ != "image/jpeg" && typ != "application/pdf" {
 		typ = "image/png"
 	}
 	w.Header().Set("Content-Type", typ)

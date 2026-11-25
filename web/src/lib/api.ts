@@ -182,13 +182,14 @@ export const api = {
     return call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/page`, form);
   },
   unpublishPage: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/page`),
-  /** Give a post a picture of its own (PNG or JPEG) in place of the card, or go back to the card. */
-  setAttachment: (id: string, file: Blob) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment`, file),
+  /** Give a post a file of its own in place of the card (a PNG or JPEG picture, or a PDF), or go back to the card. */
+  setAttachment: (id: string, file: Blob, name = "") => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment?name=${encodeURIComponent(name)}`, file),
+  setAttachmentTitle: (id: string, title: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment/title`, { title }),
   clearAttachment: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/attachment`),
   attachmentImage: async (id: string): Promise<Blob> => {
     const token = getToken();
     const res = await fetch(`${API_BASE}/drafts/${encodeURIComponent(id)}/attachment`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
+    if (!res.ok) throw new ApiError(res.status, "http", `Could not load the file (${res.status})`);
     return res.blob();
   },
   approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),
