@@ -45,6 +45,18 @@ CARDPRESS_TEST_LIBSQL_URL=http://127.0.0.1:8081 go test ./internal/store -run On
 
 The test applies the migrations and runs the kinds of statement the server depends on (BLOBs of a few megabytes, transactions, `INSERT … SELECT` with a window function) on SQLite and on libSQL. Without the variable it runs on SQLite only. Use a database kept for tests. To run the whole server on it: `CARDPRESS_DB_URL=http://127.0.0.1:8081 ./bin/cardpress`.
 
+### Large files on libSQL
+
+A local libSQL server (`sqld` 0.24.31, started by `turso dev`) refuses any single value over about 4.7 MB (4,999,168 bytes was accepted, measured), both when writing and when reading: `string or blob too big`. The SQLite file has no such limit in practice. CardPress's own limits are higher, so on that server these fail with "internal error":
+
+| Stored value | CardPress allows |
+|---|---|
+| A post's own PDF | 20 MB |
+| A post's own image, or the card image of a scheduled post | 10 MB |
+| An article's text, including the images inside it | 25 MB |
+
+Up to 4.5 MB, a PDF, ten images and the copy a scheduled post takes were checked on that server and came back unchanged. Whether Turso Cloud has the same limit has not been checked. Use SQLite if you need larger files.
+
 ## Configuration
 
 | Variable | Flag | Default | Meaning |

@@ -8,7 +8,7 @@ Settings come from environment variables, with a few command-line flags. With Do
 |---|---|---|---|
 | `ADDR` / `PORT` | `-addr` | `127.0.0.1:8080` | Listen address. `PORT` alone sets the port on loopback |
 | `BASE_PATH` | `-base` | `/` | URL prefix the app is served under. Must match the web build |
-| `CARDPRESS_DB_URL` | `-db` | `file:./data/cardpress.db` | SQLite file, `libsql://...` for Turso, or `http://127.0.0.1:<port>` for a libSQL server on this machine |
+| `CARDPRESS_DB_URL` | `-db` | `file:./data/cardpress.db` | SQLite file, `libsql://...` for Turso, or `http://127.0.0.1:<port>` for a libSQL server on this machine ([file size limit](deployment.md#large-files-on-libsql)) |
 | `CARDPRESS_DB_TOKEN` | | | Auth token for a hosted libSQL database |
 | `CARDPRESS_SERVE_WEB` | `-serve-web` | `true` | Serve the embedded web app. Turn off for an API-only server |
 | `CARDPRESS_MCP` | `-mcp` | `true` | Serve the MCP endpoint at `/mcp` |
