@@ -1,6 +1,6 @@
 # Data model
 
-CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0013). **It is updated with every migration.**
+CardPress keeps everything in one database: SQLite in a file by default, or Turso (libSQL) with `CARDPRESS_DB`. The schema is made of numbered migrations in `internal/store/migrations/`, applied in order at start-up and recorded in `schema_migrations`. This page describes the schema as it is (migrations 0001 to 0014). **It is updated with every migration.**
 
 ## Conventions
 
@@ -56,7 +56,7 @@ Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
+| `drafts` | 0002, 0009, 0014 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `attachment_kind` (`card`, `image` or `document`), `attachment` (BLOB, the post's own file), `attachment_type`, `attachment_title`, `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -103,6 +103,11 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0011 | Accounts: `users`, `user_roles`, `sessions`, `user_preferences`; `profiles.owner_id`, `drafts.created_by` and `approved_by`, `publish_jobs.created_by`, `conversations.user_id` |
 | 0012 | `draft_versions` and `doc_blobs`: the history of an item |
 | 0013 | `api_keys`: keys for programs (MCP, scripts), scoped and revocable |
+| 0014 | `drafts`: `attachment_kind`, `attachment`, `attachment_type`, `attachment_title`; `publish_jobs`: `attachment_kind`, `image_type`, `attachment_title`. A post can carry its own image or PDF in place of the card |
+
+## A post's own file
+
+`drafts.attachment_kind` says what a post goes out with: `card` (the designed card, the default), `image` or `document`. For the last two, `attachment` holds the file (a PNG or JPEG of at most 10 MB, or a PDF of at most 20 MB) and `attachment_type` its media type; a document also has `attachment_title`. The server decides the kind from the file's first bytes, not from its name. The card design is kept, so going back to the card loses nothing. Setting, changing or removing the file, or changing the title, returns an approved or published post to `draft`. When a post is published or scheduled, the file is copied into the job (`publish_jobs.image`, with `image_type`, `attachment_kind` and `attachment_title`), so a scheduled post sends what was approved.
 
 ## Draft status and approval
 

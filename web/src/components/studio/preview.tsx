@@ -70,12 +70,21 @@ const Act = ({ icon, label }: { icon: ReactNode; label?: string }) => (
 );
 
 /** A neutral, unbranded post frame so the card can be judged in a feed context. */
-export function FeedFrame({ width, caption = "", expandable, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean }) {
+export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string }) {
   const { profile, palette, size } = p;
   const net = size.net;
   const handle = profile.handle || "@you";
   const name = profile.displayName || profile.name;
-  const media = <ScaledCard {...p} maxW={width} maxH={99999} rounded={false} />;
+  const own = !mediaSrc ? null : documentTitle !== undefined ? (
+    <div className="border-y border-neutral-200 bg-neutral-100">
+      <div className="flex items-center gap-2 bg-neutral-800 px-3 py-2 text-[12.5px] font-medium text-white">
+        <span className="min-w-0 flex-1 truncate">{documentTitle}</span><span className="shrink-0 text-neutral-300">PDF</span>
+      </div>
+      {/* the browser's own PDF viewer: the pages as they are, to scroll through */}
+      <iframe src={`${mediaSrc}#toolbar=0&navpanes=0&view=FitH`} title={`Document: ${documentTitle}`} className="block w-full border-0" style={{ height: Math.round(width * 1.05) }} />
+    </div>
+  ) : <img src={mediaSrc} alt="" className="block w-full" />;
+  const media = own ?? <ScaledCard {...p} maxW={width} maxH={99999} rounded={false} />;
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-[0_8px_30px_rgba(0,0,0,0.08)]" style={{ width }}>
       <div className="flex items-center gap-2.5 px-3.5 py-3">
@@ -92,7 +101,7 @@ export function FeedFrame({ width, caption = "", expandable, ...p }: CardProps &
       </div>
       {net !== "Instagram" && caption && <div className="px-3.5 pb-3"><Caption text={caption} limit={net === "X" ? 280 : 210} expandable={expandable} more={net === "LinkedIn" ? "…see more" : "…more"} /></div>}
       <div className={net === "X" ? "mx-3.5 overflow-hidden rounded-2xl border border-neutral-200" : ""}>
-        {net === "X" ? <ScaledCard {...p} maxW={width - 30} maxH={99999} rounded={false} /> : media}
+        {net === "X" && !own ? <ScaledCard {...p} maxW={width - 30} maxH={99999} rounded={false} /> : media}
       </div>
       {net === "Instagram" && (
         <>

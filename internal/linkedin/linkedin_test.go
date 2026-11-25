@@ -79,6 +79,8 @@ func newFake(t *testing.T) *fake {
 				up = f.uploadURLOverride
 			}
 			fmt.Fprintf(w, `{"value":{"uploadUrl":%q,"image":"urn:li:image:IMG1"}}`, up)
+		case r.URL.Path == "/rest/documents":
+			fmt.Fprintf(w, `{"value":{"uploadUrl":%q,"document":"urn:li:document:DOC1"}}`, f.srv.URL+"/upload/doc?sig=SECRET")
 		case strings.HasPrefix(r.URL.Path, "/upload/"):
 			f.uploadAuth = r.Header.Get("Authorization")
 			f.uploaded, _ = io.ReadAll(r.Body)
@@ -291,5 +293,35 @@ func TestATraceKeepsAFailedAnswer(t *testing.T) {
 	last := steps[len(steps)-1]
 	if last.Status != 422 || !strings.Contains(last.Body, "Field author is invalid") {
 		t.Fatalf("%+v", last)
+	}
+}
+
+func TestPublishADocument(t *testing.T) {
+	f := newFake(t)
+	pdf := []byte("%PDF-1.7 pages")
+	p := Post{AuthorURN: "urn:li:person:Ab_1", Commentary: "Hello", AltText: "not for a document", Image: pdf, ContentType: "application/pdf", Document: true, Title: " Our deck "}
+	urn, err := f.client().Publish(context.Background(), "TOKEN-XYZ", p)
+	if err != nil || urn != "urn:li:share:123" {
+		t.Fatalf("%q %v", urn, err)
+	}
+	if got := strings.Join(f.calls, ", "); got != "POST /rest/documents, PUT /upload/doc, POST /rest/posts" {
+		t.Fatalf("steps: %s", got)
+	}
+	if string(f.uploaded) != string(pdf) || f.uploadAuth != "Bearer TOKEN-XYZ" {
+		t.Fatalf("upload: %q auth %q", f.uploaded, f.uploadAuth)
+	}
+	media := f.postBody["content"].(map[string]any)["media"].(map[string]any)
+	if media["id"] != "urn:li:document:DOC1" || media["title"] != "Our deck" {
+		t.Fatalf("media: %v", media)
+	}
+	if _, has := media["altText"]; has {
+		t.Fatal("a document has no alt text")
+	}
+
+	// a document without a title is refused before anything is sent
+	f2 := newFake(t)
+	p.Title = "  "
+	if _, err := f2.client().Publish(context.Background(), "t", p); err == nil || len(f2.calls) != 0 {
+		t.Fatalf("no title: %v, calls %v", err, f2.calls)
 	}
 }

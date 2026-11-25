@@ -77,8 +77,11 @@ type Post struct {
 	AuthorURN   string // urn:li:person:… or urn:li:organization:…
 	Commentary  string // already escaped: see Commentary
 	AltText     string
-	Image       []byte
+	Image       []byte // the file: a picture, or a document when Document is set
 	ContentType string
+	// Document posts the file as a document (a PDF, shown as pages to swipe through) with Title above it.
+	Document bool
+	Title    string
 }
 
 // APIError is a failure where LinkedIn answered, or a step failed before anything was posted.
@@ -161,57 +164,75 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	if token == "" || p.AuthorURN == "" {
 		return "", &APIError{Message: "The LinkedIn access token and author URN are required."}
 	}
+	// a picture and a document are sent the same way, to different addresses, and named differently in the answer
+	what, path := "image", "/rest/images"
+	if p.Document {
+		what, path = "document", "/rest/documents"
+	}
 	if len(p.Image) == 0 {
-		return "", &APIError{Message: "There is no image to upload."}
+		return "", &APIError{Message: "There is no " + what + " to upload."}
+	}
+	if p.Document && strings.TrimSpace(p.Title) == "" {
+		return "", &APIError{Message: "The document needs a title."}
 	}
 
 	// 1. reserve an upload
 	initBody, _ := json.Marshal(map[string]any{"initializeUploadRequest": map[string]string{"owner": p.AuthorURN}})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.APIBase+"/rest/images?action=initializeUpload", bytes.NewReader(initBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.APIBase+path+"?action=initializeUpload", bytes.NewReader(initBody))
 	if err != nil {
 		return "", err
 	}
 	c.headers(req, token)
 	req.Header.Set("Content-Type", "application/json")
-	resp, body, err := c.do("Reserve the image upload", req)
+	resp, body, err := c.do("Reserve the "+what+" upload", req)
 	if err != nil {
-		return "", &APIError{Message: "Could not reach LinkedIn to start the image upload. Nothing was posted."}
+		return "", &APIError{Message: "Could not reach LinkedIn to start the " + what + " upload. Nothing was posted."}
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", friendly(resp.StatusCode, body, "start the image upload")
+		return "", friendly(resp.StatusCode, body, "start the "+what+" upload")
 	}
 	var init struct {
 		Value struct {
 			UploadURL string `json:"uploadUrl"`
 			Image     string `json:"image"`
+			Document  string `json:"document"`
 		} `json:"value"`
 	}
-	if err := json.Unmarshal(body, &init); err != nil || init.Value.UploadURL == "" || init.Value.Image == "" {
-		return "", &APIError{Message: "LinkedIn's answer to the image upload request was not understood. Nothing was posted."}
+	if err := json.Unmarshal(body, &init); err != nil {
+		init.Value.UploadURL = ""
+	}
+	mediaID := init.Value.Image
+	if p.Document {
+		mediaID = init.Value.Document
+	}
+	if init.Value.UploadURL == "" || mediaID == "" {
+		return "", &APIError{Message: "LinkedIn's answer to the " + what + " upload request was not understood. Nothing was posted."}
 	}
 
-	// 2. upload the PNG, only to a LinkedIn address
+	// 2. upload the file, only to a LinkedIn address
 	u, err := url.Parse(init.Value.UploadURL)
 	schemeOK := err == nil && (u.Scheme == "https" || (c.AllowHTTP && u.Scheme == "http"))
 	if !schemeOK || c.AllowUploadHost == nil || !c.AllowUploadHost(u.Hostname()) {
-		return "", &APIError{Message: "LinkedIn returned an upload address that is not a LinkedIn host, so the image was not sent. Nothing was posted."}
+		return "", &APIError{Message: "LinkedIn returned an upload address that is not a LinkedIn host, so the " + what + " was not sent. Nothing was posted."}
 	}
 	up, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(p.Image))
 	if err != nil {
 		return "", err
 	}
 	up.Header.Set("Authorization", "Bearer "+token)
-	resp, body, err = c.do("Upload the image", up)
+	resp, body, err = c.do("Upload the "+what, up)
 	if err != nil {
-		return "", &APIError{Message: "Could not upload the image to LinkedIn. Nothing was posted."}
+		return "", &APIError{Message: "Could not upload the " + what + " to LinkedIn. Nothing was posted."}
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", friendly(resp.StatusCode, body, "accept the image")
+		return "", friendly(resp.StatusCode, body, "accept the "+what)
 	}
 
 	// 3. create the post. From here on a lost answer leaves the outcome unknown.
-	media := map[string]string{"id": init.Value.Image}
-	if p.AltText != "" {
+	media := map[string]string{"id": mediaID}
+	if p.Document {
+		media["title"] = strings.TrimSpace(p.Title)
+	} else if p.AltText != "" {
 		media["altText"] = p.AltText
 	}
 	payload, _ := json.Marshal(map[string]any{

@@ -31,6 +31,8 @@ export function FullPreview(props: {
   palette: Palette;
   size: Size;
   actions?: ReactNode;
+  /** The post's own file, when it has one: shown in place of the card. */
+  image?: string;
 }) {
   const { draft, serialized: s } = props;
   const [copied, setCopied] = useState<string | null>(null);
@@ -52,13 +54,13 @@ export function FullPreview(props: {
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Full preview · {isPost ? "LinkedIn post" : "Article"}</DialogTitle>
-          <DialogDescription>{isPost ? "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
+          <DialogDescription>{isPost ? draft.attachment === "document" ? "This is exactly the text and document that would be sent." : "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
           <div className="flex justify-center">
             {isPost ? (
-              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable />
+              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable mediaSrc={props.image} documentTitle={draft.attachment === "document" ? draft.attachmentTitle ?? "" : undefined} />
             ) : (
               <div className="w-full max-w-xl space-y-4">
                 <div className="flex justify-center">
@@ -78,7 +80,9 @@ export function FullPreview(props: {
               <>
                 <Check2 ok={!s.overLimit} text={s.overLimit ? `Over LinkedIn's ${LINKEDIN_LIMIT.toLocaleString()} character limit` : "Within the length limit"} />
                 <Check2 ok={!empty && !fold(s.text).truncated} text={empty ? "The post has no text" : fold(s.text).truncated ? `Cut after about ${FOLD_LINES} lines or ${FOLD_CHARS} characters (“…see more”)` : "Fits without a “see more” cut"} />
-                <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />
+                {draft.attachment === "document"
+                  ? <Check2 ok={!!draft.attachmentTitle?.trim()} text={draft.attachmentTitle?.trim() ? "Document has a title" : "The document needs a title"} />
+                  : <Check2 ok={draft.altText.trim() !== ""} text={draft.altText.trim() ? "Image has alt text" : "No alt text for the image"} />}
               </>
             )}
             {isPost && s.warnings.map((w) => <Check2 key={w.code} ok={false} text={w.message} />)}

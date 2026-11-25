@@ -24,7 +24,8 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `GET /library` | The library list, with server-side paging, search and filters |
 | `GET /profiles/{id}/settings`, `GET/PUT /profiles/{id}/settings/{network}`, `POST .../test` | One brand's social credentials (secrets are write-only). The older `/settings...` routes act on the first brand |
 | `POST/GET /publish/jobs`, `GET/DELETE /publish/jobs/{id}`, `GET .../attempts` | Publish jobs and what LinkedIn answered on each attempt |
-| `GET /publish/jobs/{id}/image` | The card image of a job |
+| `GET /publish/jobs/{id}/image` | The file of a job: the card, or the post's own image or PDF |
+| `GET/PUT/DELETE /drafts/{id}/attachment`, `PUT .../attachment/title` | A post's own image or PDF, sent in place of the card, and a document's title |
 | `POST /publish/jobs/{id}/publish-now`, `PUT .../schedule`, `POST .../cancel` | Job actions |
 | `POST/GET /chat/conversations`, `GET/DELETE /chat/conversations/{id}` | Conversations |
 | `POST /chat/conversations/{id}/messages` | Send a message; the reply streams as server-sent events |

@@ -135,7 +135,7 @@ func TestPublishNowRecordsThePostAndSendsTheEscapedText(t *testing.T) {
 	if got.PreviewText != "Hello (world)\n\n#Go" {
 		t.Fatalf("preview text: %q", got.PreviewText)
 	}
-	if img, _ := h.p.Image(ctx, j.ID); string(img) != string(testPNG) {
+	if img, _, _ := h.p.Image(ctx, j.ID); string(img) != string(testPNG) {
 		t.Fatal("image not stored")
 	}
 }

@@ -23,10 +23,12 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const isForm = typeof FormData !== "undefined" && body instanceof FormData; // the browser sets the multipart boundary itself
-  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
+  const isFile = typeof Blob !== "undefined" && body instanceof Blob; // a picture, sent as it is
+  if (isFile) headers["Content-Type"] = "application/octet-stream";
+  else if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body) });
+    res = await fetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : isForm || isFile ? (body as FormData | Blob) : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, "network", `Cannot reach the API at ${API_BASE}`);
   }
@@ -180,6 +182,16 @@ export const api = {
     return call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/page`, form);
   },
   unpublishPage: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/page`),
+  /** Give a post a file of its own in place of the card (a PNG or JPEG picture, or a PDF), or go back to the card. */
+  setAttachment: (id: string, file: Blob, name = "") => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment?name=${encodeURIComponent(name)}`, file),
+  setAttachmentTitle: (id: string, title: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment/title`, { title }),
+  clearAttachment: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/attachment`),
+  attachmentImage: async (id: string): Promise<Blob> => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/drafts/${encodeURIComponent(id)}/attachment`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, "http", `Could not load the file (${res.status})`);
+    return res.blob();
+  },
   approveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/approve`),
   unapproveDraft: (id: string) => call<Draft>("POST", `/drafts/${encodeURIComponent(id)}/unapprove`),
   /** An approved article's planned date; leave both out to clear it. */
@@ -191,10 +203,11 @@ export const api = {
   /** One brand's posts, or every brand's with `scope: "all"`. */
   listJobs: (profileId: string, scope: "brand" | "all" = "brand") => call<{ jobs: Job[] }>("GET", scope === "all" ? "/publish/jobs?scope=all" : `/publish/jobs?profileId=${encodeURIComponent(profileId)}`).then((r) => r.jobs),
   /** Confirms a post: publish now (no `scheduledAt`) or later. The image is the card as a PNG. */
-  createJob: (meta: NewJob, image: Blob) => {
+  /** `image` is the card; a post with a picture of its own sends none (the server uses the picture it holds). */
+  createJob: (meta: NewJob, image?: Blob) => {
     const form = new FormData();
     form.set("meta", JSON.stringify(meta));
-    form.set("image", image, "card.png");
+    if (image) form.set("image", image, "card.png");
     return call<Job>("POST", "/publish/jobs", form);
   },
   getJob: (id: string) => call<Job>("GET", `/publish/jobs/${encodeURIComponent(id)}`),
