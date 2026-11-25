@@ -6,7 +6,7 @@
 Posts can be scheduled and articles given a planned date, but only one item at a time from its preview. There is no view of what goes out when.
 
 ## What changes
-- A **Calendar** page: month and week, showing scheduled, sent and failed posts and articles with a planned date, per brand or all the person's brands.
+- A **full-page Calendar**: its own page that fills the window, not a drawer, popup or panel inside the studio. Month and week, showing scheduled, sent and failed posts and articles with a planned date, per brand or all the person's brands.
 - **Schedule from the calendar:** pick a day, choose an approved post or article, set the time.
 - **Links to it:** a Calendar entry in the account menu, and a calendar action next to each article in the Library list that opens the calendar with that article selected.
 

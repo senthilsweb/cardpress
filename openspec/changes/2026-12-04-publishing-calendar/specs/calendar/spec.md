@@ -2,6 +2,10 @@
 
 ## ADDED Requirements
 
+### Requirement: A full page
+- **WHEN** the person opens the calendar
+- **THEN** it is its own page filling the window, with the calendar as its only content below the header
+
 ### Requirement: See what is scheduled
 - **WHEN** the person opens the calendar
 - **THEN** scheduled, sent and failed posts and planned articles appear on their days, in the person's time zone
