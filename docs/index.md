@@ -20,7 +20,7 @@ CardPress is an open-source, self-hosted tool for writing and publishing social 
 - **A person publishes.** The assistant and any MCP client end at a proposal. Nothing is posted without your click, and a failed post is never retried on its own.
 - **Your data stays with you.** A SQLite file (or Turso) on your server holds everything. Social credentials are encrypted. Nothing is kept in the browser.
 - **Safe by default.** It listens on loopback, refuses to expose the API without a token, and fetches web pages with an SSRF guard.
-- **Honest about AI.** The default assistant is a small built-in demo and says so. A real model is opt-in and the screen shows it.
+- **Honest about AI.** The assistant is opt-in, the screen names it, and without one the app says so.
 
 ## Status
 
@@ -31,7 +31,7 @@ CardPress is an open-source, self-hosted tool for writing and publishing social 
 | LinkedIn publishing: a post with its card | Built. A real post from a live server has succeeded |
 | LinkedIn publishing: your own image, several images, a PDF, a video | Tested against a local fake of LinkedIn's API, **not yet against a real account**. Treat the first real post of each as a trial. See [Publishing](publishing.md) |
 | X, Instagram and Facebook | Card sizes and feed previews. Publishing is not built (X and Instagram credentials can be stored) |
-| Assistant | Works with the built-in demo agent. The Claude Managed Agent adapter is built and tested against a fake API, **not yet against a real Anthropic account** |
+| Assistant | [Claude Managed Agents](cma-agent.md) write posts and articles from your sources; optional, off until set up |
 | MCP server | Built and tested |
 
 ## Where to go next

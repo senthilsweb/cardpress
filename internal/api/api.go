@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
@@ -97,7 +98,7 @@ type Chatting interface {
 	RemoveSource(ctx context.Context, id, sourceID string) error
 	Search(ctx context.Context, profileID, query string) ([]service.Conversation, error)
 	Delete(ctx context.Context, id string) error
-	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
+	SendWith(ctx context.Context, id, content string, req service.ChatRequest, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
 	ProposalBrand(ctx context.Context, proposalID string) (string, error)
 }
@@ -113,6 +114,8 @@ type Settings interface {
 
 // Options configure the handler.
 type Options struct {
+	// AssistantAdminOnly limits the chat to the admin, for an assistant whose tools act as one account.
+	AssistantAdminOnly bool
 	// Notes are the assistant\'s notes about brands.
 	Notes interface {
 		ListMemories(ctx context.Context, profileID string) ([]service.Memory, error)
@@ -1079,10 +1082,18 @@ func (s *server) removeSource(w http.ResponseWriter, r *http.Request) {
 // normal JSON error with a status code.
 func (s *server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Content string `json:"content"`
+		Content string   `json:"content"`
+		Write   []string `json:"write"`   // the kinds ticked: post, article
+		Viewing string   `json:"viewing"` // the item on screen
 	}
 	if !decode(w, r, &body) {
 		return
+	}
+	if s.AssistantAdminOnly {
+		if p, ok := principalOf(r); ok && !p.Admin() {
+			writeError(w, r, http.StatusForbidden, "forbidden", "The assistant is limited to the admin for now.")
+			return
+		}
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -1090,7 +1101,10 @@ func (s *server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	started := false
+	var writing sync.Mutex // the reply and the keep-alive below share the connection
 	send := func(name string, data any) {
+		writing.Lock()
+		defer writing.Unlock()
 		if !started {
 			h := w.Header()
 			h.Set("Content-Type", "text/event-stream")
@@ -1103,7 +1117,31 @@ func (s *server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", name, b)
 		flusher.Flush()
 	}
-	err := s.Chat.Send(r.Context(), r.PathValue("id"), body.Content, func(e service.ChatEvent) { send(e.Name, e.Data) })
+	// an agent can be quiet for minutes while it writes: a comment line now and then keeps proxies from closing the stream
+	quiet := make(chan struct{})
+	var beating sync.WaitGroup
+	beating.Add(1)
+	go func() {
+		defer beating.Done()
+		beat := time.NewTicker(eventsHeartbeat / 2)
+		defer beat.Stop()
+		for {
+			select {
+			case <-quiet:
+				return
+			case <-beat.C:
+				writing.Lock()
+				if started {
+					fmt.Fprint(w, ": still working\n\n")
+					flusher.Flush()
+				}
+				writing.Unlock()
+			}
+		}
+	}()
+	err := s.Chat.SendWith(r.Context(), r.PathValue("id"), body.Content, service.ChatRequest{Write: body.Write, Viewing: body.Viewing}, func(e service.ChatEvent) { send(e.Name, e.Data) })
+	close(quiet)
+	beating.Wait()
 	if err == nil {
 		send("done", map[string]any{})
 		return

@@ -106,7 +106,7 @@ docker compose up -d      # pulls ghcr.io/<owner>/cardpress:latest (or: docker c
 - **Database**: SQLite in the volume by default. To use Turso instead, set `CARDPRESS_DB_URL=libsql://...` and `CARDPRESS_DB_TOKEN` in `.env` (and a `CARDPRESS_SECRET_KEY`).
 - **Data**: the SQLite database (and the key file, if you did not set `CARDPRESS_SECRET_KEY`) live in the `cardpress-data` volume, mounted at `/data`. Back it up with `docker run --rm -v cardpress-data:/data -v $PWD:/out busybox tar czf /out/cardpress-data.tgz /data`. To use a folder instead of the named volume, make it writable by uid 65532 (the image runs as non-root).
 - **Access**: the port is published on `127.0.0.1` only. To expose it, set `CARDPRESS_BIND=0.0.0.0`, a `CARDPRESS_API_TOKEN` and a `CARDPRESS_SECRET_KEY`, and put it behind HTTPS.
-- **Assistant**: see [Claude Managed Agent](cma-agent.md). Create the agent once with `docker compose run --rm -e ANTHROPIC_API_KEY=... cardpress agent-setup`, then add `CARDPRESS_AGENT=cma`, the two ids and the key to `.env` and run `docker compose up -d`.
+- **Assistant**: optional. See [Claude Managed Agent](cma-agent.md) for the settings.
 - **Health**: the container runs `/cardpress healthcheck` (there is no shell or curl in the image).
 - **Image tags**: `latest` and `main` follow the main branch; `vX.Y.Z` tags follow releases; set `CARDPRESS_IMAGE_TAG` to pin one.
 

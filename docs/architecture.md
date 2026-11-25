@@ -14,7 +14,7 @@ flowchart LR
     SVC --> AG[agent.Client]
     SCH[scheduler] --> SVC
   end
-  AG --> MOCK[built-in demo agent]
+  AG --> NONE[no assistant]
   AG --> CMA[Claude Managed Agent]
   SVC --> LI[LinkedIn API]
   SRC --> WEB[(public web pages)]

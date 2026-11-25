@@ -4,8 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
+import type { DraftKind } from "@/lib/draft";
 import { ProposalCard } from "./ProposalCard";
 import { ChatInput, SourceChip } from "./ChatInput";
+import { cn } from "@/lib/utils";
 import { costText } from "@/lib/history";
 
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
@@ -13,9 +15,7 @@ const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^ww
 function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
   if (conv?.sourceKind === "mcp") return <Badge variant="warn" title="Sent by a program through MCP. Name not verified.">Outside agent</Badge>;
   if (!chat.agent) return null;
-  return chat.agent.ai
-    ? <Badge variant="brand">{chat.agent.name}</Badge>
-    : <Badge variant="warn" title="Built-in demo, not an AI model.">{chat.agent.name} · no AI model</Badge>;
+  return chat.agent.ready ? <Badge variant="brand">{chat.agent.name}</Badge> : <Badge variant="outline">No assistant</Badge>;
 }
 
 /** What shows before a conversation: how to begin. Earlier ones are under History. */
@@ -23,14 +23,15 @@ function Welcome({ chat }: { chat: ChatStore }) {
   return (
     <div className="space-y-4 px-4 py-4">
       <h3 className="eyebrow">Prepare content</h3>
-      <p className="text-xs leading-snug text-muted-foreground">
-        Say what to write about, or attach a file, a link or text. It drafts; you approve.
-      </p>
-      {chat.agent && !chat.agent.ai && (
-        <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] leading-snug">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-          <p><b>Demo agent</b>: simple rules, not an AI model.</p>
+      {chat.agent?.ready === false ? (
+        <div role="status" className="flex gap-2 rounded-md border border-border bg-card p-2.5 text-xs leading-snug">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p><b>No assistant is set up</b> on this server. Writing, design and publishing work as usual.</p>
         </div>
+      ) : (
+        <p className="text-xs leading-snug text-muted-foreground">
+          Say what to write about, or attach a file, a link or text. Tick <b>Post</b>, <b>Article</b> or both.
+        </p>
       )}
     </div>
   );
@@ -90,7 +91,8 @@ function Thread({ conv, chat, onApply, onShow }: {
         <ProposalCard key={p.id} p={p} onApprove={approve(p)} onReject={() => chat.decide(p, { status: "rejected" })} onOpenPost={() => onShow(p.draftId)} />
       ))}
       {chat.streaming !== null && (
-        <Bubble role="assistant">{chat.streaming || <span className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing…</span>}</Bubble>
+        <Bubble role="assistant">{chat.streaming}
+          <span role="status" className={`flex items-center gap-1.5 text-muted-foreground ${chat.streaming ? "mt-2" : ""}`}><Loader2 className="h-3.5 w-3.5 animate-spin" /> {chat.progress ?? "Working"}…</span></Bubble>
       )}
       <div ref={end} />
     </div>
@@ -101,21 +103,27 @@ function Thread({ conv, chat, onApply, onShow }: {
  * The chat that prepares content, turn by turn. It proposes; the person decides. Approving a proposal hands its content
  * to `onApply`, which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
-export function ChatPanel({ chat, onApply, onShow, draftId, onHistory }: {
+export function ChatPanel({ chat, onApply, onShow, draftId, viewing, onHistory }: {
   chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   /** Put an item an approved proposal went into on the canvas. */
   onShow: (draftId?: string) => void;
-  /** The item on screen. */
+  /** The item on screen, and its kind. */
   draftId?: string;
+  viewing?: DraftKind;
   /** Open the list of earlier conversations and the notes. */
   onHistory: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const conv = chat.current;
+  // what to write with the next message: a new conversation starts on what is on screen, later ones with nothing ticked
+  const [chosen, setChosen] = useState<DraftKind[] | null>(null);
+  useEffect(() => setChosen(null), [conv?.id]);
+  const write: DraftKind[] = chosen ?? (conv?.messages?.length ? [] : [viewing ?? "post"]);
+  const toggle = (k: DraftKind) => setChosen(write.includes(k) ? write.filter((x) => x !== k) : [...write, k]);
 
   if (!chat.loaded) return <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>;
-  const demo = !(conv?.agent ?? chat.agent)?.ai;
+  const off = chat.agent?.ready === false;
   const sources = conv?.sources ?? [];
   const waiting = sources.filter((s) => !s.messageId);
 
@@ -158,10 +166,25 @@ export function ChatPanel({ chat, onApply, onShow, draftId, onHistory }: {
         </div>
       ) : (
         <ChatInput
-          placeholder={!conv ? "Message the assistant" : demo ? "Try: shorter, longer, make it an article…" : "Ask for changes…"}
+          placeholder={off ? "No assistant is set up" : !conv?.messages?.length ? "Message the assistant" : "Ask for changes…"}
+          disabled={off}
+          ticks={off ? undefined : (
+            <div className="flex gap-1" role="group" aria-label="What to write">
+              {(["post", "article"] as const).map((k) => (
+                <button key={k} type="button" aria-pressed={write.includes(k)} onClick={() => toggle(k)}
+                  className={cn("cursor-pointer rounded-md border px-2 py-0.5 text-[11.5px] font-medium", write.includes(k) ? "border-brand bg-accent text-brand" : "border-border text-muted-foreground hover:text-foreground")}>
+                  {k === "post" ? "Post" : "Article"}
+                </button>
+              ))}
+            </div>
+          )}
           replying={chat.streaming !== null} busy={chat.busy && chat.streaming === null}
           waiting={waiting} onRemoveWaiting={(id) => { if (conv) void chat.removeSource(conv.id, id); }}
-          onSend={(text, attachments) => chat.submit(text, attachments, draftId)} onStop={chat.stop}
+          onSend={async (text, attachments) => {
+            const sent = await chat.submit(text, attachments, draftId, { write, viewing });
+            if (sent) setChosen([]);
+            return sent;
+          }} onStop={chat.stop}
         />
       )}
     </div>

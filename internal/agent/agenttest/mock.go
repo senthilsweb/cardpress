@@ -1,10 +1,13 @@
-package agent
+// Package agenttest is a stand-in assistant for tests: it drafts from sources by simple rules, with no model behind it.
+// It is not part of the product.
+package agenttest
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/senthilsweb/cardpress/internal/agent"
 	"regexp"
 	"sort"
 	"strings"
@@ -22,6 +25,7 @@ type Mock struct {
 
 func (m *Mock) Name() string { return "Demo agent" }
 func (m *Mock) IsAI() bool   { return false }
+func (m *Mock) Ready() bool  { return true }
 
 func (m *Mock) CreateSession(context.Context) (string, error) {
 	b := make([]byte, 6)
@@ -52,8 +56,8 @@ var (
 )
 
 // parse reads every user message in order, so a later message overrides an earlier one.
-func parse(msgs []Message) options {
-	o := options{kind: KindPost, level: 1, question: true}
+func parse(msgs []agent.Message) options {
+	o := options{kind: agent.KindPost, level: 1, question: true}
 	var last string
 	for _, msg := range msgs {
 		if msg.Role != "user" {
@@ -62,10 +66,10 @@ func parse(msgs []Message) options {
 		t := strings.ToLower(msg.Content)
 		last = t
 		if reArticle.MatchString(t) {
-			o.kind = KindArticle
+			o.kind = agent.KindArticle
 		}
 		if rePost.MatchString(t) && !reArticle.MatchString(t) {
-			o.kind = KindPost
+			o.kind = agent.KindPost
 		}
 		switch {
 		case reShorter.MatchString(t):
@@ -207,7 +211,7 @@ func keywords(text string, n int) []string {
 }
 
 // Respond writes a draft from the source and the instructions so far.
-func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output, error) {
+func (m *Mock) Respond(ctx context.Context, in agent.Input, emit func(agent.Event)) (agent.Output, error) {
 	sid := in.SessionID
 	if sid == "" {
 		sid, _ = m.CreateSession(ctx)
@@ -236,7 +240,7 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 	}
 	sents := sentences(material)
 
-	var out Output
+	var out agent.Output
 	out.SessionID = sid
 	switch {
 	case len(sents) == 0:
@@ -246,11 +250,11 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 	default:
 		p := draft(o, sents, srcTitle, material)
 		if err := p.Normalize(); err != nil {
-			return Output{}, fmt.Errorf("the demo agent produced an invalid proposal: %w", err)
+			return agent.Output{}, fmt.Errorf("the demo agent produced an invalid proposal: %w", err)
 		}
 		out.Proposal = &p
 		what := "post"
-		if p.Kind == KindArticle {
+		if p.Kind == agent.KindArticle {
 			what = "article"
 		}
 		from := "your text"
@@ -259,7 +263,7 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 		}
 		out.Reply = fmt.Sprintf("Here is a draft %s from %s. Approve it to copy it into your draft, edit it first, or tell me what to change.", what, from)
 	}
-	out.Reply = CleanReply(out.Reply)
+	out.Reply = agent.CleanReply(out.Reply)
 
 	// stream the reply word by word
 	words := strings.Fields(out.Reply)
@@ -267,21 +271,21 @@ func (m *Mock) Respond(ctx context.Context, in Input, emit func(Event)) (Output,
 		if m.Delay > 0 {
 			select {
 			case <-ctx.Done():
-				return Output{}, ctx.Err()
+				return agent.Output{}, ctx.Err()
 			case <-time.After(m.Delay):
 			}
 		} else if err := ctx.Err(); err != nil {
-			return Output{}, err
+			return agent.Output{}, err
 		}
 		if i > 0 {
 			w = " " + w
 		}
-		emit(Event{Type: "delta", Text: w})
+		emit(agent.Event{Type: "delta", Text: w})
 	}
 	return out, nil
 }
 
-func draft(o options, sents []string, srcTitle, material string) Proposal {
+func draft(o options, sents []string, srcTitle, material string) agent.Proposal {
 	title := cleanTitle(srcTitle)
 	if title == "" {
 		title = strings.TrimRight(clip(sents[0], 90), ".…")
@@ -303,7 +307,7 @@ func draft(o options, sents []string, srcTitle, material string) Proposal {
 		return chosen
 	}
 	closer := "What would you try first?"
-	if o.kind == KindArticle {
+	if o.kind == agent.KindArticle {
 		n := []int{4, 8, 14}[o.level]
 		body.WriteString("## " + title + "\n\n")
 		body.WriteString(strings.Join(sents[:min(3, len(sents))], " "))
@@ -330,14 +334,14 @@ func draft(o options, sents []string, srcTitle, material string) Proposal {
 	}
 
 	var tags []string
-	if !o.noTags && o.kind == KindPost {
+	if !o.noTags && o.kind == agent.KindPost {
 		tags = keywords(material, 3)
 	}
 	tags = append(tags, o.extraTags...)
-	if o.kind == KindArticle {
+	if o.kind == agent.KindArticle {
 		tags = nil
 	}
-	norm, err := NormalizeHashtags(tags)
+	norm, err := agent.NormalizeHashtags(tags)
 	if err != nil {
 		norm = nil
 	}
@@ -345,7 +349,7 @@ func draft(o options, sents []string, srcTitle, material string) Proposal {
 		norm = norm[:5]
 	}
 	n := strings.Count(body.String(), "- ")
-	return Proposal{
+	return agent.Proposal{
 		Kind:     o.kind,
 		Title:    title,
 		Body:     strings.TrimSpace(body.String()),
