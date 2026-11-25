@@ -45,6 +45,7 @@ type Studio interface {
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
 	SetAttachment(ctx context.Context, id string, data []byte, name string) (service.Draft, error)
 	SetAttachmentTitle(ctx context.Context, id, title string) (service.Draft, error)
+	SetVideo(ctx context.Context, id, url string) (service.Draft, error)
 	ClearAttachment(ctx context.Context, id string) (service.Draft, error)
 	AttachmentFile(ctx context.Context, id string) ([]byte, string, error)
 	AddImage(ctx context.Context, id string, data []byte) (service.Draft, error)
@@ -203,6 +204,7 @@ func (s *server) table() []routeDef {
 		{"PUT", "/drafts/{id}/attachment", write(scopeDraft), s.setAttachment},
 		{"DELETE", "/drafts/{id}/attachment", write(scopeDraft), s.clearAttachment},
 		{"PUT", "/drafts/{id}/attachment/title", write(scopeDraft), s.setAttachmentTitle},
+		{"PUT", "/drafts/{id}/video", write(scopeDraft), s.setVideo},
 		{"POST", "/drafts/{id}/images", write(scopeDraft), s.addImage},
 		{"PUT", "/drafts/{id}/images/order", write(scopeDraft), s.orderImages},
 		{"GET", "/drafts/{id}/images/{image}", write(scopeDraft), s.getImage},
@@ -475,6 +477,22 @@ func (s *server) setAttachmentTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.SetAttachmentTitle(r.Context(), r.PathValue("id"), body.Title)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// setVideo gives a post a video by its public https address: {"url": "..."}. The file is not uploaded here or stored.
+func (s *server) setVideo(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	d, err := s.Studio.SetVideo(r.Context(), r.PathValue("id"), body.URL)
 	if err != nil {
 		fail(w, r, err)
 		return

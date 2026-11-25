@@ -38,8 +38,11 @@ export interface Draft {
   pageAt?: string;
   hasCover?: boolean;
   /** What a post goes out with: the designed card, or a file of its own (a picture, or a PDF document with a title). */
-  attachment?: "card" | "image" | "document" | "images";
+  attachment?: "card" | "image" | "document" | "images" | "video";
   attachmentTitle?: string;
+  /** The public address of a post's video, and the file's size when it was checked. */
+  videoUrl?: string;
+  videoSize?: number;
   /** The pictures of a post whose attachment is "images", in order. */
   images?: DraftPicture[];
   /** Who wrote it and who approved it, for showing. */

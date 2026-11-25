@@ -67,7 +67,7 @@ func (s *Studio) AddImage(ctx context.Context, id string, data []byte) (Draft, e
 		VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM draft_images WHERE draft_id = ?), ?, ?, ?)`, newID(), id, id, data, typ, s.draftStamp()); err != nil {
 		return Draft{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = '', `+backToDraft+`, updated_at = ? WHERE id = ?`,
+	if _, err := tx.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', attachment_title = '', video_url = '', video_size = 0, `+backToDraft+`, updated_at = ? WHERE id = ?`,
 		AttachImages, s.draftStamp(), id); err != nil {
 		return Draft{}, err
 	}

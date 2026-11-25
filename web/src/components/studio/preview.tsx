@@ -90,12 +90,18 @@ function PictureGrid({ urls }: { urls: string[] }) {
 }
 
 /** A neutral, unbranded post frame so the card can be judged in a feed context. */
-export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, mediaList, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string; /** Several pictures, shown as LinkedIn shows them: a grid in place of the card. */ mediaList?: string[] }) {
+export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentTitle, mediaList, videoSrc, videoTitle, ...p }: CardProps & { width: number; caption?: string; expandable?: boolean; /** A picture shown in place of the card. */ mediaSrc?: string; /** When set, mediaSrc is a PDF shown as LinkedIn shows a document, under this title. */ documentTitle?: string; /** Several pictures, shown as LinkedIn shows them: a grid in place of the card. */ mediaList?: string[]; /** A video at its public address, with its title, shown in place of the card. */ videoSrc?: string; videoTitle?: string }) {
   const { profile, palette, size } = p;
   const net = size.net;
   const handle = profile.handle || "@you";
   const name = profile.displayName || profile.name;
-  const own = mediaList && mediaList.length > 1 ? <PictureGrid urls={mediaList} /> : !mediaSrc ? null : documentTitle !== undefined ? (
+  const own = videoSrc ? (
+    <div className="border-y border-neutral-200 bg-black">
+      {/* played straight from its address, as it will be read when the post is sent */}
+      <video key={videoSrc} src={videoSrc} controls preload="metadata" playsInline aria-label={`Video: ${videoTitle ?? ""}`} className="block w-full" style={{ aspectRatio: "16 / 9" }} />
+      <div className="truncate bg-white px-3.5 py-2 text-[13px] font-semibold">{videoTitle}</div>
+    </div>
+  ) : mediaList && mediaList.length > 1 ? <PictureGrid urls={mediaList} /> : !mediaSrc ? null : documentTitle !== undefined ? (
     <div className="border-y border-neutral-200 bg-neutral-100">
       <div className="flex items-center gap-2 bg-neutral-800 px-3 py-2 text-[12.5px] font-medium text-white">
         <span className="min-w-0 flex-1 truncate">{documentTitle}</span><span className="shrink-0 text-neutral-300">PDF</span>

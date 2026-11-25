@@ -15,7 +15,7 @@ What is sent is a **snapshot** taken at that moment: the text, the hashtags, the
 Three calls, made by the server with the stored access token:
 
 1. reserve an image upload (`POST /rest/images?action=initializeUpload`, owner = the author URN),
-2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else). A post with a PDF uses the document calls instead, described below,
+2. upload the image: the card as a PNG, or the post's own picture (only to a LinkedIn host; the token is never sent anywhere else). A post with a PDF or a video uses the document or video calls instead, described below,
 3. create the post (`POST /rest/posts`): the text, the image and its alt text, public, main feed.
 
 The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ] { } < > @ | ~ _ * # \`), so it reads exactly as previewed. Hashtags go on a last line as LinkedIn hashtag templates, so they become real hashtags.
@@ -42,7 +42,32 @@ For a document the server calls `POST /rest/documents?action=initializeUpload`, 
 
 For several images the server uploads each image in turn (`POST /rest/images?action=initializeUpload`, then the upload) and creates one post that names them all (`content.multiImage.images`, each with its `id` and `altText`). The images are read from the database one at a time, so they are never all in memory together, and the job gets 30 more seconds for each image.
 
-Video is not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
+## A video from a public address
+
+Choose **Use a video** and paste a direct link to an MP4 that anyone can open. **CardPress takes no video upload from your computer and does not keep the video.** Only the address is stored, with the file's size.
+
+| Rule | Limit |
+|---|---|
+| Address | `https` on the standard port, a public host, also after every redirect (at most 5). No user name or password in it. A page on a video sharing site is not a video file |
+| File | MP4, from 75 KB to 500 MB (`CARDPRESS_VIDEO_MAX_MB` lowers the upper limit). LinkedIn also asks for 3 seconds to 30 minutes, which CardPress does not check |
+| Server | It must state the file's size |
+
+The address is checked when you add it (CardPress reads the first bytes) and the file is read again when the post is sent. If it no longer answers, is no longer an MP4, or has a different size, the post fails before anything is posted, and says why. A file replaced by another of exactly the same size is not noticed. The video has a **title**, which starts as the file name. The full preview plays the video from its address.
+
+When the post is sent, the server:
+
+1. opens the address,
+2. reserves the upload (`POST /rest/videos?action=initializeUpload` with the size), which says how to cut the file into parts,
+3. sends each part (`PUT` to the address given, a LinkedIn host only, without the access token), holding one part (about 4 MB) in memory and nothing on disk,
+4. finishes the upload (`action=finalizeUpload` with the parts' ids),
+5. asks every 5 seconds whether LinkedIn has processed the video, for at most 10 minutes,
+6. creates the post.
+
+If processing fails, the post fails. If it is still processing after 10 minutes, no post is created and it is marked **needs review**. LinkedIn's documentation does not say whether a member's token may read the processing status; if LinkedIn refuses that, CardPress waits 30 seconds and creates the post, which LinkedIn may refuse if the video is not ready.
+
+One video is sent at a time, in the background, so other posts that are due do not wait for it. A video post has 45 minutes in all.
+
+**You are responsible for having the right to post the video.**
 
 | Route | Purpose |
 |---|---|
@@ -55,6 +80,7 @@ Video is not built yet (see the proposal in `openspec/changes/2026-11-30-linkedi
 | `PUT /api/v1/drafts/{id}/images/{image}` | `{"altText": "…"}` |
 | `PUT /api/v1/drafts/{id}/images/order` | `{"ids": [...]}`: every image once, in the new order |
 | `DELETE /api/v1/drafts/{id}/images/{image}` | Remove one image |
+| `PUT /api/v1/drafts/{id}/video` | `{"url": "https://…/video.mp4"}`: the post's video, by its public address. `PUT .../attachment/title` sets its title, `DELETE .../attachment` goes back to the card |
 
 ## Approve first
 

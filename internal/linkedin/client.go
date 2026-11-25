@@ -1,4 +1,5 @@
-// Package linkedin publishes an image post: it reserves an image upload, uploads the PNG, then creates the post.
+// Package linkedin publishes a post with a picture, several pictures, a document or a video: it reserves an upload,
+// sends the file, then creates the post.
 package linkedin
 
 import (
@@ -33,6 +34,9 @@ type Client struct {
 	AllowUploadHost func(host string) bool
 	// AllowHTTP permits a plain-http upload address. For tests against a local fake only.
 	AllowHTTP bool
+	// How long to wait for LinkedIn to process a video, and how often to ask (defaults if zero). BlindWait is the wait
+	// when the token may not read the video's status.
+	VideoWait, VideoPoll, VideoBlindWait time.Duration
 }
 
 // New returns a client for the real LinkedIn API. It never follows redirects, so the token is not forwarded.
@@ -84,6 +88,8 @@ type Post struct {
 	Title    string
 	// Pictures, when there are two or more, are posted together as a multi-image post and Image is not used.
 	Pictures []Picture
+	// Video, when set, is posted with Title above it, and Image is not used.
+	Video *Video
 }
 
 // Picture is one picture of a multi-image post. Load reads its bytes when it is its turn to be uploaded, so the
@@ -176,10 +182,19 @@ func (c *Client) Publish(ctx context.Context, token string, p Post) (string, err
 	if p.Document && strings.TrimSpace(p.Title) == "" {
 		return "", &APIError{Message: "The document needs a title."}
 	}
+	if p.Video != nil && strings.TrimSpace(p.Title) == "" {
+		return "", &APIError{Message: "The video needs a title."}
+	}
 
 	// 1 and 2. upload what the post carries: one picture, a document, or several pictures one after another
 	var content map[string]any
 	switch {
+	case p.Video != nil:
+		id, err := c.uploadVideo(ctx, token, p.AuthorURN, p.Video)
+		if err != nil {
+			return "", err
+		}
+		content = map[string]any{"media": map[string]string{"id": id, "title": strings.TrimSpace(p.Title)}}
 	case len(p.Pictures) >= 2:
 		images := make([]map[string]string, 0, len(p.Pictures))
 		for i, pic := range p.Pictures {
@@ -298,9 +313,8 @@ func (c *Client) upload(ctx context.Context, token, owner, what string, document
 		return "", &APIError{Message: "LinkedIn's answer to the " + what + " upload request was not understood. Nothing was posted."}
 	}
 
-	u, err := url.Parse(init.Value.UploadURL)
-	schemeOK := err == nil && (u.Scheme == "https" || (c.AllowHTTP && u.Scheme == "http"))
-	if !schemeOK || c.AllowUploadHost == nil || !c.AllowUploadHost(u.Hostname()) {
+	u, ok := c.uploadAddress(init.Value.UploadURL)
+	if !ok {
 		return "", &APIError{Message: "LinkedIn returned an upload address that is not a LinkedIn host, so the " + what + " was not sent. Nothing was posted."}
 	}
 	up, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(data))
@@ -316,6 +330,15 @@ func (c *Client) upload(ctx context.Context, token, owner, what string, document
 		return "", friendly(resp.StatusCode, body, "accept the "+what)
 	}
 	return id, nil
+}
+
+// uploadAddress accepts an upload address LinkedIn returned only when it is a LinkedIn host.
+func (c *Client) uploadAddress(raw string) (*url.URL, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !(u.Scheme == "https" || (c.AllowHTTP && u.Scheme == "http")) || c.AllowUploadHost == nil || !c.AllowUploadHost(u.Hostname()) {
+		return nil, false
+	}
+	return u, true
 }
 
 // PostURL is the public address of a post URN.

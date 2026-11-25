@@ -21,6 +21,7 @@ type Config struct {
 	APIToken        string        // optional bearer token for /api/v1
 	SecretKey       string        // encrypts stored social credentials (CARDPRESS_SECRET_KEY)
 	MissedGrace     time.Duration // how late a scheduled post may still go out (CARDPRESS_MISSED_GRACE)
+	VideoMaxBytes   int64         // the largest video a post may carry; 0 means the limit in package source (CARDPRESS_VIDEO_MAX_MB)
 	LinkedInVersion string        // LinkedIn-Version header (CARDPRESS_LINKEDIN_VERSION)
 	LinkedInAPIBase string        // API address; only for tests and proxies (CARDPRESS_LINKEDIN_API_BASE)
 	CORSOrigins     []string      // allowed browser origins for a separately hosted web app
@@ -105,6 +106,13 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("CARDPRESS_MISSED_GRACE must be a duration between 1m and 24h, got %q", v)
 		}
 		c.MissedGrace = d
+	}
+	if v := env("CARDPRESS_VIDEO_MAX_MB", ""); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 500 {
+			return Config{}, fmt.Errorf("CARDPRESS_VIDEO_MAX_MB must be a whole number from 1 to 500, got %q", v)
+		}
+		c.VideoMaxBytes = int64(n) << 20
 	}
 	c.Agent = strings.ToLower(env("CARDPRESS_AGENT", "mock"))
 	c.AgentID = env("CARDPRESS_AGENT_ID", "")

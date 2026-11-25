@@ -185,6 +185,7 @@ export const api = {
   /** Give a post a file of its own in place of the card (a PNG or JPEG picture, or a PDF), or go back to the card. */
   setAttachment: (id: string, file: Blob, name = "") => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment?name=${encodeURIComponent(name)}`, file),
   setAttachmentTitle: (id: string, title: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/attachment/title`, { title }),
+  setVideo: (id: string, url: string) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}/video`, { url }),
   clearAttachment: (id: string) => call<Draft>("DELETE", `/drafts/${encodeURIComponent(id)}/attachment`),
   attachmentImage: async (id: string): Promise<Blob> => {
     const token = getToken();

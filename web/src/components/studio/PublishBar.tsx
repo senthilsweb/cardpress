@@ -20,7 +20,7 @@ const suggested = (tz: string) => toLocalInput(new Date(Math.ceil((Date.now() + 
  */
 export function PublishBar({ own, draft, onApprove, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
   /** The post carries a file of its own, so no card is rendered or sent. */
-  own?: "image" | "document" | "images";
+  own?: "image" | "document" | "images" | "video";
   draft: Draft;
   /** Approve the draft (a post is only sent from an approved draft). */
   onApprove: () => void | Promise<void>;
@@ -128,7 +128,7 @@ export function PublishBar({ own, draft, onApprove, serialized, bodyOnly, size, 
         <div className="space-y-2 rounded-md border border-border bg-card p-3">
           <p className="text-xs font-medium">Schedule for later</p>
           <ScheduleFields idPrefix="new" local={local} tz={tz} onLocal={setLocal} onTz={setTz} />
-          <p className="text-[11px] text-muted-foreground">The server must be running at that time.</p>
+          <p className="text-[11px] text-muted-foreground">The server must be running at that time.{own === "video" ? " The video must still be at its address." : ""}</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setStep("idle")}>Back</Button>
             <Button size="sm" variant="brand" disabled={busy || !!schedule.problem || !schedule.at} onClick={() => schedule.at && void submit({ at: schedule.at, tz })}>

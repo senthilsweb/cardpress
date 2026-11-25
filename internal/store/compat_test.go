@@ -148,6 +148,18 @@ func TestTheSchemaAndTheQueriesWorkOnEveryBackend(t *testing.T) {
 				t.Fatalf("order = %v", order)
 			}
 
+			// a video post's job has no file: an empty BLOB, which a NOT NULL column must accept
+			video := id(t)
+			t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DELETE FROM publish_jobs WHERE id = ?`, video) })
+			if _, err := db.ExecContext(ctx, `INSERT INTO publish_jobs (id, profile_id, draft_id, status, body, image, created_at, updated_at, attachment_kind, video_url, video_size)
+				VALUES (?, 'compat', ?, 'scheduled', 'text', ?, 'now', 'now', 'video', 'https://example.com/a.mp4', ?)`, video, draft, []byte{}, int64(500<<20)); err != nil {
+				t.Fatalf("insert a video job: %v", err)
+			}
+			var size int64
+			if err := db.QueryRowContext(ctx, `SELECT image, video_size FROM publish_jobs WHERE id = ?`, video).Scan(&got, &size); err != nil || len(got) != 0 || size != 500<<20 {
+				t.Fatalf("a video job: %d bytes, size %d, %v", len(got), size, err)
+			}
+
 			// a count as a column, as the job list reads it
 			var n int
 			if err := db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM job_images WHERE job_id = publish_jobs.id) FROM publish_jobs WHERE id = ?`, job).Scan(&n); err != nil || n != 3 {

@@ -33,9 +33,13 @@
 - [ ] Not done: reordering is by arrows, not by dragging; the version history does not record the pictures; the library and the public page still show the card
 
 ## Bolt 4: video from a public address
-- [ ] Address field; check on paste (https, public host, answers, is a video, size within the limit)
-- [ ] Guarded streaming fetch at send time (shared guard with `internal/source`), no storage, bounded memory
-- [ ] Upload in parts; waiting state until LinkedIn has processed it; time limit; "needs review" when unclear
-- [ ] A failure before anything is posted says what was wrong with the address
-- [ ] Memory check: the largest allowed video on a 256 MB machine
-- [ ] Tests (fake LinkedIn, fake video host, private-address and redirect refusals), docs, one real post
+- [x] Confirmed against LinkedIn's documentation: initializeUpload (size) → PUT each part → finalizeUpload (part ids) → status → post with `content.media` `{title, id}`; MP4. It gives two size limits (500 MB and 5 GB; CardPress uses 500 MB), and does not say whether a member token can read the status or whether the upload address needs the token (not sent)
+- [x] Address field; check on entry (https, public host also after redirects, answers, MP4 by its first bytes, size known and within the limit)
+- [x] Guarded streaming fetch at send time (same address guard as articles), no storage, one part in memory; a changed size is refused
+- [x] Upload in parts; wait for processing (10 minutes), then "needs review"; fixed 30 s wait when the status cannot be read
+- [x] One video at a time, in the background, marked alive so it is not taken for a hung publish
+- [x] A failure before anything is posted says what was wrong with the address
+- [x] Tests (fake LinkedIn, test video host, private-address and redirect refusals), docs
+- [ ] Memory check: the largest allowed video on a 256 MB machine (by design one part is held; not measured)
+- [ ] A real public video address, and one real post
+- [ ] Not done: the waiting for processing is inside the "publishing" state, not a job state of its own; duration is not checked; no thumbnail or captions; the library shows no picture for a video job

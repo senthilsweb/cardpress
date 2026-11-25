@@ -69,6 +69,7 @@ See [Claude Managed Agent](cma-agent.md).
 |---|---|---|
 | `CARDPRESS_MISSED_GRACE` | `15m` | How late a scheduled post may still go out (1m to 24h) |
 | `CARDPRESS_LINKEDIN_VERSION` | built in | The `LinkedIn-Version` header |
+| `CARDPRESS_VIDEO_MAX_MB` | `500` | The largest video a post may carry (1 to 500) |
 | `CARDPRESS_LINKEDIN_API_BASE` | LinkedIn | API address; for tests and proxies only. Must be https (http only for localhost) |
 
 ## Docker Compose only

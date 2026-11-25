@@ -11,17 +11,18 @@ import { ScheduleFields, resolveSchedule } from "./ScheduleFields";
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /** A small preview of the image that will be (or was) posted. */
-export function Thumb({ id, document = false }: { id: string; /** The job carries a PDF, which has no picture to show. */ document?: boolean }) {
+export function Thumb({ id, file }: { id: string; /** The job carries a PDF or a video, which have no picture to show. */ file?: "document" | "video" }) {
   const [src, setSrc] = useState<string | null>(null);
-  const [pdf, setPdf] = useState(document);
+  const [pdf, setPdf] = useState(false);
   useEffect(() => {
-    if (document) return;
+    if (file) return;
     let url: string | undefined;
     let live = true;
     api.jobImage(id).then((b) => { if (!live) return; if (b.type === "application/pdf") { setPdf(true); return; } url = URL.createObjectURL(b); setSrc(url); }).catch(() => undefined);
     return () => { live = false; if (url) URL.revokeObjectURL(url); };
-  }, [id, document]);
-  if (document || pdf) return <div className="grid h-12 w-20 shrink-0 place-items-center rounded border border-border bg-muted text-[10px] font-semibold tracking-wide text-muted-foreground" aria-label="Document">PDF</div>;
+  }, [id, file]);
+  const kind = file ?? (pdf ? "document" : undefined);
+  if (kind) return <div className="grid h-12 w-20 shrink-0 place-items-center rounded border border-border bg-muted text-[10px] font-semibold tracking-wide text-muted-foreground" aria-label={kind === "video" ? "Video" : "Document"}>{kind === "video" ? "VIDEO" : "PDF"}</div>;
   return src
     ? <img src={src} alt="" className="h-12 w-20 shrink-0 rounded border border-border object-cover" />
     : <div className="h-12 w-20 shrink-0 rounded border border-border bg-muted" aria-hidden />;
@@ -101,7 +102,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
   return (
     <li className="space-y-2 rounded-md border border-border bg-card p-2.5">
       <div className="flex gap-2.5">
-        <Thumb id={job.id} document={job.attachment === "document"} />
+        <Thumb id={job.id} file={job.attachment === "document" || job.attachment === "video" ? job.attachment : undefined} />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge s={s} />
@@ -109,6 +110,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
             {job.attachment === "image" && <Badge variant="outline" title="This post carries its own image, not the card">Own image</Badge>}
             {job.attachment === "images" && <Badge variant="outline" title="This post carries several images, not the card">{job.imageCount ?? 0} images</Badge>}
             {job.attachment === "document" && <Badge variant="outline" title={job.attachmentTitle}>Document</Badge>}
+            {job.attachment === "video" && <Badge variant="outline" title={job.videoUrl}>Video</Badge>}
             {s === "publishing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" aria-label="Publishing" />}
             <span className="text-[11px] text-muted-foreground"><When j={job} /></span>
           </div>

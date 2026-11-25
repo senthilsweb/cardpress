@@ -1014,6 +1014,19 @@ func TestPublishingAPageThroughTheAPI(t *testing.T) {
 	}
 }
 
+func TestAPostsVideoThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	id := approvedDraft(h, nil)
+	// this handler has no video reader, as a server without one would answer
+	r := do(h, "PUT", "/api/v1/drafts/"+id+"/video", `{"url":"https://example.com/a.mp4"}`, nil)
+	if r.Code != 400 || !strings.Contains(r.Body.String(), "not available") {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	if r := do(h, "PUT", "/api/v1/drafts/nope/video", `{"url":"https://example.com/a.mp4"}`, nil); r.Code != 404 {
+		t.Fatalf("unknown draft: %d %s", r.Code, r.Body)
+	}
+}
+
 func TestAPostsOwnPictureThroughTheAPI(t *testing.T) {
 	h, _ := publishHandler(t, "", nil)
 	id := approvedDraft(h, nil)

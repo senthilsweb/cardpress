@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, History, ImageUp, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, History, ImageUp, Loader2, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,13 +96,13 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
   const [tag, setTag] = useState("");
   // the post's own picture, when it has one, as an address the page can show
-  const own = draft?.kind === "post" && (draft.attachment === "image" || draft.attachment === "document" || draft.attachment === "images") ? draft.attachment : undefined;
+  const own = draft?.kind === "post" && (draft.attachment === "image" || draft.attachment === "document" || draft.attachment === "images" || draft.attachment === "video") ? draft.attachment : undefined;
   const pics = own === "images" ? draft?.images ?? [] : [];
   const picUrls = usePictures(own === "images" ? draft?.id : undefined, pics.map((p) => p.id));
   const [ownSrc, setOwnSrc] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!own || own === "images" || !draft) { setOwnSrc(undefined); return; }
+    if (!own || own === "images" || own === "video" || !draft) { setOwnSrc(undefined); return; }
     let live = true, url: string | undefined;
     api.attachmentImage(draft.id).then((b) => { if (live) { url = URL.createObjectURL(b); setOwnSrc(url); } }).catch(() => undefined);
     return () => { live = false; if (url) URL.revokeObjectURL(url); };
@@ -182,6 +182,25 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   const savePicAlt = (id: string, alt: string) => guard(async () => { await store.setImageAlt(id, alt); })();
   const saveTitle = (title: string) => guard(async () => { await store.setAttachmentTitle(title); })();
   const useCard = guard(async () => { await store.clearAttachment(); toast("The card goes out with this post"); });
+
+  // the video's address, as typed; the field is open for a new video or a change of address
+  const [video, setVideo] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => setVideo(null), [draft.id]);
+  const saveVideo = guard(async () => {
+    const url = (video ?? "").trim();
+    if (!url || checking) return;
+    setChecking(true);
+    try {
+      await store.setVideo(url);
+      setVideo(null);
+      toast.success("Your video replaces the card", { description: "Approve the post again before publishing." });
+    } catch (e) {
+      toast.error("The video cannot be used", { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setChecking(false);
+    }
+  });
 
   const addTag = () => {
     const t = normalizeHashtag(tag);
@@ -327,6 +346,18 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
                     <Button variant="outline" size="sm" disabled={locked} onClick={useCard}>Use the card</Button>
                   </div>
                 </>
+              ) : own === "video" ? (
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-14 w-24 shrink-0 place-items-center rounded border border-border bg-muted text-muted-foreground" aria-hidden><Film className="h-6 w-6" /></div>
+                  <div className="min-w-0 space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Your video goes out, not the card.</p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground" title={draft.videoUrl}>{Math.max(0.1, (draft.videoSize ?? 0) / 1048576).toFixed(1)} MB · {draft.videoUrl}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button variant="outline" size="sm" disabled={locked} onClick={() => setVideo(draft.videoUrl ?? "")}><Film /> Change</Button>
+                      <Button variant="outline" size="sm" disabled={locked} onClick={useCard}>Use the card</Button>
+                    </div>
+                  </div>
+                </div>
               ) : own ? (
                 <div className="flex items-center gap-2.5">
                   {own === "document"
@@ -342,14 +373,23 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex-1 text-xs text-muted-foreground">The card goes out with the post.</span>
+                  <span className="w-full text-xs text-muted-foreground">The card goes out with the post.</span>
                   <Button variant="outline" size="sm" disabled={locked} onClick={() => fileRef.current?.click()}><ImageUp /> Use images or a PDF</Button>
+                  <Button variant="outline" size="sm" disabled={locked || video !== null} onClick={() => setVideo("")}><Film /> Use a video</Button>
                 </div>
               )}
+              {video !== null && !locked && (
+                <form className="flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); void saveVideo(); }}>
+                  <Input autoFocus type="url" value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://…/video.mp4" aria-label="Video address" disabled={checking} className="h-8 min-w-0 flex-1 text-xs" />
+                  <Button type="submit" variant="brand" size="sm" disabled={checking || !video.trim()}>{checking ? <Loader2 className="animate-spin" /> : <Check />} Add</Button>
+                  <Button type="button" variant="ghost" size="icon-sm" disabled={checking} onClick={() => setVideo(null)} aria-label="Cancel"><X /></Button>
+                  <p className="w-full text-[11px] text-muted-foreground">A direct link to a public MP4. It is not uploaded or stored here.</p>
+                </form>
+              )}
             </div>
-            {own === "document" ? (
-              <Field label="Document title" hint="Shown above the pages on LinkedIn.">
-                <Input key={`${draft.id}:${draft.attachmentTitle}`} defaultValue={draft.attachmentTitle ?? ""} maxLength={150} disabled={locked} aria-label="Document title"
+            {own === "document" || own === "video" ? (
+              <Field label={own === "video" ? "Video title" : "Document title"} hint={own === "video" ? "Shown with the video on LinkedIn." : "Shown above the pages on LinkedIn."}>
+                <Input key={`${draft.id}:${draft.attachmentTitle}`} defaultValue={draft.attachmentTitle ?? ""} maxLength={150} disabled={locked} aria-label={own === "video" ? "Video title" : "Document title"}
                   onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== draft.attachmentTitle) void saveTitle(v); else e.target.value = draft.attachmentTitle ?? ""; }}
                   onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
               </Field>

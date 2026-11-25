@@ -13,8 +13,10 @@ export interface Job {
   previewText: string;
   altText: string;
   /** What it carries: the card, or a file of the post's own (a picture, or a PDF document with a title). */
-  attachment?: "card" | "image" | "document" | "images";
+  attachment?: "card" | "image" | "document" | "images" | "video";
   attachmentTitle?: string;
+  /** Where a video post reads its file from when it is sent. */
+  videoUrl?: string;
   /** How many pictures a multi-image post carries. */
   imageCount?: number;
   /** UTC. Empty for a post published at once. */
