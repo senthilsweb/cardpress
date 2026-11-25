@@ -59,6 +59,8 @@ type Draft struct {
 	Summary  string `json:"summary,omitempty"`
 	PageAt   string `json:"pageAt,omitempty"`
 	HasCover bool   `json:"hasCover"`
+	// Attachment is what a post goes out with: "card" (the designed card) or "image" (a picture of its own).
+	Attachment string `json:"attachment"`
 	// Who wrote it and who approved it (ids, and the names for showing).
 	CreatedBy      string `json:"createdBy,omitempty"`
 	CreatedByName  string `json:"createdByName,omitempty"`
@@ -148,7 +150,7 @@ func newID() string {
 func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayout) }
 
 // draftCols is what a draft is read with; the cover image itself is left out (it is large) and only whether there is one is read.
-const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), created_by, approved_by,
+const draftCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, created_by, approved_by,
 	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
@@ -161,7 +163,7 @@ func scanDraft(r scanner) (Draft, error) {
 	var doc, tags, design string
 	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)
@@ -379,4 +381,94 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+/* ------------------------------------------------------------------ a post's own picture */
+
+// Attachment kinds.
+const (
+	AttachCard  = "card"
+	AttachImage = "image"
+)
+
+var jpegSignature = []byte("\xff\xd8\xff")
+
+// imageType says whether data is a PNG or a JPEG, by its first bytes ("" for anything else). The name and the type a
+// browser sent are not trusted.
+func imageType(data []byte) string {
+	switch {
+	case bytes.HasPrefix(data, pngSignature):
+		return "image/png"
+	case bytes.HasPrefix(data, jpegSignature):
+		return "image/jpeg"
+	}
+	return ""
+}
+
+// attachmentChange is the check before a post's attachment changes, and the step back to draft: what was approved is
+// what goes out, so an approved or published post must be approved again.
+func (s *Studio) attachmentChange(ctx context.Context, id string) (Draft, error) {
+	d, err := s.GetDraft(ctx, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if d.Kind != KindPost {
+		return Draft{}, invalid("only a post has an attachment")
+	}
+	if d.Status == StatusScheduled {
+		return Draft{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it before changing it", ErrConflict)
+	}
+	return d, nil
+}
+
+// SetAttachment gives a post a picture of its own (PNG or JPEG) to go out in place of the card. The card is kept.
+func (s *Studio) SetAttachment(ctx context.Context, id string, data []byte) (Draft, error) {
+	if _, err := s.attachmentChange(ctx, id); err != nil {
+		return Draft{}, err
+	}
+	typ := imageType(data)
+	if typ == "" || len(data) > maxImageBytes {
+		return Draft{}, invalid("the picture must be a PNG or JPEG of at most %d MB", maxImageBytes>>20)
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = ?, attachment_type = ?, `+backToDraft+`, updated_at = ? WHERE id = ?`,
+		AttachImage, data, typ, s.draftStamp(), id)
+	if err != nil {
+		return Draft{}, err
+	}
+	return s.GetDraft(ctx, id)
+}
+
+// ClearAttachment goes back to the card.
+func (s *Studio) ClearAttachment(ctx context.Context, id string) (Draft, error) {
+	d, err := s.attachmentChange(ctx, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if d.Attachment == AttachCard {
+		return d, nil
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE drafts SET attachment_kind = ?, attachment = NULL, attachment_type = '', `+backToDraft+`, updated_at = ? WHERE id = ?`,
+		AttachCard, s.draftStamp(), id)
+	if err != nil {
+		return Draft{}, err
+	}
+	return s.GetDraft(ctx, id)
+}
+
+// backToDraft returns an approved or published item to draft and takes its public page down; a draft stays a draft.
+const backToDraft = `status = 'draft', approved_at = '', approved_by = '', scheduled_at = '', timezone = '', page_at = '', cover = NULL`
+
+// AttachmentImage returns a post's own picture and its media type.
+func (s *Studio) AttachmentImage(ctx context.Context, id string) ([]byte, string, error) {
+	return attachmentOf(ctx, s.db, id)
+}
+
+func attachmentOf(ctx context.Context, db *sql.DB, id string) ([]byte, string, error) {
+	var data []byte
+	var kind, typ string
+	err := db.QueryRowContext(ctx, `SELECT attachment_kind, attachment, attachment_type FROM drafts WHERE id = ?`, id).Scan(&kind, &data, &typ)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && (kind != AttachImage || len(data) == 0)) {
+		return nil, "", ErrNotFound
+	}
+	return data, typ, err
 }

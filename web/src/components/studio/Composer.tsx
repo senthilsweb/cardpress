@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowLeftRight, Check, Copy, Eye, FileText, History, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Eye, FileText, History, ImageUp, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { LINKEDIN_LIMIT, serializeDraft, serializeForLinkedIn } from "@/lib/link
 import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
 import { formatInZone, type Job } from "@/lib/jobs";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { cn } from "@/lib/utils";
 import type { DraftStore } from "@/lib/useDrafts";
@@ -36,6 +37,8 @@ const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 
 
 // A draft's label only changes when its document does, and the store keeps untouched documents as the same object, so
 // every draft but the one being typed in is served from here instead of being serialised again on each keystroke.
+const MAX_IMAGE_BYTES = 10 << 20; // the server refuses more
+
 const labelCache = new WeakMap<object, string>();
 const labelOf = (d: Draft) => {
   let l = labelCache.get(d.doc);
@@ -89,6 +92,16 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   const collapse = () => { flushPendingEdits(); setExpanded(false); };
   useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
   const [tag, setTag] = useState("");
+  // the post's own picture, when it has one, as an address the page can show
+  const ownImage = draft?.kind === "post" && draft.attachment === "image";
+  const [ownSrc, setOwnSrc] = useState<string | undefined>();
+  const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!ownImage || !draft) { setOwnSrc(undefined); return; }
+    let live = true, url: string | undefined;
+    api.attachmentImage(draft.id).then((b) => { if (live) { url = URL.createObjectURL(b); setOwnSrc(url); } }).catch(() => undefined);
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [ownImage, draft?.id, draft?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };
   const [busy, setBusy] = useState<string | null>(null);
@@ -129,6 +142,16 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   // approving is the step between writing and publishing: only an approved draft can be sent
   const approve = guard(async () => { await store.approve(); toast.success("Approved", { description: isPost ? "It can now be published or scheduled." : "It is marked final." }); });
   const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
+
+  const pickImage = guard(async () => {
+    const f = fileRef.current?.files?.[0];
+    if (fileRef.current) fileRef.current.value = "";
+    if (!f) return;
+    if (f.size > MAX_IMAGE_BYTES) throw new Error("The image is over 10 MB.");
+    await store.setAttachment(f);
+    toast.success("Your image replaces the card", { description: "Approve the post again before publishing." });
+  });
+  const useCard = guard(async () => { await store.clearAttachment(); toast("The card goes out with this post"); });
 
   const addTag = () => {
     const t = normalizeHashtag(tag);
@@ -251,6 +274,26 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
           </Section>
 
           <Section title="Image">
+            <div className="space-y-2" aria-label="Attachment">
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={() => void pickImage()} aria-label="Choose an image" />
+              {ownImage ? (
+                <div className="flex items-center gap-2.5">
+                  {ownSrc ? <img src={ownSrc} alt="" className="h-14 w-24 shrink-0 rounded border border-border object-cover" /> : <div className="h-14 w-24 shrink-0 rounded border border-border bg-muted" aria-hidden />}
+                  <div className="min-w-0 space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Your image goes out, not the card.</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button variant="outline" size="sm" disabled={draft.status === "scheduled"} onClick={() => fileRef.current?.click()}><ImageUp /> Change</Button>
+                      <Button variant="outline" size="sm" disabled={draft.status === "scheduled"} onClick={useCard}>Use the card</Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex-1 text-xs text-muted-foreground">The card goes out with the post.</span>
+                  <Button variant="outline" size="sm" disabled={draft.status === "scheduled"} onClick={() => fileRef.current?.click()}><ImageUp /> Use your own image</Button>
+                </div>
+              )}
+            </div>
             <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="For screen readers." />
           </Section>
 
@@ -290,6 +333,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
       </Section>
 
       <FullPreview
+        image={ownImage ? ownSrc : undefined}
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={preview ? html() : ""} design={design} profile={profile} palette={palette} size={size}
         actions={(
@@ -298,6 +342,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
               <ArticleBar draft={draft} html={html} onApprove={approve} onPlan={store.plan} />
             ) : (
               <PublishBar
+                ownImage={ownImage}
                 draft={draft} onApprove={approve} serialized={ser} bodyOnly={bodyOnly} size={linkedinSize(size)} renderPng={renderPng} onDone={onPublished} brandName={profile.name}
                 onOpenSettings={() => { setPreview(false); onOpenSettings(); }}
               />

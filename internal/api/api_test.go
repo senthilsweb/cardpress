@@ -1013,3 +1013,53 @@ func TestPublishingAPageThroughTheAPI(t *testing.T) {
 		t.Fatalf("%d", nope.Code)
 	}
 }
+
+func TestAPostsOwnPictureThroughTheAPI(t *testing.T) {
+	h, _ := publishHandler(t, "", nil)
+	id := approvedDraft(h, nil)
+	jpeg := append([]byte("\xff\xd8\xff\xe0"), []byte("pixels")...)
+	path := "/api/v1/drafts/" + id + "/attachment"
+
+	if r := do(h, "GET", path, "", nil); r.Code != 404 {
+		t.Fatalf("no picture yet: %d", r.Code)
+	}
+	if r := do(h, "PUT", path, "<html>not a picture</html>", nil); r.Code != 400 {
+		t.Fatalf("not a picture: %d %s", r.Code, r.Body)
+	}
+	set := do(h, "PUT", path, string(jpeg), nil)
+	var d service.Draft
+	if set.Code != 200 || json.Unmarshal(set.Body.Bytes(), &d) != nil || d.Attachment != "image" || d.Status != "draft" {
+		t.Fatalf("%d %s", set.Code, set.Body)
+	}
+	if strings.Contains(set.Body.String(), "pixels") {
+		t.Fatal("the draft must not carry the picture")
+	}
+	got := do(h, "GET", path, "", nil)
+	if got.Code != 200 || got.Header().Get("Content-Type") != "image/jpeg" || got.Header().Get("X-Content-Type-Options") != "nosniff" || !bytes.Equal(got.Body.Bytes(), jpeg) {
+		t.Fatalf("%d %q", got.Code, got.Header().Get("Content-Type"))
+	}
+
+	// approved again, it is posted without a card, and the job serves the same picture
+	if a := do(h, "POST", "/api/v1/drafts/"+id+"/approve", "", nil); a.Code != 200 {
+		t.Fatal(a.Body.String())
+	}
+	r := postJobRaw(h, `{"profileId":"p","draftId":"`+id+`","body":"Hello"}`, nil, nil)
+	var j service.Job
+	if r.Code != 201 || json.Unmarshal(r.Body.Bytes(), &j) != nil || j.Attachment != "image" {
+		t.Fatalf("%d %s", r.Code, r.Body)
+	}
+	waitStatus(t, h, j.ID, service.JobPublished)
+	img := do(h, "GET", "/api/v1/publish/jobs/"+j.ID+"/image", "", nil)
+	if img.Code != 200 || img.Header().Get("Content-Type") != "image/jpeg" || !bytes.Equal(img.Body.Bytes(), jpeg) {
+		t.Fatalf("job picture: %d %q", img.Code, img.Header().Get("Content-Type"))
+	}
+
+	// a card post without its card is still refused
+	other := approvedDraft(h, nil)
+	if r := postJobRaw(h, `{"profileId":"p","draftId":"`+other+`","body":"Hello"}`, nil, nil); r.Code != 400 {
+		t.Fatalf("card post without a card: %d", r.Code)
+	}
+	if r := do(h, "DELETE", path, "", nil); r.Code != 409 && r.Code != 200 {
+		t.Fatalf("clear: %d %s", r.Code, r.Body)
+	}
+}

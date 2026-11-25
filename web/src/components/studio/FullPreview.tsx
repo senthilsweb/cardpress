@@ -31,6 +31,8 @@ export function FullPreview(props: {
   palette: Palette;
   size: Size;
   actions?: ReactNode;
+  /** The post's own picture, when it has one: shown in place of the card. */
+  image?: string;
 }) {
   const { draft, serialized: s } = props;
   const [copied, setCopied] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function FullPreview(props: {
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
           <div className="flex justify-center">
             {isPost ? (
-              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable />
+              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable mediaSrc={props.image} />
             ) : (
               <div className="w-full max-w-xl space-y-4">
                 <div className="flex justify-center">

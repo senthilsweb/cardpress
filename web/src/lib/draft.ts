@@ -34,6 +34,8 @@ export interface Draft {
   summary?: string;
   pageAt?: string;
   hasCover?: boolean;
+  /** What a post goes out with: the designed card, or a picture of its own. */
+  attachment?: "card" | "image";
   /** Who wrote it and who approved it, for showing. */
   createdByName?: string;
   approvedByName?: string;

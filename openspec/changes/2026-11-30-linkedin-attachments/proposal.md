@@ -1,6 +1,6 @@
 # LinkedIn attachments: your own image, several images, a document, a video
 
-**Status:** Proposed. Nothing is built. LinkedIn's calls and limits named here are from memory and must be confirmed against its current documentation before each bolt.
+**Status:** Bolt 1 (own image) is built and tested against the fake LinkedIn; no real post of it yet. Bolts 2 to 4 are not built. LinkedIn's calls and limits named here are from memory and must be confirmed against its current documentation before each bolt.
 
 ## Why
 A LinkedIn post from CardPress always carries the designed card: one PNG. There is no way to post a photo, a set of images, a PDF that people swipe through, or a video. Those are the formats most posts use, and a document is the usual way to get a carousel on a member's post.

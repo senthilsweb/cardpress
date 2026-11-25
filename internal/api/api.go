@@ -43,6 +43,9 @@ type Studio interface {
 	DeleteDraft(ctx context.Context, id string) error
 	Approve(ctx context.Context, id string) (service.Draft, error)
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
+	SetAttachment(ctx context.Context, id string, data []byte) (service.Draft, error)
+	ClearAttachment(ctx context.Context, id string) (service.Draft, error)
+	AttachmentImage(ctx context.Context, id string) ([]byte, string, error)
 	Plan(ctx context.Context, id string, at *time.Time, timezone string) (service.Draft, error)
 	PublishPage(ctx context.Context, id string, in service.PageInput) (service.Draft, error)
 	UnpublishPage(ctx context.Context, id string) (service.Draft, error)
@@ -64,7 +67,7 @@ type Publishing interface {
 	Get(ctx context.Context, id string) (service.Job, error)
 	List(ctx context.Context, profileID string) ([]service.Job, error)
 	ListAll(ctx context.Context) ([]service.Job, error)
-	Image(ctx context.Context, id string) ([]byte, error)
+	Image(ctx context.Context, id string) ([]byte, string, error)
 	Attempts(ctx context.Context, jobID string) ([]service.Attempt, error)
 	PublishNow(ctx context.Context, id string, acceptDuplicate bool) (service.Job, error)
 	Reschedule(ctx context.Context, id string, at time.Time, timezone string) (service.Job, error)
@@ -190,6 +193,9 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/drafts/{id}", write(scopeDraft), s.deleteDraft},
 		{"POST", "/drafts/{id}/approve", rule{scopeDraft, service.PermApprove}, s.approveDraft},
 		{"POST", "/drafts/{id}/unapprove", write(scopeDraft), s.unapproveDraft},
+		{"GET", "/drafts/{id}/attachment", write(scopeDraft), s.getAttachment},
+		{"PUT", "/drafts/{id}/attachment", write(scopeDraft), s.setAttachment},
+		{"DELETE", "/drafts/{id}/attachment", write(scopeDraft), s.clearAttachment},
 		{"PUT", "/drafts/{id}/plan", rule{scopeDraft, service.PermApprove}, s.planDraft},
 		{"POST", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.publishPage},
 		{"DELETE", "/drafts/{id}/page", rule{scopeDraft, service.PermPublish}, s.unpublishPage},
@@ -430,6 +436,52 @@ func (s *server) unapproveDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// setAttachment gives a post a picture of its own, sent as the request body (PNG or JPEG). It goes out in place of the card.
+func (s *server) setAttachment(w http.ResponseWriter, r *http.Request) {
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 11<<20))
+	if err != nil {
+		writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", "the picture is too large")
+		return
+	}
+	d, err := s.Studio.SetAttachment(r.Context(), r.PathValue("id"), data)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// clearAttachment goes back to the card.
+func (s *server) clearAttachment(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.ClearAttachment(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) getAttachment(w http.ResponseWriter, r *http.Request) {
+	b, typ, err := s.Studio.AttachmentImage(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	servePicture(w, b, typ)
+}
+
+// servePicture sends a stored picture. Only the two types the server accepts are ever named, and the browser is told not
+// to guess another.
+func servePicture(w http.ResponseWriter, b []byte, typ string) {
+	if typ != "image/jpeg" {
+		typ = "image/png"
+	}
+	w.Header().Set("Content-Type", typ)
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(b)
 }
 
 // planDraft sets (or, with no scheduledAt, clears) an article's planned date.
@@ -846,7 +898,7 @@ func (s *server) run(j service.Job) {
 	s.Publishing.Go(func() { s.Publishing.Execute(context.WithoutCancel(context.Background()), j.ID) })
 }
 
-// createJob takes a multipart form: "meta" (JSON) and "image" (the PNG). With no scheduledAt the post goes out now.
+// createJob takes a multipart form: "meta" (JSON) and "image" (the card as a PNG; not needed when the post has a picture of its own). With no scheduledAt the post goes out now.
 func (s *server) createJob(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
@@ -875,16 +927,15 @@ func (s *server) createJob(w http.ResponseWriter, r *http.Request) {
 	if !s.requireBrand(w, r, meta.ProfileID, service.PermPublish) {
 		return
 	}
-	file, _, err := r.FormFile("image")
-	if err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid", "the image file is missing")
-		return
-	}
-	defer file.Close()
-	img, err := io.ReadAll(io.LimitReader(file, 11<<20))
-	if err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid", "the image could not be read")
-		return
+	// the card as a PNG; a post that carries a picture of its own needs none, and the service says so if one is missing
+	var img []byte
+	if file, _, err := r.FormFile("image"); err == nil {
+		img, err = io.ReadAll(io.LimitReader(file, 11<<20))
+		file.Close()
+		if err != nil {
+			writeError(w, r, http.StatusBadRequest, "invalid", "the image could not be read")
+			return
+		}
 	}
 	in := service.JobInput{ProfileID: meta.ProfileID, DraftID: meta.DraftID, Body: meta.Body, Hashtags: meta.Hashtags, AltText: meta.AltText, Image: img, Timezone: meta.Timezone}
 	if meta.ScheduledAt != "" {
@@ -960,15 +1011,12 @@ func (s *server) jobAttempts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) jobImage(w http.ResponseWriter, r *http.Request) {
-	b, err := s.Publishing.Image(r.Context(), r.PathValue("id"))
+	b, typ, err := s.Publishing.Image(r.Context(), r.PathValue("id"))
 	if err != nil {
 		fail(w, r, err)
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "private, max-age=300")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(b)
+	servePicture(w, b, typ)
 }
 
 func (s *server) publishNow(w http.ResponseWriter, r *http.Request) {

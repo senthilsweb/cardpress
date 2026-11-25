@@ -12,6 +12,8 @@ export interface Job {
   /** The text and hashtag line as the preview showed them. */
   previewText: string;
   altText: string;
+  /** What it carries: the card, or a picture of the post's own. */
+  attachment?: "card" | "image";
   /** UTC. Empty for a post published at once. */
   scheduledAt?: string;
   /** IANA zone to show the time in. */

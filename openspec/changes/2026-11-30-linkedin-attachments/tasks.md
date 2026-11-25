@@ -5,11 +5,13 @@
 - [ ] Data model: an attachment kind on a draft and a job; job files as references to `doc_blobs`; migration
 
 ## Bolt 1: own image
-- [ ] Attachment choice in the Post tab (Card default); file picker; PNG and JPEG; size limit
-- [ ] Server accepts JPEG and the attachment kind; changing the attachment of an approved post returns it to draft
-- [ ] Full preview and queue label show the kind
-- [ ] Tests against the fake LinkedIn; docs (`docs/publishing.md`, `docs/post-authoring.md`)
+- [x] Attachment choice in the Post tab (card by default); file picker; PNG and JPEG; 10 MB limit
+- [x] Server stores the picture with the draft, checks its type by its first bytes, and sends it in place of the card; changing it returns an approved post to draft
+- [x] Full preview shows the picture; the queue marks the post "Own image"
+- [x] Tests against the fake LinkedIn; docs (`docs/publishing.md`, `docs/data-model.md`, `docs/reference.md`)
+- [ ] Confirm against LinkedIn's documentation that the image upload takes a JPEG (assumed)
 - [ ] One real post
+- [ ] Not done: the picture is kept in the draft row, not in `doc_blobs` (that comes with documents); the version history does not record it; the library and the public page still show the card
 
 ## Bolt 2: document
 - [ ] PDF upload with a title; stored once by hash; size and page limits

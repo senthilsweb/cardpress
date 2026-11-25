@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -51,6 +50,7 @@ type Job struct {
 	Hashtags    []string `json:"hashtags"`
 	PreviewText string   `json:"previewText"` // the body and hashtag line as the preview showed it
 	AltText     string   `json:"altText"`
+	Attachment  string   `json:"attachment"`            // what it carries: "card" or "image" (a picture of the post's own)
 	ScheduledAt string   `json:"scheduledAt,omitempty"` // UTC; empty for publish-now
 	Timezone    string   `json:"timezone,omitempty"`    // IANA zone to display the time in
 	Error       string   `json:"error,omitempty"`
@@ -68,7 +68,7 @@ type JobInput struct {
 	Body        string // the text without the hashtag line
 	Hashtags    []string
 	AltText     string
-	Image       []byte // PNG
+	Image       []byte // the card as a PNG; not needed when the draft carries a picture of its own
 	ScheduledAt *time.Time
 	Timezone    string
 }
@@ -131,8 +131,8 @@ func (p *Publisher) validate(in *JobInput) error {
 	if utf8.RuneCountInString(in.AltText) > maxAltText {
 		return invalid("altText is limited to %d characters", maxAltText)
 	}
-	if len(in.Image) == 0 || len(in.Image) > maxImageBytes || !bytes.HasPrefix(in.Image, pngSignature) {
-		return invalid("the image must be a PNG of at most %d MB", maxImageBytes>>20)
+	if imageType(in.Image) == "" || len(in.Image) > maxImageBytes {
+		return invalid("the image must be a PNG or JPEG of at most %d MB", maxImageBytes>>20)
 	}
 	if in.ScheduledAt != nil {
 		if _, err := time.LoadLocation(in.Timezone); err != nil || in.Timezone == "" {
@@ -181,6 +181,13 @@ func (p *Publisher) ready(ctx context.Context, profileID string) error {
 // Create stores a confirmed post. With no ScheduledAt it is claimed for immediate publishing (status publishing) and the
 // caller must run Execute; otherwise it waits as scheduled.
 func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
+	// a post with a picture of its own sends that picture, as it was approved, whatever the caller sent
+	kind := AttachCard
+	if own, _, err := attachmentOf(ctx, p.db, in.DraftID); err == nil {
+		in.Image, kind = own, AttachImage
+	} else if !errors.Is(err, ErrNotFound) {
+		return Job{}, err
+	}
 	if err := p.validate(&in); err != nil {
 		return Job{}, err
 	}
@@ -198,9 +205,9 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	}
 	id := newID()
 	_, err := p.db.ExecContext(ctx,
-		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, scheduled_at, timezone, created_by, created_at, updated_at)
-		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
+		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, image_type, attachment_kind, scheduled_at, timezone, created_by, created_at, updated_at)
+		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, imageType(in.Image), kind, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
 	if err != nil {
 		return Job{}, err
 	}
@@ -262,13 +269,13 @@ func (p *Publisher) releaseDrafts(ctx context.Context) {
 
 /* ------------------------------------------------------------------ read */
 
-const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
+const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, attachment_kind, scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
 
 func scanJob(r scanner) (Job, error) {
 	var j Job
 	var tags string
 	var sched sql.NullString
-	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
+	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &j.Attachment, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
 		return j, err
 	}
 	j.ScheduledAt = sched.String
@@ -325,14 +332,15 @@ func (p *Publisher) list(ctx context.Context, where string, args ...any) ([]Job,
 	return out, closeRows(rows)
 }
 
-// Image returns the PNG a job will post.
-func (p *Publisher) Image(ctx context.Context, id string) ([]byte, error) {
+// Image returns the picture a job will post and its media type.
+func (p *Publisher) Image(ctx context.Context, id string) ([]byte, string, error) {
 	var b []byte
-	err := p.db.QueryRowContext(ctx, `SELECT image FROM publish_jobs WHERE id = ?`, id).Scan(&b)
+	var typ string
+	err := p.db.QueryRowContext(ctx, `SELECT image, image_type FROM publish_jobs WHERE id = ?`, id).Scan(&b, &typ)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, "", ErrNotFound
 	}
-	return b, err
+	return b, typ, err
 }
 
 /* ------------------------------------------------------------------ people act on jobs */
@@ -459,9 +467,9 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 		}
 	}()
 
-	var status, body, tags, alt, profileID string
+	var status, body, tags, alt, profileID, imgType string
 	var img []byte
-	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image, profile_id FROM publish_jobs WHERE id = ?`, id).Scan(&status, &body, &tags, &alt, &img, &profileID)
+	err := p.db.QueryRowContext(ctx, `SELECT status, body, hashtags, alt_text, image, image_type, profile_id FROM publish_jobs WHERE id = ?`, id).Scan(&status, &body, &tags, &alt, &img, &imgType, &profileID)
 	if err != nil || status != JobPublishing {
 		return // not ours to run
 	}
@@ -479,7 +487,7 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 	started := p.now()
 	tctx, trace := linkedin.WithTrace(ctx)
 	urn, err := p.li.Publish(tctx, c["accessToken"], linkedin.Post{
-		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: "image/png",
+		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: imgType,
 	})
 	switch {
 	case err == nil:

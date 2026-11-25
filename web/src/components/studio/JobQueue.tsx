@@ -103,6 +103,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge s={s} />
             {brand && <Badge variant="outline" title="The brand this post belongs to">{brand}</Badge>}
+            {job.attachment === "image" && <Badge variant="outline" title="This post carries its own image, not the card">Own image</Badge>}
             {s === "publishing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" aria-label="Publishing" />}
             <span className="text-[11px] text-muted-foreground"><When j={job} /></span>
           </div>
