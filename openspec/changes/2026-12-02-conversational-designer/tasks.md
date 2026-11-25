@@ -25,7 +25,7 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Tool `list_connections`
 
 ## 4. Posting over MCP
-- [ ] API key scope `agent`, accepted on `/mcp` only; `editor` unchanged
+- [ ] API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
 - [ ] `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
 - [ ] Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit
 - [ ] Pinned test: the new method list and tool list; server instructions rewritten

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LAYOUT, parseLayout } from "./layout";
+import { clampSidebar, DEFAULT_LAYOUT, parseLayout } from "./layout";
 
 describe("parseLayout", () => {
   it("falls back to the default for anything that is not an object", () => {
@@ -17,5 +17,13 @@ describe("parseLayout", () => {
       sidebarCollapsed: false, collapsed: { b: true }, editorHeight: undefined, mode: "chat", both: false,
     });
     expect(parseLayout({ editorHeight: 10 }).editorHeight).toBeUndefined();
+  });
+  it("keeps the left column within its limits and leaves the canvas room", () => {
+    expect(parseLayout({ sidebarWidth: 500 }).sidebarWidth).toBe(500);
+    expect(parseLayout({ sidebarWidth: 5000 }).sidebarWidth).toBe(720);
+    expect(parseLayout({ sidebarWidth: "wide" }).sidebarWidth).toBeUndefined();
+    expect(clampSidebar(100)).toBe(320);
+    expect(clampSidebar(700, 1024)).toBe(544);
+    expect(clampSidebar(700, 600)).toBe(320);
   });
 });

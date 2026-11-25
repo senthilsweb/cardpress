@@ -21,7 +21,8 @@
 └────────────────────┴─────────────────────────────────────────────────┘
 ```
 
-### Left column (380 px, collapsible as today)
+### Left column (380 px unless dragged to 320–720, collapsible as today)
+- A grip on its right edge resizes it; the canvas keeps at least 480 px. The width is part of the saved layout.
 - Mode switch **Chat | Edit**. The mode and the view are kept in the saved layout preference.
 - Chat: conversation menu (new, earlier, delete), source chips, thread, message box. Above the box, **Post** and **Article** toggles say what to write.
 - Edit: the four tabs. **Write** edits the item on screen; with Both, the one last clicked.
@@ -35,6 +36,11 @@
 - While Edit is on Design, Text or Brand, the canvas shows the card of the item, also for an article.
 - With Chat open, the feed preview starts on.
 - A view appears when its item exists. A dot marks a view that changed while another was shown; the view does not switch by itself, except when the first item of a kind is created and nothing else is on screen.
+
+### Item picker
+Searches the brand's drafts by title, text and hashtag as the person types, newest first with matches in the name ahead, filtered to posts or articles if wanted. At most 50 rows are listed.
+
+The search runs in the browser over the drafts the studio has already loaded. The studio loads every draft in full; with many articles that load needs paging and a server search, which is a separate change.
 
 ### Narrow screens
 A bottom switch: Chat, Preview, Edit. One at a time.

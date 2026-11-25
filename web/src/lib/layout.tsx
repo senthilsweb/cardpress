@@ -11,7 +11,14 @@ export interface Layout {
   mode: "chat" | "edit";
   /** Show a post and its article side by side, when there is room. */
   both: boolean;
+  /** Width in pixels the left column was dragged to; absent for the usual width. */
+  sidebarWidth?: number;
 }
+
+export const SIDEBAR_WIDTH = 380;
+const SIDEBAR_MIN = 320, SIDEBAR_MAX = 720, CANVAS_MIN = 480;
+/** A width for the left column that is within its limits and, on a given window, leaves the canvas its room. */
+export const clampSidebar = (w: number, windowWidth = Infinity) => Math.round(Math.max(SIDEBAR_MIN, Math.min(w, SIDEBAR_MAX, windowWidth - CANVAS_MIN)));
 
 export const DEFAULT_LAYOUT: Layout = { sidebarCollapsed: false, collapsed: {}, mode: "chat", both: false };
 
@@ -24,7 +31,8 @@ export function parseLayout(v: unknown): Layout {
     for (const [k, val] of Object.entries(o.collapsed as Record<string, unknown>)) if (val === true) collapsed[k] = true;
   }
   const h = typeof o.editorHeight === "number" && o.editorHeight >= 120 && o.editorHeight <= 4000 ? Math.round(o.editorHeight) : undefined;
-  return { sidebarCollapsed: o.sidebarCollapsed === true, collapsed, editorHeight: h, mode: o.mode === "edit" ? "edit" : "chat", both: o.both === true };
+  const w = typeof o.sidebarWidth === "number" && Number.isFinite(o.sidebarWidth) ? { sidebarWidth: clampSidebar(o.sidebarWidth) } : {};
+  return { sidebarCollapsed: o.sidebarCollapsed === true, collapsed, editorHeight: h, mode: o.mode === "edit" ? "edit" : "chat", both: o.both === true, ...w };
 }
 
 interface Ctx {

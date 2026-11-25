@@ -6,7 +6,8 @@
 - [x] Canvas: Post, Article, Both; item picker above the canvas; changed dot
 - [x] Article reading view
 - [x] Narrow screens: Chat, Preview, Edit
-- [x] Saved layout holds mode and view
+- [x] Saved layout holds mode, view and column width; resize grip
+- [x] Searchable item picker
 - [x] `openspec/project.md` layout line
 - [x] Browser check: both themes, laptop and phone widths
 

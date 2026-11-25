@@ -14,6 +14,7 @@ import { SocialSettings } from "./SocialSettings";
 import { BrandSwitcher, ManageBrandsDrawer, NewBrandDrawer } from "./Brands";
 import { ChatPanel } from "./ChatPanel";
 import { StageBar, type StageView } from "./StageBar";
+import { SideGrip } from "./SideGrip";
 import { ArticleView } from "./ArticleView";
 import { conversationFor, linksDraft, pairFor } from "@/lib/workspace";
 import { useMedia } from "@/lib/useMedia";
@@ -45,7 +46,7 @@ import { serializeDraft } from "@/lib/linkedin";
 import { api } from "@/lib/api";
 import { useBoot, type Loaded } from "@/lib/boot";
 import { hydrateCustomFonts } from "@/lib/fonts";
-import { LayoutContext, type Layout } from "@/lib/layout";
+import { clampSidebar, LayoutContext, SIDEBAR_WIDTH, type Layout } from "@/lib/layout";
 import { BootScreen } from "./BootScreen";
 import { cardToBlob, copyBlob, downloadBlob } from "@/lib/export";
 import { slugify } from "@/lib/slug";
@@ -121,6 +122,11 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   // below the large breakpoint one thing is on screen at a time: the left column or the canvas
   const largeScreen = useMedia("(min-width: 1024px)");
   const [phonePreview, setPhonePreview] = useState(false);
+  // the left column's width: followed while dragging, saved when let go
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  useEffect(() => { const on = () => setWindowWidth(window.innerWidth); window.addEventListener("resize", on); return () => window.removeEventListener("resize", on); }, []);
+  const sideWidth = dragWidth ?? clampSidebar(layout.sidebarWidth ?? SIDEBAR_WIDTH, windowWidth);
   const mode = layout.mode;
   const setMode = (m: Layout["mode"]) => { flushPendingEdits(); setEditorExpanded(false); setPhonePreview(false); setLayout((l) => ({ ...l, mode: m, sidebarCollapsed: false })); };
   /** Open the editing tabs on one of them. */
@@ -393,12 +399,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           <aside
             inert={largeScreen && sidebarHidden}
             className={cn(
-              "flex shrink-0 flex-col overflow-hidden border-border bg-card transition-[width] duration-200 ease-out motion-reduce:transition-none max-lg:min-h-0 max-lg:flex-1",
+              "flex shrink-0 flex-col overflow-hidden border-border bg-card ease-out motion-reduce:transition-none max-lg:min-h-0 max-lg:flex-1",
+              dragWidth === null && "transition-[width] duration-200",
               phonePreview && "max-lg:hidden",
-              sidebarHidden ? "lg:w-0" : "lg:w-[380px] lg:border-r",
+              sidebarHidden ? "lg:w-0" : "lg:w-[var(--side)] lg:border-r",
             )}
+            style={{ "--side": `${sideWidth}px` } as React.CSSProperties}
           >
-           <div className="flex min-h-0 flex-1 flex-col lg:w-[380px]">
+           <div className="flex min-h-0 flex-1 flex-col lg:w-[var(--side)]">
             <div className="hidden border-b border-border px-3 py-2 lg:block">
               <div className="flex rounded-md border border-border bg-background p-0.5" role="group" aria-label="Left column">
                 {modeButton("chat", "Chat", <MessageSquareText />)}
@@ -442,6 +450,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </div>
            </div>
           </aside>
+          {!sidebarHidden && <SideGrip width={sideWidth} onResize={setDragWidth} onDone={(w) => { setDragWidth(null); setLayout((l) => ({ ...l, sidebarWidth: w })); }} />}
 
           {/* canvas */}
           <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:hidden")}>

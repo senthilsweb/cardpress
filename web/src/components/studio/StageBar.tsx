@@ -1,8 +1,7 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Draft } from "@/lib/draft";
-import { labelOf } from "@/lib/draftLabel";
+import { DraftPicker } from "./DraftPicker";
 import { cn } from "@/lib/utils";
 
 export type StageView = "post" | "article" | "both";
@@ -31,12 +30,7 @@ export function StageBar({ views, view, changed, onView, drafts, currentId, onPi
       </div>
       <div className="flex-1" />
       <div className="w-[min(320px,60vw)]">
-        <Select value={currentId} onValueChange={onPick}>
-          <SelectTrigger aria-label="Choose a draft" className="h-8"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {drafts.map((d) => <SelectItem key={d.id} value={d.id}>{d.kind === "article" ? "Article · " : "Post · "}{labelOf(d)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <DraftPicker drafts={drafts} currentId={currentId} onPick={onPick} />
       </div>
       <Button variant="ghost" size="icon-sm" title="New draft" aria-label="New draft" onClick={onNew}><Plus /></Button>
     </div>
