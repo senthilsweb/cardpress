@@ -21,7 +21,7 @@ The system SHALL show a conversation's post, its article, or both.
 - **THEN** the cover card, title, summary and body are shown, and Edit opens the editor on that article
 
 #### Scenario: Narrow canvas
-- **WHEN** the canvas is under 1,200 px wide
+- **WHEN** the canvas is under 900 px wide
 - **THEN** Both is not offered
 
 ### Requirement: Linked drafts

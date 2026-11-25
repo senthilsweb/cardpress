@@ -36,6 +36,9 @@ export interface Conversation {
   sourceTruncated: boolean;
   /** Proposals waiting for a decision. */
   pending: number;
+  /** The post and the article this conversation is about. */
+  postDraftId?: string;
+  articleDraftId?: string;
   agent: AgentInfo;
   createdAt: string;
   updatedAt: string;

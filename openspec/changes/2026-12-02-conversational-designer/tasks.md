@@ -2,8 +2,8 @@
 
 Build order across this change and `2026-12-03-chat-workspace`:
 
-1. Steps 1 to 4 here (the MCP server is complete and can be tried from any MCP client).
-2. Workspace A (new layout and linked drafts, with the current assistant).
+1. Workspace A (new layout and linked drafts, with the current assistant). Done first, so the screen can be tried.
+2. Steps 1 to 4 here (the MCP server is complete and can be tried from any MCP client).
 3. Workspace B (sources and files).
 4. Step 5 here (managed agents), then step 6.
 

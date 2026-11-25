@@ -405,6 +405,12 @@ func (s *Studio) DeleteDraft(ctx context.Context, id string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
 		return err
 	}
+	// a conversation that was about it stays, without it
+	for _, q := range []string{`UPDATE conversations SET post_draft_id = '' WHERE post_draft_id = ?`, `UPDATE conversations SET article_draft_id = '' WHERE article_draft_id = ?`} {
+		if _, err := s.db.ExecContext(ctx, q, id); err != nil {
+			return err
+		}
+	}
 	return dropVersions(ctx, s.db, id)
 }
 

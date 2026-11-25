@@ -13,11 +13,23 @@ A brand is an identity (name, handle, logo, fonts, colour sets) with its own car
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
 - The **Brand** tab edits the open brand. Credentials set through environment variables belong to the first brand only.
 
+## Chat, Edit and the views
+The left column has two sides: **Chat** (the [assistant](chat.md), shown first) and **Edit** (Design, Text, Write, Brand). Your choice is remembered.
+
+Above the canvas:
+
+- **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view.
+- **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, Text or Brand it shows the card instead, with the sizes and export buttons.
+- **Both** puts them side by side when the canvas is at least 900 pixels wide. Click a side to work on it.
+- The **item picker** and **+** choose or start a draft. A dot marks a view that changed while you were looking at another.
+
+On a narrow screen a bar at the bottom switches between **Chat**, **Preview** and **Edit**.
+
 ## Sidebar
 
 - **Hide or show** the whole sidebar with the button at the left of the header, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
 - **Fold sections.** Click a section's title (Draft, Hashtags, Colours…) to fold or unfold it. Folded fields cannot be reached with Tab, so they do not get in the way of the keyboard.
-- The editor in the Post tab can be **dragged taller or shorter** from its bottom-right corner.
+- The editor in the Write tab can be **dragged taller or shorter** from its bottom-right corner.
 
 All of this is remembered: it is saved on the server as the `layout` preference, so it is the same in any browser that uses the same server.
 

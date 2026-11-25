@@ -20,7 +20,7 @@ An agent that reads your drafts and jobs can see what is in them, so connect onl
 
 ## How a proposal reaches you
 
-`propose_content` stores the suggestion as a **pending proposal** in its own conversation, marked **Outside agent**. The Assistant button in the header shows a number while proposals are waiting, and the page notices new ones within about 15 seconds. You approve it (it fills an empty draft, or a new draft if the current one has text), edit it first, or reject it, the same as a proposal from the built-in chat. The agent can send a revised version into the same conversation and can later call `get_proposal` to see what you did. The name shown is whatever the agent called itself when it connected; it is **not verified**.
+`propose_content` stores the suggestion as a **pending proposal** in its own conversation, marked **Outside agent**. The **Chat** switch shows a number while proposals are waiting, and the page notices new ones within about 15 seconds. You approve it (it fills an empty draft, or a new draft if the current one has text), edit it first, or reject it, the same as a proposal from the built-in chat. The agent can send a revised version into the same conversation and can later call `get_proposal` to see what you did. The name shown is whatever the agent called itself when it connected; it is **not verified**.
 
 An agent can leave at most 20 unreviewed proposals per profile, so a runaway agent cannot bury you; it is told to ask you to review them.
 

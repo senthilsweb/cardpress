@@ -1,6 +1,6 @@
 # Chat workspace: talk on the left, see the post and the article
 
-**Status:** proposed; layout agreed with the owner. Nothing is built.
+**Status:** part A (layout and linked drafts) is built; sources and Undo are not.
 
 ## Why
 - The assistant is a drawer that covers part of the canvas.
@@ -23,7 +23,7 @@
 A third column with chat and controls side by side. Rejected: on a laptop it squeezes the canvas.
 
 ## Depends on
-`2026-12-02-conversational-designer` steps 1 and 2 (draft revision and live updates). Part A and B work with the current assistant; the managed agents arrive in step 5 of that change.
+Part A and B work with the current assistant and need nothing from `2026-12-02-conversational-designer`; the managed agents arrive in step 5 of that change.
 
 ## Out of scope
 - Sources other than the ones listed (audio, video, spreadsheets, scanned pages without text).

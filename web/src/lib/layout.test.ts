@@ -8,12 +8,13 @@ describe("parseLayout", () => {
   });
   it("reads a saved layout", () => {
     expect(parseLayout({ sidebarCollapsed: true, collapsed: { Hashtags: true, Image: false }, editorHeight: 400.4 })).toEqual({
-      sidebarCollapsed: true, collapsed: { Hashtags: true }, editorHeight: 400,
+      sidebarCollapsed: true, collapsed: { Hashtags: true }, editorHeight: 400, mode: "chat", both: false,
     });
+    expect(parseLayout({ mode: "edit", both: true })).toMatchObject({ mode: "edit", both: true });
   });
   it("ignores wrong types and absurd heights", () => {
     expect(parseLayout({ sidebarCollapsed: "yes", collapsed: { a: "true", b: true }, editorHeight: 99999 })).toEqual({
-      sidebarCollapsed: false, collapsed: { b: true }, editorHeight: undefined,
+      sidebarCollapsed: false, collapsed: { b: true }, editorHeight: undefined, mode: "chat", both: false,
     });
     expect(parseLayout({ editorHeight: 10 }).editorHeight).toBeUndefined();
   });

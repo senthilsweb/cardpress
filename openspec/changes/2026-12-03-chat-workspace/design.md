@@ -31,7 +31,9 @@
 ### Canvas
 - **Post:** today's canvas: sizes, All sizes, feed preview, shuffle, copy, zip, download.
 - **Article:** reading view of what the public page would show: card cover, title, summary, body. Copy for LinkedIn, Full preview, and **Edit**, which opens the existing large editor. Read from the same document the editor writes; pictures shown.
-- **Both:** side by side from 1,200 px of canvas width; hidden below it.
+- **Both:** side by side from 900 px of canvas width; not offered below it. Pressing in a side makes its item the one being worked on; the size and export bar shows when that is the post.
+- While Edit is on Design, Text or Brand, the canvas shows the card of the item, also for an article.
+- With Chat open, the feed preview starts on.
 - A view appears when its item exists. A dot marks a view that changed while another was shown; the view does not switch by itself, except when the first item of a kind is created and nothing else is on screen.
 
 ### Narrow screens

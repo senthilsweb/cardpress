@@ -86,7 +86,7 @@ export function useChat(profileId: string) {
     }
   }, [refreshList]);
 
-  const start = useCallback(async (input: { url?: string; text?: string }) => {
+  const start = useCallback(async (input: { url?: string; text?: string; draftId?: string }) => {
     setBusy(true); setError(null);
     try {
       const c = await api.startConversation(profileId, input);

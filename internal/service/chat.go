@@ -72,20 +72,23 @@ type ProposalView struct {
 
 // Conversation is a chat about one source. Messages and Proposals are filled in by Get.
 type Conversation struct {
-	ID              string         `json:"id"`
-	ProfileID       string         `json:"profileId"`
-	Title           string         `json:"title"`
-	SourceKind      string         `json:"sourceKind"` // "url", "text", or "mcp" (started by an outside agent)
-	SourceURL       string         `json:"sourceUrl,omitempty"`
-	SourceTitle     string         `json:"sourceTitle,omitempty"`
-	SourceChars     int            `json:"sourceChars"`
-	SourceTruncated bool           `json:"sourceTruncated"`
-	Pending         int            `json:"pending"` // proposals waiting for a decision
-	Agent           AgentInfo      `json:"agent"`
-	CreatedAt       string         `json:"createdAt"`
-	UpdatedAt       string         `json:"updatedAt"`
-	Messages        []ChatMessage  `json:"messages,omitempty"`
-	Proposals       []ProposalView `json:"proposals,omitempty"`
+	ID              string `json:"id"`
+	ProfileID       string `json:"profileId"`
+	Title           string `json:"title"`
+	SourceKind      string `json:"sourceKind"` // "url", "text", or "mcp" (started by an outside agent)
+	SourceURL       string `json:"sourceUrl,omitempty"`
+	SourceTitle     string `json:"sourceTitle,omitempty"`
+	SourceChars     int    `json:"sourceChars"`
+	SourceTruncated bool   `json:"sourceTruncated"`
+	Pending         int    `json:"pending"` // proposals waiting for a decision
+	// PostDraftID and ArticleDraftID are the items this conversation is about, empty when it has none.
+	PostDraftID    string         `json:"postDraftId,omitempty"`
+	ArticleDraftID string         `json:"articleDraftId,omitempty"`
+	Agent          AgentInfo      `json:"agent"`
+	CreatedAt      string         `json:"createdAt"`
+	UpdatedAt      string         `json:"updatedAt"`
+	Messages       []ChatMessage  `json:"messages,omitempty"`
+	Proposals      []ProposalView `json:"proposals,omitempty"`
 }
 
 // ChatEvent is progress while a reply is written. Name is "user", "delta", "proposal" or "message".
@@ -213,13 +216,13 @@ func (c *Chat) Start(ctx context.Context, profileID, rawURL, text string) (Conve
 	return c.Get(ctx, id)
 }
 
-const convCols = `id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at, (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
+const convCols = `id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at, post_draft_id, article_draft_id, (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
 
 func (c *Chat) scanConv(r scanner) (Conversation, string, error) {
 	var v Conversation
 	var text string
 	var tr int
-	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &text, &tr, &v.CreatedAt, &v.UpdatedAt, &v.Pending); err != nil {
+	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &text, &tr, &v.CreatedAt, &v.UpdatedAt, &v.PostDraftID, &v.ArticleDraftID, &v.Pending); err != nil {
 		return v, "", err
 	}
 	v.SourceChars, v.SourceTruncated, v.Agent = utf8.RuneCountInString(text), tr != 0, c.Agent()
@@ -318,6 +321,28 @@ func (c *Chat) proposals(ctx context.Context, convID string) ([]ProposalView, er
 		out = append(out, p)
 	}
 	return out, closeRows(rows)
+}
+
+// linkDraft makes a draft the conversation's post or article, by the draft's kind. A draft of another brand, or one
+// that does not exist, matches nothing, so a conversation can only ever point at its own brand's items.
+func linkDraft(ctx context.Context, db execer, convID, draftID string) error {
+	for _, l := range []struct{ column, kind string }{{"post_draft_id", KindPost}, {"article_draft_id", KindArticle}} {
+		if _, err := db.ExecContext(ctx,
+			`UPDATE conversations SET `+l.column+` = ? WHERE id = ? AND EXISTS (
+			   SELECT 1 FROM drafts d WHERE d.id = ? AND d.kind = ? AND d.profile_id = conversations.profile_id)`,
+			draftID, convID, draftID, l.kind); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Link records the item a conversation is about (see linkDraft) and returns the conversation.
+func (c *Chat) Link(ctx context.Context, id, draftID string) (Conversation, error) {
+	if err := linkDraft(ctx, c.db, id, draftID); err != nil {
+		return Conversation{}, err
+	}
+	return c.Get(ctx, id)
 }
 
 // Delete removes a conversation and everything in it.
@@ -549,6 +574,12 @@ func (c *Chat) Decide(ctx context.Context, proposalID string, d Decision) (Propo
 	}
 	if n, _ := res.RowsAffected(); n != 1 {
 		return ProposalView{}, fmt.Errorf("%w: this proposal was already decided", ErrConflict)
+	}
+	// where an approved proposal went is now the conversation's post or article
+	if d.Status == ProposalApproved && d.DraftID != "" {
+		if err := linkDraft(ctx, tx, cur.ConversationID, d.DraftID); err != nil {
+			return ProposalView{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return ProposalView{}, err

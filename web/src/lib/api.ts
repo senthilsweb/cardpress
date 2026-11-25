@@ -244,7 +244,7 @@ export const api = {
     return res.blob();
   },
   listConversations: (profileId: string) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}`),
-  startConversation: (profileId: string, input: { url?: string; text?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
+  startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
   getConversation: (id: string) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`),
   deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
   streamMessage,

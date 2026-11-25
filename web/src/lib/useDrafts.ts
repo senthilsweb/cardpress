@@ -77,16 +77,18 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush, profileId]);
 
   /**
-   * Create a draft that already has content and switch to it. The editing target is switched at once (not after the next
-   * render), so a change made straight afterwards cannot land in the draft that was open before.
+   * Create a draft that already has content and, unless told not to, switch to it. The editing target is switched at once
+   * (not after the next render), so a change made straight afterwards cannot land in the draft that was open before.
    */
-  const createFrom = useCallback(async (content: Pick<DraftInput, "kind" | "doc" | "hashtags" | "altText">): Promise<string> => {
+  const createFrom = useCallback(async (content: Pick<DraftInput, "kind" | "doc" | "hashtags" | "altText"> & { title?: string; design?: Design }, opts: { select?: boolean } = {}): Promise<string> => {
     await flush();
-    const design = designFor?.();
-    const d = await api.createDraft({ profileId, unicodeStyles: false, ...(design ? { design: toCardDesign(design) } : {}), ...content });
+    const design = content.design ?? designFor?.();
+    const d = await api.createDraft({ profileId, unicodeStyles: false, ...content, ...(design ? { design: toCardDesign(design) } : {}) });
     commit([d, ...ref.current]);
-    idRef.current = d.id;
-    setCurrentId(d.id);
+    if (opts.select !== false) {
+      idRef.current = d.id;
+      setCurrentId(d.id);
+    }
     return d.id;
   }, [flush, profileId]);
 

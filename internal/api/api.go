@@ -90,6 +90,7 @@ type Chatting interface {
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
+	Link(ctx context.Context, id, draftID string) (service.Conversation, error)
 	Delete(ctx context.Context, id string) error
 	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
@@ -884,6 +885,7 @@ func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
 		ProfileID string `json:"profileId"`
 		URL       string `json:"url"`
 		Text      string `json:"text"`
+		DraftID   string `json:"draftId"` // the item on screen: the conversation is about it
 	}
 	if !decode(w, r, &body) {
 		return
@@ -892,6 +894,9 @@ func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := s.Chat.Start(r.Context(), body.ProfileID, body.URL, body.Text)
+	if err == nil && body.DraftID != "" {
+		v, err = s.Chat.Link(r.Context(), v.ID, body.DraftID)
+	}
 	if err != nil {
 		fail(w, r, err)
 		return

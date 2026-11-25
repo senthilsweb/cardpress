@@ -20,11 +20,12 @@ function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
 }
 
 /** Where a conversation starts: a web address or pasted text, plus older conversations to reopen. */
-function StartView({ chat }: { chat: ChatStore }) {
+function StartView({ chat, draftId, onOpenConversation }: { chat: ChatStore; draftId?: string; onOpenConversation: (id: string) => void }) {
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const ready = (url.trim() !== "") !== (text.trim() !== ""); // exactly one
-  const go = () => { if (ready) void chat.start(url.trim() ? { url: url.trim() } : { text }); };
+  // the item on screen is what the conversation will be about
+  const go = () => { if (ready) void chat.start({ ...(url.trim() ? { url: url.trim() } : { text }), draftId }); };
   return (
     <div className="space-y-4 px-4 py-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -61,7 +62,7 @@ function StartView({ chat }: { chat: ChatStore }) {
           <ul className="space-y-1">
             {chat.list.map((c) => (
               <li key={c.id}>
-                <button type="button" onClick={() => void chat.open(c.id)} className="w-full cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-xs hover:bg-accent">
+                <button type="button" onClick={() => onOpenConversation(c.id)} className="w-full cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-xs hover:bg-accent">
                   <span className="block truncate font-medium">{c.title}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
                     {c.sourceKind === "url" ? host(c.sourceUrl) : c.sourceKind === "mcp" ? `Outside agent: ${c.sourceTitle ?? "unknown"}` : "Pasted text"} · {new Date(c.updatedAt).toLocaleDateString()}
@@ -89,10 +90,10 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
   );
 }
 
-function Thread({ conv, chat, onApply, onOpenPost }: {
+function Thread({ conv, chat, onApply, onShow }: {
   conv: Conversation; chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
-  onOpenPost: () => void;
+  onShow: (draftId?: string) => void;
 }) {
   const end = useRef<HTMLDivElement>(null);
   const messages = conv.messages ?? [];
@@ -110,7 +111,7 @@ function Thread({ conv, chat, onApply, onOpenPost }: {
   const placed = new Set<string>();
   const cards = (messageId: string) => proposals.filter((p) => p.messageId === messageId).map((p) => {
     placed.add(p.id);
-    return <ProposalCard key={p.id} p={p} onApprove={approve(p)} onReject={() => chat.decide(p, { status: "rejected" })} onOpenPost={onOpenPost} />;
+    return <ProposalCard key={p.id} p={p} onApprove={approve(p)} onReject={() => chat.decide(p, { status: "rejected" })} onOpenPost={() => onShow(p.draftId)} />;
   });
 
   return (
@@ -123,7 +124,7 @@ function Thread({ conv, chat, onApply, onOpenPost }: {
       ))}
       {/* a proposal that arrives just before its reply is stored */}
       {proposals.filter((p) => !placed.has(p.id)).map((p) => (
-        <ProposalCard key={p.id} p={p} onApprove={approve(p)} onReject={() => chat.decide(p, { status: "rejected" })} onOpenPost={onOpenPost} />
+        <ProposalCard key={p.id} p={p} onApprove={approve(p)} onReject={() => chat.decide(p, { status: "rejected" })} onOpenPost={() => onShow(p.draftId)} />
       ))}
       {chat.streaming !== null && (
         <Bubble role="assistant">{chat.streaming || <span className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing…</span>}</Bubble>
@@ -137,17 +138,21 @@ function Thread({ conv, chat, onApply, onOpenPost }: {
  * The chat that prepares content. It proposes; the person decides. Approving a proposal hands its content to `onApply`,
  * which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
-export function ChatPanel({ chat, onApply, onOpenPost }: {
+export function ChatPanel({ chat, onApply, onShow, draftId, onOpenConversation }: {
   chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
-  onOpenPost: () => void;
+  /** Put an item an approved proposal went into on the canvas. */
+  onShow: (draftId?: string) => void;
+  /** The item on screen. */
+  draftId?: string;
+  onOpenConversation: (id: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const conv = chat.current;
 
   if (!chat.loaded) return <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>;
-  if (!conv) return <StartView chat={chat} />;
+  if (!conv) return <StartView chat={chat} draftId={draftId} onOpenConversation={onOpenConversation} />;
 
   const send = () => {
     const text = draft.trim();
@@ -178,7 +183,7 @@ export function ChatPanel({ chat, onApply, onOpenPost }: {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite">
-        <Thread conv={conv} chat={chat} onApply={onApply} onOpenPost={onOpenPost} />
+        <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} />
       </div>
 
       {conv.sourceKind === "mcp" ? (
