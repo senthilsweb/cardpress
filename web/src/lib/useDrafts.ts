@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { merge, note, union, untouched, type Touched } from "./merge";
 import { flushPendingEdits } from "./pendingEdits";
+import { lockReason } from "./lock";
 import { flattenForPost, EMPTY_DOC, type Draft, type DraftInput, type DraftKind } from "./draft";
 import { toCardDesign } from "./cardDesign";
 import type { Design } from "./types";
@@ -15,7 +16,7 @@ const toInput = (d: Draft): DraftInput => ({
 });
 
 /** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
-const meta = (x: Draft, s: Draft): Draft => ({ ...x, revision: s.revision, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, updatedAt: s.updatedAt });
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, revision: s.revision, version: s.version, versionIsCurrent: s.versionIsCurrent, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, updatedAt: s.updatedAt });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;
@@ -69,7 +70,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
       }
       sending.current.delete(id);
       // an edit made while this was saving will be saved next, and will say what the server should now know
-      commit(ref.current.map((x) => (x.id !== saved.id ? x : dirty.current === saved.id ? { ...x, revision: saved.revision } : meta(x, saved))));
+      commit(ref.current.map((x) => (x.id !== saved.id ? x : dirty.current === saved.id ? { ...x, revision: saved.revision, version: saved.version, versionIsCurrent: saved.versionIsCurrent } : meta(x, saved))));
       setSaveState(dirty.current ? "saving" : "saved");
     } catch {
       edits.current.set(id, unconfirmed(id));
@@ -127,10 +128,10 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
     const id = idRef.current;
     // a draft waiting to be sent is not edited (the server refuses it too); a changed approved draft goes back to draft
     const before = ref.current.find((d) => d.id === id);
-    if (!before || before.status === "scheduled") return;
+    if (!before || lockReason(before)) return;
     edits.current.set(id, note(edits.current.get(id) ?? untouched(), before, patch as Record<string, unknown>));
     commit(ref.current.map((d) => (d.id === id
-      ? { ...d, ...patch, ...(d.status === "approved" || d.status === "published" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined, pageAt: undefined, hasCover: false } : {}), updatedAt: new Date().toISOString() }
+      ? { ...d, ...patch, ...(d.status === "approved" ? { status: "draft" as const, approvedAt: undefined, scheduledAt: undefined, timezone: undefined, pageAt: undefined, hasCover: false } : {}), updatedAt: new Date().toISOString() }
       : d)));
     dirty.current = id;
     setSaveState("saving");

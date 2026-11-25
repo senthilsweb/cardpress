@@ -20,6 +20,7 @@ import { ArticleView } from "./ArticleView";
 import { conversationFor, linksDraft, pairFor } from "@/lib/workspace";
 import { useMedia } from "@/lib/useMedia";
 import { toCardDesign } from "@/lib/cardDesign";
+import { lockReason } from "@/lib/lock";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "@/lib/profiles";
 import { blankDesign, brandColor, move } from "@/lib/brands";
@@ -254,13 +255,13 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
 
-  const waiting = store.current?.status === "scheduled";
+  const locked = lockReason(store.current);
   const set = useCallback((patch: Partial<Design>) => {
-    if (waiting) { toast("A post is waiting to be sent from this draft", { description: "Cancel it in the queue to change the card." }); return; }
+    if (locked) { toast("The card cannot be changed", { description: locked }); return; }
     const next = { ...design, ...patch };
     setDesigns((all) => ({ ...all, [profile.id]: next })); // the brand's starting point follows the latest card
     store.update({ design: next });
-  }, [design, profile.id, setDesigns, store, waiting]);
+  }, [design, profile.id, setDesigns, store, locked]);
   const updateProfile = (patch: Partial<Profile>) => setProfiles((all) => all.map((p) => (p.id === profile.id ? { ...p, ...patch } : p)));
 
   const [grid, setGrid] = useState<"one" | "all">("one");
@@ -456,7 +457,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
 
           {/* canvas */}
           <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:hidden")}>
-            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void newItem()} />
+            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void newItem()} item={store.current} onVersions={() => setPanel(panel === "history" ? null : "history")} />
             {/* sizes and export belong to the card, so they show with it */}
             <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">

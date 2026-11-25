@@ -115,6 +115,7 @@ type draftOut struct {
 	Kind          string   `json:"kind"`
 	Status        string   `json:"status"`
 	Revision      int      `json:"revision"`
+	Version       int      `json:"version"`
 	Title         string   `json:"title"`
 	Body          string   `json:"body"`
 	Summary       string   `json:"summary"`
@@ -130,7 +131,7 @@ type draftOut struct {
 }
 
 func describe(d service.Draft) draftOut {
-	return draftOut{ID: d.ID, ProfileID: d.ProfileID, Kind: d.Kind, Status: d.Status, Revision: d.Revision, Title: d.Title,
+	return draftOut{ID: d.ID, ProfileID: d.ProfileID, Kind: d.Kind, Status: d.Status, Revision: d.Revision, Version: d.Version, Title: d.Title,
 		Body: service.DraftText(d.Doc), Summary: d.Summary, Slug: d.Slug, Hashtags: d.Hashtags, AltText: d.AltText, UnicodeStyles: d.UnicodeStyles,
 		Attachment: d.Attachment, VideoURL: d.VideoURL, HasPictures: service.HasPictures(d.Doc), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }

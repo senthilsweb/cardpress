@@ -46,6 +46,7 @@ type draftRefIn struct {
 type designOut struct {
 	DraftID  string         `json:"draftId"`
 	Revision int            `json:"revision"`
+	Version  int            `json:"version"`
 	Design   map[string]any `json:"design"`
 	service.Effects
 }
@@ -76,7 +77,7 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	return nil, designOut{DraftID: d.ID, Revision: d.Revision, Design: view}, nil
+	return nil, designOut{DraftID: d.ID, Revision: d.Revision, Version: d.Version, Design: view}, nil
 }
 
 type cardTextIn struct {
@@ -127,7 +128,7 @@ func (t tools) updateCardText(ctx context.Context, _ *mcp.CallToolRequest, in ca
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	return nil, designOut{DraftID: d.ID, Revision: d.Revision, Design: view, Effects: eff}, nil
+	return nil, designOut{DraftID: d.ID, Revision: d.Revision, Version: d.Version, Design: view, Effects: eff}, nil
 }
 
 /* ------------------------------------------------------------------ drafts */

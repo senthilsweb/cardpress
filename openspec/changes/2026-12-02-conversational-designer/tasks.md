@@ -33,7 +33,7 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 
 ## 5. The chat on the managed agents
-- [ ] Read the manifest (version 4); remove `agent-setup` and the two id settings
+- [ ] Read the manifest (version 5); remove `agent-setup` and the two id settings
 - [ ] `CARDPRESS_PUBLIC_URL` check; fall back to the demo agent with a clear message
 - [ ] Per-person vault and agent key, created on first chat; single vault when accounts are off
 - [ ] Adapter: MCP tool events as progress and recorded changes, outcomes in turn, sub-agent thread events, `requires_action` and `user.tool_confirmation`

@@ -23,7 +23,7 @@ CardPress can be used by an AI agent through the [Model Context Protocol](https:
 
 **Not available to an agent, by design:** publishing, scheduling, rescheduling, cancelling, approving, deleting a draft, anything about how a card looks (layout, colours, background, size, fonts, images, brand), uploading files, putting a page online, credentials and settings. This is enforced in the code, not just left out of the list: the tools are handed narrow interfaces, a test pins every method they can call, and `update_card_text` refuses any field that is not text.
 
-**Writes are checked like yours.** A draft with a post waiting to be sent cannot change. Changing an approved or published item returns it to draft, and takes an article's page offline; the tool says so. An article that holds pictures cannot have its text replaced. The text from before a replacement is kept in History. Each draft has a revision, so you and an agent do not overwrite each other: what you are typing wins in your field, and the rest of the agent's change is kept.
+**Writes are checked like yours.** A draft with a post waiting to be sent, and anything published, cannot change. Changing an approved item returns it to draft; the tool says so. Every change is saved as a version. An article that holds pictures cannot have its text replaced. The text from before a replacement is kept in History. Each draft has a revision, so you and an agent do not overwrite each other: what you are typing wins in your field, and the rest of the agent's change is kept.
 
 An agent that reads your drafts and jobs can see what is in them, and one that can write can change them, so connect only agents you trust, and use an API key or token if the server can be reached by anything else.
 

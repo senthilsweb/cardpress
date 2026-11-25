@@ -78,9 +78,9 @@ The system SHALL let an agent create a draft and write its text.
 - **WHEN** the draft has a post waiting to be sent
 - **THEN** the call is refused, as it is for a person
 
-#### Scenario: Published page
-- **WHEN** a tool changes a published article
-- **THEN** it returns to draft, its page goes offline, and the result says so
+#### Scenario: Published item
+- **WHEN** a tool changes a sent post or an article with a live page
+- **THEN** it is refused, and nothing changes
 
 #### Scenario: Article with pictures
 - **WHEN** `update_draft` writes the body of an article that contains pictures

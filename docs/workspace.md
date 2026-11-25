@@ -25,6 +25,12 @@ Above the canvas:
 
 On a narrow screen a bar at the bottom switches between **Chat**, **Preview** and **Edit**.
 
+## Versions and published items
+- Above the canvas, **v4** is the newest saved version of the item; **· edited** means the text changed since. Click it to see all versions.
+- Every change the assistant saves is a version, and what you had just before is kept too. Your own typing becomes a version at most every ten minutes, and when you approve, send or save one by hand.
+- **Make current** brings an earlier version back by saving it as a new one.
+- A **published** item (a sent post, or a live page) is locked. Choose **Back to draft** to change it; a live page goes offline until you approve and publish it again.
+
 ## Sidebar
 - **Make the left column wider or narrower** by dragging the grip on its right edge (320 to 720 pixels; double-click to reset, or focus it and use the arrow keys). The width is remembered.
 

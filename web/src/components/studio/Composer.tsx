@@ -18,6 +18,7 @@ import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
 import { useLayout } from "@/lib/layout";
+import { lockReason } from "@/lib/lock";
 import { labelCache, labelOf, shortLabel } from "@/lib/draftLabel";
 import { useSession } from "@/lib/session";
 import { normalizeHashtag, type Draft, type DocNode, type DraftKind } from "@/lib/draft";
@@ -132,7 +133,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
   const approve = guard(async () => { await store.approve(); toast.success("Approved", { description: isPost ? "It can now be published or scheduled." : "It is marked final." }); });
   const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
 
-  const locked = draft.status === "scheduled"; // a post waiting to be sent cannot change
+  const locked = !!lockReason(draft); // waiting to be sent, or published: it cannot change
   const pickFile = guard(async () => {
     const files = Array.from(fileRef.current?.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
@@ -226,11 +227,11 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
       >
         {!isPost && (
           <Field label="Title" hint="Shown in the library and used for the file name.">
-            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={draft.status === "scheduled"} />
+            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={locked} />
           </Field>
         )}
         <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
-          <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
+          <ToggleGroup type="single" disabled={locked} value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
             <ToggleGroupItem value="post">Post</ToggleGroupItem>
             <ToggleGroupItem value="article"><FileText className="mr-1 h-3.5 w-3.5" /> Article</ToggleGroupItem>
           </ToggleGroup>
@@ -263,7 +264,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
+            <RichEditor fill readOnly={!!lockReason(draft)} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -278,7 +279,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
       </Section>
 
       {isPost && (
-        <>
+        <div inert={locked} className={locked ? "opacity-60" : undefined}>
           <Section title="Hashtags">
             <div className="flex flex-wrap gap-1.5">
               {draft.hashtags.map((h) => (
@@ -384,7 +385,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
               </div>
             </div>
           </Section>
-        </>
+        </div>
       )}
 
       <Section title="Review">
@@ -393,10 +394,10 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
           {draft.status === "draft" && can("approve") && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
           {draft.status === "draft" && !can("approve") && <span className="text-[11px] text-muted-foreground">An editor or admin approves it.</span>}
           {(draft.status === "approved" || draft.status === "published") && (
-            <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
+            <Button variant={locked ? "brand" : "outline"} size="sm" onClick={unapprove}><Undo2 /> Back to draft</Button>
           )}
           {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
-          {draft.status === "scheduled" && <span className="text-[11px] text-muted-foreground">A post is waiting to be sent. Cancel it in the queue to edit.</span>}
+          {locked && <span role="status" className="w-full text-[11px] text-muted-foreground">{lockReason(draft)}</span>}
         </div>
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
         {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
@@ -456,7 +457,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
             <div className="min-h-0 flex-1 overflow-y-auto p-6" data-editor-scroll>
               <div className={cn("mx-auto w-full", width === "wide" ? "max-w-6xl" : "max-w-3xl")} style={{ "--rich-size": `${TEXT_SIZES[isPost ? DEFAULT_SIZE_INDEX : sizeIdx]}rem` } as React.CSSProperties}>
                 <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <RichEditor large bare readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
+                  <RichEditor large bare readOnly={!!lockReason(draft)} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
                 </div>
               </div>
             </div>

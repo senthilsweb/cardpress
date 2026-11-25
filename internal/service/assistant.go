@@ -119,8 +119,8 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 	if err != nil {
 		return cur, Effects{}, err
 	}
-	if cur.Status == StatusScheduled {
-		return cur, Effects{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it before editing", ErrConflict)
+	if err := editable(cur); err != nil {
+		return cur, Effects{}, err
 	}
 	if p.Revision != 0 && p.Revision != cur.Revision {
 		return cur, Effects{}, ErrStale
@@ -140,10 +140,6 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 			return cur, Effects{}, invalid("a post is limited to %d characters", maxBodyChars)
 		}
 		in.Doc = DocFromText(*p.Body, cur.Kind)
-		// the text as it was can be brought back from History, whatever the ten minutes between automatic versions
-		if err := snapshotDraft(ctx, s.db, id, VersionManual, "before an assistant change"); err != nil {
-			return cur, Effects{}, err
-		}
 	}
 	if p.Title != nil {
 		in.Title = *p.Title
@@ -176,7 +172,11 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 			return cur, Effects{}, invalid("a summary is limited to %d characters", maxAssistantSummary)
 		}
 	}
-	d, err := s.updateDraft(ctx, id, in)
+	// what the person had is kept, whatever the ten minutes between automatic versions; what the assistant saves is a version too
+	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
+		return cur, Effects{}, err
+	}
+	d, err := s.updateDraft(ctx, id, in, VersionAssistant, "")
 	if err != nil {
 		return d, Effects{}, err
 	}
@@ -220,7 +220,13 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	}
 	in := inputOf(cur)
 	in.Design = raw
-	d, err := s.updateDraft(ctx, id, in)
+	if err := editable(cur); err != nil {
+		return card, cur, Effects{}, err
+	}
+	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
+		return card, cur, Effects{}, err
+	}
+	d, err := s.updateDraft(ctx, id, in, VersionAssistant, "card text")
 	if err != nil {
 		return card, d, Effects{}, err
 	}

@@ -140,7 +140,7 @@ func TestOnlyAnApprovedDraftCanBePublishedAndItsStatusFollowsTheJob(t *testing.T
 	if status() != StatusApproved {
 		t.Fatalf("a cancelled post hands the draft back: %s", status())
 	}
-	// publishing now marks it published, and editing it makes a new draft
+	// publishing now marks it published; it is edited only after coming back to draft
 	in.ScheduledAt, in.Timezone = nil, ""
 	j, err = l.p.Create(ctx, in)
 	if err != nil {
@@ -153,7 +153,14 @@ func TestOnlyAnApprovedDraftCanBePublishedAndItsStatusFollowsTheJob(t *testing.T
 	if _, err := l.p.Create(ctx, in); !errors.Is(err, ErrConflict) {
 		t.Fatalf("a published draft needs editing before it is posted again: %v", err)
 	}
-	if up, err := l.st.UpdateDraft(ctx, d.ID, DraftInput{ProfileID: "p", Kind: "post", Doc: docOf(para("A new version"))}); err != nil || up.Status != StatusDraft {
+	edit := DraftInput{ProfileID: "p", Kind: "post", Doc: docOf(para("A new version"))}
+	if _, err := l.st.UpdateDraft(ctx, d.ID, edit); !errors.Is(err, ErrConflict) {
+		t.Fatalf("a published draft was edited: %v", err)
+	}
+	if _, err := l.st.Unapprove(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if up, err := l.st.UpdateDraft(ctx, d.ID, edit); err != nil || up.Status != StatusDraft {
 		t.Fatalf("%+v %v", up, err)
 	}
 }

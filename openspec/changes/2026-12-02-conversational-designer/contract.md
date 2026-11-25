@@ -3,7 +3,7 @@
 The only things the two repositories share. This file is authoritative; `social-card-agent` keeps a copy in
 `openspec/changes/2026-11-26-studio-contract/contract.md`. Change it here first, then copy it.
 
-Version 4. (Version 3: the agent changes the words on a card, never how it looks. Version 4: the writers save their own text with `update_draft`; every outcome carries its sources; a restarted session is sent the earlier messages.)
+Version 5. (Version 5: every change an assistant saves is a version, and a published item is refused.) (Version 3: the agent changes the words on a card, never how it looks. Version 4: the writers save their own text with `update_draft`; every outcome carries its sources; a restarted session is sent the earlier messages.)
 
 ## 1. MCP tools
 
@@ -45,13 +45,15 @@ Two different titles: `update_draft.title` is the item's name (and an article's 
 Refusals the agent must expect, each with a message to repeat to the person:
 
 - the draft has a post waiting to be sent;
+- the item is published (a sent post, or a live public page): the person brings it back to draft first;
 - `revision` is old (read again, then retry once);
 - `body` on an article that contains pictures (they would be lost);
 - a field that is not card text (how the card looks is the person's to set);
 - `publish_post`: card image not ready, network not connected, daily limit reached.
 
-A change to an approved or published draft returns it to draft, and takes an article's public page offline. The result says so
-(`returnedToDraft`, `pageTakenOffline`), and the agent tells the person.
+A change to an approved draft returns it to draft. The result says so (`returnedToDraft`), and the agent tells the person.
+
+**Versions.** Every change saved through `update_draft` or `update_card_text` is a new version. Results and `get_draft` carry `version`, the newest one's number; the agent tells the person which version it saved. Bringing an earlier version back is done by the person in the studio.
 
 ## 2. What CardPress sends in a message
 
@@ -107,6 +109,6 @@ The person's message.
 
 ## 4. Manifest
 
-As built by `scripts/build-manifest.sh`: `version` (4), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
+As built by `scripts/build-manifest.sh`: `version` (5), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
 `mcp_server_url`, `confirm_tools`, `outcomes.post`, `outcomes.article` (`description`, `rubric`, `max_iterations`).
 CardPress refuses a manifest whose `version` it does not know.

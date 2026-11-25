@@ -23,7 +23,7 @@ Two writers on one draft need a rule. `drafts` gets a `revision` counter, moved 
 - `update_draft` changes only the named fields; with `body` it must name the revision it read, and is refused if the draft has moved on.
 - The browser's save sends the revision it knows. If refused, it takes the server's draft, re-applies only the fields the person changed since the last save, and saves again. What the person typed wins for those fields.
 
-Every write by a tool keeps the rules a person's write has: refused while a post is waiting; an approved or published draft returns to draft and its page goes offline. The tool result says when that happened.
+Every write by a tool keeps the rules a person's write has: refused while a post is waiting or when the item is published; an approved draft returns to draft, and the tool result says so. Every tool write is a version (`2026-12-05-versions-and-publish-lock`).
 
 A body written by a tool is plain text turned into a document. An article that contains pictures is refused, because they would be lost. Before the first tool write of a chat turn the service saves a version, whatever the ten-minute limit on automatic versions, so the text can always be restored from History.
 

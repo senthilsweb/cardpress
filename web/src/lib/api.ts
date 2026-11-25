@@ -61,7 +61,7 @@ export interface ApiInfo {
 }
 /** A saved state of a draft (text only when one is fetched on its own). */
 export interface DraftVersion {
-  id: string; draftId: string; seq: number; label: "created" | "auto" | "manual" | "approved" | "sent" | "restored";
+  id: string; draftId: string; seq: number; revision: number; label: "created" | "auto" | "manual" | "approved" | "sent" | "restored" | "assistant";
   note?: string; kind: string; title: string; createdBy?: string; createdByName?: string; createdAt: string; preview?: string;
   doc?: import("./draft").DocNode; hashtags?: string[]; altText?: string;
 }

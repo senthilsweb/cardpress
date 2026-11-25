@@ -21,6 +21,8 @@ const (
 	VersionApproved = "approved"
 	VersionSent     = "sent"
 	VersionRestored = "restored"
+	// VersionAssistant is what an assistant saved: each of its changes is a version.
+	VersionAssistant = "assistant"
 )
 
 const (
@@ -34,11 +36,25 @@ const (
 // versionNow is the clock for versions; tests move it.
 var versionNow = func() time.Time { return time.Now().UTC() }
 
+// keepCurrent saves the draft as it stands, before something replaces it, unless a version already holds that state.
+func keepCurrent(ctx context.Context, db *sql.DB, draftID, note string) error {
+	var held bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM drafts d JOIN draft_versions v ON v.draft_id = d.id AND v.revision = d.revision WHERE d.id = ?)`, draftID).Scan(&held); err != nil {
+		return err
+	}
+	if held {
+		return nil
+	}
+	return snapshotDraft(ctx, db, draftID, VersionManual, note)
+}
+
 // Version is one saved state of an item.
 type Version struct {
-	ID            string          `json:"id"`
-	DraftID       string          `json:"draftId"`
-	Seq           int             `json:"seq"`
+	ID      string `json:"id"`
+	DraftID string `json:"draftId"`
+	Seq     int    `json:"seq"` // the version number
+	// Revision is the state of the draft it holds: the draft's current one is the version in use.
+	Revision      int             `json:"revision"`
 	Label         string          `json:"label"`
 	Note          string          `json:"note,omitempty"`
 	Kind          string          `json:"kind"`
@@ -158,9 +174,9 @@ func nextSeq(ctx context.Context, q execer, draftID string) (int, error) {
 // enough time has passed since the last one; any other label is always taken.
 func snapshotDraft(ctx context.Context, db *sql.DB, draftID, label, note string) error {
 	var kind, title, doc, tags, alt, design string
-	var uni, dv int
-	err := db.QueryRowContext(ctx, `SELECT kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version FROM drafts WHERE id = ?`, draftID).
-		Scan(&kind, &title, &doc, &tags, &alt, &uni, &design, &dv)
+	var uni, dv, revision int
+	err := db.QueryRowContext(ctx, `SELECT kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, revision FROM drafts WHERE id = ?`, draftID).
+		Scan(&kind, &title, &doc, &tags, &alt, &uni, &design, &dv, &revision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -203,9 +219,9 @@ func snapshotDraft(ctx context.Context, db *sql.DB, draftID, label, note string)
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO draft_versions (id, draft_id, seq, label, note, kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, blobs, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		newID(), draftID, seq, label, note, kind, title, string(light), tags, alt, uni, design, dv, string(hj), actorID(ctx), versionNow().Format(time.RFC3339)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO draft_versions (id, draft_id, seq, label, note, kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, blobs, created_by, created_at, revision)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		newID(), draftID, seq, label, note, kind, title, string(light), tags, alt, uni, design, dv, string(hj), actorID(ctx), versionNow().Format(time.RFC3339), revision); err != nil {
 		return err
 	}
 	if err := prune(ctx, tx, draftID); err != nil {
@@ -301,7 +317,7 @@ func (s *Studio) Versions(ctx context.Context, draftID string) ([]Version, error
 	if _, err := s.GetDraft(ctx, draftID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT v.id, v.seq, v.label, v.note, v.kind, v.title, v.created_by,
+	rows, err := s.db.QueryContext(ctx, `SELECT v.id, v.seq, v.revision, v.label, v.note, v.kind, v.title, v.created_by,
 		COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = v.created_by), ''), v.created_at, substr(v.doc, 1, 4000)
 		FROM draft_versions v WHERE v.draft_id = ? ORDER BY v.seq DESC`, draftID)
 	if err != nil {
@@ -312,7 +328,7 @@ func (s *Studio) Versions(ctx context.Context, draftID string) ([]Version, error
 	for rows.Next() {
 		v := Version{DraftID: draftID}
 		var head string
-		if err := rows.Scan(&v.ID, &v.Seq, &v.Label, &v.Note, &v.Kind, &v.Title, &v.CreatedBy, &v.CreatedByName, &v.CreatedAt, &head); err != nil {
+		if err := rows.Scan(&v.ID, &v.Seq, &v.Revision, &v.Label, &v.Note, &v.Kind, &v.Title, &v.CreatedBy, &v.CreatedByName, &v.CreatedAt, &head); err != nil {
 			return nil, err
 		}
 		v.Preview = versionPreview(head)
@@ -393,18 +409,21 @@ func (s *Studio) RestoreVersion(ctx context.Context, draftID string, seq int) (D
 	if err != nil {
 		return Draft{}, err
 	}
-	if cur.Status == StatusScheduled {
-		return Draft{}, fmt.Errorf("%w: a post is waiting to be sent from this draft; cancel it before restoring", ErrConflict)
+	if err := editable(cur); err != nil {
+		return Draft{}, err
 	}
-	if err := snapshotDraft(ctx, s.db, draftID, VersionManual, "before restoring version "+fmt.Sprint(seq)); err != nil {
+	if err := keepCurrent(ctx, s.db, draftID, "before restoring version "+fmt.Sprint(seq)); err != nil {
 		return Draft{}, err
 	}
 	in := DraftInput{ProfileID: cur.ProfileID, Kind: v.Kind, Doc: v.Doc, Hashtags: v.Hashtags, AltText: v.AltText, UnicodeStyles: v.UnicodeStyles, Title: v.Title, Design: v.Design}
-	d, err := s.UpdateDraft(ctx, draftID, in)
-	if err != nil {
+	if err := in.normalize(); err != nil {
 		return Draft{}, err
 	}
-	if err := snapshotDraft(ctx, s.db, draftID, VersionRestored, fmt.Sprintf("from version %d", seq)); err != nil {
+	// bringing an old version back makes a new one, which is then the current one
+	s.writing.Lock()
+	defer s.writing.Unlock()
+	d, err := s.updateDraft(ctx, draftID, in, VersionRestored, fmt.Sprintf("from version %d", seq))
+	if err != nil {
 		return Draft{}, err
 	}
 	return d, nil
