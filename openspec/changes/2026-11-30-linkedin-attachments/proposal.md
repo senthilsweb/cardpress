@@ -47,3 +47,7 @@ Each bolt ends with one real post of that kind on a real account before the next
 - LinkedIn's exact calls, size and count limits for documents, multi-image posts and video (confirm before building).
 - Whether the video owner's permission needs any wording in the editor: the person posting is responsible for having the right to post it.
 - Whether a scheduled video post should check the address again a few minutes before its time and warn if it has gone.
+
+## Decision: large files on libSQL (2026-11-25)
+
+A local libSQL server refuses any single value over about 4.7 MB (see [deployment](../../../docs/deployment.md#large-files-on-libsql)). The limits stay as they are, no code change: **use SQLite for larger files.** The Fly deployment is a demo, so size limits there are not a concern.
