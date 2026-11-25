@@ -70,6 +70,7 @@ Keys also work for the JSON API (`Authorization: Bearer cpk_...`), so a script c
 
 - **Key or token.** With accounts on, `/mcp` needs an API key or `CARDPRESS_API_TOKEN`. The token acts as an admin for machines and sees everything; a key acts as one person. (With `CARDPRESS_API_TOKEN` set, every JSON API request needs the token, a key or a sign-in.) Without a token the server only listens on this machine unless you override that (see [Deployment](deployment.md)).
 - **No token: only `localhost` names are answered.** A website you visit can send requests to `localhost` from your browser, and a hostile DNS name can be pointed at `127.0.0.1` ("DNS rebinding"). So with no token, a request whose `Host` is not `localhost`, `127.0.0.1` or `::1` is refused. If you reach the server under another name (a reverse proxy, a LAN name), list it in `CARDPRESS_ALLOWED_HOSTS` or set a token.
+- **A key works under any host name.** A request with a valid API key is accepted also when it arrives through a tunnel or a reverse proxy under another name; requests without a key keep the `localhost` rule above.
 - **No cross-site changes.** A request that changes something and that a browser makes *from another website* is refused (Go's `http.CrossOriginProtection`), whether it targets `/api/v1` or `/mcp`. Programs such as curl or an MCP client send no browser headers and are unaffected. A separately hosted web app you listed in `CARDPRESS_CORS_ORIGINS` is trusted.
 
 ## The audit trail

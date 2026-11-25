@@ -148,6 +148,15 @@ func HTTPHandler(s *mcp.Server) http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{SessionTimeout: 30 * time.Minute})
 }
 
+// KeyedHTTPHandler is HTTPHandler for requests that have already shown a valid API key. The library otherwise refuses a
+// request that arrives on a loopback address under another host name, which is what a tunnel or a reverse proxy on the
+// same machine looks like. That check guards a server that trusts whoever can reach it (DNS rebinding); a web page does
+// not have the key. Never serve a request without a key through this handler.
+func KeyedHTTPHandler(s *mcp.Server) http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s },
+		&mcp.StreamableHTTPOptions{SessionTimeout: 30 * time.Minute, DisableLocalhostProtection: true})
+}
+
 // RunStdio serves one client over stdin and stdout until it disconnects. Nothing else may write to stdout.
 func RunStdio(ctx context.Context, s *mcp.Server) error { return s.Run(ctx, &mcp.StdioTransport{}) }
 

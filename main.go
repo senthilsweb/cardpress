@@ -151,7 +151,7 @@ func main() {
 		// process on the same machine cannot use it to reach everyone's work without one.
 		// An API key (cpk_...) makes the call act as the key's person, within its scope, so it reaches only that person's
 		// brands; the access rules above then do not apply to it (the key is the credential).
-		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
+		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.KeyedHTTPHandler(mcpSrv))
 		mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); got != r.Header.Get("Authorization") && strings.HasPrefix(got, service.KeyPrefix) {
 				u, id, scope, err := accounts.AuthenticateKey(r.Context(), got)
