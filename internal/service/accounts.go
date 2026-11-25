@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/mail"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -86,12 +87,25 @@ var (
 
 const argonKeyLen = 32
 
+// hashGate lets one password be hashed at a time. One hash needs 64 MB, so several sign-ins at once could use more
+// memory than a small server has (a 256 MB machine was killed this way).
+var hashGate = make(chan struct{}, 1)
+
+// argonKey works out one hash, alone, and hands its memory back straight away instead of leaving it for a later clean-up.
+func argonKey(pw, salt []byte, t, m uint32, p uint8, n uint32) []byte {
+	hashGate <- struct{}{}
+	defer func() { <-hashGate }()
+	key := argon2.IDKey(pw, salt, t, m, p, n)
+	debug.FreeOSMemory()
+	return key
+}
+
 func hashPassword(pw string) (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	key := argon2.IDKey([]byte(pw), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	key := argonKey([]byte(pw), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, argonMemory, argonTime, argonThreads,
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
 }
@@ -113,7 +127,7 @@ func checkPassword(hash, pw string) bool {
 	if err1 != nil || err2 != nil || len(want) == 0 {
 		return false
 	}
-	got := argon2.IDKey([]byte(pw), salt, uint32(t), uint32(m), uint8(p), uint32(len(want)))
+	got := argonKey([]byte(pw), salt, uint32(t), uint32(m), uint8(p), uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
