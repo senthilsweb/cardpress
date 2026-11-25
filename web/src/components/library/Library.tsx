@@ -10,7 +10,7 @@ import { Attempts, Thumb } from "@/components/studio/JobQueue";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
 import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog";
-import { Logo } from "@/components/studio/Logo";
+import { BuiltWith, Logo } from "@/components/studio/Logo";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { useSession } from "@/lib/session";
 import { ScaledCard } from "@/components/studio/preview";
@@ -118,7 +118,7 @@ function Page({ data }: { data: LibraryBoot }) {
           <a href="" aria-current="page" className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-2 font-medium"><FileText className="h-4 w-4" /> Library</a>
         </nav>
         <div className="flex-1" />
-        <div className="border-t border-border p-2">{menu("footer")}</div>
+        <div className="border-t border-border p-2">{menu("footer")}<BuiltWith className="px-2 pb-1 pt-2" /></div>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">

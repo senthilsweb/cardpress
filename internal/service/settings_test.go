@@ -381,3 +381,26 @@ func TestARejectedCheckSaysWhichValueIsWrongWithoutEchoingIt(t *testing.T) {
 		}
 	}
 }
+
+func TestARefusedAppCheckSaysPostingMayStillWork(t *testing.T) {
+	for code, want := range map[string]string{"invalid_client": "same app", "unauthorized_client": "different app"} {
+		srv := fakeLinkedIn(t, 401, fmt.Sprintf(`{"error":%q}`, code), nil)
+		res, err := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin")
+		if err != nil || res.Status != TestInvalid || !strings.Contains(res.Message, want) {
+			t.Fatalf("%s: %+v %v", code, res, err)
+		}
+		out := mustJSON(res)
+		if !strings.Contains(out, "LinkedIn's answer: "+code) || !strings.Contains(out, "you can still try a post") {
+			t.Errorf("%s: the answer should name the code and say posting may still work: %s", code, out)
+		}
+	}
+	// a refused token is about the token, so nothing says posting may work; a code that is not a plain word is not shown
+	srv := fakeLinkedIn(t, 400, `{"error":"invalid_token"}`, nil)
+	if res, _ := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin"); strings.Contains(mustJSON(res), "still try") {
+		t.Errorf("a refused token must not suggest posting: %+v", res)
+	}
+	srv = fakeLinkedIn(t, 400, `{"error":"<b>odd value</b>"}`, nil)
+	if res, _ := ready(t, srv.URL).Test(context.Background(), testBrand, "linkedin"); strings.Contains(mustJSON(res), "odd value") {
+		t.Errorf("an odd error code must not be shown: %+v", res)
+	}
+}
