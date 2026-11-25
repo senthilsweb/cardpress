@@ -27,7 +27,7 @@ import { UsersDrawer } from "./UsersDrawer";
 import { VersionsDrawer } from "./VersionsDrawer";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { SessionProvider } from "./SessionProvider";
-import { Logo } from "./Logo";
+import { BuiltWith, Logo } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useDrafts } from "@/lib/useDrafts";
@@ -320,6 +320,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </Tabs>
             <div className="shrink-0 border-t border-border p-2">
               <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />
+              <BuiltWith className="px-2 pb-1 pt-2" />
             </div>
            </div>
           </aside>

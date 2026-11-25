@@ -101,7 +101,15 @@ func (s *Settings) Test(ctx context.Context, profileID, id string) (TestResult, 
 
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusBadRequest:
-		res.Status, res.Message = TestInvalid, introspectRejection(body)
+		msg, appOnly, code := introspectRejection(body)
+		res.Status, res.Message = TestInvalid, msg
+		if code != "" {
+			res.Checks = append(res.Checks, Check{false, "LinkedIn's answer: " + code + "."})
+		}
+		if appOnly && urnOK {
+			// the Client ID and secret are only used for this check; a post is sent with the token and the author alone
+			res.Checks = append(res.Checks, Check{true, "The token itself was not checked. Posting uses only the access token and author, so you can still try a post."})
+		}
 		return res, nil
 	case resp.StatusCode >= 300:
 		res.Status, res.Message = TestError, "LinkedIn answered with an error ("+http.StatusText(resp.StatusCode)+"). Try again later."
@@ -164,20 +172,29 @@ func (s *Settings) Test(ctx context.Context, profileID, id string) (TestResult, 
 
 // introspectRejection says why LinkedIn refused the check. LinkedIn names the cause in an error code; its description is
 // not shown because it repeats the value that was sent, and a secret pasted in the wrong box must not be echoed back.
-func introspectRejection(body []byte) string {
+// appOnly reports a refusal of the app's own Client ID or secret, which says nothing about the token. code is LinkedIn's
+// error code when it is a plain word, so the person can look it up.
+func introspectRejection(body []byte) (msg string, appOnly bool, code string) {
 	var e struct {
 		Error string `json:"error"`
 	}
 	_ = json.Unmarshal(body, &e)
+	if errorCodeRe.MatchString(e.Error) {
+		code = e.Error
+	}
 	switch e.Error {
 	case "invalid_client_id":
-		return "LinkedIn does not know this Client ID. Copy it again from the app's Auth tab (it is not the secret)."
+		return "LinkedIn does not know this Client ID. Copy it again from the app's Auth tab (it is not the secret).", true, code
 	case "invalid_client_secret":
-		return "The Client ID is right but the Client secret is not. Copy the Primary Client Secret again from the Auth tab."
-	case "invalid_client", "unauthorized_client":
-		return "LinkedIn did not accept the Client ID and secret together. Copy both again from the app's Auth tab."
+		return "The Client ID is right but the Client secret is not. Copy the Primary Client Secret again from the Auth tab.", true, code
+	case "invalid_client":
+		return "LinkedIn did not accept the Client ID and secret together. Check both are from the same app, and that the secret was not regenerated after you copied it.", true, code
+	case "unauthorized_client":
+		return "LinkedIn does not let this app check this token. The token was probably made by a different app: use the Client ID and secret of the app that made it.", true, code
 	case "invalid_token", "invalid_request":
-		return "LinkedIn did not accept the access token. It may belong to a different app or have been revoked: generate a new one for this app."
+		return "LinkedIn did not accept the access token. It may belong to a different app or have been revoked: generate a new one for this app.", false, code
 	}
-	return "LinkedIn refused the check (the Client ID, secret or token is not accepted)."
+	return "LinkedIn refused the check (the Client ID, secret or token is not accepted).", false, code
 }
+
+var errorCodeRe = regexp.MustCompile(`^[a-z_]{3,40}$`)

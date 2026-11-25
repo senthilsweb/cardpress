@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiInfo } from "@/lib/api";
+import { BuiltWith, Logo } from "@/components/studio/Logo";
 import { base, daysIn, joinDate, loginUrl, MONTHS, signupUrl } from "@/lib/session";
 
 const select = "flex h-9 w-full cursor-pointer rounded-md border border-input bg-card px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -14,25 +15,17 @@ function nextPage(): string {
   return n && n.startsWith(base()) && !n.startsWith("//") && !/\/(login|signup)\/?$/.test(n) ? n : `${base()}studio/`;
 }
 
-function Mark() {
-  return (
-    <a href={base()} className="mb-6 flex items-center justify-center gap-2" aria-label="CardPress home">
-      <svg width="22" height="22" viewBox="0 0 10 10" aria-hidden><path d="M5 0.6 9.4 5 5 9.4 0.6 5Z" className="fill-brand" /></svg>
-      <span className="font-mono text-[13px] font-bold uppercase tracking-[0.14em]">CardPress</span>
-    </a>
-  );
-}
-
 function Card({ title, lead, children }: { title: string; lead?: string; children: React.ReactNode }) {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <Mark />
+        <div className="mb-7"><Logo stacked /></div>
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           {lead && <p className="mt-1 text-sm text-muted-foreground">{lead}</p>}
           <div className="mt-5">{children}</div>
         </div>
+        <BuiltWith className="mt-6 text-center" />
       </div>
     </main>
   );

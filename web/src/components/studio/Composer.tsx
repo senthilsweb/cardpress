@@ -146,7 +146,9 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   };
   // the HTML of a long article with pictures is large, so it is made when asked for (the preview opening, a copy), never per keystroke
   // a hand-over that was written under another draft than the one open now is dropped rather than put into the wrong draft
-  const onDoc = (doc: DocNode, key: string) => { if (key === draft.id) store.update({ doc }); };
+  // the key is the one the editor was given (draft and revision), so it must be compared with that, not with the bare id
+  const docKey = `${draft.id}:${store.rev}`;
+  const onDoc = (doc: DocNode, key: string) => { if (key === docKey) store.update({ doc }); };
   const html = () => (editor && !editor.isDestroyed ? editor.getHTML() : "");
   const copyNow = async () => {
     try {
@@ -214,7 +216,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={`${draft.id}:${store.rev}`} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
+            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -330,7 +332,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
             <div className="min-h-0 flex-1 overflow-y-auto p-6" data-editor-scroll>
               <div className={cn("mx-auto w-full", width === "wide" ? "max-w-6xl" : "max-w-3xl")} style={{ "--rich-size": `${TEXT_SIZES[isPost ? DEFAULT_SIZE_INDEX : sizeIdx]}rem` } as React.CSSProperties}>
                 <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <RichEditor large bare readOnly={draft.status === "scheduled"} docKey={`${draft.id}:${store.rev}`} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
+                  <RichEditor large bare readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
                 </div>
               </div>
             </div>

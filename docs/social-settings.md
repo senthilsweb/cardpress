@@ -29,6 +29,20 @@ You paste the values in. There is no LinkedIn sign-in (OAuth) flow in the studio
 
 Social accounts belong to a brand, and a brand belongs to a person. Only its owner (an editor) and admins can open this screen or use the stored credentials; a writer cannot see it at all (see [Accounts and roles](accounts.md)). Anyone with the server's `CARDPRESS_API_TOKEN` acts as an admin, so keep it secret (see [Deployment](deployment.md)).
 
+## When Test connection fails
+
+The result lists each check. When LinkedIn refuses, it also shows LinkedIn's own error code.
+
+| LinkedIn's answer | What it means | What to do |
+|---|---|---|
+| `invalid_client_id` | LinkedIn does not know the Client ID | Copy the Client ID again from the app's Auth tab |
+| `invalid_client_secret` | The Client ID is right, the secret is not | Copy the Primary Client Secret again |
+| `invalid_client` | The Client ID and secret were not accepted together | Check both come from the same app, and that the secret was not regenerated after you copied it |
+| `unauthorized_client` | This app may not check this token | The token was probably made by a different app: use that app's Client ID and secret |
+| `invalid_token`, `invalid_request` | The access token was not accepted | Generate a new token for this app |
+
+The Client ID and secret are used only by this check. A post is sent with the access token and the author URN alone, so when only the app check is refused you can still try a post.
+
 ## Environment variables
 
 A credential can come from the environment instead. An environment value overrides a stored one, is shown as "Set by environment", and cannot be changed in the screen. This suits Docker and CI.
