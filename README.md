@@ -12,8 +12,9 @@
 |---|---|
 | Card designer, post composer, full preview, exports | Built and tested |
 | Encrypted credentials, scheduler | Built and tested |
-| LinkedIn publishing | Tested against a local fake of LinkedIn's API, **not yet against a real account**. Treat the first real post as a trial |
-| X and Instagram | Credentials can be stored; publishing is not built |
+| LinkedIn publishing: a post with its card | Built. A real post from a live server has succeeded |
+| LinkedIn publishing: your own image, several images, a PDF, a video | Tested against a local fake of LinkedIn's API, **not yet against a real account**. Treat the first real post of each as a trial. See [Publishing](docs/publishing.md) |
+| X, Instagram and Facebook | Card sizes and feed previews. Publishing is not built (X and Instagram credentials can be stored) |
 | Assistant | Works with a built-in demo agent (no AI model). The Claude Managed Agent adapter is built and tested against a fake API, **not yet against a real Anthropic account** |
 | MCP server | Built and tested |
 
@@ -22,6 +23,7 @@
 - **Brands**: keep several brands in one install, each with its own look, drafts, queue and accounts.
 - **Cards**: a brand profile with 28 colour sets, 6 layouts, 12 backgrounds drawn in code, and 10 sizes for LinkedIn, X, Instagram and Facebook. Export a PNG, copy it, or download every size as a zip.
 - **Posts**: a rich-text editor with hashtags and alt text, and a full preview of the LinkedIn feed.
+- **Attachments**: send the card, or in its place your own image, up to 10 images, a PDF, or a video from a public `https` address (not uploaded or stored). Feed previews follow what each network accepts.
 - **Assistant**: paste an article or a web address and it proposes a post. You approve, edit or reject it. It prepares content only.
 - **Publish**: post to LinkedIn now or at a chosen time, with a queue, per-post status and no automatic retries. A person confirms every post.
 - **Accounts**: admin, editor and writer roles, a workspace for each person, approval before publishing, and a history of every item.
