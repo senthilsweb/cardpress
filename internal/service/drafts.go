@@ -63,6 +63,8 @@ type Draft struct {
 	// "document" (a PDF of its own, which has a title).
 	Attachment      string `json:"attachment"`
 	AttachmentTitle string `json:"attachmentTitle,omitempty"`
+	// Images are the pictures of a post whose attachment is "images", in order.
+	Images []DraftImage `json:"images,omitempty"`
 	// Who wrote it and who approved it (ids, and the names for showing).
 	CreatedBy      string `json:"createdBy,omitempty"`
 	CreatedByName  string `json:"createdByName,omitempty"`
@@ -341,7 +343,17 @@ func (s *Studio) GetDraft(ctx context.Context, id string) (Draft, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return Draft{}, ErrNotFound
 	}
-	return d, err
+	if err != nil {
+		return d, err
+	}
+	if d.Attachment == AttachImages {
+		ims, err := imagesOf(ctx, s.db, `draft_id = ?`, id)
+		if err != nil {
+			return d, err
+		}
+		d.Images = ims[id]
+	}
+	return d, nil
 }
 
 // ListDrafts returns a profile's drafts, most recently changed first.
@@ -359,7 +371,17 @@ func (s *Studio) ListDrafts(ctx context.Context, profileID string) ([]Draft, err
 		}
 		out = append(out, d)
 	}
-	return out, closeRows(rows)
+	if err := closeRows(rows); err != nil {
+		return nil, err
+	}
+	ims, err := imagesOf(ctx, s.db, `draft_id IN (SELECT id FROM drafts WHERE profile_id = ?)`, profileID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].Images = ims[out[i].ID]
+	}
+	return out, nil
 }
 
 // DeleteDraft removes a draft and its history. An item that is approved, waiting to be sent or posted must be brought
@@ -373,6 +395,9 @@ func (s *Studio) DeleteDraft(ctx context.Context, id string) error {
 		return fmt.Errorf("%w: bring this %s back to draft before deleting it", ErrConflict, d.Kind)
 	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM drafts WHERE id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
 		return err
 	}
 	return dropVersions(ctx, s.db, id)
@@ -470,6 +495,9 @@ func (s *Studio) SetAttachment(ctx context.Context, id string, data []byte, name
 	if err != nil {
 		return Draft{}, err
 	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil { // a single file replaces a set
+		return Draft{}, err
+	}
 	return s.GetDraft(ctx, id)
 }
 
@@ -532,6 +560,9 @@ func (s *Studio) ClearAttachment(ctx context.Context, id string) (Draft, error) 
 	if err != nil {
 		return Draft{}, err
 	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM draft_images WHERE draft_id = ?`, id); err != nil {
+		return Draft{}, err
+	}
 	return s.GetDraft(ctx, id)
 }
 
@@ -547,6 +578,9 @@ type ownFile struct {
 // AttachmentFile returns a post's own file and its media type.
 func (s *Studio) AttachmentFile(ctx context.Context, id string) ([]byte, string, error) {
 	f, err := attachmentOf(ctx, s.db, id)
+	if err == nil && len(f.Data) == 0 { // a set of pictures has no single file
+		return nil, "", ErrNotFound
+	}
 	return f.Data, f.Type, err
 }
 
@@ -554,8 +588,8 @@ func (s *Studio) AttachmentFile(ctx context.Context, id string) ([]byte, string,
 func attachmentOf(ctx context.Context, db *sql.DB, id string) (ownFile, error) {
 	var f ownFile
 	err := db.QueryRowContext(ctx, `SELECT attachment_kind, attachment, attachment_type, attachment_title FROM drafts WHERE id = ?`, id).Scan(&f.Kind, &f.Data, &f.Type, &f.Title)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && (f.Kind == AttachCard || len(f.Data) == 0)) {
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && f.Kind != AttachImages && (f.Kind == AttachCard || len(f.Data) == 0)) {
 		return ownFile{}, ErrNotFound
 	}
-	return f, err
+	return f, err // for a set of pictures only Kind is set: the pictures are in draft_images
 }

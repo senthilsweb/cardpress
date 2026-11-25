@@ -20,7 +20,7 @@ const suggested = (tz: string) => toLocalInput(new Date(Math.ceil((Date.now() + 
  */
 export function PublishBar({ own, draft, onApprove, serialized, bodyOnly, size, renderPng, onDone, onOpenSettings, brandName }: {
   /** The post carries a file of its own, so no card is rendered or sent. */
-  own?: "image" | "document";
+  own?: "image" | "document" | "images";
   draft: Draft;
   /** Approve the draft (a post is only sent from an approved draft). */
   onApprove: () => void | Promise<void>;

@@ -26,6 +26,7 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST/GET /publish/jobs`, `GET/DELETE /publish/jobs/{id}`, `GET .../attempts` | Publish jobs and what LinkedIn answered on each attempt |
 | `GET /publish/jobs/{id}/image` | The file of a job: the card, or the post's own image or PDF |
 | `GET/PUT/DELETE /drafts/{id}/attachment`, `PUT .../attachment/title` | A post's own image or PDF, sent in place of the card, and a document's title |
+| `POST /drafts/{id}/images`, `GET/PUT/DELETE /drafts/{id}/images/{image}`, `PUT .../images/order` | A post's set of images: add, read, describe, remove, reorder |
 | `POST /publish/jobs/{id}/publish-now`, `PUT .../schedule`, `POST .../cancel` | Job actions |
 | `POST/GET /chat/conversations`, `GET/DELETE /chat/conversations/{id}` | Conversations |
 | `POST /chat/conversations/{id}/messages` | Send a message; the reply streams as server-sent events |

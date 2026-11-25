@@ -13,8 +13,10 @@ export interface Job {
   previewText: string;
   altText: string;
   /** What it carries: the card, or a file of the post's own (a picture, or a PDF document with a title). */
-  attachment?: "card" | "image" | "document";
+  attachment?: "card" | "image" | "document" | "images";
   attachmentTitle?: string;
+  /** How many pictures a multi-image post carries. */
+  imageCount?: number;
   /** UTC. Empty for a post published at once. */
   scheduledAt?: string;
   /** IANA zone to show the time in. */

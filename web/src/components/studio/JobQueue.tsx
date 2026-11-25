@@ -107,6 +107,7 @@ function JobRow({ job, store, brand }: { job: Job; store: JobsStore; brand?: str
             <StatusBadge s={s} />
             {brand && <Badge variant="outline" title="The brand this post belongs to">{brand}</Badge>}
             {job.attachment === "image" && <Badge variant="outline" title="This post carries its own image, not the card">Own image</Badge>}
+            {job.attachment === "images" && <Badge variant="outline" title="This post carries several images, not the card">{job.imageCount ?? 0} images</Badge>}
             {job.attachment === "document" && <Badge variant="outline" title={job.attachmentTitle}>Document</Badge>}
             {s === "publishing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" aria-label="Publishing" />}
             <span className="text-[11px] text-muted-foreground"><When j={job} /></span>

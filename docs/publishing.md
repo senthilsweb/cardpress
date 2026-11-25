@@ -20,31 +20,41 @@ Three calls, made by the server with the stored access token:
 
 The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ] { } < > @ | ~ _ * # \`), so it reads exactly as previewed. Hashtags go on a last line as LinkedIn hashtag templates, so they become real hashtags.
 
-## Your own image or PDF in place of the card
+## Your own images or PDF in place of the card
 
-In the Post tab, under **Attachment**, choose **Use an image or PDF** and pick a file. It goes out with the post, not the card. The card design is kept: **Use the card** goes back to it.
+In the Post tab, under **Attachment**, choose **Use images or a PDF** and pick one file or several images. They go out with the post, not the card. The card design is kept: **Use the card** goes back to it.
 
 | File | Limit | How LinkedIn shows it |
 |---|---|---|
 | Image: PNG or JPEG | 10 MB | One image, with your alt text |
+| Several images: PNG or JPEG | 10 MB each, up to 10 (LinkedIn allows 20) | A grid, each image with its own alt text |
 | Document: PDF | 20 MB (LinkedIn allows 100 MB and 300 pages; CardPress holds the file in memory, so its limit is lower) | Pages to swipe through, under the document title |
 
 A document has a **title**, shown above its pages. It starts as the file name and can be changed. A document has no alt text.
 
-The full preview shows the image, or the PDF's pages in the browser's own viewer. The queue marks the post **Own image** or **Document**.
+With several images, the Attachment section lists them in order. Each has its own alt text, arrows to move it up or down, and a button to remove it. **Add images** adds more. One image left in the list is sent as an ordinary image post; removing the last one goes back to the card.
 
-Changing the file or the title of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its attachment; cancel it first.
+The full preview shows the image, the grid of images, or the PDF's pages in the browser's own viewer. The queue marks the post **Own image**, **N images** or **Document**.
+
+Changing the file, the title, an image's alt text or the order of the images of an approved post returns it to draft, so it must be approved again: what was approved is what goes out. A post waiting to be sent cannot change its attachment; cancel it first.
 
 For a document the server calls `POST /rest/documents?action=initializeUpload`, uploads the PDF to the address LinkedIn returns, and creates the post with the document and its title. The post is created straight after the upload: a member token cannot read a document's processing status, so CardPress does not wait for it.
 
-Several images and video are not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
+For several images the server uploads each image in turn (`POST /rest/images?action=initializeUpload`, then the upload) and creates one post that names them all (`content.multiImage.images`, each with its `id` and `altText`). The images are read from the database one at a time, so they are never all in memory together, and the job gets 30 more seconds for each image.
+
+Video is not built yet (see the proposal in `openspec/changes/2026-11-30-linkedin-attachments`).
 
 | Route | Purpose |
 |---|---|
 | `PUT /api/v1/drafts/{id}/attachment?name=` | The file as the request body (PNG, JPEG or PDF). `name` is the file name, which a document's title starts from. Returns the draft |
 | `PUT /api/v1/drafts/{id}/attachment/title` | `{"title": "…"}`: a document's title, one line of at most 150 characters |
 | `GET /api/v1/drafts/{id}/attachment` | The file. `404` when the post uses the card |
-| `DELETE /api/v1/drafts/{id}/attachment` | Back to the card |
+| `DELETE /api/v1/drafts/{id}/attachment` | Back to the card (also removes a set of images) |
+| `POST /api/v1/drafts/{id}/images` | Add an image (the request body) to the post's set. The first one turns the attachment into a set |
+| `GET /api/v1/drafts/{id}/images/{image}` | One image of the set |
+| `PUT /api/v1/drafts/{id}/images/{image}` | `{"altText": "…"}` |
+| `PUT /api/v1/drafts/{id}/images/order` | `{"ids": [...]}`: every image once, in the new order |
+| `DELETE /api/v1/drafts/{id}/images/{image}` | Remove one image |
 
 ## Approve first
 

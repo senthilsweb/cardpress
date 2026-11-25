@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowLeftRight, Check, Copy, Eye, FileText, History, ImageUp, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, History, ImageUp, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { CAPTION_LIMITS, NETWORKS, type Size } from "@/lib/sizes";
 import { formatInZone, type Job } from "@/lib/jobs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { usePictures } from "@/lib/usePictures";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { cn } from "@/lib/utils";
 import type { DraftStore } from "@/lib/useDrafts";
@@ -39,6 +40,7 @@ const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 
 // every draft but the one being typed in is served from here instead of being serialised again on each keystroke.
 const MAX_IMAGE_BYTES = 10 << 20; // the server refuses more
 const MAX_DOCUMENT_BYTES = 20 << 20;
+const MAX_POST_IMAGES = 10;
 
 const labelCache = new WeakMap<object, string>();
 const labelOf = (d: Draft) => {
@@ -94,11 +96,13 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
   useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
   const [tag, setTag] = useState("");
   // the post's own picture, when it has one, as an address the page can show
-  const own = draft?.kind === "post" && (draft.attachment === "image" || draft.attachment === "document") ? draft.attachment : undefined;
+  const own = draft?.kind === "post" && (draft.attachment === "image" || draft.attachment === "document" || draft.attachment === "images") ? draft.attachment : undefined;
+  const pics = own === "images" ? draft?.images ?? [] : [];
+  const picUrls = usePictures(own === "images" ? draft?.id : undefined, pics.map((p) => p.id));
   const [ownSrc, setOwnSrc] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!own || !draft) { setOwnSrc(undefined); return; }
+    if (!own || own === "images" || !draft) { setOwnSrc(undefined); return; }
     let live = true, url: string | undefined;
     api.attachmentImage(draft.id).then((b) => { if (live) { url = URL.createObjectURL(b); setOwnSrc(url); } }).catch(() => undefined);
     return () => { live = false; if (url) URL.revokeObjectURL(url); };
@@ -146,14 +150,36 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
 
   const locked = draft.status === "scheduled"; // a post waiting to be sent cannot change
   const pickFile = guard(async () => {
-    const f = fileRef.current?.files?.[0];
+    const files = Array.from(fileRef.current?.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
-    if (!f) return;
-    const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
-    if (f.size > (pdf ? MAX_DOCUMENT_BYTES : MAX_IMAGE_BYTES)) throw new Error(pdf ? "The PDF is over 20 MB." : "The image is over 10 MB.");
-    await store.setAttachment(f, f.name);
-    toast.success(pdf ? "Your PDF replaces the card" : "Your image replaces the card", { description: "Approve the post again before publishing." });
+    if (!files.length) return;
+    const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+    const pdfs = files.filter(isPdf), images = files.filter((f) => !isPdf(f));
+    if (pdfs.length && (pdfs.length > 1 || images.length)) throw new Error("Choose one PDF, or images, not both.");
+    if (pdfs.length) {
+      if (pdfs[0].size > MAX_DOCUMENT_BYTES) throw new Error("The PDF is over 20 MB.");
+      await store.setAttachment(pdfs[0], pdfs[0].name);
+      toast.success("Your PDF replaces the card", { description: "Approve the post again before publishing." });
+      return;
+    }
+    if (images.some((f) => f.size > MAX_IMAGE_BYTES)) throw new Error("An image is over 10 MB.");
+    // one image on its own stays a single image; more, or adding to a set, makes a set
+    if (images.length === 1 && own !== "images") {
+      await store.setAttachment(images[0], images[0].name);
+      toast.success("Your image replaces the card", { description: "Approve the post again before publishing." });
+      return;
+    }
+    if (pics.length + images.length > MAX_POST_IMAGES) throw new Error(`A post can carry at most ${MAX_POST_IMAGES} images.`);
+    for (const f of images) await store.addImage(f); // one after another, so they keep the order they were chosen in
+    toast.success(`${pics.length + images.length} images replace the card`, { description: "Approve the post again before publishing." });
   });
+  const movePic = (i: number, by: 1 | -1) => guard(async () => {
+    const ids = pics.map((p) => p.id);
+    [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
+    await store.orderImages(ids);
+  })();
+  const removePic = (id: string) => guard(async () => { await store.removeImage(id); })();
+  const savePicAlt = (id: string, alt: string) => guard(async () => { await store.setImageAlt(id, alt); })();
   const saveTitle = (title: string) => guard(async () => { await store.setAttachmentTitle(title); })();
   const useCard = guard(async () => { await store.clearAttachment(); toast("The card goes out with this post"); });
 
@@ -279,8 +305,29 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
 
           <Section title="Attachment">
             <div className="space-y-2" aria-label="Attachment">
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={() => void pickFile()} aria-label="Choose an image or a PDF" />
-              {own ? (
+              <input ref={fileRef} type="file" multiple accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={() => void pickFile()} aria-label="Choose images or a PDF" />
+              {own === "images" ? (
+                <>
+                  <p className="text-xs text-muted-foreground">{pics.length === 1 ? "Your image goes out, not the card." : `Your ${pics.length} images go out, not the card.`}</p>
+                  <ol className="space-y-1.5" aria-label="Images, in order">
+                    {pics.map((p, i) => (
+                      <li key={p.id} className="flex items-center gap-2">
+                        {picUrls[p.id] ? <img src={picUrls[p.id]} alt="" className="h-11 w-14 shrink-0 rounded border border-border object-cover" /> : <div className="h-11 w-14 shrink-0 rounded border border-border bg-muted" aria-hidden />}
+                        <Input key={`${p.id}:${p.altText}`} defaultValue={p.altText} placeholder={`Alt text for image ${i + 1}`} aria-label={`Alt text for image ${i + 1}`} disabled={locked} className="h-8 min-w-0 flex-1 text-xs"
+                          onBlur={(e) => { if (e.target.value.trim() !== p.altText) void savePicAlt(p.id, e.target.value); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
+                        <Button variant="ghost" size="icon-sm" disabled={locked || i === 0} onClick={() => void movePic(i, -1)} aria-label={`Move image ${i + 1} up`}><ArrowUp /></Button>
+                        <Button variant="ghost" size="icon-sm" disabled={locked || i === pics.length - 1} onClick={() => void movePic(i, 1)} aria-label={`Move image ${i + 1} down`}><ArrowDown /></Button>
+                        <Button variant="ghost" size="icon-sm" disabled={locked} onClick={() => void removePic(p.id)} aria-label={`Remove image ${i + 1}`}><X /></Button>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button variant="outline" size="sm" disabled={locked || pics.length >= MAX_POST_IMAGES} onClick={() => fileRef.current?.click()}><ImageUp /> Add images</Button>
+                    <Button variant="outline" size="sm" disabled={locked} onClick={useCard}>Use the card</Button>
+                  </div>
+                </>
+              ) : own ? (
                 <div className="flex items-center gap-2.5">
                   {own === "document"
                     ? <div className="grid h-14 w-24 shrink-0 place-items-center rounded border border-border bg-muted text-muted-foreground" aria-hidden><FileText className="h-6 w-6" /></div>
@@ -296,7 +343,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="flex-1 text-xs text-muted-foreground">The card goes out with the post.</span>
-                  <Button variant="outline" size="sm" disabled={locked} onClick={() => fileRef.current?.click()}><ImageUp /> Use an image or PDF</Button>
+                  <Button variant="outline" size="sm" disabled={locked} onClick={() => fileRef.current?.click()}><ImageUp /> Use images or a PDF</Button>
                 </div>
               )}
             </div>
@@ -306,7 +353,7 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
                   onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== draft.attachmentTitle) void saveTitle(v); else e.target.value = draft.attachmentTitle ?? ""; }}
                   onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
               </Field>
-            ) : (
+            ) : own === "images" ? null : (
               <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="For screen readers." />
             )}
           </Section>
@@ -347,7 +394,8 @@ export function Composer({ onOpenHistory, openPreview, store, jobs, brandNames, 
       </Section>
 
       <FullPreview
-        image={own ? ownSrc : undefined}
+        image={own === "images" ? (pics.length === 1 ? picUrls[pics[0].id] : undefined) : own ? ownSrc : undefined}
+        images={own === "images" && pics.length > 1 ? pics.map((p) => picUrls[p.id]).filter(Boolean) : undefined}
         open={preview} onOpenChange={setPreview} draft={draft} serialized={ser}
         articleHtml={preview ? html() : ""} design={design} profile={profile} palette={palette} size={size}
         actions={(

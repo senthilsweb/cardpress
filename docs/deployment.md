@@ -28,8 +28,22 @@ The Go server is required: it owns the database, the encrypted credentials, publ
 |---|---|
 | unset, or `file:./data/cardpress.db` | Local SQLite file (created with its folder on first run) |
 | `libsql://<db>.turso.io` plus `CARDPRESS_DB_TOKEN` | [Turso](https://turso.tech) (hosted SQLite). Neon is Postgres and is not supported. |
+| `http://127.0.0.1:<port>` | A libSQL server on this machine (`turso dev`), to try the Turso path without an account. Plain `http://` and `ws://` are accepted only for this machine. |
 
 Migrations are embedded and run at startup. Back up the `data/` folder (or use Turso's backups).
+
+### SQLite and Turso use the same schema
+
+The server speaks to a SQLite file through one driver and to Turso (libSQL) through another, with the same migrations and the same SQL. Files (a post's own image, PDF or set of images) are stored as BLOBs; each picture of a set is its own row, so no single statement carries more than one file.
+
+To check the libSQL path on your own machine, start a local libSQL server and point the tests at it:
+
+```bash
+turso dev --port 8081 --db-file /tmp/cardpress-libsql-test.db    # needs the Turso CLI
+CARDPRESS_TEST_LIBSQL_URL=http://127.0.0.1:8081 go test ./internal/store -run OnEveryBackend -v
+```
+
+The test applies the migrations and runs the kinds of statement the server depends on (BLOBs of a few megabytes, transactions, `INSERT … SELECT` with a window function) on SQLite and on libSQL. Without the variable it runs on SQLite only. Use a database kept for tests. To run the whole server on it: `CARDPRESS_DB_URL=http://127.0.0.1:8081 ./bin/cardpress`.
 
 ## Configuration
 

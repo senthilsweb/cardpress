@@ -23,10 +23,14 @@
 - [ ] Not done, and different from the proposal: the PDF is held in memory and kept in the draft and job rows (hence the 20 MB limit), not streamed and not in `doc_blobs`. The page count is not checked. Only PDF is accepted. The post is created without waiting for LinkedIn to process the document (a member token cannot read the status); whether LinkedIn accepts that is unknown until a real post
 
 ## Bolt 3: images
-- [ ] Several pictures with order and alt text each; count limit
-- [ ] Multi-image post
-- [ ] Preview as a grid
-- [ ] Tests, docs, one real post
+- [x] Confirmed against LinkedIn's documentation: `content.multiImage.images` with `id` and `altText` each; 2 to 20 images; each uploaded through the Images API
+- [x] Several pictures with an order and alt text each; at most 10, 10 MB each
+- [x] Multi-image post; each picture uploaded in turn and read from the database when it is its turn
+- [x] One picture left in a set is sent as an ordinary image post; none goes back to the card
+- [x] Preview as a grid; the queue shows how many
+- [x] Tests (service, API, LinkedIn client against the fake); docs
+- [ ] One real post
+- [ ] Not done: reordering is by arrows, not by dragging; the version history does not record the pictures; the library and the public page still show the card
 
 ## Bolt 4: video from a public address
 - [ ] Address field; check on paste (https, public host, answers, is a video, size within the limit)

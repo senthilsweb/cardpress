@@ -16,21 +16,29 @@ import (
 var testPNG = append([]byte("\x89PNG\r\n\x1a\n"), []byte("pixels")...)
 
 type fakePoster struct {
-	mu    sync.Mutex
-	calls []linkedin.Post
-	token string
-	err   error
-	urn   string
-	delay time.Duration
-	boom  bool
+	mu     sync.Mutex
+	calls  []linkedin.Post
+	loaded [][]byte // the pictures of the last multi-image post, as they were read
+	token  string
+	err    error
+	urn    string
+	delay  time.Duration
+	boom   bool
 }
 
 func (f *fakePoster) Publish(_ context.Context, token string, p linkedin.Post) (string, error) {
 	if f.delay > 0 {
 		time.Sleep(f.delay)
 	}
+	// read the pictures now, as the real client does: afterwards the job's time is up
+	var loaded [][]byte
+	for _, pic := range p.Pictures {
+		b, _ := pic.Load()
+		loaded = append(loaded, b)
+	}
 	f.mu.Lock()
 	f.calls = append(f.calls, p)
+	f.loaded = loaded
 	f.token = token
 	f.mu.Unlock()
 	if f.boom {

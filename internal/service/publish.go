@@ -27,12 +27,14 @@ const (
 )
 
 const (
-	maxImageBytes   = 10 << 20
-	maxBodyChars    = 3000
-	minLeadTime     = 30 * time.Second
-	maxLeadTime     = 366 * 24 * time.Hour
-	publishTimeout  = 90 * time.Second
-	stalePublishing = 10 * time.Minute
+	maxImageBytes  = 10 << 20
+	maxBodyChars   = 3000
+	minLeadTime    = 30 * time.Second
+	maxLeadTime    = 366 * 24 * time.Hour
+	publishTimeout = 90 * time.Second
+	// perPictureTimeout is the extra time a multi-image post gets for each picture.
+	perPictureTimeout = 30 * time.Second
+	stalePublishing   = 10 * time.Minute
 	// DefaultMissedGrace is how late a scheduled post may still go out.
 	DefaultMissedGrace = 15 * time.Minute
 )
@@ -52,6 +54,7 @@ type Job struct {
 	AltText     string   `json:"altText"`
 	Attachment  string   `json:"attachment"`                // what it carries: "card", "image" or "document" (a file of the post's own)
 	Title       string   `json:"attachmentTitle,omitempty"` // a document's title
+	ImageCount  int      `json:"imageCount,omitempty"`      // how many pictures a multi-image post carries
 	ScheduledAt string   `json:"scheduledAt,omitempty"`     // UTC; empty for publish-now
 	Timezone    string   `json:"timezone,omitempty"`        // IANA zone to display the time in
 	Error       string   `json:"error,omitempty"`
@@ -198,7 +201,24 @@ func (p *Publisher) ready(ctx context.Context, profileID string) error {
 func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 	// a post with a file of its own sends that file, as it was approved, whatever the caller sent
 	in.kind, in.title = AttachCard, ""
-	if own, err := attachmentOf(ctx, p.db, in.DraftID); err == nil {
+	pictures := 0
+	if own, err := attachmentOf(ctx, p.db, in.DraftID); err == nil && own.Kind == AttachImages {
+		// a set of pictures: the first also stands for the job (its thumbnail), and one alone is an ordinary image post
+		in.kind = AttachImages
+		if err := p.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM draft_images WHERE draft_id = ?`, in.DraftID).Scan(&pictures); err != nil {
+			return Job{}, err
+		}
+		if pictures == 0 {
+			return Job{}, invalid("the post has no picture: add one, or use the card")
+		}
+		var alt string
+		if err := p.db.QueryRowContext(ctx, `SELECT data, alt_text FROM draft_images WHERE draft_id = ? ORDER BY position, id LIMIT 1`, in.DraftID).Scan(&in.Image, &alt); err != nil {
+			return Job{}, err
+		}
+		if pictures == 1 {
+			in.kind, in.AltText = AttachImage, alt
+		}
+	} else if err == nil {
 		in.Image, in.kind, in.title = own.Data, own.Kind, own.Title
 	} else if !errors.Is(err, ErrNotFound) {
 		return Job{}, err
@@ -219,11 +239,24 @@ func (p *Publisher) Create(ctx context.Context, in JobInput) (Job, error) {
 		status, sched = JobScheduled, sql.NullString{String: p.stamp(*in.ScheduledAt), Valid: true}
 	}
 	id := newID()
-	_, err := p.db.ExecContext(ctx,
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Job{}, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO publish_jobs (id, profile_id, draft_id, network, status, body, hashtags, alt_text, image, image_type, attachment_kind, attachment_title, scheduled_at, timezone, created_by, created_at, updated_at)
 		 VALUES (?, ?, ?, 'linkedin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, in.ProfileID, in.DraftID, status, strings.TrimSpace(in.Body), string(tags), in.AltText, in.Image, fileType(in.Image), in.kind, in.title, sched, in.Timezone, actorID(ctx), p.stamp(now), p.stamp(now))
 	if err != nil {
+		return Job{}, err
+	}
+	if in.kind == AttachImages {
+		if n, err := copyImagesToJob(ctx, tx, in.DraftID, id); err != nil || n != pictures {
+			return Job{}, fmt.Errorf("the pictures changed while the post was being made (%v): try again", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return Job{}, err
 	}
 	p.syncDraft(ctx, id, status)
@@ -284,13 +317,13 @@ func (p *Publisher) releaseDrafts(ctx context.Context) {
 
 /* ------------------------------------------------------------------ read */
 
-const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, attachment_kind, attachment_title, scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
+const jobCols = `id, profile_id, draft_id, network, status, body, hashtags, alt_text, attachment_kind, attachment_title, (SELECT COUNT(*) FROM job_images WHERE job_id = publish_jobs.id), scheduled_at, timezone, error, post_urn, post_url, created_at, updated_at, published_at`
 
 func scanJob(r scanner) (Job, error) {
 	var j Job
 	var tags string
 	var sched sql.NullString
-	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &j.Attachment, &j.Title, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
+	if err := r.Scan(&j.ID, &j.ProfileID, &j.DraftID, &j.Network, &j.Status, &j.Body, &tags, &j.AltText, &j.Attachment, &j.Title, &j.ImageCount, &sched, &j.Timezone, &j.Error, &j.PostURN, &j.PostURL, &j.CreatedAt, &j.UpdatedAt, &j.PublishedAt); err != nil {
 		return j, err
 	}
 	j.ScheduledAt = sched.String
@@ -454,6 +487,7 @@ func (p *Publisher) Delete(ctx context.Context, id string) error {
 	}
 	if n, _ := res.RowsAffected(); n == 1 {
 		_, _ = p.db.ExecContext(ctx, `DELETE FROM publish_attempts WHERE job_id = ?`, id)
+		_, _ = p.db.ExecContext(ctx, `DELETE FROM job_images WHERE job_id = ?`, id)
 		p.releaseDrafts(ctx)
 		return nil
 	}
@@ -474,7 +508,10 @@ func (p *Publisher) Wait() { p.wg.Wait() }
 // Execute performs the LinkedIn calls for a job already claimed (status publishing) and records the outcome. It does
 // not retry. A failure sets failed; an unclear result of the create call sets needs_review.
 func (p *Publisher) Execute(ctx context.Context, id string) {
-	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
+	// several pictures are uploaded one after another, so the job gets more time for each
+	var pictures int
+	_ = p.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM job_images WHERE job_id = ?`, id).Scan(&pictures)
+	ctx, cancel := context.WithTimeout(ctx, publishTimeout+time.Duration(pictures)*perPictureTimeout)
 	defer cancel()
 	defer func() {
 		if r := recover(); r != nil {
@@ -500,11 +537,33 @@ func (p *Publisher) Execute(ctx context.Context, id string) {
 		p.finish(ctx, id, JobFailed, "", "", err.Error())
 		return
 	}
+	post := linkedin.Post{
+		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: imgType, Document: kind == AttachDocument, Title: title,
+	}
+	if kind == AttachImages {
+		// each picture is read from the database when it is its turn, so they are never all in memory together
+		post.Image = nil
+		rows, err := p.db.QueryContext(ctx, `SELECT position, alt_text FROM job_images WHERE job_id = ? ORDER BY position`, id)
+		if err != nil {
+			p.finish(ctx, id, JobFailed, "", "", "Could not read the post's pictures. Nothing was posted.")
+			return
+		}
+		for rows.Next() {
+			var pos int
+			var a string
+			if err := rows.Scan(&pos, &a); err != nil {
+				break
+			}
+			post.Pictures = append(post.Pictures, linkedin.Picture{AltText: a, Load: func() ([]byte, error) { return jobImage(ctx, p.db, id, pos) }})
+		}
+		if err := closeRows(rows); err != nil || len(post.Pictures) < 2 {
+			p.finish(ctx, id, JobFailed, "", "", "Could not read the post's pictures. Nothing was posted.")
+			return
+		}
+	}
 	started := p.now()
 	tctx, trace := linkedin.WithTrace(ctx)
-	urn, err := p.li.Publish(tctx, c["accessToken"], linkedin.Post{
-		AuthorURN: c["authorUrn"], Commentary: linkedin.Commentary(body, hashtags), AltText: alt, Image: img, ContentType: imgType, Document: kind == AttachDocument, Title: title,
-	})
+	urn, err := p.li.Publish(tctx, c["accessToken"], post)
 	switch {
 	case err == nil:
 		p.finish(ctx, id, JobPublished, urn, linkedin.PostURL(urn), "")

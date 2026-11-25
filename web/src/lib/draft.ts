@@ -9,6 +9,9 @@ export interface DocNode {
   content?: DocNode[];
 }
 
+/** One picture of a post with several. Its bytes are fetched separately. */
+export interface DraftPicture { id: string; type: string; altText: string }
+
 export type DraftKind = "post" | "article";
 /** draft, then approved, then scheduled (a post is waiting) and published. An edit returns approved or published to draft. */
 export type DraftStatus = "draft" | "approved" | "scheduled" | "published";
@@ -35,8 +38,10 @@ export interface Draft {
   pageAt?: string;
   hasCover?: boolean;
   /** What a post goes out with: the designed card, or a file of its own (a picture, or a PDF document with a title). */
-  attachment?: "card" | "image" | "document";
+  attachment?: "card" | "image" | "document" | "images";
   attachmentTitle?: string;
+  /** The pictures of a post whose attachment is "images", in order. */
+  images?: DraftPicture[];
   /** Who wrote it and who approved it, for showing. */
   createdByName?: string;
   approvedByName?: string;
