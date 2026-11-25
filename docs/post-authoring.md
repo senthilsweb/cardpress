@@ -1,6 +1,6 @@
 # Post authoring
 
-The **Post** tab is where you write the text that goes with a card. Everything is saved on the server as a *draft*; you can keep several and switch between them from the Draft menu.
+The **Write** tab (under **Edit**) is where you write the text that goes with a card. Everything is saved on the server as a *draft*; you can keep several and switch between them from the Draft menu.
 
 ## Post or article
 
@@ -52,7 +52,7 @@ The caption field from the earlier version is copied into the first draft the fi
 | `web/src/lib/linkedin.ts` | `serializeForLinkedIn`, Unicode styling, the fold; unit-tested in `linkedin.test.ts` |
 | `web/src/lib/draft.ts` | Draft types, plain text to document, article to post simplification |
 | `web/src/lib/useDrafts.ts` | The draft list and the one being edited, with debounced saving |
-| `web/src/components/studio/Composer.tsx` | The Post tab |
+| `web/src/components/studio/Composer.tsx` | The Write tab |
 | `web/src/components/studio/RichEditor.tsx` | The TipTap editor and toolbar |
 | `web/src/components/studio/FullPreview.tsx` | The preview dialog |
 | `internal/service/drafts.go` | Draft rules (validation, hashtags) |

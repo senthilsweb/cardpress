@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +16,9 @@ import (
 
 	"github.com/senthilsweb/cardpress/internal/agent"
 	"github.com/senthilsweb/cardpress/internal/source"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -22,6 +27,8 @@ const (
 	maxChatMessage   = 20_000
 	historyLimit     = 30
 	defaultFirstTurn = "Draft a LinkedIn post from this source."
+	defaultNewSource = "Use the source I just added."
+	stoppedReply     = "Stopped before the reply was finished."
 
 	ProposalPending    = "pending"
 	ProposalApproved   = "approved"
@@ -69,20 +76,26 @@ type ProposalView struct {
 
 // Conversation is a chat about one source. Messages and Proposals are filled in by Get.
 type Conversation struct {
-	ID              string         `json:"id"`
-	ProfileID       string         `json:"profileId"`
-	Title           string         `json:"title"`
-	SourceKind      string         `json:"sourceKind"` // "url", "text", or "mcp" (started by an outside agent)
-	SourceURL       string         `json:"sourceUrl,omitempty"`
-	SourceTitle     string         `json:"sourceTitle,omitempty"`
-	SourceChars     int            `json:"sourceChars"`
-	SourceTruncated bool           `json:"sourceTruncated"`
-	Pending         int            `json:"pending"` // proposals waiting for a decision
-	Agent           AgentInfo      `json:"agent"`
-	CreatedAt       string         `json:"createdAt"`
-	UpdatedAt       string         `json:"updatedAt"`
-	Messages        []ChatMessage  `json:"messages,omitempty"`
-	Proposals       []ProposalView `json:"proposals,omitempty"`
+	ID              string `json:"id"`
+	ProfileID       string `json:"profileId"`
+	Title           string `json:"title"`
+	SourceKind      string `json:"sourceKind"` // "url", "text", or "mcp" (started by an outside agent)
+	SourceURL       string `json:"sourceUrl,omitempty"`
+	SourceTitle     string `json:"sourceTitle,omitempty"`
+	SourceChars     int    `json:"sourceChars"`
+	SourceTruncated bool   `json:"sourceTruncated"`
+	Pending         int    `json:"pending"` // proposals waiting for a decision
+	// PostDraftID and ArticleDraftID are the items this conversation is about, empty when it has none.
+	PostDraftID    string        `json:"postDraftId,omitempty"`
+	ArticleDraftID string        `json:"articleDraftId,omitempty"`
+	Agent          AgentInfo     `json:"agent"`
+	CreatedAt      string        `json:"createdAt"`
+	UpdatedAt      string        `json:"updatedAt"`
+	Messages       []ChatMessage `json:"messages,omitempty"`
+	Sources        []SourceView  `json:"sources,omitempty"`
+	// CostCents is what the conversation has cost at list price; absent when no cost has been recorded.
+	CostCents *int           `json:"costCents,omitempty"`
+	Proposals []ProposalView `json:"proposals,omitempty"`
 }
 
 // ChatEvent is progress while a reply is written. Name is "user", "delta", "proposal" or "message".
@@ -164,74 +177,84 @@ func firstLine(s string, n int) string {
 
 /* ------------------------------------------------------------------ start, list, get, delete */
 
-// Start begins a conversation from a web address or pasted text (exactly one).
+// Start begins a conversation: from a web address, from pasted text, or from neither, in which case the person's first
+// message says what to write about and sources can be added.
 func (c *Chat) Start(ctx context.Context, profileID, rawURL, text string) (Conversation, error) {
 	rawURL, text = strings.TrimSpace(rawURL), strings.TrimSpace(text)
 	if profileID == "" {
 		return Conversation{}, invalid("profileId is required")
 	}
-	if (rawURL == "") == (text == "") {
-		return Conversation{}, invalid("give either a web address or some text to work from, not both and not neither")
+	if rawURL != "" && text != "" {
+		return Conversation{}, invalid("give a web address or some text, not both; add the other afterwards")
 	}
-	var kind, srcURL, srcTitle, srcText string
-	var truncated bool
-	if rawURL != "" {
-		s, err := c.fetch.Fetch(ctx, rawURL)
+	kind, title := sourceKindNone, untitledTopic
+	var first *newSource
+	var srcURL, srcTitle string
+	if rawURL != "" || text != "" {
+		s, err := c.readSource(ctx, SourceInput{URL: rawURL, Text: text})
 		if err != nil {
-			var se *source.Error
-			if errors.As(err, &se) {
-				return Conversation{}, invalid("%s", se.Message)
+			return Conversation{}, err
+		}
+		first, kind, title = &s, s.kind, firstLine(s.name, 60)
+		if s.kind == "url" {
+			srcURL = s.url
+			if s.name != s.url {
+				title, srcTitle = s.name, s.name
 			}
-			return Conversation{}, err
 		}
-		kind, srcURL, srcTitle, srcText, truncated = "url", s.URL, s.Title, s.Text, s.Truncated
-	} else {
-		if err := cleanText(text, maxPastedChars); err != nil {
-			return Conversation{}, err
-		}
-		if utf8.RuneCountInString(text) < minPastedChars {
-			return Conversation{}, invalid("paste at least %d characters of text to work from", minPastedChars)
-		}
-		kind, srcText = "text", text
-	}
-	title := srcTitle
-	if title == "" {
-		title = firstLine(srcText, 60)
 	}
 	at := c.stamp()
 	id := newID()
 	_, err := c.db.ExecContext(ctx,
 		`INSERT INTO conversations (id, user_id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, actorID(ctx), profileID, title, kind, srcURL, srcTitle, srcText, boolInt(truncated), at, at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '', 0, ?, ?)`,
+		id, actorID(ctx), profileID, title, kind, srcURL, srcTitle, at, at)
 	if err != nil {
 		return Conversation{}, err
+	}
+	if first != nil {
+		if _, err := c.insertSource(ctx, id, *first); err != nil {
+			return Conversation{}, err
+		}
 	}
 	return c.Get(ctx, id)
 }
 
-const convCols = `id, profile_id, title, source_kind, source_url, source_title, source_text, source_truncated, created_at, updated_at, (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
+// how much a conversation draws on is the sum over its sources
+const convCols = `id, profile_id, title, source_kind, source_url, source_title,
+	(SELECT COALESCE(SUM(s.chars), 0) FROM conversation_sources s WHERE s.conversation_id = conversations.id),
+	(SELECT COALESCE(MAX(s.truncated), 0) FROM conversation_sources s WHERE s.conversation_id = conversations.id),
+	created_at, updated_at, post_draft_id, article_draft_id,
+	(SELECT SUM(u.added_cents) FROM chat_usage u WHERE u.conversation_id = conversations.id), (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
 
-func (c *Chat) scanConv(r scanner) (Conversation, string, error) {
+func (c *Chat) scanConv(r scanner) (Conversation, error) {
 	var v Conversation
-	var text string
 	var tr int
-	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &text, &tr, &v.CreatedAt, &v.UpdatedAt, &v.Pending); err != nil {
-		return v, "", err
+	var cost sql.NullInt64
+	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &v.SourceChars, &tr, &v.CreatedAt, &v.UpdatedAt, &v.PostDraftID, &v.ArticleDraftID, &cost, &v.Pending); err != nil {
+		return v, err
 	}
-	v.SourceChars, v.SourceTruncated, v.Agent = utf8.RuneCountInString(text), tr != 0, c.Agent()
-	return v, text, nil
+	v.SourceTruncated, v.Agent = tr != 0, c.Agent()
+	if cost.Valid {
+		n := int(cost.Int64)
+		v.CostCents = &n
+	}
+	return v, nil
 }
 
 // List returns a profile's conversations, newest first, without their messages.
 func (c *Chat) List(ctx context.Context, profileID string) ([]Conversation, error) {
-	rows, err := c.db.QueryContext(ctx, `SELECT `+convCols+` FROM conversations WHERE profile_id = ? ORDER BY updated_at DESC, id LIMIT 50`, profileID)
+	return c.list(ctx, "", profileID)
+}
+
+func (c *Chat) list(ctx context.Context, where, profileID string, args ...any) ([]Conversation, error) {
+	rows, err := c.db.QueryContext(ctx, `SELECT `+convCols+` FROM conversations WHERE profile_id = ? `+where+` ORDER BY updated_at DESC, id LIMIT `+strconv.Itoa(maxListed), append([]any{profileID}, args...)...)
 	if err != nil {
 		return nil, err
 	}
 	out := []Conversation{}
 	for rows.Next() {
-		v, _, err := c.scanConv(rows)
+		v, err := c.scanConv(rows)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -241,18 +264,21 @@ func (c *Chat) List(ctx context.Context, profileID string) ([]Conversation, erro
 	return out, closeRows(rows)
 }
 
-func (c *Chat) load(ctx context.Context, id string) (Conversation, string, error) {
-	v, text, err := c.scanConv(c.db.QueryRowContext(ctx, `SELECT `+convCols+` FROM conversations WHERE id = ?`, id))
+func (c *Chat) load(ctx context.Context, id string) (Conversation, error) {
+	v, err := c.scanConv(c.db.QueryRowContext(ctx, `SELECT `+convCols+` FROM conversations WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return v, "", ErrNotFound
+		return v, ErrNotFound
 	}
-	return v, text, err
+	return v, err
 }
 
 // Get returns a conversation with its messages and every proposal, oldest first.
 func (c *Chat) Get(ctx context.Context, id string) (Conversation, error) {
-	v, _, err := c.load(ctx, id)
+	v, err := c.load(ctx, id)
 	if err != nil {
+		return v, err
+	}
+	if v.Sources, err = c.sources(ctx, id); err != nil {
 		return v, err
 	}
 	v.Messages, err = c.messages(ctx, id, 0)
@@ -317,6 +343,28 @@ func (c *Chat) proposals(ctx context.Context, convID string) ([]ProposalView, er
 	return out, closeRows(rows)
 }
 
+// linkDraft makes a draft the conversation's post or article, by the draft's kind. A draft of another brand, or one
+// that does not exist, matches nothing, so a conversation can only ever point at its own brand's items.
+func linkDraft(ctx context.Context, db execer, convID, draftID string) error {
+	for _, l := range []struct{ column, kind string }{{"post_draft_id", KindPost}, {"article_draft_id", KindArticle}} {
+		if _, err := db.ExecContext(ctx,
+			`UPDATE conversations SET `+l.column+` = ? WHERE id = ? AND EXISTS (
+			   SELECT 1 FROM drafts d WHERE d.id = ? AND d.kind = ? AND d.profile_id = conversations.profile_id)`,
+			draftID, convID, draftID, l.kind); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Link records the item a conversation is about (see linkDraft) and returns the conversation.
+func (c *Chat) Link(ctx context.Context, id, draftID string) (Conversation, error) {
+	if err := linkDraft(ctx, c.db, id, draftID); err != nil {
+		return Conversation{}, err
+	}
+	return c.Get(ctx, id)
+}
+
 // Delete removes a conversation and everything in it.
 func (c *Chat) Delete(ctx context.Context, id string) error {
 	tx, err := c.db.BeginTx(ctx, nil)
@@ -324,7 +372,7 @@ func (c *Chat) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	for _, q := range []string{`DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
+	for _, q := range []string{`DELETE FROM chat_usage WHERE conversation_id = ?`, `DELETE FROM conversation_sources WHERE conversation_id = ?`, `DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {
 			return err
 		}
@@ -356,8 +404,8 @@ func (c *Chat) unlock(id string) { c.mu.Lock(); delete(c.busy, id); c.mu.Unlock(
 // Send adds the person's message, gets the agent's reply, and stores both. Progress goes to emit: the stored user
 // message, text as it is written ("delta"), the proposal, and the stored reply. The person's message is kept even if
 // the agent then fails, so nothing they typed is lost. Invalid agent output is an error and is never stored.
-func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) error {
-	conv, srcText, err := c.load(ctx, id)
+func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent)) (err error) {
+	conv, err := c.load(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -377,17 +425,50 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	if err != nil {
 		return err
 	}
-	if content == "" {
-		if len(prior) > 0 {
-			return invalid("write a message first")
-		}
-		content = defaultFirstTurn
+	sources, fresh, err := agentSources(ctx, c.db, id)
+	if err != nil {
+		return err
 	}
+	if content == "" { // sources can be sent on their own
+		switch {
+		case len(fresh) == 0:
+			return invalid("write a message first")
+		case len(prior) == 0:
+			content = defaultFirstTurn
+		default:
+			content = defaultNewSource
+		}
+	}
+	// one span per turn of the assistant: which agent answered, never what was said
+	info := c.Agent()
+	ctx, span := telemetry.Start(ctx, "assistant turn", trace.WithAttributes(
+		attribute.String("openinference.span.kind", "AGENT"), attribute.String("cardpress.agent.name", info.Name), attribute.Bool("cardpress.agent.ai", info.AI)))
+	defer func() {
+		if err != nil {
+			telemetry.Fail(span, "the turn failed")
+		}
+		span.End()
+	}()
 	user, err := c.addMessage(ctx, id, len(prior)+1, "user", content)
 	if err != nil {
 		return err
 	}
 	emit(ChatEvent{"user", user})
+	// a person who stops a reply sees that it was stopped, also after a reload
+	defer func() {
+		if err != nil && errors.Is(ctx.Err(), context.Canceled) {
+			if _, serr := c.addMessage(context.WithoutCancel(ctx), id, user.Seq+1, "assistant", stoppedReply); serr != nil {
+				log.Printf("chat: could not record a stopped reply: %v", serr)
+			}
+		}
+	}()
+	// the sources waiting to be sent go with this message
+	if _, err := c.db.ExecContext(ctx, `UPDATE conversation_sources SET message_id = ? WHERE conversation_id = ? AND message_id = ''`, user.ID, id); err != nil {
+		return err
+	}
+	if _, err := c.db.ExecContext(ctx, `UPDATE conversations SET title = ? WHERE id = ? AND title = ?`, firstLine(content, 60), id, untitledTopic); err != nil {
+		return err
+	}
 
 	session, err := c.session(ctx, id)
 	if err != nil {
@@ -397,15 +478,32 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	if err != nil {
 		return err
 	}
-	in := agent.Input{SessionID: session, Source: &agent.Source{URL: conv.SourceURL, Title: conv.SourceTitle, Text: srcText, Truncated: conv.SourceTruncated}}
+	in := agent.Input{SessionID: session, Sources: sources}
 	for _, m := range history {
 		in.Messages = append(in.Messages, agent.Message{Role: m.Role, Content: m.Content})
 	}
-	out, err := c.agent.Respond(ctx, in, func(e agent.Event) {
+	progress := func(e agent.Event) {
 		if e.Type == "delta" {
 			emit(ChatEvent{"delta", map[string]string{"text": e.Text}})
 		}
-	})
+	}
+	out, err := c.agent.Respond(ctx, in, progress)
+	if errors.Is(err, agent.ErrSessionGone) {
+		// the agent has lost the session: start another and give it what is saved here
+		if _, derr := c.db.ExecContext(ctx, `UPDATE conversations SET session_id = '' WHERE id = ?`, id); derr != nil {
+			return derr
+		}
+		if session, err = c.session(ctx, id); err != nil {
+			return err
+		}
+		in.SessionID, in.Restarted = session, true
+		in.Sources = append([]agent.Source(nil), sources...)
+		for i := range in.Sources {
+			in.Sources[i].New = true
+		}
+		progress(agent.Event{Type: "delta", Text: restartNote + "\n\n"})
+		out, err = c.agent.Respond(ctx, in, progress)
+	}
 	if err != nil {
 		return agentErr("The agent could not reply: %v", err)
 	}
@@ -422,9 +520,23 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 		}
 	}
 
+	if in.Restarted {
+		reply = restartNote + "\n\n" + reply
+	}
 	assistant, prop, err := c.storeReply(ctx, id, user.Seq+1, reply, out.Proposal)
 	if err != nil {
 		return err
+	}
+	if out.SessionID != "" {
+		session = out.SessionID
+	}
+	if err := c.recordUsage(ctx, id, assistant.ID, session, out.Usage); err != nil {
+		log.Printf("chat: could not record what the reply cost: %v", err)
+	}
+	for _, sid := range fresh {
+		if _, err := c.db.ExecContext(ctx, `UPDATE conversation_sources SET delivered = 1 WHERE id = ?`, sid); err != nil {
+			return err
+		}
 	}
 	if prop != nil {
 		emit(ChatEvent{"proposal", prop})
@@ -537,6 +649,12 @@ func (c *Chat) Decide(ctx context.Context, proposalID string, d Decision) (Propo
 	if n, _ := res.RowsAffected(); n != 1 {
 		return ProposalView{}, fmt.Errorf("%w: this proposal was already decided", ErrConflict)
 	}
+	// where an approved proposal went is now the conversation's post or article
+	if d.Status == ProposalApproved && d.DraftID != "" {
+		if err := linkDraft(ctx, tx, cur.ConversationID, d.DraftID); err != nil {
+			return ProposalView{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return ProposalView{}, err
 	}
@@ -609,7 +727,7 @@ func (c *Chat) Propose(ctx context.Context, in ExternalProposal) (ProposalView, 
 			return ProposalView{}, err
 		}
 	} else {
-		conv, _, err := c.load(ctx, convID)
+		conv, err := c.load(ctx, convID)
 		if err != nil {
 			return ProposalView{}, err
 		}

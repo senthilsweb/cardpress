@@ -12,10 +12,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/service"
+	"github.com/senthilsweb/cardpress/internal/source"
 )
 
 const (
@@ -90,6 +92,10 @@ type Chatting interface {
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
+	Link(ctx context.Context, id, draftID string) (service.Conversation, error)
+	AddSource(ctx context.Context, id string, in service.SourceInput) (service.SourceView, error)
+	RemoveSource(ctx context.Context, id, sourceID string) error
+	Search(ctx context.Context, profileID, query string) ([]service.Conversation, error)
 	Delete(ctx context.Context, id string) error
 	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
@@ -107,6 +113,13 @@ type Settings interface {
 
 // Options configure the handler.
 type Options struct {
+	// Notes are the assistant\'s notes about brands.
+	Notes interface {
+		ListMemories(ctx context.Context, profileID string) ([]service.Memory, error)
+		DeleteMemory(ctx context.Context, profileID, key string) error
+	}
+	// Events carries changes to open studios; nil turns live updates off.
+	Events       *service.Hub
 	Studio       Studio
 	Settings     Settings
 	Publishing   Publishing
@@ -194,6 +207,7 @@ func (s *server) table() []routeDef {
 		{"POST", "/import/legacy", rule{scope: scopeAdmin, perm: service.PermUsers}, s.importLegacy},
 
 		{"GET", "/drafts", write(scopeBrandQuery), s.listDrafts},
+		{"GET", "/events", write(scopeBrandQuery), s.events},
 		{"POST", "/drafts", write(scopeBrandBody), s.createDraft},
 		{"GET", "/drafts/{id}", write(scopeDraft), s.getDraft},
 		{"PUT", "/drafts/{id}", write(scopeDraft), s.updateDraft},
@@ -236,9 +250,13 @@ func (s *server) table() []routeDef {
 
 		{"POST", "/chat/conversations", write(scopeBrandBody), s.startConversation},
 		{"GET", "/chat/conversations", write(scopeBrandQuery), s.listConversations},
+		{"GET", "/chat/memories", write(scopeBrandQuery), s.listMemories},
+		{"DELETE", "/chat/memories/{key}", write(scopeBrandQuery), s.deleteMemory},
 		{"GET", "/chat/conversations/{id}", write(scopeConversation), s.getConversation},
 		{"DELETE", "/chat/conversations/{id}", write(scopeConversation), s.deleteConversation},
 		{"POST", "/chat/conversations/{id}/messages", write(scopeConversation), s.sendMessage},
+		{"POST", "/chat/conversations/{id}/sources", write(scopeConversation), s.addSource},
+		{"DELETE", "/chat/conversations/{id}/sources/{sid}", write(scopeConversation), s.removeSource},
 		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
@@ -884,6 +902,7 @@ func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
 		ProfileID string `json:"profileId"`
 		URL       string `json:"url"`
 		Text      string `json:"text"`
+		DraftID   string `json:"draftId"` // the item on screen: the conversation is about it
 	}
 	if !decode(w, r, &body) {
 		return
@@ -892,6 +911,9 @@ func (s *server) startConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := s.Chat.Start(r.Context(), body.ProfileID, body.URL, body.Text)
+	if err == nil && body.DraftID != "" {
+		v, err = s.Chat.Link(r.Context(), v.ID, body.DraftID)
+	}
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -905,7 +927,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
 		return
 	}
-	list, err := s.Chat.List(r.Context(), profileID)
+	list, err := s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -924,6 +946,128 @@ func (s *server) getConversation(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) deleteConversation(w http.ResponseWriter, r *http.Request) {
 	if err := s.Chat.Delete(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+const eventsHeartbeat = 25 * time.Second
+
+// events streams a brand's changes to an open studio (server-sent events) until it leaves or the server stops.
+func (s *server) events(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok || s.Events == nil {
+		writeError(w, r, http.StatusNotImplemented, "not_supported", "live updates are not available here")
+		return
+	}
+	events, cancel, ok := s.Events.Subscribe(profileID)
+	if !ok {
+		writeError(w, r, http.StatusServiceUnavailable, "busy", "too many open studios; try again shortly")
+		return
+	}
+	defer cancel()
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, ": listening\n\n")
+	flusher.Flush()
+	beat := time.NewTicker(eventsHeartbeat)
+	defer beat.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-beat.C:
+			fmt.Fprint(w, ": still here\n\n")
+		case e, open := <-events:
+			if !open {
+				return
+			}
+			b, _ := json.Marshal(e)
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, b)
+		}
+		flusher.Flush()
+	}
+}
+
+// listMemories and deleteMemory let a person see and remove the notes an assistant keeps about a brand.
+func (s *server) listMemories(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" || s.Notes == nil {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	notes, err := s.Notes.ListMemories(r.Context(), profileID)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"notes": notes})
+}
+
+func (s *server) deleteMemory(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" || s.Notes == nil {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	if err := s.Notes.DeleteMemory(r.Context(), profileID, r.PathValue("key")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// addSource takes a web address or pasted text as JSON, or a file as a multipart form with one "file" field.
+func (s *server) addSource(w http.ResponseWriter, r *http.Request) {
+	var in service.SourceInput
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.Body = http.MaxBytesReader(w, r.Body, source.MaxFileBytes+64<<10)
+		f, head, err := r.FormFile("file")
+		if err != nil {
+			var tooBig *http.MaxBytesError
+			if errors.As(err, &tooBig) {
+				writeError(w, r, http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("That file is over %d MB.", source.MaxFileBytes>>20))
+				return
+			}
+			writeError(w, r, http.StatusBadRequest, "bad_form", "expected a multipart form with a file field")
+			return
+		}
+		defer f.Close()
+		defer r.MultipartForm.RemoveAll() //nolint:errcheck
+		if in.Data, err = io.ReadAll(f); err != nil {
+			fail(w, r, err)
+			return
+		}
+		in.FileName = head.Filename
+	} else {
+		var body struct {
+			URL  string `json:"url"`
+			Text string `json:"text"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		in.URL, in.Text = body.URL, body.Text
+	}
+	v, err := s.Chat.AddSource(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, v)
+}
+
+func (s *server) removeSource(w http.ResponseWriter, r *http.Request) {
+	if err := s.Chat.RemoveSource(r.Context(), r.PathValue("id"), r.PathValue("sid")); err != nil {
 		fail(w, r, err)
 		return
 	}
@@ -1211,6 +1355,8 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusNotImplemented, "not_supported", "this is not supported for that network yet")
 	case errors.Is(err, service.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "not found")
+	case errors.Is(err, service.ErrStale):
+		writeError(w, r, http.StatusConflict, "stale", service.UserMessage(err))
 	case errors.Is(err, service.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
 	case errors.Is(err, service.ErrForbidden):

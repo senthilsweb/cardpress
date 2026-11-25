@@ -61,7 +61,7 @@ func newRig(t *testing.T, f service.SourceFetcher) *rig {
 	chat := service.NewChat(db.DB, &agent.Mock{}, f)
 	audit := NewAuditor(db.DB)
 	r := &rig{studio: studio, chat: chat, audit: audit, db: db.DB}
-	r.deps = Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {
+	r.deps = Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: service.NewSettings(db.DB, nil, func(string) string { return "" }), Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {
 		Fetch(context.Context, string) (source.Source, error)
 	}), Audit: audit, Transport: "stdio", Version: "test"}
 	return r
@@ -118,32 +118,32 @@ func TestTheToolListHasNothingThatPublishesSchedulesOrTouchesCredentials(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
+	// the tools that change something, and no others, are not read-only
+	writes := map[string]bool{"propose_content": true, "update_card_text": true, "create_draft": true, "update_draft": true, "set_attachment": true, "save_memory": true, "delete_memory": true}
 	var names []string
-	forbidden := regexp.MustCompile(`(?i)publish|schedul|cancel|delete|remove|credential|secret|token|setting|password|key|update|edit|write|save|set_|create|send|post_|run`)
+	forbidden := regexp.MustCompile(`(?i)publish|schedul|cancel|approve|credential|secret|token|setting|password|api_?key|send|post_|run|delete_draft|update_design`)
 	for _, tool := range list.Tools {
 		names = append(names, tool.Name)
 		if forbidden.MatchString(tool.Name) {
-			t.Errorf("tool %q sounds like it can change things it must not", tool.Name)
+			t.Errorf("tool %q sounds like it can do things it must not", tool.Name)
 		}
 		readOnly := tool.Annotations != nil && tool.Annotations.ReadOnlyHint
-		if tool.Name == "propose_content" {
-			if readOnly || tool.Annotations == nil || tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
-				t.Errorf("propose_content must be marked as not read-only and not destructive: %+v", tool.Annotations)
-			}
-		} else if !readOnly {
-			t.Errorf("tool %q must be read-only", tool.Name)
+		if readOnly == writes[tool.Name] {
+			t.Errorf("tool %q is marked read-only=%v", tool.Name, readOnly)
 		}
 	}
 	sort.Strings(names)
-	want := []string{"fetch_source", "get_draft", "get_job", "get_proposal", "list_design_presets", "list_drafts", "list_jobs", "list_profiles", "propose_content"}
+	want := []string{"create_draft", "delete_memory", "fetch_source", "get_design", "get_draft", "get_job", "get_proposal", "list_connections", "list_design_presets",
+		"list_drafts", "list_jobs", "list_memories", "list_profiles", "propose_content", "save_memory", "set_attachment", "update_card_text", "update_draft"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools = %v\nwant    %v\nadding a tool must be a deliberate, reviewed change", names, want)
 	}
 }
 
 // The tools are handed narrow interfaces. This test pins down every method they can possibly call, so publishing,
-// scheduling, cancelling, editing drafts and reading credentials are unreachable from this package by construction.
-func TestTheToolsCanOnlyCallReadAndProposeMethods(t *testing.T) {
+// scheduling, cancelling, approving, deleting a draft, changing a card's look and reading credentials are unreachable
+// from this package by construction.
+func TestTheToolsCanOnlyCallTheListedMethods(t *testing.T) {
 	var reachable []string
 	dt := reflect.TypeOf(Deps{})
 	for i := 0; i < dt.NumField(); i++ {
@@ -156,8 +156,11 @@ func TestTheToolsCanOnlyCallReadAndProposeMethods(t *testing.T) {
 		}
 	}
 	sort.Strings(reachable)
-	// Access.BrandOwner and Proposals.ProposalBrand only read who owns a brand, to keep a key to its own person's work
-	want := []string{"Access.BrandOwner", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List", "Profiles.Profiles", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose"}
+	// Access.BrandOwner and Proposals.ProposalBrand only read who owns a brand, to keep a key to its own person's work.
+	// Connections.View never carries a secret.
+	want := []string{"Access.BrandOwner", "Connections.View", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List",
+		"Notes.DeleteMemory", "Notes.ListMemories", "Notes.SaveMemory", "Profiles.Profiles", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose",
+		"Writer.Card", "Writer.ClearAttachment", "Writer.NewAssistantDraft", "Writer.PatchCardText", "Writer.PatchDraft", "Writer.SetAttachmentTitle", "Writer.SetVideo"}
 	if !reflect.DeepEqual(reachable, want) {
 		t.Fatalf("methods reachable from tools:\n got  %v\n want %v", reachable, want)
 	}
@@ -245,7 +248,7 @@ func TestReadingProfilesDraftsAndPresets(t *testing.T) {
 		t.Fatalf("%v", out)
 	}
 	_, out = call(t, cs, "get_draft", map[string]any{"id": d.ID})
-	if out["text"] != "Hello draft\n\n- point" || out["kind"] != "post" || out["altText"] != "alt" {
+	if out["body"] != "Hello draft\n\n- point" || out["kind"] != "post" || out["altText"] != "alt" {
 		t.Fatalf("%v", out)
 	}
 	if res, _ := call(t, cs, "get_draft", map[string]any{"id": "missing"}); !res.IsError || !strings.Contains(errText(res), "Not found") {

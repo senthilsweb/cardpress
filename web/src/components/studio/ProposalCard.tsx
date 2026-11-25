@@ -117,7 +117,7 @@ export function ProposalCard({ p, onApprove, onReject, onOpenPost }: {
           {p.status === "approved" && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>Copied into a draft.</span>
-              <Button size="sm" variant="outline" onClick={onOpenPost}>Open the Post tab</Button>
+              <Button size="sm" variant="outline" onClick={onOpenPost}>Show the {p.kind === "article" ? "article" : "post"}</Button>
             </div>
           )}
         </>

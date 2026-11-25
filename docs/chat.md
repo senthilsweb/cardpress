@@ -6,15 +6,24 @@ The **Assistant** drafts a post or an article from something you give it, and yo
 
 ## Using it
 
-1. Click the **sparkle button** in the header to open the Assistant. It is a drawer on the right that stays beside the card, so you can talk to it while watching the design; Drag the grip on its left edge to make it wider or narrower (double-click the grip to reset, or focus it and use the arrow keys); the width is remembered. Esc or the close button hides it. Writing and editing yourself stays in the sidebar tabs (Design, Text, Post, Profile), and the conversation lives here. The button shows a number when proposals are waiting for you.
-   Then Give it a **web address** or **paste the text** (one or the other, at least 40 characters), and press **Draft from this**.
+1. The assistant is the **Chat** side of the left column, and is what opens first. **Edit** holds the Design, Text, Write and Brand tabs. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
+   Type what you want in the message box and send it with the **send** button (or Enter; Shift+Enter adds a line). While a reply is being written the button becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
+   To give it something to write from, use the **paperclip** in the box:
+   - **Attach a file:** PDF, Word (`.docx`), Markdown or text, up to 10 MB. You can also drop files onto the box.
+   - **Add a link:** a public web page. Pasting only an address into an empty box does the same.
+   - **Paste text:** at least 40 characters. A paste over 1,500 characters becomes a source by itself.
+
+   A conversation holds up to ten sources, added at any point, and you can send them with or without a message. If one cannot be read, you are told why and nothing is sent. Text is kept up to 200,000 characters from a file or 40,000 from a web page; a cut source says so. A scanned PDF has no text to read, and a password-protected one cannot be opened.
 2. It replies and shows a **proposal card**: the kind (post or article), a title for the card, the text, hashtags, alt text, and a note on why.
 3. Choose:
-   - **Approve and use** copies it into a draft. If your current draft is empty it is filled in; **if it already has text, a new draft is made instead**, so your own writing is never overwritten. Tick or untick *Also use the title as the card's title*. Then **Open the Post tab**.
+   - **Approve and use** copies it into a draft. If your current draft is empty it is filled in; **if it already has text, a new draft is made instead**, so your own writing is never overwritten. Tick or untick *Also use the title as the card's title*. **Show the post** (or article) puts it on the canvas. An article made while a post is on screen leaves the post where it is and marks the **Article** view.
    - **Edit** lets you change the kind, title, text, hashtags and alt text first. Your edit is what gets applied, and the agent's original is kept.
    - **Reject** dismisses it.
    - Or just **reply** in the box to ask for another version. Earlier proposals stay in the thread (marked "Earlier draft") and can still be approved.
-4. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one; the bin deletes the open one.
+4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
+5. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one about the item on screen; the bin deletes the open one.
+6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
+7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
 ### What the demo agent understands
 
@@ -22,7 +31,7 @@ The **Assistant** drafts a post or an article from something you give it, and yo
 
 ## Proposals from an outside agent
 
-An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the sparkle button in the header shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
+An AI agent connected through [MCP](mcp.md) can leave a proposal here too. It appears as its own conversation marked **Outside agent**, the Chat switch shows how many are waiting, and you approve, edit or reject it exactly like a chat proposal. There is no chat box in those conversations: to change one, ask the agent to send a revised version.
 
 ## Reading a web address safely
 
@@ -47,7 +56,7 @@ These pages have no readable text for the server, so it says so. Paste the text 
 | Conversations, messages, proposals, approval rules | `internal/service/chat.go` |
 | Endpoints under `/api/v1/chat`, replies streamed as server-sent events | `internal/api/api.go` |
 | Tables `conversations`, `chat_messages`, `proposals` | `internal/store/migrations/0005_chat.sql` |
-| The tab, the cards, the hook | `web/src/components/studio/ChatPanel.tsx`, `ProposalCard.tsx`, `web/src/lib/useChat.ts` |
+| The panel, the cards, the hook | `web/src/components/studio/ChatPanel.tsx`, `ProposalCard.tsx`, `web/src/lib/useChat.ts` |
 
 A proposal is validated before it is stored: the kind must be `post` or `article`, the text must fit (3,000 characters for a post including the hashtag line), hashtags must be plain words, and only the content fields are read, so a `layout` or `publish` field in an agent's answer is ignored. An invalid proposal is shown as an error and never stored or applied.
 

@@ -87,7 +87,7 @@ func TestAddressesAreUniquePerKindAndATypedOneIsRefusedNotChanged(t *testing.T) 
 	}
 }
 
-func TestChangingOrUnapprovingAnItemTakesItsPageDown(t *testing.T) {
+func TestALivePageCannotBeEditedAndGoesDownWithTheApproval(t *testing.T) {
 	l, ctx := newLib(t), context.Background()
 	d, _ := l.st.CreateDraft(ctx, DraftInput{ProfileID: "p", Kind: "article", Doc: docOf(para("Approved text"))})
 	l.st.Approve(ctx, d.ID)
@@ -103,13 +103,22 @@ func TestChangingOrUnapprovingAnItemTakesItsPageDown(t *testing.T) {
 	if _, err := pages.Get(ctx, "article", "approved-text"); err != nil {
 		t.Fatalf("an unchanged save keeps the page up: %v", err)
 	}
-	// a change takes it down, and the stale cover with it
-	up, _ := l.st.UpdateDraft(ctx, d.ID, DraftInput{ProfileID: "p", Kind: "article", Doc: docOf(para("Edited text"))})
-	if up.PageAt != "" || up.HasCover {
-		t.Fatalf("%+v", up)
+	// a published item is not edited: it comes back to draft first, which takes the page down with the stale cover
+	edit := DraftInput{ProfileID: "p", Kind: "article", Doc: docOf(para("Edited text"))}
+	if _, err := l.st.UpdateDraft(ctx, d.ID, edit); !errors.Is(err, ErrConflict) {
+		t.Fatalf("a live page was edited: %v", err)
+	}
+	if _, err := pages.Get(ctx, "article", "approved-text"); err != nil {
+		t.Fatalf("the refused change left the page up: %v", err)
+	}
+	if up, err := l.st.Unapprove(ctx, d.ID); err != nil || up.PageAt != "" || up.HasCover {
+		t.Fatalf("%v %+v", err, up)
 	}
 	if _, err := pages.Get(ctx, "article", "approved-text"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("an edited item must not stay public: %v", err)
+		t.Fatalf("a draft must not stay public: %v", err)
+	}
+	if _, err := l.st.UpdateDraft(ctx, d.ID, edit); err != nil {
+		t.Fatalf("as a draft it can be edited: %v", err)
 	}
 	l.st.Approve(ctx, d.ID)
 	l.st.PublishPage(ctx, d.ID, PageInput{})

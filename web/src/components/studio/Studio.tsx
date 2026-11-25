@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, MessageSquareText, Sparkles, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, SlidersHorizontal, MessageSquareText, PanelLeftClose, PanelLeftOpen, } from "lucide-react";
 import { Card } from "@/card/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,20 @@ import { Composer } from "./Composer";
 import { SocialSettings } from "./SocialSettings";
 import { BrandSwitcher, ManageBrandsDrawer, NewBrandDrawer } from "./Brands";
 import { ChatPanel } from "./ChatPanel";
-import { Drawer } from "@/components/ui/drawer";
+import { ChatHistoryDrawer } from "./ChatHistoryDrawer";
+import { StageBar, type StageView } from "./StageBar";
+import { SideGrip } from "./SideGrip";
+import { ArticleView } from "./ArticleView";
+import { conversationFor, linksDraft, pairFor } from "@/lib/workspace";
+import { useMedia } from "@/lib/useMedia";
+import { toCardDesign } from "@/lib/cardDesign";
+import { lockReason } from "@/lib/lock";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "@/lib/profiles";
 import { blankDesign, brandColor, move } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Network, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
+import type { Draft } from "@/lib/draft";
 import { useSyncedState } from "@/lib/store";
 import { useTheme } from "@/lib/useTheme";
 import { AccountMenu } from "./AccountMenu";
@@ -40,7 +48,7 @@ import { serializeDraft } from "@/lib/linkedin";
 import { api } from "@/lib/api";
 import { useBoot, type Loaded } from "@/lib/boot";
 import { hydrateCustomFonts } from "@/lib/fonts";
-import { LayoutContext, type Layout } from "@/lib/layout";
+import { clampSidebar, LayoutContext, SIDEBAR_WIDTH, type Layout } from "@/lib/layout";
 import { BootScreen } from "./BootScreen";
 import { cardToBlob, copyBlob, downloadBlob } from "@/lib/export";
 import { slugify } from "@/lib/slug";
@@ -82,13 +90,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return d;
   }, [designs, profile]);
   const store = useDrafts(profile.id, initial.drafts, () => brandDesign);
-  const design: Design = useMemo(() => {
-    const own = store.current?.design;
+  /** The card an item is shown with: its own, or the brand's starting card when it has none. */
+  const designOf = useCallback((own?: Design): Design => {
     if (!own) return brandDesign;
     const d = { ...DEFAULT_DESIGN, ...own };
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
     return d;
-  }, [brandDesign, store.current?.design, profile]);
+  }, [brandDesign, profile]);
+  const design: Design = useMemo(() => designOf(store.current?.design), [designOf, store.current?.design]);
   const jobs = useJobs(profile.id);
   const chat = useChat(profile.id);
   const [tab, setTab] = useState("design");
@@ -108,38 +117,98 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
   // the right-hand drawers share one edge, so only one is open at a time
-  const [panel, setPanel] = useState<"assistant" | "accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
+  const [panel, setPanel] = useState<"chats" | "accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
   // the library can send someone straight to a draft's Full preview (to schedule it)
   const [previewRequested, setPreviewRequested] = useState(false);
+  const [editorExpanded, setEditorExpanded] = useState(false);
+  // below the large breakpoint one thing is on screen at a time: the left column or the canvas
+  const largeScreen = useMedia("(min-width: 1024px)");
+  const [phonePreview, setPhonePreview] = useState(false);
+  // the left column's width: followed while dragging, saved when let go
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  useEffect(() => { const on = () => setWindowWidth(window.innerWidth); window.addEventListener("resize", on); return () => window.removeEventListener("resize", on); }, []);
+  const sideWidth = dragWidth ?? clampSidebar(layout.sidebarWidth ?? SIDEBAR_WIDTH, windowWidth);
+  const mode = layout.mode;
+  const setMode = (m: Layout["mode"]) => { flushPendingEdits(); setEditorExpanded(false); setPhonePreview(false); setLayout((l) => ({ ...l, mode: m, sidebarCollapsed: false })); };
+  /** Open the editing tabs on one of them. */
+  const showEdit = (t: string) => { flushPendingEdits(); setTab(t); setPhonePreview(false); setLayout((l) => ({ ...l, mode: "edit", sidebarCollapsed: false })); };
   // another page (the library) can ask for a drawer or a draft: /studio/?open=accounts|brands, /studio/?draft=<id>
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const want = q.get("open"), draft = q.get("draft");
     if (want === "accounts" || want === "brands") setPanel(want === "accounts" ? "accounts" : "manage");
     if (want === "account" || want === "users") setPanel(want);
-    if (want === "preview") setPreviewRequested(true);
-    if (draft) { void store.select(draft); setTab("post"); }
+    if (want === "preview") { setPreviewRequested(true); showEdit("post"); }
+    if (draft) { void store.select(draft); showEdit("post"); }
     if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const settingsOpen = panel === "accounts", assistantOpen = panel === "assistant";
+  const settingsOpen = panel === "accounts";
   const setSettingsOpen = (o: boolean) => setPanel(o ? "accounts" : null);
-  const setAssistantOpen = (o: boolean) => setPanel(o ? "assistant" : null);
-  const [editorExpanded, setEditorExpanded] = useState(false);
+  useEffect(() => { if (editorExpanded) setPhonePreview(true); }, [editorExpanded]); // the large editor is drawn over the canvas
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
+  /* ---------- what the canvas shows, and the conversation about it ---------- */
+  const pair = useMemo(() => pairFor(store.current, store.drafts, chat.list, chat.current?.id), [store.current, store.drafts, chat.list, chat.current?.id]);
+  const [unseen, setUnseen] = useState<string[]>([]); // items that changed while another was on screen
+  /** Work on another item, and open the conversation about it (or an empty one when there is none). */
+  const openItem = async (id: string) => {
+    flushPendingEdits();
+    await store.select(id);
+    if (chat.busy) return;
+    const conv = conversationFor(id, chat.list, chat.current?.id);
+    if (conv && conv.id !== chat.current?.id) await chat.open(conv.id);
+    else if (!conv && chat.current) chat.newConversation();
+  };
+  const newItem = async () => {
+    flushPendingEdits();
+    try {
+      await store.create(store.current?.kind ?? "post");
+      if (!chat.busy && chat.current) chat.newConversation();
+    } catch (e) { toast.error("Could not create a draft", { description: (e as Error).message }); }
+  };
+  /** Open a conversation from the list, with the item it is about. */
+  const openConversation = async (id: string) => {
+    await chat.open(id);
+    // a search can find one older than the list holds
+    const conv = chat.list.find((c) => c.id === id) ?? await api.getConversation(id).catch(() => undefined);
+    if (!conv || (store.current && linksDraft(conv, store.current.id))) return;
+    const about = [conv.postDraftId, conv.articleDraftId].find((d) => d && store.drafts.some((x) => x.id === d));
+    if (about) { flushPendingEdits(); await store.select(about); }
+  };
+  // on arrival, the chat shows the conversation about the item on screen, if there is one
+  const matched = useRef(false);
+  useEffect(() => {
+    if (!chat.loaded || matched.current || !store.current) return;
+    matched.current = true;
+    const conv = conversationFor(store.current.id, chat.list, chat.current?.id);
+    if (conv && conv.id !== chat.current?.id) void chat.open(conv.id);
+  }, [chat.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /**
    * Copy an approved proposal into a draft. An empty current draft is filled in; if it already has text, a new draft is
-   * made instead, so the person's own writing is never overwritten. Returns the draft's id.
+   * made instead, so the person's own writing is never overwritten. A new item of the other kind (an article beside a
+   * post) is made without leaving the screen; its view is marked. Returns the draft's id.
    */
   const applyProposal = async (c: ProposalEdit, opts: { useTitle: boolean }): Promise<string> => {
     const content = { kind: c.kind, doc: docFromAgentText(c.body, c.kind), hashtags: c.kind === "post" ? c.hashtags : [], altText: c.altText };
     const cur = store.current;
-    let id: string;
-    if (cur && !serializeDraft(cur).text.trim()) { store.update(content); id = cur.id; }
-    else id = await store.createFrom(content);
-    if (opts.useTitle && c.title) set({ title: c.title });
-    flash(cur && id === cur.id ? "Copied into your draft" : "Copied into a new draft");
+    const title = opts.useTitle && c.title ? c.title : undefined;
+    if (cur && !serializeDraft(cur).text.trim()) {
+      store.update({ ...content, ...(title && c.kind === "article" ? { title } : {}) });
+      if (title) set({ title });
+      flash("Copied into your draft");
+      return cur.id;
+    }
+    const stay = !!cur && cur.kind !== c.kind && !!chat.current && linksDraft(chat.current, cur.id);
+    const id = await store.createFrom({
+      ...content,
+      ...(title && c.kind === "article" ? { title } : {}),
+      design: toCardDesign(title ? { ...design, title } : design),
+    }, { select: !stay });
+    if (stay) setUnseen((u) => [...u, id]);
+    flash("Copied into a new draft");
     return id;
   };
 
@@ -186,17 +255,20 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
 
-  const waiting = store.current?.status === "scheduled";
+  const locked = lockReason(store.current);
   const set = useCallback((patch: Partial<Design>) => {
-    if (waiting) { toast("A post is waiting to be sent from this draft", { description: "Cancel it in the queue to change the card." }); return; }
+    if (locked) { toast("The card cannot be changed", { description: locked }); return; }
     const next = { ...design, ...patch };
     setDesigns((all) => ({ ...all, [profile.id]: next })); // the brand's starting point follows the latest card
     store.update({ design: next });
-  }, [design, profile.id, setDesigns, store, waiting]);
+  }, [design, profile.id, setDesigns, store, locked]);
   const updateProfile = (patch: Partial<Profile>) => setProfiles((all) => all.map((p) => (p.id === profile.id ? { ...p, ...patch } : p)));
 
-  const [view, setView] = useState<"one" | "all">("one");
-  const [feed, setFeed] = useState(false);
+  const [grid, setGrid] = useState<"one" | "all">("one");
+  const one = grid === "one";
+  // beside the chat the post's text matters, so the feed preview is on there until the person chooses
+  const [feedChoice, setFeed] = useState<boolean | null>(null);
+  const feed = feedChoice ?? mode === "chat";
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2600); };
@@ -258,6 +330,52 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const cannot = (net: Network) => (feed ? whyNot(net, media.media) : null);
   const excluded = feed ? leftOut(media.media) : [];
 
+  /* ---------- the views ---------- */
+  const kind = store.current?.kind ?? "post";
+  const designing = mode === "edit" && tab !== "post"; // changing the card: the card is what to look at
+  const canBoth = !!pair.post && !!pair.article && box.w >= 900;
+  const showBoth = canBoth && layout.both && !designing;
+  const reading = !showBoth && kind === "article" && !designing;
+  const view: StageView = showBoth ? "both" : kind;
+  const views: StageView[] = [...(pair.post ? ["post" as const] : []), ...(pair.article ? ["article" as const] : []), ...(canBoth ? ["both" as const] : [])];
+  const changed = (["post", "article"] as const).filter((k) => pair[k] && unseen.includes(pair[k]!.id));
+  const showView = (v: StageView) => {
+    setLayout((l) => ({ ...l, both: v === "both" }));
+    if (v === "both") setTab("post"); // the card tabs show one card, so leave them
+    else if (pair[v]) void openItem(pair[v]!.id);
+  };
+  useEffect(() => { // what is on screen has been seen
+    const shown = [store.current?.id, ...(showBoth ? [pair.post?.id, pair.article?.id] : [])];
+    setUnseen((u) => (u.some((id) => shown.includes(id)) ? u.filter((id) => !shown.includes(id)) : u));
+  }, [store.current?.id, showBoth, pair.post?.id, pair.article?.id, unseen.length]);
+  // side by side, the pane that is not being worked on needs its own card and file
+  const postMedia = usePostMedia(showBoth ? pair.post : undefined);
+  const articleView = (d: Draft, width: number) => {
+    const own = designOf(d.design);
+    return (
+      <ArticleView draft={d} design={own} profile={profile} palette={profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0]} width={width}
+        onEdit={() => { void openItem(d.id).then(() => { showEdit("post"); setEditorExpanded(true); }); }}
+        onPreview={() => { void openItem(d.id).then(() => { setPreviewRequested(true); showEdit("post"); }); }} />
+    );
+  };
+  const postPane = (d: Draft, width: number) => {
+    const own = designOf(d.design), paneSize = sizeById(own.sizeId), why = whyNot(paneSize.net, postMedia.media);
+    const pal = profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0];
+    return (
+      <div className="flex min-h-full items-start justify-center p-6">
+        {why ? <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {paneSize.net} preview: {why}.</p>
+          : <FeedFrame design={own} profile={profile} palette={pal} {...postMedia.frame} size={paneSize} caption={serializeDraft(d).text} width={Math.max(240, Math.min(width - 48, 520))} />}
+      </div>
+    );
+  };
+  const modeButton = (m: Layout["mode"], text: string, icon: React.ReactNode) => (
+    <button type="button" aria-pressed={mode === m} onClick={() => setMode(m)}
+      className={cn("flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[13px] font-semibold [&_svg]:h-4 [&_svg]:w-4", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+      {icon} {text}
+      {m === "chat" && chat.pendingCount > 0 && <span className="min-w-4 rounded-full bg-brand px-1 text-[10px] leading-4 text-white" title={`${chat.pendingCount} proposals waiting for your decision`}>{chat.pendingCount}</span>}
+    </button>
+  );
+
   return (
     <TooltipProvider delayDuration={250}>
      <LayoutContext.Provider value={layoutCtx}>
@@ -267,7 +385,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border app-header px-4">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label={sidebarHidden ? "Show sidebar" : "Hide sidebar"} aria-pressed={sidebarHidden}>
+              <Button variant="ghost" size="icon-sm" className="max-lg:hidden" onClick={toggleSidebar} aria-label={sidebarHidden ? "Show sidebar" : "Hide sidebar"} aria-pressed={sidebarHidden}>
                 {sidebarHidden ? <PanelLeftOpen /> : <PanelLeftClose />}
               </Button>
             </TooltipTrigger>
@@ -277,40 +395,45 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           <Logo />
           <div className="flex-1" />
           <BrandSwitcher brands={profiles} activeId={profile.id} colors={brandColors} busy={switching} onSwitch={(id) => void switchBrand(id)} onNew={() => { setCopyOf(undefined); setPanel("newBrand"); }} onManage={() => setPanel("manage")} />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={assistantOpen ? "secondary" : "ghost"} size="icon-sm" className="relative" onClick={() => setAssistantOpen(!assistantOpen)} aria-label={chat.pendingCount > 0 ? `Assistant, ${chat.pendingCount} proposals waiting for your decision` : "Assistant"} aria-expanded={assistantOpen}>
-                <Sparkles />
-                {chat.pendingCount > 0 && <span aria-hidden className="absolute -right-1 -top-1 min-w-4 rounded-full bg-brand px-1 text-[10px] font-semibold leading-4 text-white">{chat.pendingCount}</span>}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Assistant: draft a post from an article</TooltipContent>
-          </Tooltip>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {/* sidebar */}
           <aside
-            inert={sidebarHidden}
+            inert={largeScreen && sidebarHidden}
             className={cn(
-              "flex shrink-0 flex-col overflow-hidden border-border bg-card transition-[width] duration-200 ease-out motion-reduce:transition-none",
-              sidebarHidden ? "hidden lg:flex lg:w-0 lg:border-r-0" : "w-full border-b lg:w-[380px] lg:border-b-0 lg:border-r",
+              "flex shrink-0 flex-col overflow-hidden border-border bg-card ease-out motion-reduce:transition-none max-lg:min-h-0 max-lg:flex-1",
+              dragWidth === null && "transition-[width] duration-200",
+              phonePreview && "max-lg:hidden",
+              sidebarHidden ? "lg:w-0" : "lg:w-[var(--side)] lg:border-r",
             )}
+            style={{ "--side": `${sideWidth}px` } as React.CSSProperties}
           >
-           <div className="flex min-h-0 flex-1 flex-col lg:w-[380px]">
-            <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
+           <div className="flex min-h-0 flex-1 flex-col lg:w-[var(--side)]">
+            <div className="hidden border-b border-border px-3 py-2 lg:block">
+              <div className="flex rounded-md border border-border bg-background p-0.5" role="group" aria-label="Left column">
+                {modeButton("chat", "Chat", <MessageSquareText />)}
+                {modeButton("edit", "Edit", <SlidersHorizontal />)}
+              </div>
+            </div>
+            {/* the chat stays mounted, so an unsent message is not lost by switching */}
+            <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
+                onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
+            </div>
+            {mode === "edit" && <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
               <div className="border-b border-border px-3 py-2.5">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
                   <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
-                  <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Post</TabsTrigger>
+                  <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Write</TabsTrigger>
                   <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Brand</TabsTrigger>
                 </TabsList>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -323,26 +446,29 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                   />
                 </TabsContent>
               </div>
-            </Tabs>
+            </Tabs>}
             <div className="shrink-0 border-t border-border p-2">
               <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />
               <BuiltWith className="px-2 pb-1 pt-2" />
             </div>
            </div>
           </aside>
+          {!sidebarHidden && <SideGrip width={sideWidth} onResize={setDragWidth} onDone={(w) => { setDragWidth(null); setLayout((l) => ({ ...l, sidebarWidth: w })); }} />}
 
           {/* canvas */}
-          <main className="relative flex min-h-[70vh] min-w-0 flex-1 flex-col lg:min-h-0">
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5">
+          <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:hidden")}>
+            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void newItem()} item={store.current} onVersions={() => setPanel(panel === "history" ? null : "history")} />
+            {/* sizes and export belong to the card, so they show with it */}
+            <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">
-                <button type="button" onClick={() => setView("one")} className={cn("flex cursor-pointer items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium", view === "one" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}><Square className="h-3.5 w-3.5" /> One</button>
-                <button type="button" onClick={() => setView("all")} className={cn("flex cursor-pointer items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium", view === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}><LayoutGrid className="h-3.5 w-3.5" /> All sizes</button>
+                <button type="button" onClick={() => setGrid("one")} className={cn("flex cursor-pointer items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium", one ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}><Square className="h-3.5 w-3.5" /> One</button>
+                <button type="button" onClick={() => setGrid("all")} className={cn("flex cursor-pointer items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium", !one ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}><LayoutGrid className="h-3.5 w-3.5" /> All sizes</button>
               </div>
               {NETWORKS.map((net) => (
                 <div key={net} className="flex items-center gap-0.5 rounded-md border border-border bg-card py-0.5 pl-2.5 pr-0.5">
                   <span className="mr-1 text-xs font-semibold">{net}</span>
                   {SIZES.filter((s) => s.net === net).map((s) => {
-                    const on = view === "one" && s.id === size.id;
+                    const on = one && s.id === size.id;
                     const why = cannot(net);
                     return (
                       <Tooltip key={s.id}>
@@ -350,7 +476,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                           <button
                             type="button"
                             aria-disabled={!!why}
-                            onClick={() => { if (why) return; set({ sizeId: s.id }); setView("one"); }}
+                            onClick={() => { if (why) return; set({ sizeId: s.id }); setGrid("one"); }}
                             className={cn("rounded px-2 py-1 text-xs", why ? "cursor-not-allowed text-muted-foreground/45 line-through" : on ? "cursor-pointer bg-primary text-primary-foreground" : "cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground")}
                           >
                             {s.name}
@@ -363,23 +489,33 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2">
-              <div className="flex items-center gap-2">
+            <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2", (reading || (showBoth && kind === "article")) && "hidden")}>
+              <div className={cn("flex items-center gap-2", showBoth && "hidden")}>
                 <Switch id="feed" checked={feed} onCheckedChange={setFeed} />
                 <Label htmlFor="feed" className="flex items-center gap-1 text-foreground"><Eye className="h-3.5 w-3.5" /> Feed preview</Label>
               </div>
-              <span className="eyebrow ml-2 hidden md:inline">{view === "one" ? `${size.net} · ${size.name} · ${size.w}×${size.h}` : `${SIZES.filter((s) => !cannot(s.net)).length} sizes`}</span>
+              <span className="eyebrow ml-2 hidden md:inline">{one ? `${size.net} · ${size.name} · ${size.w}×${size.h}` : `${SIZES.filter((s) => !cannot(s.net)).length} sizes`}</span>
               <div className="flex-1" />
               {note && <span className="flex items-center gap-1 text-xs text-brand"><Check className="h-3.5 w-3.5" />{note}</span>}
               {saveError && <span className="text-xs text-destructive">Could not save to the server – will retry on your next change</span>}
               <Button variant="outline" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}><Shuffle /> Shuffle</Button>
-              <Button variant="outline" size="sm" onClick={doCopy} disabled={!!busy || view === "all"}>{busy === "copy" ? <Loader2 className="animate-spin" /> : <Copy />} Copy</Button>
+              <Button variant="outline" size="sm" onClick={doCopy} disabled={!!busy || !one}>{busy === "copy" ? <Loader2 className="animate-spin" /> : <Copy />} Copy</Button>
               <Button variant="outline" size="sm" onClick={doZip} disabled={!!busy}>{busy === "zip" ? <Loader2 className="animate-spin" /> : <PackageOpen />} All sizes .zip</Button>
-              <Button variant="brand" size="sm" onClick={doDownload} disabled={!!busy || view === "all"}>{busy === "download" ? <Loader2 className="animate-spin" /> : <Download />} Download PNG</Button>
+              <Button variant="brand" size="sm" onClick={doDownload} disabled={!!busy || !one}>{busy === "download" ? <Loader2 className="animate-spin" /> : <Download />} Download PNG</Button>
             </div>
 
             <div ref={canvasRef} className="canvas-grid min-h-0 flex-1 overflow-auto">
-              {view === "one" ? (
+              {showBoth && pair.post && pair.article ? (
+                <div className="grid h-full grid-cols-2">
+                  {([["post", pair.post], ["article", pair.article]] as const).map(([k, d]) => (
+                    // pressing in a pane makes its item the one being worked on
+                    <section key={k} aria-label={k === "post" ? "Post preview" : "Article preview"} onPointerDownCapture={() => { if (d.id !== store.current?.id) void openItem(d.id); }}
+                      className={cn("min-h-0 overflow-auto border-t-2 border-border [&+&]:border-l", d.id === store.current?.id ? "border-t-brand" : "border-t-transparent")}>
+                      {k === "post" ? postPane(d, box.w / 2) : articleView(d, box.w / 2)}
+                    </section>
+                  ))}
+                </div>
+              ) : reading && store.current ? articleView(store.current, box.w) : one ? (
                 <div className="flex min-h-full items-center justify-center p-8">
                   {cannot(size.net) ? (
                     <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {size.net} preview: {cannot(size.net)}.</p>
@@ -393,7 +529,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 <div className="flex flex-wrap items-start justify-center gap-6 p-8">
                   {excluded.length > 0 && <p role="status" className="w-full text-center text-xs text-muted-foreground">Left out: {excluded.map((l) => `${l.net} (${l.why})`).join(", ")}</p>}
                   {SIZES.filter((s) => !cannot(s.net)).map((s) => (
-                    <button key={s.id} type="button" className="group cursor-pointer text-left" onClick={() => { set({ sizeId: s.id }); setView("one"); }}>
+                    <button key={s.id} type="button" className="group cursor-pointer text-left" onClick={() => { set({ sizeId: s.id }); setGrid("one"); }}>
                       <div className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground group-hover:text-brand">
                         <b className="text-foreground">{s.net}</b> · {s.name} · {s.w}×{s.h}
                       </div>
@@ -406,8 +542,17 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             {/* the expanded editor is drawn here, on top of the canvas */}
             <div ref={setEditorHost} className={cn("absolute inset-0 z-20", !editorExpanded && "hidden")} />
           </main>
+          <nav aria-label="Show" className="flex shrink-0 gap-1 border-t border-border bg-card p-1.5 lg:hidden">
+            {([["chat", "Chat"], ["preview", "Preview"], ["edit", "Edit"]] as const).map(([k, text]) => {
+              const on = k === "preview" ? phonePreview : !phonePreview && mode === k;
+              return <button key={k} type="button" aria-pressed={on} onClick={() => (k === "preview" ? setPhonePreview(true) : setMode(k))}
+                className={cn("flex-1 cursor-pointer rounded px-2 py-2 text-[13px] font-semibold", on ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{text}{k === "chat" && chat.pendingCount > 0 ? ` (${chat.pendingCount})` : ""}</button>;
+            })}
+          </nav>
         </div>
       </div>
+      <ChatHistoryDrawer open={panel === "chats"} onClose={() => setPanel(null)} profileId={profile.id} recent={chat.list} currentId={chat.current?.id} drafts={store.drafts} busy={chat.busy}
+        onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); chat.newConversation(); }} />
       <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
       <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
       <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />
@@ -420,9 +565,6 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
         open={panel === "manage"} onClose={() => setPanel(null)} active={profiles} archived={archived} activeId={profile.id} colors={brandColors}
         onOpen={switchBrand} onMove={moveBrand} onDuplicate={(p) => void duplicateBrand(p)} onArchive={archiveBrand} onRestore={restoreBrand} onDelete={deleteBrand}
       />
-      <Drawer open={assistantOpen} onClose={() => setAssistantOpen(false)} title={`Assistant · ${profile.name}`} resizeKey="assistant">
-        <ChatPanel chat={chat} onApply={applyProposal} onOpenPost={() => { setTab("post"); if (sidebarHidden) toggleSidebar(); setAssistantOpen(false); }} />
-      </Drawer>
      </LayoutContext.Provider>
 
       {/* off-screen export stage: full-size cards, no transforms */}

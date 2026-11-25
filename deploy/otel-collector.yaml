@@ -1,0 +1,38 @@
+# OpenTelemetry Collector for CardPress (docker compose --profile telemetry up -d).
+# The app sends everything here over OTLP/HTTP. Traces go to Arize AX, which documents traces only; metrics and logs are
+# printed by the collector until you give them a backend (see docs/telemetry.md).
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+  batch: {}
+
+exporters:
+  otlp_http/arize:
+    endpoint: https://otlp.arize.com
+    headers:
+      arize-space-id: ${env:ARIZE_SPACE_ID}
+      arize-api-key: ${env:ARIZE_API_KEY}
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/arize]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

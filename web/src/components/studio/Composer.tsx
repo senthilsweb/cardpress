@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, History, ImageUp, Loader2, Maximize2, Minimize2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, History, ImageUp, Loader2, Maximize2, Minimize2, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AreaField, Field, Section } from "./fields";
 import { EditorToolbar, Outline, RichEditor } from "./RichEditor";
@@ -19,6 +18,8 @@ import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
 import { useLayout } from "@/lib/layout";
+import { lockReason } from "@/lib/lock";
+import { labelCache, labelOf, shortLabel } from "@/lib/draftLabel";
 import { useSession } from "@/lib/session";
 import { normalizeHashtag, type Draft, type DocNode, type DraftKind } from "@/lib/draft";
 import { countWords, DEFAULT_SIZE_INDEX, parseSizeIndex, parseWidth, readingMinutes, stepSize, TEXT_SIZES, type TextWidth } from "@/lib/editorTools";
@@ -35,32 +36,23 @@ import type { DraftStore } from "@/lib/useDrafts";
 import type { Design, Palette, Profile } from "@/lib/types";
 
 const STATUS_NAME = { draft: "Draft", approved: "Approved", scheduled: "Scheduled", published: "Published" } as const;
-const label = (text: string) => (text.split("\n")[0] || "Empty draft").slice(0, 34);
-
-// A draft's label only changes when its document does, and the store keeps untouched documents as the same object, so
-// every draft but the one being typed in is served from here instead of being serialised again on each keystroke.
 const MAX_IMAGE_BYTES = 10 << 20; // the server refuses more
 const MAX_DOCUMENT_BYTES = 20 << 20;
 const MAX_POST_IMAGES = 10;
-
-const labelCache = new WeakMap<object, string>();
-const labelOf = (d: Draft) => {
-  let l = labelCache.get(d.doc);
-  if (l === undefined) { l = label(serializeDraft(d).text); labelCache.set(d.doc, l); }
-  return l;
-};
 
 /** A saved view choice. Storage can be blocked or full, and the choice is only a convenience. */
 const loadPref = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
 const savePref = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* not remembered */ } };
 
-export function Composer({ media, onOpenHistory, openPreview, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   /** What the open post carries. */
   media: PostMediaView;
   /** Open the item's history (versions). */
   onOpenHistory?: () => void;
   /** Open the Full preview as soon as this shows (asked for by the library). */
   openPreview?: boolean;
+  /** Called once it has opened, so it does not open again the next time this shows. */
+  onPreviewOpened?: () => void;
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
@@ -72,7 +64,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
   /** The editor takes over the centre of the studio. `host` is the element it is drawn into. */
   expanded: boolean; setExpanded: (v: boolean) => void; host: HTMLElement | null;
 }) {
-  const { current: draft, drafts } = store;
+  const { current: draft } = store;
   const { can } = useSession();
   const { editorHeight, setEditorHeight } = useLayout();
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -96,7 +88,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
   )), [draft?.kind, width, sizeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
   const openFull = () => { flushPendingEdits(); setPreview(true); };
   const collapse = () => { flushPendingEdits(); setExpanded(false); };
-  useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); } }, [openPreview]);
+  useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); onPreviewOpened?.(); } }, [openPreview]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tag, setTag] = useState("");
   const own = draft?.kind === "post" && media.media.kind !== "card" ? media.media.kind : undefined;
   const pics = own === "images" ? draft?.images ?? [] : [];
@@ -104,7 +96,6 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
   const fileRef = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
   const flash = (m: string) => { setNote(m); window.setTimeout(() => setNote(null), 2200); };
-  const [busy, setBusy] = useState<string | null>(null);
   // typing in an article reaches the store after a short pause; whatever acts on the draft takes what is waiting first
   const guard = (fn: () => Promise<void>) => async () => {
     flushPendingEdits();
@@ -131,10 +122,9 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
   const ser = useMemo(() => {
     if (!draft) return null;
     const out = serializeDraft(draft);
-    labelCache.set(draft.doc, label(out.text)); // the label below needs the same text, so it is not worked out twice
+    labelCache.set(draft.doc, shortLabel(out.text)); // the picker needs the same text, so it is not worked out twice
     return out;
   }, [draft]);
-  const labels = useMemo(() => new Map(drafts.map((d) => [d.id, labelOf(d)])), [drafts]);
   const words = useMemo(() => (ser ? countWords(ser.text) : 0), [ser]);
   if (!draft || !ser) return null;
   const isPost = draft.kind === "post";
@@ -143,7 +133,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
   const approve = guard(async () => { await store.approve(); toast.success("Approved", { description: isPost ? "It can now be published or scheduled." : "It is marked final." }); });
   const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
 
-  const locked = draft.status === "scheduled"; // a post waiting to be sent cannot change
+  const locked = !!lockReason(draft); // waiting to be sent, or published: it cannot change
   const pickFile = guard(async () => {
     const files = Array.from(fileRef.current?.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
@@ -231,26 +221,17 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
         action={
           <div className="flex gap-1">
             {onOpenHistory && <Button variant="ghost" size="icon-sm" title="History" aria-label="History" onClick={onOpenHistory}><History /></Button>}
-            <Button variant="ghost" size="icon-sm" title="New draft" aria-label="New draft" disabled={busy === "new"} onClick={guard(async () => { setBusy("new"); try { await store.create(draft.kind); } finally { setBusy(null); } })}><Plus /></Button>
             <Button variant="ghost" size="icon-sm" title={draft.status === "draft" ? "Delete this draft" : "Bring it back to draft to delete it"} aria-label="Delete this draft" disabled={draft.status !== "draft"} onClick={guard(() => store.remove(draft.id))}><Trash2 /></Button>
           </div>
         }
       >
-        <Select value={draft.id} onValueChange={(id) => void guard(() => store.select(id))()}>
-          <SelectTrigger aria-label="Choose a draft"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {drafts.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.kind === "article" ? "Article · " : "Post · "}{labels.get(d.id)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         {!isPost && (
           <Field label="Title" hint="Shown in the library and used for the file name.">
-            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={draft.status === "scheduled"} />
+            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={locked} />
           </Field>
         )}
         <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
-          <ToggleGroup type="single" value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
+          <ToggleGroup type="single" disabled={locked} value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
             <ToggleGroupItem value="post">Post</ToggleGroupItem>
             <ToggleGroupItem value="article"><FileText className="mr-1 h-3.5 w-3.5" /> Article</ToggleGroupItem>
           </ToggleGroup>
@@ -283,7 +264,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
               if (el.style.height && Math.abs(el.offsetHeight - (editorHeight ?? 0)) > 3) setEditorHeight(Math.round(el.offsetHeight));
             }}
           >
-            <RichEditor fill readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
+            <RichEditor fill readOnly={!!lockReason(draft)} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
@@ -298,7 +279,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
       </Section>
 
       {isPost && (
-        <>
+        <div inert={locked} className={locked ? "opacity-60" : undefined}>
           <Section title="Hashtags">
             <div className="flex flex-wrap gap-1.5">
               {draft.hashtags.map((h) => (
@@ -404,7 +385,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
               </div>
             </div>
           </Section>
-        </>
+        </div>
       )}
 
       <Section title="Review">
@@ -413,10 +394,10 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
           {draft.status === "draft" && can("approve") && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
           {draft.status === "draft" && !can("approve") && <span className="text-[11px] text-muted-foreground">An editor or admin approves it.</span>}
           {(draft.status === "approved" || draft.status === "published") && (
-            <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> {draft.status === "published" ? "Edit again" : "Back to draft"}</Button>
+            <Button variant={locked ? "brand" : "outline"} size="sm" onClick={unapprove}><Undo2 /> Back to draft</Button>
           )}
           {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
-          {draft.status === "scheduled" && <span className="text-[11px] text-muted-foreground">A post is waiting to be sent. Cancel it in the queue to edit.</span>}
+          {locked && <span role="status" className="w-full text-[11px] text-muted-foreground">{lockReason(draft)}</span>}
         </div>
         {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
         {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
@@ -457,7 +438,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
         <div className="flex h-full flex-col bg-background" role="region" aria-label="Expanded editor">
           <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5">
             <span className="eyebrow">{isPost ? "Post text" : "Article"}</span>
-            <span className="truncate text-xs text-muted-foreground">{labels.get(draft.id)}</span>
+            <span className="truncate text-xs text-muted-foreground">{labelOf(draft)}</span>
             <span className="flex-1" />
             {note && <span className="text-xs text-brand">{note}</span>}
             <Button variant="outline" size="sm" onClick={copyNow} disabled={!ser.text.trim()}><Copy /> {isPost ? "Copy text" : "Copy formatted"}</Button>
@@ -476,7 +457,7 @@ export function Composer({ media, onOpenHistory, openPreview, store, jobs, brand
             <div className="min-h-0 flex-1 overflow-y-auto p-6" data-editor-scroll>
               <div className={cn("mx-auto w-full", width === "wide" ? "max-w-6xl" : "max-w-3xl")} style={{ "--rich-size": `${TEXT_SIZES[isPost ? DEFAULT_SIZE_INDEX : sizeIdx]}rem` } as React.CSSProperties}>
                 <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <RichEditor large bare readOnly={draft.status === "scheduled"} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
+                  <RichEditor large bare readOnly={!!lockReason(draft)} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} onLinkRequest={() => setLinkOpen(true)} />
                 </div>
               </div>
             </div>

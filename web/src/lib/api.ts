@@ -51,7 +51,8 @@ import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage } from "./library";
-import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { AgentInfo, ChatMessage, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { Attachment } from "./compose";
 
 export interface ApiInfo {
   name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo;
@@ -60,11 +61,13 @@ export interface ApiInfo {
 }
 /** A saved state of a draft (text only when one is fetched on its own). */
 export interface DraftVersion {
-  id: string; draftId: string; seq: number; label: "created" | "auto" | "manual" | "approved" | "sent" | "restored";
+  id: string; draftId: string; seq: number; revision: number; label: "created" | "auto" | "manual" | "approved" | "sent" | "restored" | "assistant";
   note?: string; kind: string; title: string; createdBy?: string; createdByName?: string; createdAt: string; preview?: string;
   doc?: import("./draft").DocNode; hashtags?: string[]; altText?: string;
 }
 /** An API key as listed. The secret is shown once, when the key is made, and never again. */
+/** A note the assistant keeps about a brand. */
+export interface BrandNote { key: string; content: string; updatedAt: string }
 export interface ApiKey { id: string; name: string; prefix: string; scope: string; createdAt: string; lastUsedAt?: string }
 export interface SignupInput { firstName: string; lastName: string; email: string; password: string; phone?: string; birthDate?: string }
 /** One credential field as the server lets the browser see it: a secret is only ever its last four characters. */
@@ -93,6 +96,36 @@ export interface ChatStreamHandlers {
   onDelta?: (text: string) => void;
   onProposal?: (p: Proposal) => void;
   onMessage?: (m: ChatMessage) => void;
+}
+
+/** Something of a brand changed on the server. */
+export interface ServerEvent { type: string; profileId: string; draftId: string; revision: number }
+
+/**
+ * Listen for a brand's changes. `onOpen` runs once the server is listening. Resolves when the stream ends; the caller
+ * decides whether to listen again. (Read with fetch, so the token can go in a header.)
+ */
+async function listen(profileId: string, onEvent: (e: ServerEvent) => void, onOpen: () => void, signal: AbortSignal): Promise<void> {
+  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/events?profileId=${encodeURIComponent(profileId)}`, { headers, signal });
+  if (!res.ok || !res.body) throw new ApiError(res.status, "events", `Live updates are not available (${res.status})`);
+  onOpen();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buf += decoder.decode(value, { stream: !done });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const data = buf.slice(0, i).split("\n").filter((l) => l.startsWith("data: ")).map((l) => l.slice(6)).join("");
+      buf = buf.slice(i + 2);
+      if (data) onEvent(JSON.parse(data) as ServerEvent);
+    }
+    if (done) return;
+  }
 }
 
 /**
@@ -171,8 +204,9 @@ export const api = {
   putPreference: (key: "theme" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
-  updateDraft: (id: string, input: DraftInput) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
+  updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
+  listen,
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
   /** Put an approved item's page on the public web. `cover` is the card as a PNG, used as the preview image. */
   publishPage: (id: string, meta: { slug?: string; summary?: string }, cover?: Blob) => {
@@ -243,8 +277,17 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
     return res.blob();
   },
-  listConversations: (profileId: string) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}`),
-  startConversation: (profileId: string, input: { url?: string; text?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
+  listConversations: (profileId: string, q = "") => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  listNotes: (profileId: string) => call<{ notes: BrandNote[] }>("GET", `/chat/memories?profileId=${encodeURIComponent(profileId)}`).then((r) => r.notes),
+  deleteNote: (profileId: string, key: string) => call<void>("DELETE", `/chat/memories/${encodeURIComponent(key)}?profileId=${encodeURIComponent(profileId)}`),
+  startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
+  addSource: (conversationId: string, a: Attachment) => {
+    let body: FormData | { url: string } | { text: string };
+    if (a.kind === "file") { body = new FormData(); body.set("file", a.file, a.file.name); }
+    else body = a.kind === "url" ? { url: a.url } : { text: a.text };
+    return call<ChatSource>("POST", `/chat/conversations/${encodeURIComponent(conversationId)}/sources`, body);
+  },
+  removeSource: (conversationId: string, sourceId: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(conversationId)}/sources/${encodeURIComponent(sourceId)}`),
   getConversation: (id: string) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`),
   deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
   streamMessage,

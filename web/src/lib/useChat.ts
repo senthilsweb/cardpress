@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { AgentInfo, ChatMessage, Conversation, Proposal, ProposalEdit } from "./chat";
+import type { Attachment } from "./compose";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
@@ -62,14 +63,17 @@ export function useChat(profileId: string) {
 
   const patch = (id: string, fn: (c: Conversation) => Conversation) => setCurrent((c) => (c && c.id === id ? fn(c) : c));
 
-  /** Send a message and show the reply as it arrives. An empty message starts the first draft. */
+  /** Send a message and show the reply as it arrives. An empty message sends the waiting sources. */
   const send = useCallback(async (convId: string, content: string) => {
     setBusy(true); setError(null); setStreaming("");
     const ctl = new AbortController();
     abort.current = ctl;
     try {
       await api.streamMessage(convId, content, {
-        onUser: (m: ChatMessage) => patch(convId, (c) => ({ ...c, messages: [...(c.messages ?? []), m] })),
+        onUser: (m: ChatMessage) => patch(convId, (c) => ({
+          ...c, messages: [...(c.messages ?? []), m],
+          sources: (c.sources ?? []).map((s) => (s.messageId ? s : { ...s, messageId: m.id })),
+        })),
         onDelta: (t) => setStreaming((s) => (s ?? "") + t),
         onProposal: (p: Proposal) => patch(convId, (c) => ({
           ...c,
@@ -80,24 +84,58 @@ export function useChat(profileId: string) {
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError(message(e));
     } finally {
+      // what the server kept is the truth; after a stop it takes a moment to note it
+      for (let i = 0; i < 6; i++) {
+        if (ctl.signal.aborted) await new Promise((r) => window.setTimeout(r, 250));
+        try {
+          const c = await api.getConversation(convId);
+          if (ctl.signal.aborted && i < 5 && c.messages?.[c.messages.length - 1]?.role === "user") continue;
+          patch(convId, () => c);
+        } catch { /* the next look will do */ }
+        break;
+      }
       setStreaming(null); setBusy(false);
-      // note the new update time, so the periodic check does not mistake our own change for someone else's
-      refreshList().then((cs) => { const it = cs.find((c) => c.id === convId); if (it) patch(convId, (c) => ({ ...c, updatedAt: it.updatedAt })); }).catch(() => undefined);
+      refreshList().catch(() => undefined);
     }
   }, [refreshList]);
 
-  const start = useCallback(async (input: { url?: string; text?: string }) => {
+  /** Stop the reply being written. What was said is kept, and the conversation goes on. */
+  const stop = useCallback(() => abort.current?.abort(), []);
+
+  /**
+   * Send words and attachments, starting a conversation about `draftId` if none is open. Resolves true once everything
+   * attached was accepted and the message is on its way; false leaves the box as it was, with the reason in `error`.
+   */
+  const submit = useCallback(async (content: string, attachments: Attachment[], draftId?: string): Promise<boolean> => {
     setBusy(true); setError(null);
+    let conv = live.current.current;
+    const created = !conv;
+    const added: string[] = [];
     try {
-      const c = await api.startConversation(profileId, input);
-      setCurrent(c);
-      refreshList().catch(() => undefined);
-      await send(c.id, ""); // writes the first draft straight away
+      if (!conv) conv = await api.startConversation(profileId, { draftId });
+      for (const a of attachments) added.push((await api.addSource(conv.id, a)).id);
+      const fresh = await api.getConversation(conv.id);
+      setCurrent(fresh);
     } catch (e) {
+      // nothing is left half attached
+      if (conv) {
+        if (created) await api.deleteConversation(conv.id).catch(() => undefined);
+        else for (const id of added) await api.removeSource(conv.id, id).catch(() => undefined);
+      }
       setError(message(e));
       setBusy(false);
+      return false;
     }
-  }, [profileId, send, refreshList]);
+    void send(conv.id, content);
+    return true;
+  }, [profileId, send]);
+
+  const removeSource = useCallback(async (convId: string, sourceId: string) => {
+    try {
+      await api.removeSource(convId, sourceId);
+      patch(convId, (c) => ({ ...c, sources: (c.sources ?? []).filter((s) => s.id !== sourceId) }));
+    } catch (e) { setError(message(e)); }
+  }, []);
 
   const open = useCallback(async (id: string) => {
     setError(null); setStreaming(null);
@@ -121,7 +159,7 @@ export function useChat(profileId: string) {
   }, [refreshList]);
 
   const pendingCount = list.reduce((n, c) => n + (c.pending ?? 0), 0);
-  return { agent, list, current, loaded, pendingCount, streaming, busy, error, setError, start, send, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
+  return { agent, list, current, loaded, pendingCount, streaming, busy, error, setError, send, submit, stop, removeSource, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
 }
 
 export type ChatStore = ReturnType<typeof useChat>;

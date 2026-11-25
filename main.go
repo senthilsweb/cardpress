@@ -32,6 +32,7 @@ import (
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
+	"github.com/senthilsweb/cardpress/internal/telemetry"
 )
 
 //go:embed all:web/dist
@@ -76,6 +77,21 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	signals, stopTelemetry, err := telemetry.Setup(context.Background(), version, os.Getenv)
+	if err != nil {
+		log.Printf("%v. Telemetry is off or incomplete; the server runs as usual.", err)
+	}
+	defer func() { // send what is still waiting
+		flush, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stopTelemetry(flush); err != nil {
+			log.Printf("telemetry: could not send what was left: %v", err)
+		}
+	}()
+	if len(signals) > 0 {
+		log.Printf("telemetry: sending %s over OTLP", strings.Join(signals, ", "))
+	}
+
 	db, err := store.Open(ctx, cfg.DBURL, cfg.DBToken)
 	if err != nil {
 		log.Fatal(err)
@@ -111,6 +127,8 @@ func main() {
 	go func() { defer close(schedulerDone); publisher.Run(ctx, 20*time.Second) }()
 	studio := service.New(db.DB)
 	studio.Videos = videos
+	events := service.NewHub()
+	studio.Events = events
 	fetcher := source.New()
 	chatAgent, err := newAgent(cfg)
 	if err != nil {
@@ -119,20 +137,22 @@ func main() {
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
+		Events:   events,
+		Notes:    studio,
 		Accounts: accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
 		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
 		// process on the same machine cannot use it to reach everyone's work without one.
 		// An API key (cpk_...) makes the call act as the key's person, within its scope, so it reaches only that person's
 		// brands; the access rules above then do not apply to it (the key is the credential).
-		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
+		keyedHandler := api.Protect(api.ProtectOptions{TrustedOrigins: cfg.CORSOrigins}, mcpserver.KeyedHTTPHandler(mcpSrv))
 		mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); got != r.Header.Get("Authorization") && strings.HasPrefix(got, service.KeyPrefix) {
 				u, id, scope, err := accounts.AuthenticateKey(r.Context(), got)
@@ -170,7 +190,8 @@ func main() {
 		}
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: logRequests(mux), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: telemetry.HTTP(logRequests(mux)), ReadHeaderTimeout: 10 * time.Second}
+	srv.RegisterOnShutdown(events.Close) // open studios stop listening, so the server can stop
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -318,7 +339,9 @@ func runMCP(args []string) {
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
-	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
+	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)
+	connections := service.NewSettings(db.DB, nil, os.Getenv) // only says what is filled in; reads no secret
+	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
 	log.Printf("cardpress MCP over stdio is ready (%s database)", db.Driver)
 	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
 		log.Fatal(err)

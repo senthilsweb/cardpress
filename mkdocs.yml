@@ -45,6 +45,7 @@ nav:
   - Assistant:
       - Chat: chat.md
       - Claude Managed Agent: cma-agent.md
+  - Telemetry: telemetry.md
   - Publishing:
       - Publishing: publishing.md
       - Social accounts: social-settings.md

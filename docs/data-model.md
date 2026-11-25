@@ -56,7 +56,7 @@ Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown
 
 | Table | Migration | Columns |
 |---|---|---|
-| `drafts` | 0002, 0009, 0014 | `id` (PK), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `attachment_kind` (`card`, `image`, `document`, `images` or `video`), `attachment` (BLOB, the post's own file), `attachment_type`, `attachment_title`, `video_url`, `video_size`, `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
+| `drafts` | 0002, 0009, 0014, 0019 | `id` (PK), `revision` (moves with every change to what the draft says or shows), `profile_id`, `kind` (`post` or `article`), `status` (`draft`, `approved`, `scheduled`, `published`), `doc` (JSON, the editor's rich text), `hashtags` (JSON array), `alt_text`, `unicode_styles` (0/1), `title`, `design` (JSON, the card), `design_version`, `approved_at`, `scheduled_at`, `timezone`, `slug`, `summary`, `page_at`, `cover` (BLOB), `attachment_kind` (`card`, `image`, `document`, `images` or `video`), `attachment` (BLOB, the post's own file), `attachment_type`, `attachment_title`, `video_url`, `video_size`, `created_by`, `approved_by` (user ids), `created_at`, `updated_at`. Indexes `(profile_id, updated_at DESC)`, `(profile_id, status, updated_at DESC)`, unique `(kind, slug)` where `slug` is set, and `(kind, page_at DESC)` for live pages |
 
 `doc` is a TipTap/ProseMirror document: `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]}`. It is limited to 25 MB, because an article keeps its images inside its text as base64 (`{"type":"image","attrs":{"src":"data:image/png;base64,…"}}`).
 
@@ -76,7 +76,11 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005, 0011 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `created_at`, `updated_at` |
+| `conversations` | 0005, 0011, 0017 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `created_at`, `updated_at` |
+| `agent_memories` | 0019 | `profile_id`, `key` (PK together), `content`, `created_by`, `created_at`, `updated_at` |
+| `draft_versions.revision` | 0021 | the state of the draft a version holds |
+| `chat_usage` | 0020 | `id` (PK), `conversation_id`, `message_id`, `session_id`, `total_cents` (the session's running total), `added_cents`, `active_seconds`, `created_at` |
+| `conversation_sources` | 0018 | `id` (PK), `conversation_id`, `message_id`, `kind` (`url`, `text`, `md`, `docx`, `pdf`), `name`, `url`, `chars`, `truncated`, `text`, `data` (a PDF as attached), `delivered`, `created_at` |
 | `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`. Unique `(conversation_id, seq)` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 

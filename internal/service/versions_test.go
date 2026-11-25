@@ -74,7 +74,8 @@ func TestRestoringAVersionIsAnEditAndKeepsWhatWasThere(t *testing.T) {
 		t.Fatalf("a restore is an edit: an approved item goes back to draft: %+v", got)
 	}
 	vs, _ := l.st.Versions(ctx, d.ID)
-	if !strings.HasSuffix(labels(vs), "manual,restored") || vs[0].Note != "from version 1" {
+	// the state before it was already a version, so only the restored one is added
+	if !strings.HasSuffix(labels(vs), "approved,restored") || vs[0].Note != "from version 1" || vs[0].Revision != got.Revision {
 		t.Fatalf("%s %+v", labels(vs), vs[0])
 	}
 	if v2, _ := l.st.Version(ctx, d.ID, 2); v2.Label != VersionApproved && v2.Label != VersionAuto {

@@ -13,6 +13,10 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/senthilsweb/cardpress/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // DefaultVersion is the LinkedIn-Version header sent with every call. LinkedIn retires versions about a year after
@@ -158,14 +162,23 @@ func friendly(status int, body []byte, step string) *APIError {
 func (c *Client) do(step string, req *http.Request) (*http.Response, []byte, error) {
 	started := time.Now()
 	tr, _ := req.Context().Value(traceKey{}).(*Trace)
+	// the span names the step and the host; never the path or query, which can carry an upload signature
+	_, span := telemetry.Start(req.Context(), "linkedin: "+step, trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attribute.String("http.request.method", req.Method), attribute.String("server.address", req.URL.Hostname())))
+	defer span.End()
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		telemetry.Fail(span, "no answer")
 		if tr != nil {
 			tr.record(step, req, started, nil, nil, err)
 		}
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
+	span.SetAttributes(attribute.Int("http.response.status_code", resp.StatusCode))
+	if resp.StatusCode >= 400 {
+		telemetry.Fail(span, http.StatusText(resp.StatusCode))
+	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if tr != nil {
 		tr.record(step, req, started, resp, body, nil)

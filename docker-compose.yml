@@ -31,5 +31,20 @@ services:
       retries: 3
       start_period: 10s
 
+  # Optional: receives the app's telemetry and passes it on. Start with `docker compose --profile telemetry up -d`
+  # and set OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 in .env. See docs/telemetry.md.
+  otel-collector:
+    profiles: [telemetry]
+    image: otel/opentelemetry-collector:0.166.0
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      ARIZE_SPACE_ID: "${ARIZE_SPACE_ID:-}"
+      ARIZE_API_KEY: "${ARIZE_API_KEY:-}"
+    volumes:
+      - ./deploy/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:4318:4318" # for a server run outside Docker on this machine
+
 volumes:
   cardpress-data:
