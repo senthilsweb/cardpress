@@ -72,7 +72,7 @@ Table `conversation_sources (id, conversation_id, message_id, kind, name, url, c
 - `POST /chat/conversations/{id}/sources` (JSON for url and text, multipart for files), `DELETE …/sources/{sid}` for one not yet sent.
 
 ## Message box
-One box for the whole chat, also before a conversation exists. Attach (paperclip) at the lower left, send (rocket) at the lower right; while a reply is written the send button is **Stop**. Attachments are staged in the box and sent with the message; if one is refused, none is added and the box keeps its contents. Stopping cancels the request, which cancels the agent's work (a managed session is interrupted), and the thread records that the reply was stopped.
+One box for the whole chat, also before a conversation exists. Attach (paperclip) at the lower left, send (paper plane) at the lower right; while a reply is written the send button is **Stop**. Attachments are staged in the box and sent with the message; if one is refused, none is added and the box keeps its contents. Stopping cancels the request, which cancels the agent's work (a managed session is interrupted), and the thread records that the reply was stopped.
 
 ## Changes and Undo
 Table `chat_changes (id, conversation_id, message_id, draft_id, before, after, created_at, undone_at)`, holding only the fields a turn changed.

@@ -1,5 +1,5 @@
 import { useRef, useState, type ClipboardEvent, type DragEvent } from "react";
-import { FileText, Link2, Loader2, Paperclip, Rocket, Square, Type, X } from "lucide-react";
+import { FileText, Link2, Loader2, Paperclip, Send, Square, Type, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,8 +27,8 @@ export const SourceChip = ({ source, onRemove }: { source: ChatSource; onRemove?
 );
 
 /**
- * The one box a person talks to the assistant through: words, with files, links and long text beside them. The rocket
- * sends; while a reply is being written it becomes a stop button.
+ * The one box a person talks to the assistant through: words, with files, links and long text beside them. The send
+ * button becomes a stop button while a reply is being written.
  */
 export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaiting, onSend, onStop }: {
   placeholder: string;
@@ -147,7 +147,7 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
           </DropdownMenu>
           {replying
             ? <Button type="button" variant="brand" size="icon-sm" onClick={onStop} aria-label="Stop" title="Stop"><Square className="fill-current" /></Button>
-            : <Button type="button" variant={ready ? "brand" : "ghost"} size="icon-sm" disabled={!ready} onClick={() => void send()} aria-label="Send" title="Send (Enter)">{sending || busy ? <Loader2 className="animate-spin" /> : <Rocket />}</Button>}
+            : <Button type="button" variant={ready ? "brand" : "ghost"} size="icon-sm" disabled={!ready} onClick={() => void send()} aria-label="Send" title="Send (Enter)">{sending || busy ? <Loader2 className="animate-spin" /> : <Send />}</Button>}
         </div>
       </div>
     </div>

@@ -18,7 +18,7 @@
 - [x] Web: **+** menu, chips, long paste, refusals
 - [ ] Try a mounted PDF with a managed session (ask first: it costs money)
 - [x] Docs: `docs/chat.md`, `docs/data-model.md`
-- [x] One message box: attach inside it, rocket to send, Stop while replying
+- [x] One message box: attach inside it, paper plane to send, Stop while replying
 
 ## C. Changes and Undo (with designer step 5)
 - [ ] Migration `chat_changes`; record from tool results; undo endpoint

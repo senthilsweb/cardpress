@@ -38,7 +38,7 @@ The tabs are under **Edit** in the left column. Set your name, handle, logo and 
 
 ## Write a post
 
-1. In **Chat**, say what to write, attach a file or add a link with the paperclip if you have one, and press the rocket.
+1. In **Chat**, say what to write, attach a file or add a link with the paperclip if you have one, and press send.
 2. Read the proposal. **Approve and use** copies it into a draft, **Edit** changes it first, **Reject** dismisses it.
 3. In **Edit**, **Write**, refine the text, hashtags and alt text. **Full preview** shows the LinkedIn feed as it will look.
 

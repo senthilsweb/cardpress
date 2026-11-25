@@ -7,7 +7,7 @@ The **Assistant** drafts a post or an article from something you give it, and yo
 ## Using it
 
 1. The assistant is the **Chat** side of the left column, and is what opens first. **Edit** holds the Design, Text, Write and Brand tabs. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
-   Type what you want in the message box and send it with the **rocket** (or Enter; Shift+Enter adds a line). While a reply is being written the rocket becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
+   Type what you want in the message box and send it with the **send** button (or Enter; Shift+Enter adds a line). While a reply is being written the button becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
    To give it something to write from, use the **paperclip** in the box:
    - **Attach a file:** PDF, Word (`.docx`), Markdown or text, up to 10 MB. You can also drop files onto the box.
    - **Add a link:** a public web page. Pasting only an address into an empty box does the same.
