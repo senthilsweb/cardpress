@@ -13,6 +13,7 @@ import { Composer } from "./Composer";
 import { SocialSettings } from "./SocialSettings";
 import { BrandSwitcher, ManageBrandsDrawer, NewBrandDrawer } from "./Brands";
 import { ChatPanel } from "./ChatPanel";
+import { ChatHistoryDrawer } from "./ChatHistoryDrawer";
 import { StageBar, type StageView } from "./StageBar";
 import { SideGrip } from "./SideGrip";
 import { ArticleView } from "./ArticleView";
@@ -115,7 +116,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
   // the right-hand drawers share one edge, so only one is open at a time
-  const [panel, setPanel] = useState<"accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
+  const [panel, setPanel] = useState<"chats" | "accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
   // the library can send someone straight to a draft's Full preview (to schedule it)
   const [previewRequested, setPreviewRequested] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(false);
@@ -169,7 +170,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   /** Open a conversation from the list, with the item it is about. */
   const openConversation = async (id: string) => {
     await chat.open(id);
-    const conv = chat.list.find((c) => c.id === id);
+    // a search can find one older than the list holds
+    const conv = chat.list.find((c) => c.id === id) ?? await api.getConversation(id).catch(() => undefined);
     if (!conv || (store.current && linksDraft(conv, store.current.id))) return;
     const about = [conv.postDraftId, conv.articleDraftId].find((d) => d && store.drafts.some((x) => x.id === d));
     if (about) { flushPendingEdits(); await store.select(about); }
@@ -415,7 +417,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </div>
             {/* the chat stays mounted, so an unsent message is not lost by switching */}
             <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
-              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} onOpenConversation={(id) => void openConversation(id)}
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
             {mode === "edit" && <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
@@ -548,6 +550,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           </nav>
         </div>
       </div>
+      <ChatHistoryDrawer open={panel === "chats"} onClose={() => setPanel(null)} profileId={profile.id} recent={chat.list} currentId={chat.current?.id} drafts={store.drafts} busy={chat.busy}
+        onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); chat.newConversation(); }} />
       <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
       <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
       <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />

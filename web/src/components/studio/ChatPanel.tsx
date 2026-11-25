@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Info, Loader2, Plus, Trash2 } from "lucide-react";
+import { History, Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
 import { ProposalCard } from "./ProposalCard";
 import { ChatInput, SourceChip } from "./ChatInput";
+import { costText } from "@/lib/history";
 
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
@@ -17,19 +18,11 @@ function AgentBadge({ chat, conv }: { chat: ChatStore; conv?: Conversation }) {
     : <Badge variant="warn" title="Built-in demo, not an AI model.">{chat.agent.name} · no AI model</Badge>;
 }
 
-const beganFrom = (c: Conversation) =>
-  c.sourceKind === "url" ? host(c.sourceUrl) : c.sourceKind === "mcp" ? `Outside agent: ${c.sourceTitle ?? "unknown"}`
-    : c.sourceKind === "text" ? "Pasted text" : c.sourceKind === "topic" ? "Chat" : "File";
-
-/** What shows before a conversation: how to begin, and older ones to reopen. */
-function Welcome({ chat, onOpenConversation }: { chat: ChatStore; onOpenConversation: (id: string) => void }) {
+/** What shows before a conversation: how to begin. Earlier ones are under History. */
+function Welcome({ chat }: { chat: ChatStore }) {
   return (
     <div className="space-y-4 px-4 py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="eyebrow">Prepare content</h3>
-        <span className="flex-1" />
-        <AgentBadge chat={chat} />
-      </div>
+      <h3 className="eyebrow">Prepare content</h3>
       <p className="text-xs leading-snug text-muted-foreground">
         Say what to write about, or attach a file, a link or text. It drafts; you approve.
       </p>
@@ -37,24 +30,6 @@ function Welcome({ chat, onOpenConversation }: { chat: ChatStore; onOpenConversa
         <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] leading-snug">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
           <p><b>Demo agent</b>: simple rules, not an AI model.</p>
-        </div>
-      )}
-      {chat.list.length > 0 && (
-        <div className="space-y-1.5 border-t border-border pt-3">
-          <h3 className="eyebrow">Earlier conversations</h3>
-          <ul className="space-y-1">
-            {chat.list.map((c) => (
-              <li key={c.id}>
-                <button type="button" onClick={() => onOpenConversation(c.id)} className="w-full cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-xs hover:bg-accent">
-                  <span className="block truncate font-medium">{c.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {beganFrom(c)} · {new Date(c.updatedAt).toLocaleDateString()}
-                    {c.pending > 0 && <b className="ml-1 text-brand">· {c.pending} waiting</b>}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </div>
@@ -126,14 +101,15 @@ function Thread({ conv, chat, onApply, onShow }: {
  * The chat that prepares content, turn by turn. It proposes; the person decides. Approving a proposal hands its content
  * to `onApply`, which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
-export function ChatPanel({ chat, onApply, onShow, draftId, onOpenConversation }: {
+export function ChatPanel({ chat, onApply, onShow, draftId, onHistory }: {
   chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   /** Put an item an approved proposal went into on the canvas. */
   onShow: (draftId?: string) => void;
   /** The item on screen. */
   draftId?: string;
-  onOpenConversation: (id: string) => void;
+  /** Open the list of earlier conversations and the notes. */
+  onHistory: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const conv = chat.current;
@@ -145,28 +121,34 @@ export function ChatPanel({ chat, onApply, onShow, draftId, onOpenConversation }
 
   return (
     <div className="flex h-full flex-col">
-      {conv && (
-        <div className="space-y-1.5 border-b border-border px-3 py-2.5">
-          <div className="flex items-center gap-1.5">
-            <AgentBadge chat={chat} conv={conv} />
-            <span className="flex-1" />
-            <Button variant="ghost" size="icon-sm" title="Start a new conversation" aria-label="New conversation" disabled={chat.busy} onClick={chat.newConversation}><Plus /></Button>
+      <div className="space-y-1.5 border-b border-border px-3 py-2">
+        <div className="flex items-center gap-1">
+          <AgentBadge chat={chat} conv={conv ?? undefined} />
+          <span className="flex-1" />
+          <Button variant="ghost" size="icon-sm" title="Conversations and notes" aria-label="Conversations and notes" onClick={onHistory}><History /></Button>
+          <Button variant="ghost" size="icon-sm" title="Start a new conversation about the item on screen" aria-label="New conversation" disabled={chat.busy || !conv} onClick={chat.newConversation}><Plus /></Button>
+          {conv && (
             <Button variant={confirmDelete ? "destructive" : "ghost"} size={confirmDelete ? "sm" : "icon-sm"} title="Delete this conversation" aria-label="Delete this conversation" disabled={chat.busy}
               onClick={() => { if (!confirmDelete) { setConfirmDelete(true); window.setTimeout(() => setConfirmDelete(false), 3000); } else { setConfirmDelete(false); void chat.remove(conv.id); } }}>
               {confirmDelete ? "Confirm delete" : <Trash2 />}
             </Button>
-          </div>
-          <p className="truncate text-xs font-medium" title={conv.title}>{conv.title}</p>
-          <p className="truncate text-[11px] text-muted-foreground">
-            {conv.sourceKind === "mcp"
-              ? `Proposed by “${conv.sourceTitle ?? "an outside agent"}” (a name it gave itself, not verified)`
-              : sources.length === 0 ? "No sources" : `${sources.length} ${sources.length === 1 ? "source" : "sources"} · ${conv.sourceChars.toLocaleString()} characters`}
-          </p>
+          )}
         </div>
-      )}
+        {conv && (
+          <>
+            <p className="truncate text-xs font-medium" title={conv.title}>{conv.title}</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {conv.sourceKind === "mcp"
+                ? `Proposed by “${conv.sourceTitle ?? "an outside agent"}” (a name it gave itself, not verified)`
+                : sources.length === 0 ? "No sources" : `${sources.length} ${sources.length === 1 ? "source" : "sources"} · ${conv.sourceChars.toLocaleString()} characters`}
+              {conv.costCents !== undefined && ` · ${costText(conv.costCents)}`}
+            </p>
+          </>
+        )}
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite">
-        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} /> : <Welcome chat={chat} onOpenConversation={onOpenConversation} />}
+        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} /> : <Welcome chat={chat} />}
       </div>
 
       {chat.error && <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-destructive">{chat.error}</p>}

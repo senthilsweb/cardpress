@@ -35,6 +35,19 @@ The system SHALL link a conversation to at most one post and one article.
 - **WHEN** a linked draft is deleted
 - **THEN** the conversation remains and no longer shows that view
 
+### Requirement: Earlier conversations
+#### Scenario: Find and continue
+- **WHEN** the person searches the history and opens a result
+- **THEN** that conversation opens with the item it is about
+
+#### Scenario: Lost session
+- **WHEN** the agent no longer has the conversation's session
+- **THEN** a new session receives the saved messages and sources, the reply says the conversation was continued, and nothing the person typed is lost
+
+#### Scenario: Notes
+- **WHEN** the person opens the Notes tab
+- **THEN** every note about the brand is listed and can be removed
+
 ### Requirement: Undo a turn
 #### Scenario: Undo
 - **WHEN** the person chooses Undo on a turn

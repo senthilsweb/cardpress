@@ -33,14 +33,15 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [ ] Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 
 ## 5. The chat on the managed agents
-- [ ] Read the manifest (version 3); remove `agent-setup` and the two id settings
+- [ ] Read the manifest (version 4); remove `agent-setup` and the two id settings
 - [ ] `CARDPRESS_PUBLIC_URL` check; fall back to the demo agent with a clear message
 - [ ] Per-person vault and agent key, created on first chat; single vault when accounts are off
 - [ ] Adapter: MCP tool events as progress and recorded changes, outcomes in turn, sub-agent thread events, `requires_action` and `user.tool_confirmation`
-- [ ] The message blocks of the contract, with escaping; revision last sent kept per draft
+- [ ] The message blocks of the contract, with escaping (the `history` block exists); every source in every outcome; revision last sent kept per draft
 - [ ] Chat stream events `progress`, `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`
-- [ ] Web: the grader's verdict, the Post / Cancel card, saved notes in the right drawer
-- [ ] Migration `chat_usage`; read the session's usage after each turn; show a conversation's cost
+- [ ] Web: the grader's verdict and the Post / Cancel card (notes are in the drawer already)
+- [x] Migration `chat_usage`; show a conversation's cost
+- [ ] Read the session's usage after each turn (also when stopped or failed)
 - [ ] Tests: state machine and scripted fake for the new events
 - [ ] Try it against a real account (ask first: it costs money)
 

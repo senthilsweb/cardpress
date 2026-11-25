@@ -1185,3 +1185,21 @@ func TestAttachingAFileOverTheAPI(t *testing.T) {
 		t.Errorf("remove: %d %s", r.Code, r.Body)
 	}
 }
+
+func TestSearchAndNotesRoutes(t *testing.T) {
+	h := chatHandler(t, "", stubFetcher{})
+	conv := startChat(t, h)
+	for _, c := range []struct {
+		q     string
+		found bool
+	}{{"", true}, {"?q=no-such-words", false}} {
+		url := "/api/v1/chat/conversations?profileId=p" + strings.Replace(c.q, "?", "&", 1)
+		r := do(h, "GET", url, ``, nil)
+		if r.Code != 200 || strings.Contains(r.Body.String(), conv.ID) != c.found {
+			t.Errorf("%s: %d %s", url, r.Code, r.Body)
+		}
+	}
+	if r := do(h, "GET", "/api/v1/chat/memories", ``, nil); r.Code != 400 {
+		t.Errorf("notes without a brand: %d", r.Code)
+	}
+}

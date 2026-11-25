@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -46,11 +47,22 @@ type Source struct {
 	New bool
 }
 
+// ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
+var ErrSessionGone = errors.New("the session cannot be continued")
+
+// Usage is the running total of a session: its cost at list price in cents, and the seconds it has been working.
+type Usage struct {
+	TotalCents    int
+	ActiveSeconds float64
+}
+
 // Input is what the agent is given for one reply.
 type Input struct {
 	SessionID string
 	Messages  []Message // oldest first; the last is the person's newest message
 	Sources   []Source  // everything the conversation draws on, oldest first
+	// Restarted is true when an earlier session could not be continued: this one is new and has been given nothing.
+	Restarted bool
 }
 
 // Event is progress while a reply is being written.
@@ -64,6 +76,8 @@ type Output struct {
 	SessionID string
 	Reply     string
 	Proposal  *Proposal
+	// Usage is what the session has cost so far, when the agent reports it.
+	Usage *Usage
 }
 
 // Client is the port the chat uses. CreateSession starts a conversation on the agent's side; Respond sends the next

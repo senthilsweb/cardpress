@@ -21,7 +21,9 @@ The **Assistant** drafts a post or an article from something you give it, and yo
    - **Reject** dismisses it.
    - Or just **reply** in the box to ask for another version. Earlier proposals stay in the thread (marked "Earlier draft") and can still be approved.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
-5. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one; the bin deletes the open one.
+5. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one about the item on screen; the bin deletes the open one.
+6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
+7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
 ### What the demo agent understands
 

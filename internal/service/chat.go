@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -85,14 +86,16 @@ type Conversation struct {
 	SourceTruncated bool   `json:"sourceTruncated"`
 	Pending         int    `json:"pending"` // proposals waiting for a decision
 	// PostDraftID and ArticleDraftID are the items this conversation is about, empty when it has none.
-	PostDraftID    string         `json:"postDraftId,omitempty"`
-	ArticleDraftID string         `json:"articleDraftId,omitempty"`
-	Agent          AgentInfo      `json:"agent"`
-	CreatedAt      string         `json:"createdAt"`
-	UpdatedAt      string         `json:"updatedAt"`
-	Messages       []ChatMessage  `json:"messages,omitempty"`
-	Sources        []SourceView   `json:"sources,omitempty"`
-	Proposals      []ProposalView `json:"proposals,omitempty"`
+	PostDraftID    string        `json:"postDraftId,omitempty"`
+	ArticleDraftID string        `json:"articleDraftId,omitempty"`
+	Agent          AgentInfo     `json:"agent"`
+	CreatedAt      string        `json:"createdAt"`
+	UpdatedAt      string        `json:"updatedAt"`
+	Messages       []ChatMessage `json:"messages,omitempty"`
+	Sources        []SourceView  `json:"sources,omitempty"`
+	// CostCents is what the conversation has cost at list price; absent when no cost has been recorded.
+	CostCents *int           `json:"costCents,omitempty"`
+	Proposals []ProposalView `json:"proposals,omitempty"`
 }
 
 // ChatEvent is progress while a reply is written. Name is "user", "delta", "proposal" or "message".
@@ -221,21 +224,31 @@ func (c *Chat) Start(ctx context.Context, profileID, rawURL, text string) (Conve
 const convCols = `id, profile_id, title, source_kind, source_url, source_title,
 	(SELECT COALESCE(SUM(s.chars), 0) FROM conversation_sources s WHERE s.conversation_id = conversations.id),
 	(SELECT COALESCE(MAX(s.truncated), 0) FROM conversation_sources s WHERE s.conversation_id = conversations.id),
-	created_at, updated_at, post_draft_id, article_draft_id, (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
+	created_at, updated_at, post_draft_id, article_draft_id,
+	(SELECT SUM(u.added_cents) FROM chat_usage u WHERE u.conversation_id = conversations.id), (SELECT COUNT(*) FROM proposals p WHERE p.conversation_id = conversations.id AND p.status = 'pending')`
 
 func (c *Chat) scanConv(r scanner) (Conversation, error) {
 	var v Conversation
 	var tr int
-	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &v.SourceChars, &tr, &v.CreatedAt, &v.UpdatedAt, &v.PostDraftID, &v.ArticleDraftID, &v.Pending); err != nil {
+	var cost sql.NullInt64
+	if err := r.Scan(&v.ID, &v.ProfileID, &v.Title, &v.SourceKind, &v.SourceURL, &v.SourceTitle, &v.SourceChars, &tr, &v.CreatedAt, &v.UpdatedAt, &v.PostDraftID, &v.ArticleDraftID, &cost, &v.Pending); err != nil {
 		return v, err
 	}
 	v.SourceTruncated, v.Agent = tr != 0, c.Agent()
+	if cost.Valid {
+		n := int(cost.Int64)
+		v.CostCents = &n
+	}
 	return v, nil
 }
 
 // List returns a profile's conversations, newest first, without their messages.
 func (c *Chat) List(ctx context.Context, profileID string) ([]Conversation, error) {
-	rows, err := c.db.QueryContext(ctx, `SELECT `+convCols+` FROM conversations WHERE profile_id = ? ORDER BY updated_at DESC, id LIMIT 50`, profileID)
+	return c.list(ctx, "", profileID)
+}
+
+func (c *Chat) list(ctx context.Context, where, profileID string, args ...any) ([]Conversation, error) {
+	rows, err := c.db.QueryContext(ctx, `SELECT `+convCols+` FROM conversations WHERE profile_id = ? `+where+` ORDER BY updated_at DESC, id LIMIT `+strconv.Itoa(maxListed), append([]any{profileID}, args...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +372,7 @@ func (c *Chat) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	for _, q := range []string{`DELETE FROM conversation_sources WHERE conversation_id = ?`, `DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
+	for _, q := range []string{`DELETE FROM chat_usage WHERE conversation_id = ?`, `DELETE FROM conversation_sources WHERE conversation_id = ?`, `DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {
 			return err
 		}
@@ -469,11 +482,28 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 	for _, m := range history {
 		in.Messages = append(in.Messages, agent.Message{Role: m.Role, Content: m.Content})
 	}
-	out, err := c.agent.Respond(ctx, in, func(e agent.Event) {
+	progress := func(e agent.Event) {
 		if e.Type == "delta" {
 			emit(ChatEvent{"delta", map[string]string{"text": e.Text}})
 		}
-	})
+	}
+	out, err := c.agent.Respond(ctx, in, progress)
+	if errors.Is(err, agent.ErrSessionGone) {
+		// the agent has lost the session: start another and give it what is saved here
+		if _, derr := c.db.ExecContext(ctx, `UPDATE conversations SET session_id = '' WHERE id = ?`, id); derr != nil {
+			return derr
+		}
+		if session, err = c.session(ctx, id); err != nil {
+			return err
+		}
+		in.SessionID, in.Restarted = session, true
+		in.Sources = append([]agent.Source(nil), sources...)
+		for i := range in.Sources {
+			in.Sources[i].New = true
+		}
+		progress(agent.Event{Type: "delta", Text: restartNote + "\n\n"})
+		out, err = c.agent.Respond(ctx, in, progress)
+	}
 	if err != nil {
 		return agentErr("The agent could not reply: %v", err)
 	}
@@ -490,9 +520,18 @@ func (c *Chat) Send(ctx context.Context, id, content string, emit func(ChatEvent
 		}
 	}
 
+	if in.Restarted {
+		reply = restartNote + "\n\n" + reply
+	}
 	assistant, prop, err := c.storeReply(ctx, id, user.Seq+1, reply, out.Proposal)
 	if err != nil {
 		return err
+	}
+	if out.SessionID != "" {
+		session = out.SessionID
+	}
+	if err := c.recordUsage(ctx, id, assistant.ID, session, out.Usage); err != nil {
+		log.Printf("chat: could not record what the reply cost: %v", err)
 	}
 	for _, sid := range fresh {
 		if _, err := c.db.ExecContext(ctx, `UPDATE conversation_sources SET delivered = 1 WHERE id = ?`, sid); err != nil {

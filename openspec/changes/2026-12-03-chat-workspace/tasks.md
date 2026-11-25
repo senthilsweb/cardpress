@@ -20,6 +20,11 @@
 - [x] Docs: `docs/chat.md`, `docs/data-model.md`
 - [x] One message box: attach inside it, paper plane to send, Stop while replying
 
+## History and sessions
+- [x] History drawer with search, linked items and cost; Notes tab
+- [x] A lost session is restarted from the saved messages and sources
+- [x] `chat_usage` and the cost on screen (filled when the managed agent reports it)
+
 ## C. Changes and Undo (with designer step 5)
 - [ ] Migration `chat_changes`; record from tool results; undo endpoint
 - [ ] Change cards with Undo and View

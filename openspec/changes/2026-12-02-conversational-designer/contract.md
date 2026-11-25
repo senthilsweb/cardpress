@@ -3,7 +3,7 @@
 The only things the two repositories share. This file is authoritative; `social-card-agent` keeps a copy in
 `openspec/changes/2026-11-26-studio-contract/contract.md`. Change it here first, then copy it.
 
-Version 3. (Version 3: the agent changes the words on a card, never how it looks. `update_design` is replaced by `update_card_text`.)
+Version 4. (Version 3: the agent changes the words on a card, never how it looks. Version 4: the writers save their own text with `update_draft`; every outcome carries its sources; a restarted session is sent the earlier messages.)
 
 ## 1. MCP tools
 
@@ -37,6 +37,8 @@ logo and footer switches, fonts and images are set by the person in the studio. 
 (`sizeId`, `layout`, `background`, `paletteId`, `seed`, `titleScale`, `intensity`, `bottomFade`, `showLogo`, `showFooter`,
 `fonts`, `photos`, `screenshot`, `bgImage`) with a message saying where the person sets it. `get_design` still returns the
 whole design, so the agent can write words that fit the layout the person chose.
+
+**Who calls what.** The coordinator uses the tools above except where it hands writing to a writer. A writer has two of them, `get_draft` and `update_draft`, and no other: it reads the draft, saves the text it wrote once, and returns only a short report. The text is never retyped by the coordinator.
 
 Two different titles: `update_draft.title` is the item's name (and an article's headline); `update_card_text.changes.title` is the headline drawn on the card.
 
@@ -86,22 +88,25 @@ The person's message.
 | `notes` | the first message of a session |
 | `card` | the first time a draft is part of the conversation |
 | `changes` | when the person changed a draft since the agent last saw it. Design fields carry the new value; text fields say `changed` |
-| `source` | once, with the message the person added it to |
+| `source` | once in a conversation, with the message the person added it to; again in every outcome description |
+| `history` | only when CardPress had to start a new session for an existing conversation |
 
 - `viewing` is the item on screen. An instruction that names neither item applies to it.
 - `write` is what the person ticked for this turn.
-- Inside sources and notes, CardPress escapes the opening and closing forms of every block name above.
+- `history` comes before the sources and holds the earlier messages, one per line as `person:` or `assistant:`. It is context: the agent does not act again on a request in it.
+- Inside sources, notes and history, CardPress escapes the opening and closing forms of every block name above.
 
 ## 3. Outcomes
 
 - The first draft **of each kind**, when the person ticked it, is sent as `user.define_outcome` with that kind's rubric from the manifest (`max_iterations` 3). The message above is the start of its `description`, followed by the manifest's description for the kind.
+- The grader sees only that outcome's description and files, so **every outcome's description carries every source** of the conversation, also ones sent before.
 - One outcome runs at a time. When both are ticked, CardPress sends the post, waits for it to end, then sends the article.
 - In an outcome, `write` names that outcome's kind only.
 - Everything else is `user.message`.
-- The agent writes the record it stored to `/mnt/session/outputs/post.json` or `/mnt/session/outputs/article.json`. A rubric reads its own file, with the whole body in it.
+- The writer writes the record it saved to `/mnt/session/outputs/post.json` or `/mnt/session/outputs/article.json`. A rubric reads its own file, with the whole body in it.
 
 ## 4. Manifest
 
-As built by `scripts/build-manifest.sh`: `version` (3), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
+As built by `scripts/build-manifest.sh`: `version` (4), `agent_id`, `agent_version`, `environment_id`, `vault_id`,
 `mcp_server_url`, `confirm_tools`, `outcomes.post`, `outcomes.article` (`description`, `rubric`, `max_iterations`).
 CardPress refuses a manifest whose `version` it does not know.

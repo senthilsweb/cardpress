@@ -74,6 +74,9 @@ Table `conversation_sources (id, conversation_id, message_id, kind, name, url, c
 ## Message box
 One box for the whole chat, also before a conversation exists. Attach (paperclip) at the lower left, send (paper plane) at the lower right; while a reply is written the send button is **Stop**. Attachments are staged in the box and sent with the message; if one is refused, none is added and the box keeps its contents. Stopping cancels the request, which cancels the agent's work (a managed session is interrupted), and the thread records that the reply was stopped.
 
+## History, new, and lost sessions
+The chat header always has **History** and **+**. History is the right-hand drawer with two tabs: conversations (grouped by age, searchable by title, message and source name, showing the linked items and the recorded cost) and the brand's notes (read and remove). **+** starts a conversation about the item on screen. The app's database is the record of a conversation; the agent's session is a copy of it. When the agent says a session is gone (`agent.ErrSessionGone`), the chat starts another, sends the earlier messages and every source, says so in the reply, and carries on. Costs are kept per reply in `chat_usage`, as what each added to its session's total.
+
 ## Changes and Undo
 Table `chat_changes (id, conversation_id, message_id, draft_id, before, after, created_at, undone_at)`, holding only the fields a turn changed.
 

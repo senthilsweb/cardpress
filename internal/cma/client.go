@@ -92,7 +92,7 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 	hist, err := c.api.history(ctx, sid)
 	if err != nil {
 		if errors.Is(err, errSessionGone) {
-			return agent.Output{}, errors.New("this conversation was started with a different agent, so it cannot continue. Start a new conversation")
+			return agent.Output{}, agent.ErrSessionGone
 		}
 		return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
 	}
@@ -114,6 +114,9 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		}
 	}
 	text = WithSources(send, text)
+	if !hasMessage && in.Restarted {
+		text = WithHistory(in.Messages[:len(in.Messages)-1], text)
+	}
 
 	// open the stream first, so nothing the agent does is missed, then send
 	st, err := c.api.stream(ctx, sid)
@@ -124,7 +127,7 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 	sentID, err := c.api.sendMessage(ctx, sid, text)
 	if err != nil {
 		if errors.Is(err, errSessionGone) {
-			return agent.Output{}, errors.New("this conversation was started with a different agent, so it cannot continue. Start a new conversation")
+			return agent.Output{}, agent.ErrSessionGone
 		}
 		return agent.Output{}, fmt.Errorf("could not send the message: %w", err)
 	}

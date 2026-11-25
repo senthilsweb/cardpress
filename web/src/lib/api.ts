@@ -66,6 +66,8 @@ export interface DraftVersion {
   doc?: import("./draft").DocNode; hashtags?: string[]; altText?: string;
 }
 /** An API key as listed. The secret is shown once, when the key is made, and never again. */
+/** A note the assistant keeps about a brand. */
+export interface BrandNote { key: string; content: string; updatedAt: string }
 export interface ApiKey { id: string; name: string; prefix: string; scope: string; createdAt: string; lastUsedAt?: string }
 export interface SignupInput { firstName: string; lastName: string; email: string; password: string; phone?: string; birthDate?: string }
 /** One credential field as the server lets the browser see it: a secret is only ever its last four characters. */
@@ -275,7 +277,9 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
     return res.blob();
   },
-  listConversations: (profileId: string) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}`),
+  listConversations: (profileId: string, q = "") => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  listNotes: (profileId: string) => call<{ notes: BrandNote[] }>("GET", `/chat/memories?profileId=${encodeURIComponent(profileId)}`).then((r) => r.notes),
+  deleteNote: (profileId: string, key: string) => call<void>("DELETE", `/chat/memories/${encodeURIComponent(key)}?profileId=${encodeURIComponent(profileId)}`),
   startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
   addSource: (conversationId: string, a: Attachment) => {
     let body: FormData | { url: string } | { text: string };

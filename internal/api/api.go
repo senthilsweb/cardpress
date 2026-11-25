@@ -95,6 +95,7 @@ type Chatting interface {
 	Link(ctx context.Context, id, draftID string) (service.Conversation, error)
 	AddSource(ctx context.Context, id string, in service.SourceInput) (service.SourceView, error)
 	RemoveSource(ctx context.Context, id, sourceID string) error
+	Search(ctx context.Context, profileID, query string) ([]service.Conversation, error)
 	Delete(ctx context.Context, id string) error
 	Send(ctx context.Context, id, content string, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
@@ -112,6 +113,11 @@ type Settings interface {
 
 // Options configure the handler.
 type Options struct {
+	// Notes are the assistant\'s notes about brands.
+	Notes interface {
+		ListMemories(ctx context.Context, profileID string) ([]service.Memory, error)
+		DeleteMemory(ctx context.Context, profileID, key string) error
+	}
 	// Events carries changes to open studios; nil turns live updates off.
 	Events       *service.Hub
 	Studio       Studio
@@ -244,6 +250,8 @@ func (s *server) table() []routeDef {
 
 		{"POST", "/chat/conversations", write(scopeBrandBody), s.startConversation},
 		{"GET", "/chat/conversations", write(scopeBrandQuery), s.listConversations},
+		{"GET", "/chat/memories", write(scopeBrandQuery), s.listMemories},
+		{"DELETE", "/chat/memories/{key}", write(scopeBrandQuery), s.deleteMemory},
 		{"GET", "/chat/conversations/{id}", write(scopeConversation), s.getConversation},
 		{"DELETE", "/chat/conversations/{id}", write(scopeConversation), s.deleteConversation},
 		{"POST", "/chat/conversations/{id}/messages", write(scopeConversation), s.sendMessage},
@@ -919,7 +927,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
 		return
 	}
-	list, err := s.Chat.List(r.Context(), profileID)
+	list, err := s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -988,6 +996,34 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 		}
 		flusher.Flush()
 	}
+}
+
+// listMemories and deleteMemory let a person see and remove the notes an assistant keeps about a brand.
+func (s *server) listMemories(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" || s.Notes == nil {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	notes, err := s.Notes.ListMemories(r.Context(), profileID)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"notes": notes})
+}
+
+func (s *server) deleteMemory(w http.ResponseWriter, r *http.Request) {
+	profileID := r.URL.Query().Get("profileId")
+	if profileID == "" || s.Notes == nil {
+		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
+		return
+	}
+	if err := s.Notes.DeleteMemory(r.Context(), profileID, r.PathValue("key")); err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // addSource takes a web address or pasted text as JSON, or a file as a multipart form with one "file" field.

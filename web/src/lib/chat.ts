@@ -57,6 +57,8 @@ export interface Conversation {
   messages?: ChatMessage[];
   proposals?: Proposal[];
   sources?: ChatSource[];
+  /** What it has cost at list price, in cents; absent when nothing was recorded. */
+  costCents?: number;
 }
 
 /** What the person may change before approving. */
