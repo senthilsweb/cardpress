@@ -37,12 +37,14 @@ type ChatDetail struct {
 	Steps  []string       `json:"steps,omitempty"`
 	Saved  []SavedVersion `json:"saved,omitempty"`
 	Checks []agent.Check  `json:"checks,omitempty"`
+	// Reports are the assistant's short answers, which the screen shows in place of the message's text.
+	Reports []agent.Report `json:"reports,omitempty"`
 	// Error is why the reply failed, in words meant for the person.
 	Error string `json:"error,omitempty"`
 }
 
 func (d ChatDetail) empty() bool {
-	return len(d.Steps) == 0 && len(d.Saved) == 0 && len(d.Checks) == 0 && d.Error == ""
+	return len(d.Steps) == 0 && len(d.Saved) == 0 && len(d.Checks) == 0 && len(d.Reports) == 0 && d.Error == ""
 }
 
 func (d ChatDetail) stored() string {

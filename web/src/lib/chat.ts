@@ -35,8 +35,10 @@ export interface ChatSource {
 
 export interface SavedVersion { draftId: string; kind: DraftKind; version: number }
 export interface ReplyCheck { kind: DraftKind; passed: boolean; round?: number; note?: string }
+/** The assistant's short answer. One with no outcome was not reported: its last words, or a note from the studio. */
+export interface ReplyReport { outcome?: "done" | "needs_answer" | "not_done"; message: string; points?: string[]; question?: string; next?: string }
 /** What happened while a reply was written. */
-export interface ReplyDetail { steps?: string[]; saved?: SavedVersion[]; checks?: ReplyCheck[]; error?: string }
+export interface ReplyDetail { steps?: string[]; saved?: SavedVersion[]; checks?: ReplyCheck[]; reports?: ReplyReport[]; error?: string }
 export interface ChatMessage {
   id: string; seq: number; role: "user" | "assistant"; content: string; createdAt: string;
   /** How a reply ended. */

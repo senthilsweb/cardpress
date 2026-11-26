@@ -583,8 +583,12 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		}
 	}
 
+	detail.Reports = out.Reports
 	if in.Restarted {
 		reply = restartNote + "\n\n" + reply
+		if len(detail.Reports) > 0 {
+			detail.Reports = append([]agent.Report{{Message: restartNote}}, detail.Reports...)
+		}
 	}
 	assistant, prop, err := c.storeReply(ctx, id, user.Seq+1, reply, out.Proposal, detail)
 	if err != nil {
@@ -849,6 +853,12 @@ func (c *Chat) Proposal(ctx context.Context, id string) (ProposalView, error) {
 		return p, ErrNotFound
 	}
 	return p, err
+}
+
+// ConversationBrand returns the brand a conversation belongs to, for checking who may answer in it.
+func (c *Chat) ConversationBrand(ctx context.Context, id string) (string, error) {
+	v, err := c.load(ctx, id)
+	return v.ProfileID, err
 }
 
 // ProposalBrand returns the brand a proposal belongs to (through its conversation), for checking who may act on it.

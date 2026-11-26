@@ -1,6 +1,6 @@
 # Chat: a short reply instead of the agent's running text
 
-**Status:** proposed 2026-11-26. Specification only: nothing is built.
+**Status:** approved and built 2026-11-26; not deployed.
 
 ## Why
 The chat shows everything the assistant writes while it works, including its narration between tool calls. The person wants to read what happened, briefly. The assistant needs a fixed shape to answer in, so the screen does not depend on how talkative a model is.

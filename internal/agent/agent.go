@@ -119,7 +119,9 @@ type Check struct {
 type Output struct {
 	SessionID string
 	Reply     string
-	Proposal  *Proposal
+	// Reports are the short answers, one for each part of the turn, from an assistant that gives them.
+	Reports  []Report
+	Proposal *Proposal
 	// Usage is what the session has cost so far, when the agent reports it.
 	Usage *Usage
 }

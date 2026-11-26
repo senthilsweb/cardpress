@@ -60,3 +60,8 @@ The coordinator: end every turn with `report_reply`, write nothing else, and say
 
 ## Cost and risk
 One more tool call a turn. A small model may sometimes skip it, which the fallback covers; the live test shows how often.
+
+## As built
+- A turn with a post and an article gives two reports, one after the other: the last accepted call of each part wins.
+- The adapter no longer asks the session for text previews.
+- A restarted session's note is shown as a first report of its own.

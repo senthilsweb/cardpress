@@ -94,7 +94,7 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		}
 	}
 
-	var replies []string
+	var reports []agent.Report
 	graded := false
 	run := func(send func() (string, error), kind string) error { // kind: what is graded, or empty
 		// open the stream first, so nothing the agent does is missed, then send
@@ -116,8 +116,8 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return err
 		}
 		graded = graded || t.verdict != nil
-		if r := t.reply(); r != "" {
-			replies = append(replies, r)
+		if r := t.answer(); r != nil {
+			reports = append(reports, *r)
 		}
 		return nil
 	}
@@ -163,7 +163,11 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 	if err != nil {
 		return agent.Output{}, err
 	}
-	out := agent.Output{SessionID: sid, Reply: agent.CleanReply(strings.Join(replies, "\n\n"))}
+	texts := make([]string, len(reports))
+	for i, r := range reports {
+		texts[i] = r.Text()
+	}
+	out := agent.Output{SessionID: sid, Reply: agent.CleanReply(strings.Join(texts, "\n\n")), Reports: reports}
 	if out.Reply == "" && !graded {
 		return agent.Output{}, errors.New("the agent finished without saying anything")
 	}

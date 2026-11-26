@@ -1,6 +1,7 @@
 package cma
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -32,17 +33,9 @@ type wireEvent struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error"`
-	// stream-only previews of an agent message being written
-	EventID string `json:"event_id"`
-	Event   *struct {
-		Type string `json:"type"`
-		ID   string `json:"id"`
-	} `json:"event"`
-	Delta *struct {
-		Content *struct {
-			Text string `json:"text"`
-		} `json:"content"`
-	} `json:"delta"`
+	// a tool call's input, and the call a result answers
+	Input        json.RawMessage `json:"input"`
+	MCPToolUseID string          `json:"mcp_tool_use_id"`
 }
 
 func (e wireEvent) text() string {
@@ -65,18 +58,19 @@ type turn struct {
 	kind     string // what is graded, "post" or "article"
 	sentSeen bool
 
-	seen     map[string]bool   // event ids already handled (a replay must not repeat work)
-	streamed map[string]string // agent message id -> text already passed on through live previews
-	replies  []string
-	verdict  *agent.Check // the grader's final word
-	lastErr  string
-	done     bool
+	seen    map[string]bool         // event ids already handled (a replay must not repeat work)
+	asked   map[string]agent.Report // report calls waiting for their result, by the call's id
+	report  *agent.Report           // the last report the studio accepted
+	last    string                  // the last thing the agent said
+	verdict *agent.Check            // the grader's final word
+	lastErr string
+	done    bool
 
 	emit func(agent.Event)
 }
 
 func newTurn(sentID string, graded bool, emit func(agent.Event)) *turn {
-	return &turn{sentID: sentID, graded: graded, seen: map[string]bool{}, streamed: map[string]string{}, emit: emit}
+	return &turn{sentID: sentID, graded: graded, seen: map[string]bool{}, asked: map[string]agent.Report{}, emit: emit}
 }
 
 func (t *turn) isOurEcho(e wireEvent) bool {
@@ -99,28 +93,6 @@ func (t *turn) progress(text string) { t.emit(agent.Event{Type: "progress", Text
 
 // handle processes one event, or returns an error that ends the turn. t.done becomes true when the agent has finished.
 func (t *turn) handle(e wireEvent) error {
-	// live previews have no id of their own, so they are not de-duplicated
-	switch e.Type {
-	case "event_start":
-		if t.sentSeen && e.Event != nil && e.Event.Type == "agent.message" {
-			if _, ok := t.streamed[e.Event.ID]; !ok {
-				t.streamed[e.Event.ID] = ""
-				if len(t.replies) > 0 || t.hasStreamedBefore(e.Event.ID) {
-					t.emit(agent.Event{Type: "delta", Text: "\n\n"}) // a new paragraph after an earlier message in the same turn
-				}
-			}
-		}
-		return nil
-	case "event_delta":
-		if t.sentSeen && e.Delta != nil && e.Delta.Content != nil && e.Delta.Content.Text != "" {
-			if _, ok := t.streamed[e.EventID]; ok {
-				t.streamed[e.EventID] += e.Delta.Content.Text
-				t.emit(agent.Event{Type: "delta", Text: e.Delta.Content.Text})
-			}
-		}
-		return nil
-	}
-
 	if e.ID != "" {
 		if t.seen[e.ID] {
 			return nil
@@ -136,27 +108,25 @@ func (t *turn) handle(e wireEvent) error {
 
 	switch e.Type {
 	case "agent.message":
-		txt := e.text()
-		if strings.TrimSpace(txt) == "" {
-			return nil
+		// what the agent says as it works is not shown; the last of it stands in if it never reports
+		if txt := e.text(); strings.TrimSpace(txt) != "" {
+			t.last = txt
 		}
-		already := t.streamed[e.ID]
-		switch {
-		case already != "" && strings.HasPrefix(txt, already):
-			if rest := txt[len(already):]; rest != "" {
-				t.emit(agent.Event{Type: "delta", Text: rest})
-			}
-		case already == "": // no preview: pass the whole message on, after a paragraph break from an earlier one
-			if len(t.replies) > 0 {
-				t.emit(agent.Event{Type: "delta", Text: "\n\n"})
-			}
-			t.emit(agent.Event{Type: "delta", Text: txt})
-		}
-		t.replies = append(t.replies, txt)
 
 	case "agent.mcp_tool_use":
+		if e.Name == agent.ReportTool {
+			var r agent.Report
+			if json.Unmarshal(e.Input, &r) == nil && r.Check() == nil {
+				t.asked[e.ID] = r
+			}
+		}
 		if p := progressFor[e.Name]; p != "" {
 			t.progress(p)
+		}
+	case "agent.mcp_tool_result":
+		// only a report the studio accepted counts: it checks that the conversation is the caller's
+		if r, ok := t.asked[e.MCPToolUseID]; ok && !e.IsError {
+			t.report = &r
 		}
 	case "session.thread_created":
 		switch e.AgentName {
@@ -223,15 +193,6 @@ func shorten(s string, n int) string {
 	return s
 }
 
-func (t *turn) hasStreamedBefore(id string) bool {
-	for k := range t.streamed {
-		if k != id {
-			return true
-		}
-	}
-	return false
-}
-
 func (t *turn) errSuffix() string {
 	if t.lastErr != "" {
 		return " (" + t.lastErr + ")"
@@ -239,5 +200,14 @@ func (t *turn) errSuffix() string {
 	return ""
 }
 
-// reply is what the agent said.
-func (t *turn) reply() string { return strings.Join(t.replies, "\n\n") }
+// answer is what to show for this part of the turn: the report, or else the last thing said. Nil when there is neither.
+func (t *turn) answer() *agent.Report {
+	if t.report != nil {
+		return t.report
+	}
+	if strings.TrimSpace(t.last) == "" {
+		return nil
+	}
+	r := agent.LastWords(t.last)
+	return &r
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Conversation } from "./chat";
-import { checkLine, savedLine, withOlder } from "./reply";
+import { checkLine, savedLine, withOlder, hasOutcome } from "./reply";
 
 describe("reply cards", () => {
   it("say what was saved and how the check went", () => {
@@ -16,4 +16,10 @@ describe("older conversations", () => {
   it("follow the newest, each once", () => {
     expect(withOlder([c("a", "new name"), c("b")], [c("a"), c("z")]).map((x) => x.title)).toEqual(["new name", "b", "z"]);
   });
+});
+
+it("a reply that is only words has no card", () => {
+  expect(hasOutcome(undefined)).toBe(false);
+  expect(hasOutcome({ reports: [{ message: "Which source?" }] })).toBe(false);
+  expect(hasOutcome({ steps: ["Saving the draft"] })).toBe(true);
 });

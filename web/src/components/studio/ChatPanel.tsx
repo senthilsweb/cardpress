@@ -6,7 +6,7 @@ import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
 import type { Draft, DraftKind } from "@/lib/draft";
 import { ChatHistory } from "./ChatHistory";
-import { ReplyCard } from "./ReplyCard";
+import { ReplyCard, ReplyWords } from "./ReplyCard";
 import { ProposalCard } from "./ProposalCard";
 import { ChatInput, SourceChip } from "./ChatInput";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,7 @@ function Thread({ conv, chat, onApply, onShow, onVersion }: {
       {messages.map((m) => (
         <div key={m.id} className="space-y-2">
           {/* a failed or stopped reply may have no words of its own */}
-          {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.content}</Bubble>}
+          {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.detail?.reports?.length ? <ReplyWords reports={m.detail.reports} /> : m.content}</Bubble>}
           {m.role === "assistant" && <ReplyCard message={m} onVersion={onVersion} />}
           {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
             <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">

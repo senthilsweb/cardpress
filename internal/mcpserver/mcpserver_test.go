@@ -134,7 +134,7 @@ func TestTheToolListHasNothingThatPublishesSchedulesOrTouchesCredentials(t *test
 	}
 	sort.Strings(names)
 	want := []string{"create_draft", "delete_memory", "fetch_source", "get_design", "get_draft", "get_job", "get_proposal", "list_connections", "list_design_presets",
-		"list_drafts", "list_jobs", "list_memories", "list_profiles", "propose_content", "save_memory", "set_attachment", "update_card_text", "update_draft"}
+		"list_drafts", "list_jobs", "list_memories", "list_profiles", "propose_content", "report_reply", "save_memory", "set_attachment", "update_card_text", "update_draft"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools = %v\nwant    %v\nadding a tool must be a deliberate, reviewed change", names, want)
 	}
@@ -156,10 +156,10 @@ func TestTheToolsCanOnlyCallTheListedMethods(t *testing.T) {
 		}
 	}
 	sort.Strings(reachable)
-	// Access.BrandOwner and Proposals.ProposalBrand only read who owns a brand, to keep a key to its own person's work.
+	// Access.BrandOwner, Proposals.ProposalBrand and Proposals.ConversationBrand only read who owns a brand, to keep a key to its own person's work.
 	// Connections.View never carries a secret.
 	want := []string{"Access.BrandOwner", "Connections.View", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List",
-		"Notes.DeleteMemory", "Notes.ListMemories", "Notes.SaveMemory", "Profiles.Profiles", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose",
+		"Notes.DeleteMemory", "Notes.ListMemories", "Notes.SaveMemory", "Profiles.Profiles", "Proposals.ConversationBrand", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose",
 		"Writer.Card", "Writer.ClearAttachment", "Writer.NewAssistantDraft", "Writer.PatchCardText", "Writer.PatchDraft", "Writer.SetAttachmentTitle", "Writer.SetVideo"}
 	if !reflect.DeepEqual(reachable, want) {
 		t.Fatalf("methods reachable from tools:\n got  %v\n want %v", reachable, want)
@@ -522,11 +522,17 @@ func TestAKeyReachesOnlyItsPersonsBrandsOverHTTP(t *testing.T) {
 	if owner != ana.ID {
 		t.Fatalf("the conversation belongs to the key's person: %q", owner)
 	}
+	if res, _ := call(t, cs, "report_reply", map[string]any{"conversationId": out["conversationId"], "outcome": "done", "message": "Saved."}); res.IsError {
+		t.Fatalf("a key answers in its own conversation: %q", errText(res))
+	}
 	// ben cannot read ana's proposal through his own key
 	bsrv := asKey(ben)
 	defer shut(bsrv)
 	if res, _ := call(t, connectTo(bsrv.URL), "get_proposal", map[string]any{"id": out["proposalId"]}); !res.IsError {
 		t.Fatal("someone else's proposal must not be readable")
+	}
+	if res, _ := call(t, connectTo(bsrv.URL), "report_reply", map[string]any{"conversationId": out["conversationId"], "outcome": "done", "message": "Mine now."}); !res.IsError {
+		t.Fatal("someone else's conversation must not be answered")
 	}
 	// an admin's key is still just the admin's own brands
 	asrv := asKey(admin)

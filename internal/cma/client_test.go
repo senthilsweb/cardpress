@@ -52,6 +52,12 @@ func (f *fake) say(text string) {
 	b, _ := json.Marshal(text)
 	f.emit(`{"type":"agent.message","content":[{"type":"text","text":%s}]}`, b)
 }
+
+// report is a report_reply call and the studio's answer to it.
+func (f *fake) report(input string, refused bool) {
+	f.emit(`{"type":"agent.mcp_tool_use","name":"report_reply","input":%s}`, input)
+	f.emit(`{"type":"agent.mcp_tool_result","mcp_tool_use_id":"sevt_%d","is_error":%t}`, f.n, refused)
+}
 func (f *fake) idle(reason string) {
 	f.emit(`{"type":"session.status_idle","stop_reason":{"type":%q}}`, reason)
 }
@@ -381,5 +387,48 @@ func TestLoadManifestVersion6(t *testing.T) {
 	}
 	if got, err := LoadManifest(context.Background(), string(b)); err != nil || got.SchemaVersion != 2 {
 		t.Fatalf("%v %+v", err, got.SchemaVersion)
+	}
+}
+
+func TestOnlyTheAcceptedReportIsTheReply(t *testing.T) {
+	part := func(message string) func(*fake) {
+		return func(f *fake) {
+			f.say("Let me read the draft first, then I will write it.")
+			f.report(`{"conversationId":"c","outcome":"done","message":"First try."}`, false)
+			f.report(`{"conversationId":"c","outcome":"done","message":"`+message+`","points":["Short"],"next":"Add a link"}`, false)
+			f.report(`{"conversationId":"c","outcome":"done","message":"Refused by the studio."}`, true)
+			f.say("Anything else I can do?")
+			f.idle("end_turn")
+			f.emit(`{"type":"span.outcome_evaluation_end","result":"satisfied","iteration":0}`)
+			f.idle("end_turn")
+		}
+	}
+	f := &fake{scripts: []func(*fake){part("Wrote the post."), part("Wrote the article.")}}
+	st := studio()
+	st.ArticleID, st.Write, st.Grade = "d2", []string{"post", "article"}, []string{"post", "article"}
+	out, events, err := ask(t, f, agent.Input{Studio: st})
+	if err != nil || len(out.Reports) != 2 || out.Reports[0].Message != "Wrote the post." || out.Reports[1].Message != "Wrote the article." {
+		t.Fatalf("%v %+v", err, out.Reports)
+	}
+	if out.Reply != "Wrote the post.\n- Short\nNext: Add a link\n\nWrote the article.\n- Short\nNext: Add a link" {
+		t.Fatalf("%q", out.Reply)
+	}
+	for _, e := range events {
+		if e.Type == "delta" {
+			t.Fatalf("the running text was passed on: %q", e.Text)
+		}
+	}
+}
+
+func TestWithoutAReportTheLastWordsAreShownCutShort(t *testing.T) {
+	f := &fake{scripts: []func(*fake){func(f *fake) {
+		f.say("Reading.")
+		f.report(`{"conversationId":"c","outcome":"done","message":"`+strings.Repeat("x", 241)+`"}`, false)
+		f.say(strings.Repeat("word ", 200))
+		f.idle("end_turn")
+	}}}
+	out, _, err := ask(t, f, agent.Input{Studio: studio()})
+	if err != nil || len(out.Reports) != 1 || out.Reports[0].Outcome != "" || !strings.HasSuffix(out.Reply, "…") || len([]rune(out.Reply)) > 401 {
+		t.Fatalf("%v %+v", err, out)
 	}
 }

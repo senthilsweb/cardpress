@@ -21,6 +21,10 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 6. The conversation's name at the top of Chat opens the list in place; choosing one returns to it. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; older ones load as you scroll to the end, and search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
 7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
+## A short reply
+
+While the assistant works, the thread shows the step it is on. It then answers with a sentence or two, up to four points, a question when it needs you and at most one suggestion. Its running commentary is not shown or kept. If it gives no such answer, you see the last thing it said, cut short.
+
 ## What a reply keeps
 
 Under a reply, a card shows:
@@ -69,5 +73,5 @@ A proposal is validated before it is stored: the kind must be `post` or `article
 | `POST /api/v1/chat/conversations` | `{"profileId", "url"}` or `{"profileId", "text"}` |
 | `GET /api/v1/chat/conversations?profileId=` | The list, and which agent is answering |
 | `GET /api/v1/chat/conversations/{id}` / `DELETE` | One conversation with its messages and proposals / delete it |
-| `POST /api/v1/chat/conversations/{id}/messages` | `{"content", "write": ["post","article"], "viewing"}`. Streams `user`, `progress`, `delta`, `proposal`, `message`, then `done` (or `error`). An empty message sends waiting sources. Only one reply at a time per conversation. |
+| `POST /api/v1/chat/conversations/{id}/messages` | `{"content", "write": ["post","article"], "viewing"}`. Streams `user`, `progress`, `delta` (only a note when a session was restarted), `proposal`, `message`, then `done` (or `error`). An empty message sends waiting sources. Only one reply at a time per conversation. |
 | `POST /api/v1/chat/proposals/{id}/decision` | `{"status": "approved"\|"rejected", "draftId", "edited": {…}}` |

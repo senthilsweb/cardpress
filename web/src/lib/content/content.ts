@@ -169,4 +169,14 @@ export const UpdateDraftInput = z.strictObject({
 
 export const UpdateCardTextInput = z.strictObject({ draftId, changes: CardText.partial() });
 
-export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput };
+/** `report_reply`: how the assistant answers in the chat, the last call of every turn. Plain text, never an item's text. */
+export const ReportReplyInput = z.strictObject({
+  conversationId: z.string(),
+  outcome: z.enum(["done", "needs_answer", "not_done"]),
+  message: z.string().min(1).max(240),
+  points: z.array(z.string().max(120)).max(4).optional(),
+  question: z.string().max(200).optional(),
+  next: z.string().max(120).optional(),
+});
+
+export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput, report_reply: ReportReplyInput };

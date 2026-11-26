@@ -1,6 +1,6 @@
 /** The short lines of a reply card, and the list of conversations as it grows. */
 
-import type { Conversation, ReplyCheck, SavedVersion } from "./chat";
+import type { Conversation, ReplyCheck, ReplyDetail, SavedVersion } from "./chat";
 
 const KIND = { post: "Post", article: "Article" } as const;
 
@@ -10,6 +10,9 @@ export function checkLine(c: ReplyCheck): string {
   if (!c.passed) return `${KIND[c.kind]} check not passed.`;
   return c.round && c.round > 1 ? `${KIND[c.kind]} check passed (round ${c.round}).` : `${KIND[c.kind]} check passed.`;
 }
+
+/** Whether a reply has anything to put on a card under its words. */
+export const hasOutcome = (d?: ReplyDetail) => !!(d?.saved?.length || d?.checks?.length || d?.steps?.length);
 
 /** The newest conversations followed by older ones loaded since, each once, as the newest list has it. */
 export function withOlder(recent: Conversation[], older: Conversation[]): Conversation[] {
