@@ -60,6 +60,9 @@ export interface Design {
   bottomFade: number; // 0..1
   showLogo: boolean;
   showFooter: boolean;
+  /** An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose. */
+  noFooter?: boolean;
+  noFooterLeft?: boolean;
   photos: string[];
   screenshot?: string;
   bgImage?: string;

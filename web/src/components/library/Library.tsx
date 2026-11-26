@@ -27,6 +27,7 @@ import { defaultTimezone, formatInZone, toLocalInput, type Job } from "@/lib/job
 import { COLUMNS, DEFAULT_SORT, defaultColumns, deleteSummary, draftLink, LIBRARY_STATUS_LABEL, nextSort, PAGE_SIZES, pageNumbers, pagePath, rowKey, STATUS_FILTERS, type ColumnId, type LibraryFilter, type LibraryItem, type LibraryPage, type LibrarySort } from "@/lib/library";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { DEFAULT_DESIGN } from "@/lib/profiles";
+import { fullDesign } from "@/lib/cardDesign";
 import { sizeById } from "@/lib/sizes";
 import { slugify } from "@/lib/slug";
 import type { Design, Profile } from "@/lib/types";
@@ -419,7 +420,7 @@ function Row({ item, data, open, onToggle, brandName, onPatch, onGone }: {
 function CardThumb({ design, profile }: { design?: Design; profile?: Profile }) {
   const frame = "h-12 w-20 shrink-0 overflow-hidden rounded border border-border bg-muted";
   if (!design || !profile) return <div className={`${frame} grid place-items-center text-muted-foreground`} aria-hidden><FileText className="h-4 w-4" /></div>;
-  const d: Design = { ...DEFAULT_DESIGN, ...design };
+  const d = fullDesign(DEFAULT_DESIGN, design);
   const palette = profile.palettes.find((p) => p.id === d.paletteId) ?? profile.palettes[0];
   if (!palette) return <div className={frame} aria-hidden />;
   return <div className={`${frame} grid place-items-center`} aria-hidden><ScaledCard design={d} profile={profile} palette={palette} size={sizeById(d.sizeId)} maxW={80} maxH={48} rounded={false} /></div>;
@@ -428,7 +429,7 @@ function CardThumb({ design, profile }: { design?: Design; profile?: Profile }) 
 /** The card, drawn from the design saved with the item. */
 function CardView({ design, profile }: { design?: Design; profile?: Profile }) {
   if (!profile) return null;
-  const d: Design = { ...DEFAULT_DESIGN, ...(design ?? {}) };
+  const d = design ? fullDesign(DEFAULT_DESIGN, design) : DEFAULT_DESIGN;
   const palette = profile.palettes.find((p) => p.id === d.paletteId) ?? profile.palettes[0];
   if (!palette) return null;
   return <ScaledCard design={d} profile={profile} palette={palette} size={sizeById(d.sizeId)} maxW={640} maxH={360} />;

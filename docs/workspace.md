@@ -40,6 +40,8 @@ The left column has three sides. Your choice is remembered.
 - **Details**: every field of the item on screen, once.
 - **Design**: how its card looks (layout, background, images, colours, fonts).
 
+A footer field that has never been written shows the brand's handle (right) or website (left). Once you clear it, or the assistant does, it stays empty; **Use the brand's** under the field brings it back.
+
 ### Details
 
 | Group | Fields |

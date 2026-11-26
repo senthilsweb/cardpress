@@ -184,8 +184,8 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
     { name: "headline", key: "title", shown: true, label: L === "quote" ? "Quote" : L === "stat" ? "What the number means" : undefined, lines: L === "quote" ? 4 : 2, hint: "Enter starts a new line." },
     { name: "subtitle", key: "subtitle", shown: L !== "quote", hint: "Use | to split into points." },
     { name: "quoteAuthor", key: "quoteAuthor", shown: L === "quote" },
-    { name: "footerLeft", key: "footerLeft", shown: true, placeholder: "Your website" },
-    { name: "footer", key: "footer", shown: true, placeholder: "Your handle" },
+    { name: "footerLeft", key: "footerLeft", shown: true },
+    { name: "footer", key: "footer", shown: true },
   ] as const;
   // a field this layout does not draw is listed after the ones it does
   const cardWords = [...words_.filter((w) => w.shown), ...words_.filter((w) => !w.shown)];
@@ -336,7 +336,17 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
                 hint={!w.shown ? "Not drawn by this layout." : "hint" in w ? w.hint : undefined}>
                 {"lines" in w
                   ? <Textarea id={`d-${w.name}`} rows={w.lines} value={card(w.key)} maxLength={maxOf(w.name, kind)} onChange={(e) => setCard({ [w.key]: e.target.value })} />
-                  : <Input id={`d-${w.name}`} value={card(w.key)} maxLength={maxOf(w.name, kind)} placeholder={"placeholder" in w ? w.placeholder : undefined} onChange={(e) => setCard({ [w.key]: e.target.value })} />}
+                  : <Input id={`d-${w.name}`} value={card(w.key)} maxLength={maxOf(w.name, kind)} placeholder={w.key === "footer" ? (design.noFooter ? "Empty" : profile.handle) : w.key === "footerLeft" ? (design.noFooterLeft ? "Empty" : profile.website) : undefined} onChange={(e) => setCard({ [w.key]: e.target.value })} />}
+                {(w.key === "footer" || w.key === "footerLeft") && !card(w.key) && (() => {
+                  const flag = w.key === "footer" ? "noFooter" : "noFooterLeft";
+                  const own = w.key === "footer" ? profile.handle : profile.website;
+                  if (!own) return null;
+                  return (
+                    <button type="button" className="cursor-pointer text-[11px] text-brand hover:underline" onClick={() => setCard({ [w.key]: "", [flag]: !design[flag] })}>
+                      {design[flag] ? "Use the brand's" : "Leave empty"}
+                    </button>
+                  );
+                })()}
               </FormField>
             ))}
           </div>

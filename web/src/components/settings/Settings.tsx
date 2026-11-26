@@ -14,6 +14,7 @@ import { api, type ApiInfo } from "@/lib/api";
 import { blankDesign, brandColor, move } from "@/lib/brands";
 import { sectionFromPath, settingsHref, visibleSections, type SettingsSection } from "@/lib/nav";
 import { completeProfiles, DEFAULT_DESIGN, withStandardPalettes } from "@/lib/profiles";
+import { fullDesign } from "@/lib/cardDesign";
 import { useSession } from "@/lib/session";
 import type { Design, Profile } from "@/lib/types";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
@@ -110,7 +111,8 @@ function BrandsPage({ brands, colors, sync, setActive }: {
   const create = async (p: Profile, from?: Profile) => {
     await api.createProfile(p);
     // a copy starts from the other brand's card, a blank one from the default card without footer text
-    const base = from ? { ...DEFAULT_DESIGN, ...(brands.designs[from.id] ?? {}) } : blankDesign(DEFAULT_DESIGN);
+    const copied = from && brands.designs[from.id];
+    const base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
     await api.putDesigns({ ...brands.designs, [p.id]: base });
     await setActive(p.id);
     await sync();

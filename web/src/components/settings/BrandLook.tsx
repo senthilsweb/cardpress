@@ -5,6 +5,7 @@ import { ProfilePanel } from "@/components/studio/panels";
 import { ScaledCard } from "@/components/studio/preview";
 import { api } from "@/lib/api";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
+import { fullDesign } from "@/lib/cardDesign";
 import { sizeById } from "@/lib/sizes";
 import { useSyncedState } from "@/lib/store";
 import type { Design, Profile } from "@/lib/types";
@@ -19,7 +20,7 @@ export function BrandLook({ profiles, id, design: saved, onBack }: { profiles: P
     try { if (all !== profiles) await api.putProfiles(all); onBack(); } catch { setLeaving(false); toast.error("Not saved"); }
   };
   const profile = all.find((p) => p.id === id) ?? all[0];
-  const design: Design = { ...DEFAULT_DESIGN, ...(saved ?? {}) };
+  const design: Design = saved ? fullDesign(DEFAULT_DESIGN, saved) : DEFAULT_DESIGN;
   // which colour set is being edited, and shown on the card
   const [paletteId, setPaletteId] = useState(design.paletteId);
   const palette = profile.palettes.find((p) => p.id === paletteId) ?? profile.palettes[0];
