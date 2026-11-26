@@ -100,8 +100,19 @@ type Input struct {
 
 // Event is progress while a reply is being written.
 type Event struct {
-	Type string // "delta" (text of the reply) or "progress" (what is being done)
+	Type string // "delta" (text of the reply), "progress" (what is being done) or "check" (how a draft was graded)
 	Text string
+	// Check is set on a "check" event.
+	Check *Check
+}
+
+// Check is the grader's verdict on a first draft.
+type Check struct {
+	Kind   string `json:"kind"`
+	Passed bool   `json:"passed"`
+	Round  int    `json:"round,omitempty"`
+	// Note says what was wrong when it did not pass.
+	Note string `json:"note,omitempty"`
 }
 
 // Output is one reply. Proposal is nil when the agent only talks (a question, or "I can't do that").

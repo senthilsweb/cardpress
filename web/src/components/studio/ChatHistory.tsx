@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import type { Draft } from "@/lib/draft";
 import { draftName } from "@/lib/draftSearch";
 import { costText, groupByAge } from "@/lib/history";
 import { cn } from "@/lib/utils";
+import { PAGE, withOlder } from "@/lib/reply";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
@@ -47,7 +48,30 @@ export function ChatHistory({ profileId, recent, currentId, drafts, onOpen, busy
     try { await api.deleteNote(profileId, key); loadNotes(); } catch (e) { setError(message(e)); }
   };
 
-  const list = found ?? recent;
+  // older ones are read as the end of the list comes into view
+  const [older, setOlder] = useState<Conversation[]>([]);
+  const [more, setMore] = useState(true);
+  const loading = useRef(false);
+  const all = withOlder(recent, older);
+  const last = all[all.length - 1]?.id;
+  const hasMore = !query.trim() && more && recent.length >= PAGE;
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => { setOlder([]); setMore(true); }, [profileId]);
+  useEffect(() => {
+    if (!hasMore || !last || !end.current) return;
+    const watch = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting || loading.current) return;
+      loading.current = true;
+      api.olderConversations(profileId, last)
+        .then((next) => { setOlder((o) => [...o, ...next]); setMore(next.length >= PAGE); })
+        .catch((err) => { setError(message(err)); setMore(false); })
+        .finally(() => { loading.current = false; });
+    });
+    watch.observe(end.current);
+    return () => watch.disconnect();
+  }, [hasMore, last, profileId]);
+
+  const list = found ?? all;
   const about = (c: Conversation) => [c.postDraftId, c.articleDraftId].map((id) => drafts.find((d) => d.id === id)).filter((d): d is Draft => !!d);
 
   return (
@@ -85,6 +109,7 @@ export function ChatHistory({ profileId, recent, currentId, drafts, onOpen, busy
               </ul>
             </section>
           ))}
+          {hasMore && <div ref={end} className="py-2 text-center text-xs text-muted-foreground">Loading…</div>}
         </TabsContent>
         <TabsContent value="notes" className="space-y-2">
           <p className="text-xs text-muted-foreground">What the assistant remembers about this brand.</p>

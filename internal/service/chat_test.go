@@ -224,8 +224,8 @@ func TestInvalidAgentOutputIsNotStored(t *testing.T) {
 	if len(got.Proposals) != 1 || got.Proposals[0].Status != ProposalPending {
 		t.Fatalf("the earlier proposal must be untouched: %+v", got.Proposals)
 	}
-	if len(got.Messages) != 3 || got.Messages[2].Role != "user" {
-		t.Fatalf("the person's message is kept, no assistant message is added: %+v", got.Messages)
+	if len(got.Messages) != 4 || got.Messages[3].Status != ReplyFailed || got.Messages[3].Content != "" || !strings.Contains(got.Messages[3].Detail.Error, "not valid") {
+		t.Fatalf("the person's message and why the reply failed are kept, none of its words: %+v", got.Messages)
 	}
 }
 
@@ -236,7 +236,7 @@ func TestAgentFailureKeepsTheUsersMessage(t *testing.T) {
 	if err := c.Send(ctx, conv.ID, "please draft", func(ChatEvent) {}); err == nil || !strings.Contains(err.Error(), "upstream is down") {
 		t.Fatalf("%v", err)
 	}
-	if got, _ := c.Get(ctx, conv.ID); len(got.Messages) != 1 || got.Messages[0].Content != "please draft" {
+	if got, _ := c.Get(ctx, conv.ID); len(got.Messages) != 2 || got.Messages[0].Content != "please draft" || got.Messages[1].Status != ReplyFailed {
 		t.Fatalf("%+v", got.Messages)
 	}
 }

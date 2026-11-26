@@ -68,7 +68,7 @@ type turn struct {
 	seen     map[string]bool   // event ids already handled (a replay must not repeat work)
 	streamed map[string]string // agent message id -> text already passed on through live previews
 	replies  []string
-	verdict  string // the grader's final word
+	verdict  *agent.Check // the grader's final word
 	lastErr  string
 	done     bool
 
@@ -172,10 +172,10 @@ func (t *turn) handle(e wireEvent) error {
 		case "needs_revision":
 			t.progress("Revising after the check")
 		case "satisfied":
-			t.verdict = fmt.Sprintf("%s check passed (round %d).", t.label(), e.Iteration+1)
+			t.judge(agent.Check{Kind: t.kind, Passed: true, Round: e.Iteration + 1})
 		case "interrupted":
 		default:
-			t.verdict = t.label() + " check not passed: " + shorten(e.Explanation, 600)
+			t.judge(agent.Check{Kind: t.kind, Round: e.Iteration + 1, Note: shorten(e.Explanation, 600)})
 		}
 
 	case "session.error":
@@ -199,7 +199,7 @@ func (t *turn) handle(e wireEvent) error {
 		case "budget_reached":
 			return errors.New("this conversation reached its spending limit, so the agent stopped. Start a new conversation")
 		default: // end_turn, or anything that means "finished"
-			t.done = !t.graded || t.verdict != ""
+			t.done = !t.graded || t.verdict != nil
 		}
 
 	case "session.status_terminated":
@@ -210,11 +210,9 @@ func (t *turn) handle(e wireEvent) error {
 	return nil
 }
 
-func (t *turn) label() string {
-	if t.kind == "article" {
-		return "Article"
-	}
-	return "Post"
+func (t *turn) judge(c agent.Check) {
+	t.verdict = &c
+	t.emit(agent.Event{Type: "check", Check: &c})
 }
 
 func shorten(s string, n int) string {
@@ -241,11 +239,5 @@ func (t *turn) errSuffix() string {
 	return ""
 }
 
-// reply is what the agent said, with the grader's word after it.
-func (t *turn) reply() string {
-	parts := append([]string(nil), t.replies...)
-	if t.verdict != "" {
-		parts = append(parts, t.verdict)
-	}
-	return strings.Join(parts, "\n\n")
-}
+// reply is what the agent said.
+func (t *turn) reply() string { return strings.Join(t.replies, "\n\n") }

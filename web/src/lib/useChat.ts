@@ -96,6 +96,8 @@ export function useChat(profileId: string) {
           const c = await api.getConversation(convId);
           if (ctl.signal.aborted && i < 5 && c.messages?.[c.messages.length - 1]?.role === "user") continue;
           patch(convId, () => c);
+          // a failed reply says why in the thread, so it is not said twice
+          if (c.messages?.[c.messages.length - 1]?.status === "failed") setError(null);
         } catch { /* the next look will do */ }
         break;
       }

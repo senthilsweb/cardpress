@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -208,10 +209,19 @@ func TestFirstDraftsAreGradedOneAfterTheOtherWithEverySource(t *testing.T) {
 	f := &fake{scripts: []func(*fake){grade("Post saved.", "satisfied"), grade("Article saved.", "max_iterations_reached")}}
 	st := studio()
 	st.ArticleID, st.Write, st.Grade = "d2", []string{"post", "article"}, []string{"post", "article"}
-	out, _, err := ask(t, f, agent.Input{Studio: st, Sources: []agent.Source{{Text: "THE SOURCE", New: false}}})
-	want := "Post saved.\n\nPost check passed (round 2).\n\nArticle saved.\n\nArticle check not passed: The ending repeats."
-	if err != nil || out.Reply != want {
+	out, events, err := ask(t, f, agent.Input{Studio: st, Sources: []agent.Source{{Text: "THE SOURCE", New: false}}})
+	if err != nil || out.Reply != "Post saved.\n\nArticle saved." {
 		t.Fatalf("%v %q", err, out.Reply)
+	}
+	var checks []agent.Check
+	for _, e := range events {
+		if e.Type == "check" {
+			checks = append(checks, *e.Check)
+		}
+	}
+	want := []agent.Check{{Kind: "post", Passed: true, Round: 2}, {Kind: "article", Round: 2, Note: "The ending repeats."}}
+	if !slices.Equal(checks, want) {
+		t.Fatalf("%+v", checks)
 	}
 	if strings.Join(f.rubrics, ",") != "POST RUBRIC,ARTICLE RUBRIC" {
 		t.Fatal(f.rubrics)

@@ -33,7 +33,16 @@ export interface ChatSource {
   truncated: boolean;
 }
 
-export interface ChatMessage { id: string; seq: number; role: "user" | "assistant"; content: string; createdAt: string }
+export interface SavedVersion { draftId: string; kind: DraftKind; version: number }
+export interface ReplyCheck { kind: DraftKind; passed: boolean; round?: number; note?: string }
+/** What happened while a reply was written. */
+export interface ReplyDetail { steps?: string[]; saved?: SavedVersion[]; checks?: ReplyCheck[]; error?: string }
+export interface ChatMessage {
+  id: string; seq: number; role: "user" | "assistant"; content: string; createdAt: string;
+  /** How a reply ended. */
+  status?: "done" | "failed" | "stopped";
+  detail?: ReplyDetail;
+}
 export interface AgentInfo { name: string; ai: boolean; /** False on a server with no assistant set up. */ ready: boolean }
 /** What goes with a message besides its words. */
 export interface ChatRequest { write: DraftKind[]; viewing?: DraftKind }

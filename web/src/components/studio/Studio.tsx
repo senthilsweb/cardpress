@@ -113,6 +113,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   // the card is on the canvas while its words are being worked on, and the versions open in Details when asked for
   const [cardFocus, setCardFocus] = useState(false);
   const [versionsAsked, setVersionsAsked] = useState(0);
+  const [version, setVersion] = useState<{ draftId: string; seq: number }>();
   /** Go to another page, saving what is being typed first. */
   const go = (href: string) => { flushPendingEdits(); window.location.href = href; };
   // the library can send someone straight to a draft's Full preview (to schedule it)
@@ -180,6 +181,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     if (!conv || (store.current && linksDraft(conv, store.current.id))) return;
     const about = [conv.postDraftId, conv.articleDraftId].find((d) => d && store.drafts.some((x) => x.id === d));
     if (about) { flushPendingEdits(); await store.select(about); }
+  };
+  /** Open a version that a reply saved, with its item. */
+  const openVersion = async (draftId: string, seq: number) => {
+    if (!store.drafts.some((d) => d.id === draftId)) { toast("That draft no longer exists"); return; }
+    await openItem(draftId);
+    setVersion({ draftId, seq });
+    showDetails();
+    setVersionsAsked((n) => n + 1);
   };
   // on arrival, the chat shows the conversation about the item on screen, if there is one
   const matched = useRef(false);
@@ -406,12 +415,12 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </div>
             {/* the chat stays mounted, so an unsent message is not lost by switching */}
             <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
-              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} profileId={profile.id} drafts={store.drafts} onOpen={(id) => void openConversation(id)} onDelete={(id) => void deleteChat(id)}
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} profileId={profile.id} drafts={store.drafts} onOpen={(id) => void openConversation(id)} onDelete={(id) => void deleteChat(id)} onVersion={(id, seq) => void openVersion(id, seq)}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
             {mode === "details" && (
               <div className="min-h-0 flex-1">
-                <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={seen} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked}
+                <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={seen} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked} version={version}
                   openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => go(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} />
               </div>
             )}
@@ -425,7 +434,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
 
           {/* canvas */}
           <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:order-first max-lg:flex-none max-lg:[&>*:not(:first-child)]:hidden")}>
-            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => { showDetails(); setVersionsAsked((n) => n + 1); }} />
+            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => { setVersion(undefined); showDetails(); setVersionsAsked((n) => n + 1); }} />
             {/* sizes and export belong to the card, so they show with it */}
             <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">

@@ -39,7 +39,7 @@ With accounts on, **only the admin** can send messages, and only in **brands the
 ## What happens in a conversation
 
 - Tick **Post**, **Article** or both. CardPress creates the draft if the conversation has none and tells the agent which one to write.
-- The **first** draft of each kind is graded against its rubric and revised up to three times. The reply ends with the verdict. Later messages are ordinary requests.
+- The **first** draft of each kind is graded against its rubric and revised up to three times. The verdict is shown on a card under the reply. Later messages are ordinary requests.
 - The agents save through [MCP](mcp.md). Every save is a new version, so you can go back. Published and scheduled items are locked.
 - The agents can change the words on the card, never its look. They cannot publish.
 - If you edit a draft or card yourself, the next message tells the agent what changed.

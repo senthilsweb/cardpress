@@ -18,7 +18,9 @@ const message = (e: unknown) => (e instanceof Error ? e.message : "Something wen
  * sent, saved by hand, and after a stretch of editing). Open one to read it and make it current, which saves it as a new
  * version, so nothing is lost.
  */
-export function Versions({ open, draft, onRestore, statusKey }: {
+export function Versions({ open, draft, onRestore, statusKey, show }: {
+  /** A version to open, asked for from elsewhere; a new object asks again. */
+  show?: { seq: number };
   /** The list is on screen, so it is worth reading. */
   open: boolean; draft?: Draft;
   /** Put a version back. The editor reloads the text. */
@@ -40,6 +42,13 @@ export function Versions({ open, draft, onRestore, statusKey }: {
   }, [id]);
   useEffect(() => { if (open) { setShown(null); setConfirm(false); void load(); } }, [open, load, statusKey]);
   useEffect(() => { if (!confirm) return; const t = window.setTimeout(() => setConfirm(false), 4000); return () => window.clearTimeout(t); }, [confirm]);
+
+  useEffect(() => {
+    if (!open || !show || !id) return;
+    let live = true;
+    api.version(id, show.seq).then((v) => { if (live) setShown(v); }).catch((e) => { if (live) setError(message(e)); });
+    return () => { live = false; };
+  }, [open, show, id]);
 
   if (!draft) return null;
   const view = async (v: DraftVersion) => {

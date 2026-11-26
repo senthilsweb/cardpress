@@ -6,6 +6,7 @@ import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
 import type { Draft, DraftKind } from "@/lib/draft";
 import { ChatHistory } from "./ChatHistory";
+import { ReplyCard } from "./ReplyCard";
 import { ProposalCard } from "./ProposalCard";
 import { ChatInput, SourceChip } from "./ChatInput";
 import { cn } from "@/lib/utils";
@@ -50,15 +51,17 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
   );
 }
 
-function Thread({ conv, chat, onApply, onShow }: {
+function Thread({ conv, chat, onApply, onShow, onVersion }: {
   conv: Conversation; chat: ChatStore;
+  onVersion: (draftId: string, version: number) => void;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   onShow: (draftId?: string) => void;
 }) {
   const end = useRef<HTMLDivElement>(null);
   const messages = conv.messages ?? [];
   const proposals = conv.proposals ?? [];
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages.length, proposals.length, chat.streaming]);
+  // a conversation opens at its end
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [conv.id, messages.length, proposals.length, chat.streaming]);
 
   const approve = (p: Proposal) => async (content: ProposalEdit, opts: { useTitle: boolean; edited: boolean }) => {
     const draftId = await onApply(content, { useTitle: opts.useTitle });
@@ -78,7 +81,9 @@ function Thread({ conv, chat, onApply, onShow }: {
     <div className="space-y-3 px-3 py-3">
       {messages.map((m) => (
         <div key={m.id} className="space-y-2">
-          <Bubble role={m.role}>{m.content}</Bubble>
+          {/* a failed or stopped reply may have no words of its own */}
+          {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.content}</Bubble>}
+          {m.role === "assistant" && <ReplyCard message={m} onVersion={onVersion} />}
           {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
             <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">
               {(conv.sources ?? []).filter((x) => x.messageId === m.id).map((x) => <SourceChip key={x.id} source={x} />)}
@@ -104,11 +109,13 @@ function Thread({ conv, chat, onApply, onShow }: {
  * The chat that prepares content, turn by turn. It proposes; the person decides. Approving a proposal hands its content
  * to `onApply`, which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
-export function ChatPanel({ chat, onApply, onShow, draftId, viewing, profileId, drafts, onOpen, onDelete }: {
+export function ChatPanel({ chat, onApply, onShow, onVersion, draftId, viewing, profileId, drafts, onOpen, onDelete }: {
   chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   /** Put an item an approved proposal went into on the canvas. */
   onShow: (draftId?: string) => void;
+  /** Open a version a reply saved. */
+  onVersion: (draftId: string, version: number) => void;
   /** The item on screen, and its kind. */
   draftId?: string;
   viewing?: DraftKind;
@@ -168,7 +175,7 @@ export function ChatPanel({ chat, onApply, onShow, draftId, viewing, profileId, 
       )}
       {/* the thread and the box stay mounted, so an unsent message is not lost */}
       <div className={cn("min-h-0 flex-1 overflow-y-auto", listing && "hidden")} aria-live="polite">
-        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} /> : <Welcome chat={chat} />}
+        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} onVersion={onVersion} /> : <Welcome chat={chat} />}
       </div>
 
       {chat.error && <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-destructive">{chat.error}</p>}

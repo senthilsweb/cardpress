@@ -52,7 +52,7 @@ const savePref = (key: string, value: string) => { try { window.localStorage.set
  * Everything about the item on screen, each field once, in the groups of the content schema. Its status, what is
  * missing and the next step stay at the bottom.
  */
-export function Details({ media, changed, onSeen, setCard, onCardFocus, versionsAsked, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Details({ media, changed, onSeen, setCard, onCardFocus, versionsAsked, version, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   /** What the open post carries. */
   media: PostMediaView;
   /** Fields someone else changed that have not been looked at. */
@@ -64,6 +64,8 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   onCardFocus: (on: boolean) => void;
   /** Counts up each time the versions are asked for. */
   versionsAsked: number;
+  /** One of them to open. */
+  version?: { draftId: string; seq: number };
   /** Open the Full preview as soon as this shows (asked for by the library). */
   openPreview?: boolean;
   /** Called once it has opened, so it does not open again the next time this shows. */
@@ -490,7 +492,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
             {draft.scheduledAt && <><dt className="text-muted-foreground">Planned for</dt><dd>{formatInZone(draft.scheduledAt, draft.timezone)}</dd></>}
             {draft.pageAt && <><dt className="text-muted-foreground">Page live</dt><dd>{formatInZone(draft.pageAt)}</dd></>}
           </dl>
-          <Versions open={recordOpen} draft={draft} statusKey={`${draft.id}:${draft.status}:${draft.version}`} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} />
+          <Versions open={recordOpen} show={version && version.draftId === draft.id ? version : undefined} draft={draft} statusKey={`${draft.id}:${draft.status}:${draft.version}`} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} />
           <Button variant={confirmDelete ? "destructive" : "outline"} size="sm" disabled={draft.status !== "draft"}
             title={draft.status === "draft" ? undefined : "Bring it back to draft to delete it"}
             onClick={() => { if (!confirmDelete) setConfirmDelete(true); else { setConfirmDelete(false); void guard(() => store.remove(draft.id))(); } }}>

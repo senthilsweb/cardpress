@@ -93,6 +93,7 @@ type Publishing interface {
 
 // Chatting is the part of the chat service the HTTP API needs.
 type Chatting interface {
+	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
@@ -966,7 +967,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
 		return
 	}
-	list, err := s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
+	var list []service.Conversation
+	var err error
+	if after := r.URL.Query().Get("after"); after != "" {
+		list, err = s.Chat.Older(r.Context(), profileID, after)
+	} else {
+		list, err = s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
+	}
 	if err != nil {
 		fail(w, r, err)
 		return

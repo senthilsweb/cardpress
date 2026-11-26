@@ -294,6 +294,8 @@ export const api = {
     return res.blob();
   },
   listConversations: (profileId: string, q = "") => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  /** The conversations changed before this one. */
+  olderConversations: (profileId: string, after: string) => call<{ conversations: Conversation[] }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}&after=${encodeURIComponent(after)}`).then((r) => r.conversations),
   listNotes: (profileId: string) => call<{ notes: BrandNote[] }>("GET", `/chat/memories?profileId=${encodeURIComponent(profileId)}`).then((r) => r.notes),
   deleteNote: (profileId: string, key: string) => call<void>("DELETE", `/chat/memories/${encodeURIComponent(key)}?profileId=${encodeURIComponent(profileId)}`),
   startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),
