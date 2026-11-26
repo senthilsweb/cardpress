@@ -357,11 +357,11 @@ const BUILTIN: BackgroundDef[] = [
   { id: "image", name: "Own image", hint: "Your image with colour overlay", needs: "image", render: image },
   { id: "plain", name: "Plain", hint: "Just colour", render: () => null },
 ];
-/* Drop-in backgrounds: any card/bg/*.tsx (not starting with "_") that default-exports a BackgroundDef is listed. */
-const dropIns = Object.entries(import.meta.glob<{ default: BackgroundDef }>("./bg/*.tsx", { eager: true }))
+/* Drop-in backgrounds: any card/bg/**.tsx (not starting with "_") that default-exports a BackgroundDef, or a list of them. */
+const dropIns = Object.entries(import.meta.glob<{ default: BackgroundDef | BackgroundDef[] }>("./bg/**/*.tsx", { eager: true }))
   .filter(([path]) => !path.split("/").pop()!.startsWith("_"))
   .sort(([a], [b]) => a.localeCompare(b))
-  .map(([, m]) => m.default)
+  .flatMap(([, m]) => m.default ?? [])
   .filter((d) => d && d.id && typeof d.render === "function");
 
 // Insert before "Plain" so it stays last; a drop-in with a built-in id replaces that built-in.
@@ -369,3 +369,19 @@ const plain = BUILTIN[BUILTIN.length - 1];
 const base = BUILTIN.slice(0, -1).filter((b) => !dropIns.some((d) => d.id === b.id));
 export const BACKGROUNDS: BackgroundDef[] = [...base, ...dropIns, plain];
 export const bgById = (id: string) => BACKGROUNDS.find((b) => b.id === id) ?? BACKGROUNDS[0];
+
+export const DEFAULT_CATEGORY = "Abstract";
+export const categoryOf = (b: BackgroundDef) => b.category || DEFAULT_CATEGORY;
+/** Category names, Abstract first, the rest in the order they appear. */
+export const CATEGORIES: string[] = [...new Set([DEFAULT_CATEGORY, ...BACKGROUNDS.map(categoryOf)])];
+
+/** One category's backgrounds under their group headings ("" = no heading), in the order they appear. */
+export function groupsIn(category: string): { group: string; items: BackgroundDef[] }[] {
+  const out = new Map<string, BackgroundDef[]>();
+  for (const b of BACKGROUNDS) {
+    if (categoryOf(b) !== category) continue;
+    const g = b.group ?? "";
+    out.set(g, [...(out.get(g) ?? []), b]);
+  }
+  return [...out].map(([group, items]) => ({ group, items }));
+}
