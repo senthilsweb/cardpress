@@ -45,8 +45,17 @@ const coverPalettes: Palette[] = COVER.map(([id, name, bg, primary, secondary, a
   p(id, name, bg.toLowerCase(), blend(bg.toLowerCase(), soft.toLowerCase(), dark ? 0.25 : 0.5), accent.toLowerCase(), primary.toLowerCase(), secondary.toLowerCase())
 );
 
+// Seasonal palettes, to go with the seasonal greeting backgrounds.
+const seasonalPalettes: Palette[] = [
+  p("autumn-cream", "Autumn cream", "#fbf3e4", "#f0dcb8", "#c2561b", "#3a1f0f", "#9a3412"),
+  p("autumn-night", "Autumn night", "#24140c", "#4a2413", "#e8792b", "#fbeeda", "#f4b04a"),
+  p("festival-night", "Festival night", "#1c0f33", "#3d1a52", "#f59e0b", "#fdf4e3", "#fbbf24"),
+  p("midnight-gold", "Midnight gold", "#070b1a", "#131d3d", "#d4a52c", "#f6f3ea", "#f1cf6b"),
+  p("lunar-red", "Lunar red", "#8e0f16", "#5c070c", "#f2b632", "#fff3da", "#ffd873"),
+];
+
 /** Standard theme: every palette is available to every profile. */
-export const standardPalettes: Palette[] = [...personalPalettes, ...coverPalettes, ...brochurePalettes];
+export const standardPalettes: Palette[] = [...personalPalettes, ...coverPalettes, ...brochurePalettes, ...seasonalPalettes];
 
 function blend(a: string, b: string, t: number) {
   const f = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));

@@ -273,6 +273,8 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
       {bf > 0 && <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(pal.fade, 0)} 45%, ${rgba(pal.fade, bf)} 100%)` }} />}
+      {bg.dense && footer && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 12 * u, background: `linear-gradient(0deg, ${rgba(pal.base, 0.96)} 45%, ${rgba(pal.base, 0)} 100%)` }} />}
+      {bg.dense && logo && art.area.x < pad && <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: pad + 14 * u, background: `linear-gradient(180deg, ${rgba(pal.base, 0.96)} 35%, ${rgba(pal.base, 0)} 100%)` }} />}
       {logo}
       {content}
       {footer}

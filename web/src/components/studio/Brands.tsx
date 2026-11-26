@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Palette, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -83,10 +83,34 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
   );
 }
 
+/** A brand's name, being changed in its row of the list. */
+function RenameBrand({ brand, others, onSave, onClose }: { brand: Profile; others: Profile[]; onSave: (name: string) => Promise<void>; onClose: () => void }) {
+  const [name, setName] = useState(brand.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const problem = brandProblem(name, others);
+  const save = async () => {
+    if (problem || busy) return;
+    if (name.trim() === brand.name) return onClose();
+    setBusy(true); setError(null);
+    try { await onSave(name.trim()); onClose(); } catch (e) { setError(errMsg(e)); setBusy(false); }
+  };
+  return (
+    <form className="min-w-0 flex-1 space-y-1.5" onSubmit={(e) => { e.preventDefault(); void save(); }} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
+      <div className="flex items-center gap-1.5">
+        <Input autoFocus aria-label="Brand name" value={name} onChange={(e) => setName(e.target.value)} onFocus={(e) => e.target.select()} maxLength={80} autoComplete="off" className="h-8 min-w-0 flex-1" />
+        <Button type="button" size="sm" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button type="submit" size="sm" variant="brand" disabled={!!problem || busy}>{busy && <Loader2 className="animate-spin" />} Save</Button>
+      </div>
+      {(error ?? problem) && <p role="alert" className="text-xs text-destructive">{error ?? problem}</p>}
+    </form>
+  );
+}
+
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
+export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onRename, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
   open: boolean;
   onClose: () => void;
   active: Profile[];
@@ -94,6 +118,8 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   activeId: string;
   colors: Record<string, string>;
   onOpen: (id: string) => Promise<void>;
+  /** Give a brand another name. Nothing on its cards or posts changes. */
+  onRename?: (id: string, name: string) => Promise<void>;
   /** Edit a brand's name, logo, fonts and colours. */
   onLook?: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => Promise<void>;
@@ -114,19 +140,29 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
     setBusy(key); setError(null); setNotice(null);
     try { await fn(); } catch (e) { setError(errMsg(e)); } finally { setBusy(null); setConfirm(null); }
   };
+  const [renaming, setRenaming] = useState<string | null>(null);
   const nameOf = (id: string) => [...active, ...archived].find((p) => p.id === id)?.name ?? "";
 
-  const Row = ({ p, i }: { p: Profile; i: number }) => {
+  // a plain function, not a component, so a name being typed is not lost when the list draws again
+  const row = (p: Profile, i: number) => {
     const isOpen = p.id === activeId;
     const asking = confirm?.kind === "archive" && confirm.id === p.id;
     return (
-      <li className="space-y-2 rounded-md border border-border bg-card p-2.5">
+      <li key={p.id} className="space-y-2 rounded-md border border-border bg-card p-2.5">
         <div className="flex items-center gap-2">
           <Dot color={colors[p.id] ?? "#888"} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{p.name}{isOpen && <span className="ml-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-brand">Open</span>}</p>
-            {p.handle && <p className="truncate text-xs text-muted-foreground">{p.handle}</p>}
-          </div>
+          {onRename && renaming === p.id ? (
+            <RenameBrand brand={p} others={[...active, ...archived].filter((x) => x.id !== p.id)} onSave={(name) => onRename(p.id, name)} onClose={() => setRenaming(null)} />
+          ) : (
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1">
+                <p className="truncate text-sm font-medium">{p.name}</p>
+                {onRename && <Button variant="ghost" size="icon-sm" className="h-6 w-6 shrink-0" title="Rename" aria-label={`Rename ${p.name}`} disabled={!!busy} onClick={() => setRenaming(p.id)}><Pencil /></Button>}
+                {isOpen && <span className="ml-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-brand">Open</span>}
+              </div>
+              {p.handle && <p className="truncate text-xs text-muted-foreground">{p.handle}</p>}
+            </div>
+          )}
           <Button variant="ghost" size="icon-sm" aria-label={`Move ${p.name} up`} disabled={i === 0 || !!busy} onClick={() => void run(`up-${p.id}`, () => onMove(p.id, -1))}><ArrowUp /></Button>
           <Button variant="ghost" size="icon-sm" aria-label={`Move ${p.name} down`} disabled={i === active.length - 1 || !!busy} onClick={() => void run(`down-${p.id}`, () => onMove(p.id, 1))}><ArrowDown /></Button>
         </div>
@@ -144,7 +180,7 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {!isOpen && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => void run(`open-${p.id}`, () => onOpen(p.id))}>Open</Button>}
-            {onLook && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => onLook(p.id)}><Pencil /> Edit</Button>}
+            {onLook && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => onLook(p.id)}><Palette /> Edit</Button>}
             <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => onDuplicate(p)}><Copy /> Duplicate</Button>
             <Button size="sm" variant="ghost" disabled={!!busy || active.length < 2} title={active.length < 2 ? "Keep at least one brand" : undefined} onClick={() => setConfirm({ kind: "archive", id: p.id })}><Archive /> Archive</Button>
           </div>
@@ -160,7 +196,7 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
       <div className="space-y-4 px-4 py-4">
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
-        <ul className="space-y-2">{active.map((p, i) => <Row key={p.id} p={p} i={i} />)}</ul>
+        <ul className="space-y-2">{active.map(row)}</ul>
 
         {archived.length > 0 && (
           <section className="space-y-2 border-t border-border pt-3">

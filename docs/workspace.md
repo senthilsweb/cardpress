@@ -30,6 +30,7 @@ A brand is an identity (name, handle, logo, fonts, colour sets) with its own car
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
+- The **pencil** beside a brand's name (Settings, Brands) renames it. Its cards and posts, and the name printed on them (**Logo text**), stay as they are.
 - **Edit** (Settings, Brands) changes a brand's name, handle, website, logo, fonts and colour sets, with its card beside them. Credentials set through environment variables belong to the first brand only.
 
 ## Chat, Details and Design

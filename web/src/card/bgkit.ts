@@ -29,7 +29,13 @@ export interface BackgroundDef {
   id: BackgroundId;
   name: string;
   hint: string;
+  /** The list it appears in. Default "Abstract". */
+  category?: string;
+  /** A heading inside the category, for variations of one theme. */
+  group?: string;
   needs?: "photos" | "screenshot" | "image";
+  /** Dense art: the card clears a strip behind the footer, and behind the logo where the art runs under it. */
+  dense?: boolean;
   render: (c: BgCtx) => ReactNode;
 }
 

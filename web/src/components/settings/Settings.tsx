@@ -129,6 +129,13 @@ function BrandsPage({ brands, colors, sync, setActive }: {
   return (
     <ManageBrandsDrawer open onClose={noop} active={brands.profiles} archived={brands.archived} activeId={brands.activeId} colors={colors}
       onOpen={setActive}
+      onRename={async (id, name) => {
+        // the saved brand as the server has it, so that only its name changes
+        const saved = ((await api.state()).profiles as Profile[]).find((b) => b.id === id);
+        if (!saved) throw new Error("That brand no longer exists.");
+        await api.putProfiles([{ ...saved, name }]);
+        await sync();
+      }}
       onLook={look}
       onMove={async (id, dir) => { await api.orderProfiles(move(brands.profiles.map((b) => b.id), id, dir)); await sync(); }}
       onDuplicate={(p) => { setCopyOf(p); setAdding(true); }}
