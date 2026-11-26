@@ -9,7 +9,7 @@ The library shows as a **Grid** (a table, the default on wide screens) or a **Li
 - **Sort:** click a column heading (Title, Type, Status, When, Brand). Click again to reverse the order. Dates start with the newest.
 - **Columns:** shows or hides Type, Status, When, Brand (with All brands), Written by, Approved by, Version, Planned, Public page and LinkedIn.
 - **The row menu (⋯):**
-  - **View** opens the item beside the grid, read-only when it has been sent or is waiting.
+  - **View** opens the item as its own page (`/library/?item=draft:<id>` or `job:<id>`), read-only when it has been sent or is waiting. Clicking a row does the same. **Library** at the top, or the browser's Back, returns to the grid.
   - **Edit** opens it in the studio.
   - **Schedule…** (an approved post) or **Plan a date…** (an approved article).
   - **Back to draft** (an approved item).

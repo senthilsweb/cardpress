@@ -32,6 +32,7 @@ import { slugify } from "@/lib/slug";
 import type { Design, Profile } from "@/lib/types";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
+import { serializeDraft } from "@/lib/linkedin";
 
 const base = () => import.meta.env.BASE_URL;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
@@ -85,7 +86,25 @@ function Page({ data }: { data: LibraryBoot }) {
   const [view, setView] = useState(savedView);
   const [columns, setColumns] = useState(savedColumns);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [viewing, setViewing] = useState<LibraryItem | null>(null);
+  // an item opens as its own page, at /library/?item=draft:<id> (or job:<id>), so it has an address and Back returns to the list
+  const [viewing, setViewing] = useState<ItemRef | null>(() => itemFromUrl());
+  useEffect(() => {
+    const back = () => setViewing(itemFromUrl());
+    window.addEventListener("popstate", back);
+    return () => window.removeEventListener("popstate", back);
+  }, []);
+  const pushed = useRef(false); // the item was opened from the list here, so Back can simply go back
+  const openItem = (it: LibraryItem) => {
+    pushed.current = true;
+    window.history.pushState(null, "", `${window.location.pathname}?item=${it.type}:${encodeURIComponent(it.id)}`);
+    setViewing({ type: it.type, id: it.id, item: it });
+    document.querySelector("main")?.scrollTo(0, 0);
+  };
+  const closeItem = () => {
+    if (pushed.current) { pushed.current = false; window.history.back(); return; }
+    window.history.replaceState(null, "", window.location.pathname);
+    setViewing(null);
+  };
   const [asking, setAsking] = useState<LibraryItem[] | null>(null); // rows waiting for a delete to be confirmed
   const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState<LibraryPage | null>(null);
@@ -122,7 +141,7 @@ function Page({ data }: { data: LibraryBoot }) {
   useEffect(() => { setOpenId(null); setSelected(new Set()); void load(); }, [load]);
 
   const changeSize = (n: number) => { setPageSize(n); remember(SIZE_KEY, String(n)); };
-  const changeView = (v: "grid" | "list") => { setView(v); remember(VIEW_KEY, v); setViewing(null); };
+  const changeView = (v: "grid" | "list") => { setView(v); remember(VIEW_KEY, v); };
   const toggleColumn = (id: ColumnId) => {
     const next = columns.includes(id) ? columns.filter((c) => c !== id) : COLUMNS.map((c) => c.id).filter((c) => c === id || columns.includes(c));
     setColumns(next); remember(COLUMNS_KEY, next);
@@ -132,7 +151,7 @@ function Page({ data }: { data: LibraryBoot }) {
   const patchItem = (id: string, patch: Partial<LibraryItem>) => {
     setResult((r) => (r ? { ...r, items: r.items.map((x) => (x.id === id ? { ...x, ...patch } : x)) } : r));
   };
-  const gone = () => { setOpenId(null); setViewing(null); void load(true); };
+  const gone = () => { setOpenId(null); if (viewing) closeItem(); void load(true); };
 
   /** Delete the rows the person confirmed, one by one, each checked by the server as a single delete would be. */
   const confirmDelete = async () => {
@@ -144,7 +163,7 @@ function Page({ data }: { data: LibraryBoot }) {
       catch (e) { failed.push(`${it.title || "Untitled"}: ${message(e)}`); }
     }
     setDeleting(false); setAsking(null); setSelected(new Set());
-    if (viewing && asking.some((x) => rowKey(x) === rowKey(viewing))) setViewing(null);
+    if (viewing && asking.some((x) => rowKey(x) === rowKey(viewing))) closeItem();
     const done = asking.length - failed.length;
     if (done) toast.success(done === 1 ? "Deleted" : `Deleted ${done}`);
     if (failed.length) toast.error(`${failed.length} could not be deleted`, { description: failed.join("\n") });
@@ -173,6 +192,8 @@ function Page({ data }: { data: LibraryBoot }) {
 
       <div className="flex min-h-0 min-w-0 flex-1">
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        {viewing ? <ItemPage key={`${viewing.type}:${viewing.id}`} at={viewing} data={data} onBack={closeItem} onGone={gone}
+          onPatch={(p) => { patchItem(viewing.id, p); setViewing((v) => (v?.item ? { ...v, item: { ...v.item, ...p } } : v)); }} /> : (
         <div className={cn("px-4 py-6 sm:px-6", grid ? "max-w-none" : "mx-auto max-w-3xl")}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -253,11 +274,11 @@ function Page({ data }: { data: LibraryBoot }) {
           ) : grid ? (
             <div className="mt-4">
               <Grid items={items} columns={filter.brand === "all" ? columns : columns.filter((c) => c !== "brand")} sort={sort} onSort={(k) => setSort((s) => nextSort(s, k))}
-                selected={selected} onSelected={setSelected} viewing={viewing ? rowKey(viewing) : undefined} loading={loading}
+                selected={selected} onSelected={setSelected} loading={loading}
                 brandName={(id) => names[id] ?? id} when={day}
                 thumb={(it) => (it.type === "job" ? <Thumb id={it.id} /> : <CardThumb design={it.design} profile={data.profiles.find((p) => p.id === it.profileId)} />)}
                 badge={(it) => <StatusBadge s={it.status} />}
-                onView={(it) => setViewing(it)} editHref={(it) => draftLink(base(), it)} scheduleHref={(it) => draftLink(base(), it) + "&open=preview"}
+                onView={openItem} editHref={(it) => draftLink(base(), it)} scheduleHref={(it) => draftLink(base(), it) + "&open=preview"}
                 onBackToDraft={(it) => void backToDraft(it)} onDelete={(rows) => setAsking(rows)} />
             </div>
           ) : (
@@ -271,23 +292,9 @@ function Page({ data }: { data: LibraryBoot }) {
           )}
           {result && result.total > 0 && <Pager r={result} onPage={setPage} onSize={changeSize} />}
         </div>
+        )}
       </main>
 
-      {grid && viewing && (
-        // the item beside the grid: part of the page, so the list stays in view
-        <aside aria-label="The selected item" className="flex min-h-0 w-[min(480px,45vw)] shrink-0 flex-col border-l border-border bg-background">
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-            <StatusBadge s={viewing.status} />
-            <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{viewing.title || "Untitled"}</h2>
-            <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => setViewing(null)}><X /></Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-            {viewing.type === "job"
-              ? <JobDetail key={viewing.id} id={viewing.id} page={pagePath(viewing)} onGone={gone} />
-              : <DraftDetail key={viewing.id} item={viewing} data={data} onPatch={(p) => { patchItem(viewing.id, p); setViewing((v) => (v ? { ...v, ...p } : v)); }} onGone={gone} />}
-          </div>
-        </aside>
-      )}
       </div>
 
       <Dialog open={!!asking} onOpenChange={(o) => { if (!o && !deleting) setAsking(null); }}>
@@ -302,6 +309,57 @@ function Page({ data }: { data: LibraryBoot }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface ItemRef { type: "job" | "draft"; id: string; /** The row it was opened from; absent when the page was opened by its address. */ item?: LibraryItem }
+
+/** A title for an item without one: its first line, as the list shows it. */
+const firstLine = (text: string) => {
+  const line = text.trim().split("\n")[0]?.trim() ?? "";
+  return line.length > 80 ? `${line.slice(0, 79).replace(/\s+\S*$/, "")}…` : line;
+};
+
+function itemFromUrl(): ItemRef | null {
+  const v = new URLSearchParams(window.location.search).get("item");
+  const m = v ? /^(job|draft):(.+)$/.exec(v) : null;
+  return m ? { type: m[1] as ItemRef["type"], id: m[2] } : null;
+}
+
+/** One post or article as a page of its own: its card, its text, its record and what can be done with it. */
+function ItemPage({ at, data, onBack, onGone, onPatch }: { at: ItemRef; data: LibraryBoot; onBack: () => void; onGone: () => void; onPatch: (p: Partial<LibraryItem>) => void }) {
+  const [item, setItem] = useState<LibraryItem | null>(at.item ?? null);
+  const [error, setError] = useState<string | null>(null);
+  // opened by its address: read enough of it for the heading and the actions
+  useEffect(() => {
+    if (item) return;
+    let live = true;
+    const fill = at.type === "draft"
+      ? api.getDraft(at.id).then((d): LibraryItem => ({ type: "draft", id: d.id, profileId: d.profileId, kind: d.kind, status: d.status, title: d.title || firstLine(serializeDraft(d).text), excerpt: "", at: d.updatedAt, draftId: d.id, slug: d.slug, pageAt: d.pageAt }))
+      : api.getJob(at.id).then((j): LibraryItem => ({ type: "job", id: j.id, profileId: j.profileId, kind: "post", status: j.status, title: firstLine(j.body), excerpt: "", at: j.publishedAt || j.scheduledAt || j.createdAt, postUrl: j.postUrl, draftId: j.draftId }));
+    fill.then((it) => live && setItem(it)).catch((e) => live && setError(message(e)));
+    return () => { live = false; };
+  }, [at, item]);
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <button type="button" onClick={onBack} className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Library</button>
+      {error && <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>}
+      {!item && !error && <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
+      {item && (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <StatusBadge s={item.status} />
+            <Badge variant="outline">{item.kind === "article" ? "Article" : "Post"}</Badge>
+            {data.profiles.length > 1 && <Badge variant="outline">{data.profiles.find((p) => p.id === item.profileId)?.name ?? item.profileId}</Badge>}
+            {item.at && <span className="text-xs text-muted-foreground">{day(item.at)}</span>}
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{item.title || "Untitled"}</h1>
+          {item.type === "job"
+            ? <JobDetail id={item.id} page={pagePath(item)} onGone={onGone} />
+            : <DraftDetail item={item} data={data} onPatch={(p) => { setItem((x) => (x ? { ...x, ...p } : x)); onPatch(p); }} onGone={onGone} />}
+        </>
+      )}
     </div>
   );
 }

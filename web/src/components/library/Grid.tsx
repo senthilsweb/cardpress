@@ -23,8 +23,6 @@ interface Props extends GridActions {
   onSort: (key: SortKey) => void;
   selected: Set<string>;
   onSelected: (next: Set<string>) => void;
-  /** The row open in the pane beside the grid. */
-  viewing?: string;
   loading: boolean;
   brandName: (id: string) => string;
   thumb: (it: LibraryItem) => React.ReactNode;
@@ -33,7 +31,7 @@ interface Props extends GridActions {
 }
 
 /** The library as a table: sortable headings, chosen columns, rows to select, and a menu on each row. */
-export function Grid({ items, columns, sort, onSort, selected, onSelected, viewing, loading, brandName, thumb, badge, when, ...act }: Props) {
+export function Grid({ items, columns, sort, onSort, selected, onSelected, loading, brandName, thumb, badge, when, ...act }: Props) {
   const { can } = useSession();
   const shown = COLUMNS.filter((c) => columns.includes(c.id));
   const deletable = items.filter((it) => rowActions(it, can).delete);
@@ -102,7 +100,7 @@ export function Grid({ items, columns, sort, onSort, selected, onSelected, viewi
             const a = rowActions(it, can);
             const key = rowKey(it);
             return (
-              <tr key={key} className={cn("border-b border-border last:border-b-0 hover:bg-muted/30", viewing === key && "bg-accent/60 hover:bg-accent/60", selected.has(key) && "bg-brand/5")}>
+              <tr key={key} onClick={(e) => { if (!(e.target as HTMLElement).closest("button, a, input, [role=menuitem]")) act.onView(it); }} className={cn("cursor-pointer border-b border-border last:border-b-0 hover:bg-muted/30", selected.has(key) && "bg-brand/5")}>
                 <td className="px-3 py-2 align-middle">
                   <input type="checkbox" aria-label={`Select ${it.title || "Untitled"}`} className="h-4 w-4 cursor-pointer accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
                     checked={selected.has(key)} disabled={!a.delete} title={a.deleteWhy ?? undefined} onChange={() => toggle(it)} />

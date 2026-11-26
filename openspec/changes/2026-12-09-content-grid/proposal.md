@@ -10,7 +10,7 @@ The Library lists items one under another, with actions hidden inside each opene
 - Sort by column, search, filter by brand, type and status, and choose which columns show.
 - Each row has a menu: **View**, **Edit** (opens the editor), **Schedule**, **Back to draft**, **Delete**.
 - Select rows to delete several at once.
-- **View** opens the item pane beside the grid, as part of the page: the card, the text and the record. A published item is shown read-only.
+- **View**, or a click on the row, opens the item as a page of its own with its own address (the owner chose this over a side pane on 2026-11-25): the card, the text and the record. A published item is shown read-only.
 - The secondary column lists views (All, Posts, Articles) and statuses with counts; the filters above the grid narrow further.
 
 ## Rules that stay
