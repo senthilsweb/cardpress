@@ -7,6 +7,7 @@ import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { AccountSettings } from "@/components/studio/AccountSettings";
 import { ManageBrandsDrawer, NewBrandDrawer } from "@/components/studio/Brands";
+import { BrandLook } from "./BrandLook";
 import { SocialSettings } from "@/components/studio/SocialSettings";
 import { UsersDrawer } from "@/components/studio/UsersDrawer";
 import { api, type ApiInfo } from "@/lib/api";
@@ -101,6 +102,9 @@ function BrandsPage({ brands, colors, sync, setActive }: {
   const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).get("new") === "1");
   const [copyOf, setCopyOf] = useState<Profile | undefined>(undefined);
   const current = brands.profiles.find((p) => p.id === brands.activeId) ?? brands.profiles[0];
+  // ?look=<brand> opens that brand's colours, fonts and logo
+  const [looking, setLooking] = useState(() => new URLSearchParams(window.location.search).get("look"));
+  const look = (id: string | null) => { setLooking(id); window.history.replaceState(null, "", settingsHref("brands", id ? `?look=${encodeURIComponent(id)}` : "")); };
   const close = () => { setAdding(false); setCopyOf(undefined); window.history.replaceState(null, "", settingsHref("brands")); };
 
   const create = async (p: Profile, from?: Profile) => {
@@ -119,10 +123,13 @@ function BrandsPage({ brands, colors, sync, setActive }: {
     return r;
   };
 
+  const shownLook = brands.profiles.find((b) => b.id === looking);
+  if (shownLook) return <BrandLook key={shownLook.id} profiles={brands.profiles} id={shownLook.id} design={brands.designs[shownLook.id]} onBack={() => { look(null); void sync(); }} />;
   if (adding && current) return <NewBrandDrawer open onClose={close} brands={brands.profiles} current={current} source={copyOf} onCreate={create} />;
   return (
     <ManageBrandsDrawer open onClose={noop} active={brands.profiles} archived={brands.archived} activeId={brands.activeId} colors={colors}
       onOpen={setActive}
+      onLook={look}
       onMove={async (id, dir) => { await api.orderProfiles(move(brands.profiles.map((b) => b.id), id, dir)); await sync(); }}
       onDuplicate={(p) => { setCopyOf(p); setAdding(true); }}
       onArchive={archive}

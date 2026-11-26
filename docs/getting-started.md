@@ -30,17 +30,17 @@ The server listens on `127.0.0.1` only. Open <http://localhost:8080> for the lan
 ## Design a card
 
 1. In **Design**, pick a **Layout**, a **Background** and a **Colours** set.
-2. In **Text**, type the eyebrow, title, subtitle and footers. The card updates as you type.
+2. In **Details**, **Card words**, type the eyebrow, headline, subtitle and footers. The card updates as you type.
 3. Choose a size in the bar above the canvas (LinkedIn, X, Instagram, Facebook), or **All sizes** to see them together.
 4. **Download PNG**, **Copy** the image, or **All sizes .zip**.
 
-The tabs are under **Edit** in the left column. Set your name, handle, logo and fonts once in the **Brand** tab.
+Design and Details are in the left column. Set your name, handle, logo and fonts once under **Settings**, **Brands**, **Look**.
 
 ## Write a post
 
 1. In **Chat**, say what to write, attach a file or add a link with the paperclip if you have one, and press send.
 2. Read the proposal. **Approve and use** copies it into a draft, **Edit** changes it first, **Reject** dismisses it.
-3. In **Edit**, **Write**, refine the text, hashtags and alt text. **Full preview** shows the LinkedIn feed as it will look.
+3. In **Details**, refine the text, hashtags and alt text. **Full preview** shows the LinkedIn feed as it will look.
 
 No assistant is set up by default. To add one, see [Claude Managed Agent](cma-agent.md).
 

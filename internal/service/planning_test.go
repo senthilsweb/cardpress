@@ -20,7 +20,7 @@ func TestTheSchemaLimitsAreTheServices(t *testing.T) {
 			t.Errorf("%s: %d, the service allows %d", name, got, want)
 		}
 	}
-	if content.Server["body"].ByKind["post"] != maxBodyChars || content.Server["hashtags"].MaxItems != maxHashtags || maxAssistantSummary != maxSummary {
+	if content.Server["body"].ByKind["post"] != maxBodyChars || content.Server["hashtags"].MaxItems != maxHashtags {
 		t.Error("body, hashtags or summary differ")
 	}
 	// the card's limits are enforced by the design check
@@ -132,6 +132,37 @@ func TestVersionsHoldPlanningButNotReviewNotes(t *testing.T) {
 	long := strings.Repeat("a", maxSlugLen+1)
 	if _, _, err := l.st.PatchDraft(ctx, d.ID, DraftPatch{Slug: &long}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("a long address: %v", err)
+	}
+}
+
+func TestAPersonWritesTheAddressAndDescription(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	d := l.draft(t, "p", KindArticle, docOf(para("one")))
+	other := l.draft(t, "p", KindArticle, docOf(para("two")))
+	if _, err := l.st.Approve(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	approved, _ := l.st.GetDraft(ctx, d.ID)
+	got, err := l.st.SetPageFields(ctx, d.ID, PageFields{Slug: str("short-contracts"), Summary: str("What to do.")})
+	if err != nil || got.Slug != "short-contracts" || got.Summary != "What to do." || got.Status != StatusDraft || got.Revision != approved.Revision+1 || !got.VersionIsCurrent {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if same, err := l.st.SetPageFields(ctx, d.ID, PageFields{Slug: str("short-contracts")}); err != nil || same.Revision != got.Revision {
+		t.Fatalf("the same again: %v", err)
+	}
+	for want, p := range map[error]PageFields{ErrInvalid: {Slug: str("Not an address")}, ErrConflict: {Slug: str("short-contracts")}} {
+		if _, err := l.st.SetPageFields(ctx, other.ID, p); !errors.Is(err, want) {
+			t.Errorf("%+v: %v", p, err)
+		}
+	}
+	if _, err := l.st.Approve(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.st.PublishPage(ctx, d.ID, PageInput{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.st.SetPageFields(ctx, d.ID, PageFields{Summary: str("New")}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("a live page: %v", err)
 	}
 }
 

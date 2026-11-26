@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, History, ImageUp, Loader2, Maximize2, Minimize2, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, ImageUp, Loader2, Maximize2, Minimize2, Send, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { AreaField, Field, Section } from "./fields";
+import { Section } from "./fields";
+import { FormField } from "./FormField";
+import { BlurField } from "./BlurField";
+import { Versions } from "./Versions";
+import { blockerLine, blockers, maxOf, type FieldName } from "@/lib/details";
 import { EditorToolbar, Outline, RichEditor } from "./RichEditor";
 import { FullPreview, linkedinSize } from "./FullPreview";
 import { PublishBar } from "./PublishBar";
@@ -17,7 +21,7 @@ import { PageBar } from "./PageBar";
 import { JobQueue } from "./JobQueue";
 import type { JobsStore } from "@/lib/useJobs";
 import { copyFormatted } from "@/lib/clipboard";
-import { useLayout } from "@/lib/layout";
+import { sectionOpen, useLayout } from "@/lib/layout";
 import { lockReason } from "@/lib/lock";
 import { labelCache, labelOf, shortLabel } from "@/lib/draftLabel";
 import { useSession } from "@/lib/session";
@@ -44,11 +48,22 @@ const MAX_POST_IMAGES = 10;
 const loadPref = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
 const savePref = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* not remembered */ } };
 
-export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+/**
+ * Everything about the item on screen, each field once, in the groups of the content schema. Its status, what is
+ * missing and the next step stay at the bottom.
+ */
+export function Details({ media, changed, onSeen, setCard, onCardFocus, versionsAsked, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   /** What the open post carries. */
   media: PostMediaView;
-  /** Open the item's history (versions). */
-  onOpenHistory?: () => void;
+  /** Fields someone else changed that have not been looked at. */
+  changed: readonly FieldName[];
+  onSeen: (name: FieldName) => void;
+  /** Change the card (its words are fields here). */
+  setCard: (patch: Partial<Design>) => void;
+  /** Whether the person is working on the card's words, so the card should be on the canvas. */
+  onCardFocus: (on: boolean) => void;
+  /** Counts up each time the versions are asked for. */
+  versionsAsked: number;
   /** Open the Full preview as soon as this shows (asked for by the library). */
   openPreview?: boolean;
   /** Called once it has opened, so it does not open again the next time this shows. */
@@ -66,7 +81,19 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
 }) {
   const { current: draft } = store;
   const { can } = useSession();
-  const { editorHeight, setEditorHeight } = useLayout();
+  const { editorHeight, setEditorHeight, isCollapsed, toggle } = useLayout();
+  const recordOpen = sectionOpen(isCollapsed("record"), true);
+  const record = useRef<HTMLDivElement>(null);
+  const asked = useRef(0);
+  useEffect(() => {
+    if (versionsAsked === asked.current) return;
+    asked.current = versionsAsked;
+    if (!versionsAsked) return;
+    if (!recordOpen) toggle("record");
+    window.setTimeout(() => record.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 220);
+  }, [versionsAsked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  useEffect(() => { if (!confirmDelete) return; const t = window.setTimeout(() => setConfirmDelete(false), 4000); return () => window.clearTimeout(t); }, [confirmDelete]);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -119,6 +146,10 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
   const queueKey = jobs.jobs.map((j) => `${j.id}:${j.status}`).join(",");
   useEffect(() => { void store.refreshStatus(); }, [queueKey, draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the video's address, as typed; the field is open for a new video or a change of address
+  const [video, setVideo] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => { setVideo(null); setConfirmDelete(false); }, [draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const ser = useMemo(() => {
     if (!draft) return null;
     const out = serializeDraft(draft);
@@ -126,6 +157,8 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
     return out;
   }, [draft]);
   const words = useMemo(() => (ser ? countWords(ser.text) : 0), [ser]);
+  // what the server is sent: the text without the hashtag line, which it turns into real hashtags itself
+  const bodyOnly = useMemo(() => (draft && draft.kind === "post" ? serializeForLinkedIn(draft.doc, { unicodeStyles: draft.unicodeStyles }).text : ""), [draft]);
   if (!draft || !ser) return null;
   const isPost = draft.kind === "post";
 
@@ -134,6 +167,32 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
   const unapprove = guard(async () => { await store.unapprove(); toast("Back to draft"); });
 
   const locked = !!lockReason(draft); // waiting to be sent, or published: it cannot change
+  const d = draft;
+  const kind = d.kind;
+  const stop = blockers(d, { value: ser.text, length: ser.length, limit: isPost ? LINKEDIN_LIMIT : undefined });
+  const stopped = blockerLine(stop);
+  const card = (key: "eyebrow" | "title" | "subtitle" | "tag" | "footer" | "footerLeft" | "quoteAuthor" | "statValue") => (design[key] ?? "") as string;
+  const field = (name: FieldName) => ({ name, kind, changed: changed.includes(name), onSeen });
+  const L = design.layout;
+  /** The card's words, with the ones this layout does not draw said so. */
+  const words_ = [
+    { name: "tag", key: "tag", shown: L === "cover" },
+    { name: "eyebrow", key: "eyebrow", shown: L !== "quote" },
+    { name: "statValue", key: "statValue", shown: L === "stat" },
+    { name: "headline", key: "title", shown: true, label: L === "quote" ? "Quote" : L === "stat" ? "What the number means" : undefined, lines: L === "quote" ? 4 : 2, hint: "Enter starts a new line." },
+    { name: "subtitle", key: "subtitle", shown: L !== "quote", hint: "Use | to split into points." },
+    { name: "quoteAuthor", key: "quoteAuthor", shown: L === "quote" },
+    { name: "footerLeft", key: "footerLeft", shown: true, placeholder: "Your website" },
+    { name: "footer", key: "footer", shown: true, placeholder: "Your handle" },
+  ] as const;
+  // a field this layout does not draw is listed after the ones it does
+  const cardWords = [...words_.filter((w) => w.shown), ...words_.filter((w) => !w.shown)];
+  const plan = (key: "audience" | "topic" | "campaign" | "reviewNotes") => async (v: string) => {
+    try { await store.setPlanning(d.id, { [key]: v }); } catch (e) { toast.error("Not saved", { description: (e as Error).message }); throw e; }
+  };
+  const page = (key: "slug" | "summary") => async (v: string) => {
+    try { await store.setPageFields(d.id, { [key]: v }); } catch (e) { toast.error("Not saved", { description: (e as Error).message }); throw e; }
+  };
   const pickFile = guard(async () => {
     const files = Array.from(fileRef.current?.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
@@ -168,10 +227,6 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
   const saveTitle = (title: string) => guard(async () => { await store.setAttachmentTitle(title); })();
   const useCard = guard(async () => { await store.clearAttachment(); toast("The card goes out with this post"); });
 
-  // the video's address, as typed; the field is open for a new video or a change of address
-  const [video, setVideo] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-  useEffect(() => setVideo(null), [draft.id]);
   const saveVideo = guard(async () => {
     const url = (video ?? "").trim();
     if (!url || checking) return;
@@ -192,8 +247,6 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
     setTag("");
     if (t && !draft.hashtags.some((h) => h.toLowerCase() === t.toLowerCase())) store.update({ hashtags: [...draft.hashtags, t] });
   };
-  // what the server is sent: the text without the hashtag line, which it turns into real hashtags itself
-  const bodyOnly = useMemo(() => (draft && draft.kind === "post" ? serializeForLinkedIn(draft.doc, { unicodeStyles: draft.unicodeStyles }).text : ""), [draft]);
   const onPublished = (job: Job, how: "now" | "scheduled") => {
     jobs.add(job);
     setPreview(false);
@@ -215,32 +268,10 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
   };
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col" aria-label="Details">
+      <div className="min-h-0 flex-1 overflow-y-auto" onFocusCapture={(e) => onCardFocus(!!(e.target as Element).closest("[data-card-words]"))}>
       <Section
-        title="Draft"
-        action={
-          <div className="flex gap-1">
-            {onOpenHistory && <Button variant="ghost" size="icon-sm" title="History" aria-label="History" onClick={onOpenHistory}><History /></Button>}
-            <Button variant="ghost" size="icon-sm" title={draft.status === "draft" ? "Delete this draft" : "Bring it back to draft to delete it"} aria-label="Delete this draft" disabled={draft.status !== "draft"} onClick={guard(() => store.remove(draft.id))}><Trash2 /></Button>
-          </div>
-        }
-      >
-        {!isPost && (
-          <Field label="Title" hint="Shown in the library and used for the file name.">
-            <Input value={draft.title} maxLength={200} onChange={(e) => store.update({ title: e.target.value })} aria-label="Article title" disabled={locked} />
-          </Field>
-        )}
-        <Field label="Type" hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
-          <ToggleGroup type="single" disabled={locked} value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
-            <ToggleGroupItem value="post">Post</ToggleGroupItem>
-            <ToggleGroupItem value="article"><FileText className="mr-1 h-3.5 w-3.5" /> Article</ToggleGroupItem>
-          </ToggleGroup>
-        </Field>
-      </Section>
-
-      <Section
-        id="post-text"
-        title={isPost ? "Post text" : "Article"}
+        id="writing" title="Writing"
         action={
           <div className="flex items-center gap-2">
             <SaveBadge state={store.saveState} retry={store.retry} />
@@ -248,6 +279,16 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
           </div>
         }
       >
+        <FormField {...field("kind")} hint={isPost ? "A post is sent to LinkedIn with the card image." : "An article is copied with its formatting into LinkedIn's article editor or a blog."}>
+          <ToggleGroup type="single" disabled={locked} value={draft.kind} onValueChange={(v) => { if (v) { flushPendingEdits(); store.setKind(v as DraftKind); } }}>
+            <ToggleGroupItem value="post">Post</ToggleGroupItem>
+            <ToggleGroupItem value="article"><FileText className="mr-1 h-3.5 w-3.5" /> Article</ToggleGroupItem>
+          </ToggleGroup>
+        </FormField>
+        <FormField {...field("title")} value={draft.title} htmlFor="d-title" hint={isPost ? "Names it in the library." : undefined}>
+          <Input id="d-title" value={draft.title} maxLength={maxOf("title", kind)} onChange={(e) => store.update({ title: e.target.value })} disabled={locked} />
+        </FormField>
+        <FormField {...field("body")} value={ser.text}>
         {expanded ? (
           <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-input p-3 text-xs text-muted-foreground">
             <span>Editing in the large view.</span>
@@ -267,38 +308,61 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
             <RichEditor fill readOnly={!!lockReason(draft)} docKey={docKey} kind={draft.kind} doc={draft.doc} onChange={onDoc} onEditor={setEditor} />
           </div>
         )}
-        <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
-          {isPost ? (
-            NETWORKS.filter((net) => !whyNot(net, media.media)).map((net) => (
+        {isPost && (
+          <div className="flex flex-wrap gap-1.5" aria-label="Character counts">
+            {NETWORKS.filter((net) => !whyNot(net, media.media)).map((net) => (
               <Badge key={net} variant={ser.length > CAPTION_LIMITS[net] ? "warn" : "outline"}>{net} {ser.length}/{CAPTION_LIMITS[net].toLocaleString()}</Badge>
-            ))
-          ) : (
-            <Badge variant="outline">{ser.length.toLocaleString()} characters</Badge>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+        {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
+        </FormField>
+        {!isPost && (
+          <div inert={locked} className={locked ? "opacity-60" : undefined}>
+            <FormField {...field("summary")} value={draft.summary ?? ""} htmlFor="d-summary">
+              <BlurField key={draft.id} id="d-summary" lines rows={3} value={draft.summary ?? ""} maxLength={maxOf("summary", kind)} onSave={page("summary")} disabled={locked} placeholder="The first paragraph, if left empty" />
+            </FormField>
+          </div>
+        )}
       </Section>
 
-      {isPost && (
-        <div inert={locked} className={locked ? "opacity-60" : undefined}>
-          <Section title="Hashtags">
-            <div className="flex flex-wrap gap-1.5">
-              {draft.hashtags.map((h) => (
-                <span key={h} className="inline-flex items-center gap-1 rounded-md bg-accent py-0.5 pl-2 pr-1 text-xs text-brand">
-                  #{h}
-                  <button type="button" className="cursor-pointer rounded p-0.5 hover:bg-background/60" aria-label={`Remove #${h}`} onClick={() => store.update({ hashtags: draft.hashtags.filter((x) => x !== h) })}><X className="h-3 w-3" /></button>
-                </span>
-              ))}
-            </div>
-            <Input
-              value={tag} placeholder="Type a hashtag and press Enter" aria-label="Add a hashtag"
-              onChange={(e) => setTag(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } else if (e.key === "Backspace" && !tag && draft.hashtags.length) store.update({ hashtags: draft.hashtags.slice(0, -1) }); }}
-              onBlur={addTag}
-            />
-            <p className="text-[11px] leading-snug text-muted-foreground">Added as the last line.</p>
-          </Section>
+      <div data-card-words>
+        <Section id="card-words" title="Card words">
+          <div inert={locked} className={cn("space-y-3", locked && "opacity-60")}>
+            {cardWords.map((w) => (
+              <FormField key={w.name} {...field(w.name)} label={"label" in w ? w.label : undefined} value={card(w.key)} htmlFor={`d-${w.name}`}
+                hint={!w.shown ? "Not drawn by this layout." : "hint" in w ? w.hint : undefined}>
+                {"lines" in w
+                  ? <Textarea id={`d-${w.name}`} rows={w.lines} value={card(w.key)} maxLength={maxOf(w.name, kind)} onChange={(e) => setCard({ [w.key]: e.target.value })} />
+                  : <Input id={`d-${w.name}`} value={card(w.key)} maxLength={maxOf(w.name, kind)} placeholder={"placeholder" in w ? w.placeholder : undefined} onChange={(e) => setCard({ [w.key]: e.target.value })} />}
+              </FormField>
+            ))}
+          </div>
+        </Section>
+      </div>
 
-          <Section title="Attachment">
+      <Section id="sharing" title="Sharing">
+        <div inert={locked} className={cn("space-y-3", locked && "opacity-60")}>
+          {isPost && (
+            <FormField {...field("hashtags")} value={draft.hashtags} hint="Added as the last line.">
+              <div className="flex flex-wrap gap-1.5">
+                {draft.hashtags.map((h) => (
+                  <span key={h} className="inline-flex items-center gap-1 rounded-md bg-accent py-0.5 pl-2 pr-1 text-xs text-brand">
+                    #{h}
+                    <button type="button" className="cursor-pointer rounded p-0.5 hover:bg-background/60" aria-label={`Remove #${h}`} onClick={() => store.update({ hashtags: draft.hashtags.filter((x) => x !== h) })}><X className="h-3 w-3" /></button>
+                  </span>
+                ))}
+              </div>
+              <Input
+                value={tag} placeholder="Type a hashtag and press Enter" aria-label="Add a hashtag"
+                onChange={(e) => setTag(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } else if (e.key === "Backspace" && !tag && draft.hashtags.length) store.update({ hashtags: draft.hashtags.slice(0, -1) }); }}
+                onBlur={addTag}
+              />
+            </FormField>
+          )}
+          {isPost && (
+            <FormField {...field("attachment")}>
             <div className="space-y-2" aria-label="Attachment">
               <input ref={fileRef} type="file" multiple accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={() => void pickFile()} aria-label="Choose images or a PDF" />
               {own === "images" ? (
@@ -366,51 +430,95 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
             {leftOut(media.media).length > 0 && (
               <p className="text-[11px] leading-snug text-muted-foreground" aria-label="Networks left out">Not for {leftOut(media.media).map((l) => `${l.net} (${l.why})`).join(", ")}.</p>
             )}
-            {own === "document" || own === "video" ? (
-              <Field label={own === "video" ? "Video title" : "Document title"} hint={own === "video" ? "Shown with the video on LinkedIn." : "Shown above the pages on LinkedIn."}>
+            {leftOut(media.media).length > 0 && (
+              <p className="text-[11px] leading-snug text-muted-foreground" aria-label="Networks left out">Not for {leftOut(media.media).map((l) => `${l.net} (${l.why})`).join(", ")}.</p>
+            )}
+            </FormField>
+          )}
+          {isPost && (own === "document" || own === "video") ? (
+              <FormField {...field("attachment")} label={own === "video" ? "Video title" : "Document title"} hint={own === "video" ? "Shown with the video on LinkedIn." : "Shown above the pages on LinkedIn."}>
                 <Input key={`${draft.id}:${draft.attachmentTitle}`} defaultValue={draft.attachmentTitle ?? ""} maxLength={150} disabled={locked} aria-label={own === "video" ? "Video title" : "Document title"}
                   onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== draft.attachmentTitle) void saveTitle(v); else e.target.value = draft.attachmentTitle ?? ""; }}
                   onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
-              </Field>
-            ) : own === "images" ? null : (
-              <AreaField id="alt" label="Alt text" value={draft.altText} onChange={(v) => store.update({ altText: v })} rows={2} hint="For screen readers." />
-            )}
-          </Section>
-
-          <Section title="Bold and italic">
-            <div className="flex items-start gap-2">
-              <Switch id="uni" checked={draft.unicodeStyles} onCheckedChange={(v) => store.update({ unicodeStyles: v })} />
-              <div className="space-y-1">
-                <Label htmlFor="uni" className="text-foreground">Keep bold and italic (Unicode)</Label>
-              </div>
-            </div>
-          </Section>
-        </div>
-      )}
-
-      <Section title="Review">
-        <div className="flex flex-wrap items-center gap-2" aria-label="Approval">
-          <Badge variant={draft.status === "draft" ? "outline" : "brand"}>{STATUS_NAME[draft.status]}</Badge>
-          {draft.status === "draft" && can("approve") && <Button variant="brand" size="sm" onClick={approve} disabled={!ser.text.trim() || (isPost && ser.overLimit)}><Check /> Approve</Button>}
-          {draft.status === "draft" && !can("approve") && <span className="text-[11px] text-muted-foreground">An editor or admin approves it.</span>}
-          {(draft.status === "approved" || draft.status === "published") && (
-            <Button variant={locked ? "brand" : "outline"} size="sm" onClick={unapprove}><Undo2 /> Back to draft</Button>
+              </FormField>
+          ) : own === "images" ? null : (
+            <FormField {...field("altText")} value={draft.altText} htmlFor="d-alt" hint="For screen readers.">
+              <Textarea id="d-alt" rows={2} value={draft.altText} maxLength={maxOf("altText", kind)} onChange={(e) => store.update({ altText: e.target.value })} />
+            </FormField>
           )}
-          {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
-          {locked && <span role="status" className="w-full text-[11px] text-muted-foreground">{lockReason(draft)}</span>}
-        </div>
-        {ser.warnings.map((w) => <p key={w.code} className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">{w.message}</p>)}
-        {isPost && ser.overLimit && <p className="text-[11px] text-destructive">Over LinkedIn's {LINKEDIN_LIMIT.toLocaleString()} character limit.</p>}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="brand" size="sm" onClick={openFull}><Eye /> Full preview</Button>
-          <Button variant="outline" size="sm" onClick={copyNow} disabled={!ser.text.trim()}><Copy /> {isPost ? "Copy text" : "Copy formatted"}</Button>
-          {note && <span className="text-xs text-brand">{note}</span>}
+          {isPost && (
+            <FormField {...field("unicodeStyles")}>
+              <label className="flex items-center gap-2 text-xs">
+                <Switch checked={draft.unicodeStyles} onCheckedChange={(v) => store.update({ unicodeStyles: v })} />
+                Keep bold and italic (Unicode)
+              </label>
+            </FormField>
+          )}
+          {!isPost && (
+            <FormField {...field("slug")} value={draft.slug ?? ""} htmlFor="d-slug">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">/articles/</span>
+                <div className="min-w-0 flex-1">
+                  <BlurField key={draft.id} id="d-slug" value={draft.slug ?? ""} maxLength={maxOf("slug", kind)} onSave={(v) => page("slug")(v.toLowerCase().replace(/\s+/g, "-"))} disabled={locked} placeholder="made from the title" />
+                </div>
+              </div>
+            </FormField>
+          )}
         </div>
       </Section>
 
-      <Section id="queue" title="Publishing queue">
+      <Section id="planning" title="Planning">
+        {(["audience", "topic", "campaign", "reviewNotes"] as const).map((name) => {
+          const notes = name === "reviewNotes", mine = !notes || can("approve");
+          return (
+            <FormField key={name} {...field(name)} value={draft[name] ?? ""} htmlFor={`d-${name}`} hint={notes ? (mine ? "Never published." : "Written by an editor or admin.") : undefined}>
+              <BlurField key={draft.id} id={`d-${name}`} lines={notes} rows={3} value={draft[name] ?? ""} maxLength={maxOf(name, kind)} onSave={plan(name)} disabled={!mine} />
+            </FormField>
+          );
+        })}
+      </Section>
+
+      <Section id="queue" title="Publishing queue" folded>
         <JobQueue store={jobs} brands={brandNames} />
       </Section>
+
+      <div ref={record}>
+        <Section id="record" title="Record and versions" folded>
+          <dl className="grid grid-cols-[7rem_1fr] gap-y-1 text-xs">
+            <dt className="text-muted-foreground">Created</dt><dd>{formatInZone(draft.createdAt)}{draft.createdByName ? ` · ${draft.createdByName}` : ""}</dd>
+            {draft.approvedAt && <><dt className="text-muted-foreground">Approved</dt><dd>{formatInZone(draft.approvedAt)}{draft.approvedByName ? ` · ${draft.approvedByName}` : ""}</dd></>}
+            {draft.scheduledAt && <><dt className="text-muted-foreground">Planned for</dt><dd>{formatInZone(draft.scheduledAt, draft.timezone)}</dd></>}
+            {draft.pageAt && <><dt className="text-muted-foreground">Page live</dt><dd>{formatInZone(draft.pageAt)}</dd></>}
+          </dl>
+          <Versions open={recordOpen} draft={draft} statusKey={`${draft.id}:${draft.status}:${draft.version}`} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} />
+          <Button variant={confirmDelete ? "destructive" : "outline"} size="sm" disabled={draft.status !== "draft"}
+            title={draft.status === "draft" ? undefined : "Bring it back to draft to delete it"}
+            onClick={() => { if (!confirmDelete) setConfirmDelete(true); else { setConfirmDelete(false); void guard(() => store.remove(draft.id))(); } }}>
+            <Trash2 /> {confirmDelete ? "Confirm delete" : `Delete this ${draft.kind}`}
+          </Button>
+        </Section>
+      </div>
+      </div>
+
+      <div className="shrink-0 space-y-2 border-t border-border bg-card px-4 py-3" aria-label="Status">
+        <div className="flex flex-wrap items-center gap-2" aria-label="Approval">
+          <Badge variant={draft.status === "draft" ? "outline" : "brand"}>{STATUS_NAME[draft.status]}</Badge>
+          {draft.pageAt && <Badge variant="brand" title="This has a public page">Page live</Badge>}
+          <span role="status" className={cn("min-w-0 flex-1 text-[11px] leading-snug", stop.over.length ? "text-destructive" : "text-muted-foreground")}>
+            {lockReason(draft) ?? (draft.status === "draft" ? stopped || (can("approve") ? "Ready to approve" : "An editor or admin approves it.") : note)}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button variant="ghost" size="icon-sm" title="Full preview" aria-label="Full preview" onClick={openFull}><Eye /></Button>
+          <Button variant="ghost" size="icon-sm" title={isPost ? "Copy text" : "Copy formatted"} aria-label={isPost ? "Copy text" : "Copy formatted"} onClick={copyNow} disabled={!ser.text.trim()}><Copy /></Button>
+          {note && draft.status === "draft" && <span className="text-xs text-brand">{note}</span>}
+          <span className="flex-1" />
+          {draft.status === "approved" && <Button variant="outline" size="sm" onClick={unapprove}><Undo2 /> Back to draft</Button>}
+          {draft.status === "draft" && can("approve") && <Button variant="brand" size="sm" onClick={approve} disabled={!!stopped}><Check /> Approve</Button>}
+          {draft.status === "approved" && can("publish") && <Button variant="brand" size="sm" onClick={openFull}><Send /> Publish</Button>}
+          {(draft.status === "published" || (draft.pageAt && draft.status !== "approved")) && <Button variant="brand" size="sm" onClick={unapprove}><Undo2 /> Back to draft</Button>}
+        </div>
+      </div>
 
       <FullPreview
         media={media.frame}
@@ -474,7 +582,7 @@ export function Composer({ media, onOpenHistory, openPreview, onPreviewOpened, s
         </div>,
         host,
       )}
-    </>
+    </div>
   );
 }
 

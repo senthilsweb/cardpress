@@ -103,7 +103,7 @@ func cardText(changes map[string]any) (service.CardText, error) {
 	}
 	if len(refused) > 0 {
 		sort.Strings(refused)
-		return out, errors.New("Nothing was changed: " + strings.Join(refused, ", ") + " is not card text. How a card looks (layout, background, colours, size, fonts, images) is set by the person in the studio, under Edit, Design.")
+		return out, errors.New("Nothing was changed: " + strings.Join(refused, ", ") + " is not card text. How a card looks (layout, background, colours, size, fonts, images) is set by the person in the studio, under Design.")
 	}
 	b, _ := json.Marshal(changes)
 	return out, json.Unmarshal(b, &out)

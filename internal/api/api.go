@@ -44,6 +44,7 @@ type Studio interface {
 	CreateDraft(ctx context.Context, in service.DraftInput) (service.Draft, error)
 	UpdateDraft(ctx context.Context, id string, in service.DraftInput) (service.Draft, error)
 	SetPlanning(ctx context.Context, id string, p service.PlanningPatch) (service.Draft, error)
+	SetPageFields(ctx context.Context, id string, p service.PageFields) (service.Draft, error)
 	DeleteDraft(ctx context.Context, id string) error
 	Approve(ctx context.Context, id string) (service.Draft, error)
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
@@ -219,6 +220,7 @@ func (s *server) table() []routeDef {
 		{"PUT", "/drafts/{id}", write(scopeDraft), s.updateDraft},
 		{"DELETE", "/drafts/{id}", write(scopeDraft), s.deleteDraft},
 		{"PATCH", "/drafts/{id}/planning", write(scopeDraft), s.setPlanning},
+		{"PATCH", "/drafts/{id}/page-fields", write(scopeDraft), s.setPageFields},
 		{"POST", "/drafts/{id}/approve", rule{scopeDraft, service.PermApprove}, s.approveDraft},
 		{"POST", "/drafts/{id}/unapprove", write(scopeDraft), s.unapproveDraft},
 		{"GET", "/drafts/{id}/attachment", write(scopeDraft), s.getAttachment},
@@ -468,6 +470,20 @@ func (s *server) setPlanning(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.SetPlanning(r.Context(), r.PathValue("id"), p)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// setPageFields changes the address and description of an item's public page: slug, summary.
+func (s *server) setPageFields(w http.ResponseWriter, r *http.Request) {
+	var p service.PageFields
+	if !decode(w, r, &p) {
+		return
+	}
+	d, err := s.Studio.SetPageFields(r.Context(), r.PathValue("id"), p)
 	if err != nil {
 		fail(w, r, err)
 		return

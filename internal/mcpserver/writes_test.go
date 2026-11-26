@@ -44,7 +44,7 @@ func TestAnAgentWritesTheWordsAndNeverTheLook(t *testing.T) {
 	// anything about the look refuses the whole call, text included
 	for _, field := range []string{"layout", "background", "paletteId", "sizeId", "seed", "titleScale", "intensity", "bottomFade", "showLogo", "showFooter", "fonts", "photos", "screenshot", "bgImage"} {
 		res, _ := call(t, cs, "update_card_text", map[string]any{"draftId": id, "changes": map[string]any{"title": "Changed", field: "x"}})
-		if !res.IsError || !strings.Contains(errText(res), field) || !strings.Contains(errText(res), "Edit, Design") {
+		if !res.IsError || !strings.Contains(errText(res), field) || !strings.Contains(errText(res), "under Design") {
 			t.Errorf("%s: %q", field, errText(res))
 		}
 	}

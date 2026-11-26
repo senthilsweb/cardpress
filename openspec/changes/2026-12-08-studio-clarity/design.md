@@ -102,3 +102,10 @@ Right-hand panels go. The one exception is the item pane in the Library and Cale
 - Fields an agent changed in the last reply are marked until looked at.
 - The footer's single action follows the status: Approve, then Publish or Schedule, then Back to draft.
 - Delete asks for confirmation, for drafts as for chats.
+
+## As built (step 5)
+- The form's groups are listed in `web/src/lib/details.ts`; labels, limits and standards come from the content schema. A test fails if a writable field is missing or listed twice.
+- All card words are listed; the ones the layout does not draw are last and say so.
+- An article's address and summary are written in Details (`PATCH /api/v1/drafts/{id}/page-fields`). A post's are still asked for when its page is published, since the schema gives them to articles only.
+- The publishing queue is a folded section of Details.
+- The footer shows one next step; an approved item also offers Back to draft.

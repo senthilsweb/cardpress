@@ -6,7 +6,7 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 
 ## Using it
 
-1. The assistant is the **Chat** side of the left column, and is what opens first. **Edit** holds the Design, Text, Write and Brand tabs. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
+1. The assistant is the **Chat** side of the left column, and is what opens first. **Details** and **Design** sit beside it. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
    Type what you want in the message box and send it with the **send** button (or Enter; Shift+Enter adds a line). While a reply is being written the button becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
    To give it something to write from, use the **paperclip** in the box:
    - **Attach a file:** PDF, Word (`.docx`), Markdown or text, up to 10 MB. You can also drop files onto the box.
@@ -18,7 +18,7 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 3. Reply to ask for changes. Each save is a new [version](workspace.md), so nothing is lost.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
 5. Conversations are saved on the server, so they are there after a reload. **New** [starts fresh](workspace.md). The bin deletes the open conversation and starts fresh; the post or article it wrote is kept.
-6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
+6. The conversation's name at the top of Chat opens the list in place; choosing one returns to it. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
 7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
 ## Proposals from an outside agent

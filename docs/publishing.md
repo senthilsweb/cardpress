@@ -1,6 +1,6 @@
 # Publishing
 
-Posts go to LinkedIn from the **Full preview** of the Write tab, now or at a time you choose. Articles are never published by the API (see [Post authoring](post-authoring.md)). A person confirms every post; nothing here is started by a chat or an agent.
+Posts go to LinkedIn from the **Full preview** (the eye, or **Publish**, at the bottom of Details), now or at a time you choose. Articles are never published by the API (see [Post authoring](post-authoring.md)). A person confirms every post; nothing here is started by a chat or an agent.
 
 ## Publish or schedule
 
@@ -22,7 +22,7 @@ The text is the preview text with LinkedIn's markup characters escaped (`( ) [ ]
 
 ## Your own images or PDF in place of the card
 
-In the Write tab, under **Attachment**, choose **Use images or a PDF** and pick one file or several images. They go out with the post, not the card. The card design is kept: **Use the card** goes back to it.
+In Details, under **Attachment**, choose **Use images or a PDF** and pick one file or several images. They go out with the post, not the card. The card design is kept: **Use the card** goes back to it.
 
 | File | Limit | How LinkedIn shows it |
 |---|---|---|
@@ -100,7 +100,7 @@ Not checked: video length, image dimensions and aspect ratios (Instagram asks fo
 
 ## Approve first
 
-A post is only sent from an **approved** draft. In the Review section of the Write tab, a draft shows its status and an **Approve** button; the Full preview offers the same button instead of Publish until it is approved. Approving is a deliberate step between writing and sending.
+A post is only sent from an **approved** draft. The bottom of Details shows a draft's status and an **Approve** button; the Full preview offers the same button instead of Publish until it is approved. Approving is a deliberate step between writing and sending.
 
 - **Any change** to an approved draft (its text, hashtags, alt text, title or card) puts it back to Draft, so what you approved is always what goes out. Saving the same content again changes nothing.
 - While a post is **waiting** to be sent from a draft, the draft cannot be edited. Cancel the post in the queue first.
@@ -112,7 +112,7 @@ Each draft keeps its **own card design**. Changing the card in the Design tab ch
 
 ## The queue
 
-The **Publishing queue** section of the Write tab lists posts with a small image, their time (in the zone you chose), and a status:
+The **Publishing queue** section in Details lists posts with a small image, their time (in the zone you chose), and a status:
 
 | Status | Meaning | What you can do |
 |---|---|---|

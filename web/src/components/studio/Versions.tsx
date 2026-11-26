@@ -3,7 +3,6 @@ import { History, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { api, type DraftVersion } from "@/lib/api";
 import type { Draft } from "@/lib/draft";
@@ -15,12 +14,13 @@ const LABEL: Record<DraftVersion["label"], string> = { created: "Created", auto:
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /**
- * An item's versions: each change the assistant saves, and what it said at the moments that mattered (created, approved,
+ * An item's versions, listed in place: each change the assistant saves, and what it said at the moments that mattered (created, approved,
  * sent, saved by hand, and after a stretch of editing). Open one to read it and make it current, which saves it as a new
  * version, so nothing is lost.
  */
-export function VersionsDrawer({ open, onClose, draft, onRestore, statusKey }: {
-  open: boolean; onClose: () => void; draft?: Draft;
+export function Versions({ open, draft, onRestore, statusKey }: {
+  /** The list is on screen, so it is worth reading. */
+  open: boolean; draft?: Draft;
   /** Put a version back. The editor reloads the text. */
   onRestore: (seq: number) => Promise<void>;
   /** Changes when the item's status changes, so the list is read again (an approval adds a version). */
@@ -58,11 +58,10 @@ export function VersionsDrawer({ open, onClose, draft, onRestore, statusKey }: {
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Versions" resizeKey="history">
-      <div className="space-y-4 p-4">
+      <div className="space-y-3" aria-label="Versions">
         <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" maxLength={120} aria-label="Note for the version" className="h-9" />
-          <Button type="submit" size="sm" variant="outline" disabled={busy === "save"}>{busy === "save" ? <Loader2 className="animate-spin" /> : <Save />} Save a version</Button>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for a new version" maxLength={120} aria-label="Note for the version" className="h-9" />
+          <Button type="submit" size="sm" variant="outline" disabled={busy === "save"}>{busy === "save" ? <Loader2 className="animate-spin" /> : <Save />} Save</Button>
         </form>
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {!list ? <p className="text-sm text-muted-foreground">Loading…</p> : list.length === 0 ? <p className="text-sm text-muted-foreground">No versions yet.</p> : (
@@ -95,12 +94,11 @@ export function VersionsDrawer({ open, onClose, draft, onRestore, statusKey }: {
                 : <Button size="sm" variant={confirm ? "brand" : "outline"} disabled={busy === "restore"} onClick={() => void restore()}>{busy === "restore" ? <Loader2 className="animate-spin" /> : <RotateCcw />} {confirm ? "Confirm: make current" : "Make current"}</Button>}
             </div>
             {shown.title && <p className="text-sm font-semibold">{shown.title}</p>}
-            <div className="max-h-[50vh] overflow-y-auto"><DocView doc={shown.doc} kind={shown.kind === "article" ? "article" : "post"} /></div>
+            <div className="max-h-[40vh] overflow-y-auto"><DocView doc={shown.doc} kind={shown.kind === "article" ? "article" : "post"} /></div>
             {shown.hashtags && shown.hashtags.length > 0 && <p className="text-xs text-brand">{shown.hashtags.map((h) => `#${h}`).join(" ")}</p>}
             {confirm && <p className="text-xs text-muted-foreground">An approved item goes back to draft. What it says now is kept too.</p>}
           </div>
         )}
       </div>
-    </Drawer>
   );
 }

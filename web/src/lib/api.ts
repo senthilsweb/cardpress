@@ -211,6 +211,8 @@ export const api = {
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   /** Change the named planning fields; allowed at any status. */
   setPlanning: (id: string, fields: Partial<Pick<Draft, "audience" | "topic" | "campaign" | "reviewNotes">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/planning`, fields),
+  /** Change the address and description of an item's page. An approved item goes back to draft. */
+  setPageFields: (id: string, fields: Partial<Pick<Draft, "slug" | "summary">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/page-fields`, fields),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
   listen,
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),

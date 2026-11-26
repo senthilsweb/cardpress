@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
-import { Drawer } from "@/components/ui/drawer";
+import { Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,12 +13,12 @@ import { cn } from "@/lib/utils";
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /** Earlier conversations (find one and carry on) and the notes the assistant keeps about the brand. */
-export function ChatHistoryDrawer({ open, onClose, profileId, recent, currentId, drafts, onOpen, onNew, busy }: {
-  open: boolean; onClose: () => void; profileId: string;
+export function ChatHistory({ profileId, recent, currentId, drafts, onOpen, busy }: {
+  profileId: string;
   /** The brand's conversations as the chat knows them, newest first: shown until something is searched for. */
   recent: Conversation[];
   currentId?: string; drafts: Draft[];
-  onOpen: (id: string) => void; onNew: () => void;
+  onOpen: (id: string) => void;
   /** A reply is being written, so the conversation cannot be switched. */
   busy: boolean;
 }) {
@@ -31,16 +30,16 @@ export function ChatHistoryDrawer({ open, onClose, profileId, recent, currentId,
 
   useEffect(() => {
     const q = query.trim();
-    if (!open || !q) { setFound(null); return; }
+    if (!q) { setFound(null); return; }
     let live = true;
     const t = window.setTimeout(() => {
       api.listConversations(profileId, q).then((r) => { if (live) { setFound(r.conversations); setError(null); } }).catch((e) => { if (live) setError(message(e)); });
     }, 250);
     return () => { live = false; window.clearTimeout(t); };
-  }, [open, query, profileId, recent]);
+  }, [query, profileId, recent]);
 
   const loadNotes = useCallback(() => { api.listNotes(profileId).then(setNotes).catch((e) => setError(message(e))); }, [profileId]);
-  useEffect(() => { if (open) { loadNotes(); setConfirm(null); setError(null); } }, [open, loadNotes]);
+  useEffect(() => { loadNotes(); }, [loadNotes]);
 
   const remove = async (key: string) => {
     if (confirm !== key) { setConfirm(key); window.setTimeout(() => setConfirm((c) => (c === key ? null : c)), 3000); return; }
@@ -52,7 +51,6 @@ export function ChatHistoryDrawer({ open, onClose, profileId, recent, currentId,
   const about = (c: Conversation) => [c.postDraftId, c.articleDraftId].map((id) => drafts.find((d) => d.id === id)).filter((d): d is Draft => !!d);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Conversations" resizeKey="chats">
       <Tabs defaultValue="chats" className="p-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="chats">History</TabsTrigger>
@@ -60,12 +58,9 @@ export function ChatHistoryDrawer({ open, onClose, profileId, recent, currentId,
         </TabsList>
         {error && <p role="alert" className="pt-2 text-xs text-destructive">{error}</p>}
         <TabsContent value="chats" className="space-y-3">
-          <div className="flex gap-1.5">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} maxLength={100} placeholder="Search conversations" aria-label="Search conversations" className="h-9 pl-8" />
-            </div>
-            <Button variant="brand" size="sm" onClick={onNew} disabled={busy}><Plus /> New</Button>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} maxLength={100} placeholder="Search conversations" aria-label="Search conversations" className="h-9 pl-8" />
           </div>
           {list.length === 0 && <p className="text-sm text-muted-foreground">{query.trim() ? "Nothing matches." : "No conversations yet."}</p>}
           {groupByAge(list).map((g) => (
@@ -110,6 +105,5 @@ export function ChatHistoryDrawer({ open, onClose, profileId, recent, currentId,
           )}
         </TabsContent>
       </Tabs>
-    </Drawer>
   );
 }

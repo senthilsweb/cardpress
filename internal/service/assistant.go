@@ -164,23 +164,9 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 		in.UnicodeStyles = *p.UnicodeStyles
 	}
 	// the summary and address belong to the public page; they are checked here and stored beside the rest
-	slug, summary := cur.Slug, cur.Summary
-	if p.Slug != nil {
-		if slug = strings.TrimSpace(*p.Slug); slug != "" && (len(slug) > maxSlugLen || !assistantSlug.MatchString(slug)) {
-			return cur, Effects{}, invalid("an address is lower-case letters, digits and single hyphens, up to 80 characters")
-		}
-		var other int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM drafts WHERE kind = ? AND slug = ? AND slug <> '' AND id <> ?`, cur.Kind, slug, id).Scan(&other); err != nil {
-			return cur, Effects{}, err
-		}
-		if other > 0 {
-			return cur, Effects{}, fmt.Errorf("%w: that address is already used", ErrConflict)
-		}
-	}
-	if p.Summary != nil {
-		if summary = strings.TrimSpace(*p.Summary); utf8.RuneCountInString(summary) > maxAssistantSummary {
-			return cur, Effects{}, invalid("a summary is limited to %d characters", maxAssistantSummary)
-		}
+	slug, summary, err := s.pageFields(ctx, cur, PageFields{Slug: p.Slug, Summary: p.Summary})
+	if err != nil {
+		return cur, Effects{}, err
 	}
 	// what the person had is kept, whatever the ten minutes between automatic versions; what the assistant saves is a version too
 	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
@@ -191,19 +177,9 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 		return d, Effects{}, err
 	}
 	if slug != cur.Slug || summary != cur.Summary {
-		saved := d.Revision
-		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET slug = ?, summary = ?, revision = revision + 1, status = CASE WHEN status = 'scheduled' THEN status ELSE 'draft' END, approved_at = '', approved_by = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
-			slug, summary, s.draftStamp(), id); err != nil {
+		if d, err = s.writePageFields(ctx, d, slug, summary); err != nil {
 			return d, Effects{}, err
 		}
-		// neither is part of a version, so the version just saved still holds the draft as it stands
-		if _, err := s.db.ExecContext(ctx, `UPDATE draft_versions SET revision = revision + 1 WHERE draft_id = ? AND revision = ?`, id, saved); err != nil {
-			return d, Effects{}, err
-		}
-		if d, err = s.GetDraft(ctx, id); err != nil {
-			return d, Effects{}, err
-		}
-		s.changed(d)
 	}
 	return d, effects(cur, d), nil
 }
@@ -253,12 +229,7 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	return card, d, effects(cur, d), nil
 }
 
-const (
-	maxAssistantBody    = 100_000
-	maxAssistantSummary = 300
-)
-
-var assistantSlug = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+const maxAssistantBody = 100_000
 
 /* ------------------------------------------------------------------ text to document */
 

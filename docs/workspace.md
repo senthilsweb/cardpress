@@ -19,7 +19,7 @@ Nothing is placed along the top of the window. Each setting is its own page: `/s
 
 On a narrow screen the bar runs along the bottom, with the mark (brands) at its left and you at its right. Settings opens on its list.
 
-Popups are kept for quick choices and confirmations: the brand menu, your menu, confirmations, the schedule form, the expanded editor and the full preview. In the studio, the conversation history and an item's versions still open on the right.
+Popups are kept for quick choices and confirmations: the brand menu, your menu, confirmations, the schedule form, the expanded editor and the full preview. In the studio, conversations and versions are listed inside the left column.
 
 ## Brands
 
@@ -30,22 +30,43 @@ A brand is an identity (name, handle, logo, fonts, colour sets) with its own car
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
-- The **Brand** tab edits the open brand. Credentials set through environment variables belong to the first brand only.
+- **Look** (Settings, Brands) edits a brand's logo, fonts and colour sets, with its card beside them. Credentials set through environment variables belong to the first brand only.
 
-## Chat, Edit and the views
-The left column has two sides: **Chat** (the [assistant](chat.md), shown first) and **Edit** (Design, Text, Write, Brand). Your choice is remembered.
+## Chat, Details and Design
+The left column has three sides. Your choice is remembered.
+
+- **Chat**: the [assistant](chat.md), shown first.
+- **Details**: every field of the item on screen, once.
+- **Design**: how its card looks (layout, background, images, colours, fonts).
+
+### Details
+
+| Group | Fields |
+|---|---|
+| Writing | type, title, body, and an article's summary |
+| Card words | eyebrow, headline, subtitle, tag, footers, quote author, number. Those the layout does not draw are listed last |
+| Sharing | hashtags, attachment, alt text, Unicode styles, and an article's page address |
+| Planning | audience, topic, campaign, review notes. None is published |
+| Publishing queue | posts waiting and sent (folded) |
+| Record and versions | who created and approved it, its versions, and delete (folded) |
+
+- A counter shows each limit. Where there is a writing standard it shows the aim too ("620 · aim 600–1,300"), in amber when outside it. The standard never blocks anything.
+- A field the assistant changed is marked **Changed** until you look at it.
+- The bottom of the column always shows the status, what is missing, and the next step: **Approve**, then **Publish**, then **Back to draft**.
+- Planning fields, the summary and the address are saved when you leave the field. Changing the summary or address returns an approved item to draft; changing a planning field does not. Review notes are written by an editor or admin.
+- While you type in Card words, the canvas shows the card.
 
 Above the canvas:
 
 - **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view.
-- **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, Text or Brand it shows the card instead, with the sizes and export buttons.
+- **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, or typing in Card words, it shows the card instead, with the sizes and export buttons.
 - **Both** puts them side by side when the canvas is at least 900 pixels wide. Click a side to work on it.
-- The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **New** starts fresh: an empty post or article (the one on screen decides which), a card in the brand's look with nothing written on it, and an empty chat. Deleting the item or the conversation on screen does the same. A dot marks a view that changed while you were looking at another.
+- The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **New** starts fresh: an empty post or article (the one on screen decides which), a card in the brand's look with nothing written on it, and an empty chat. It is the only **New**, and stays above the screen on a phone. Deleting the item or the conversation on screen does the same. A dot marks a view that changed while you were looking at another.
 
-On a narrow screen a bar at the bottom switches between **Chat**, **Preview** and **Edit**.
+On a narrow screen a bar at the bottom switches between **Chat**, **Preview**, **Details** and **Design**.
 
 ## Versions and published items
-- Above the canvas, **v4** is the newest saved version of the item; **· edited** means the text changed since. Click it to see all versions.
+- Above the canvas, **v4** is the newest saved version of the item; **· edited** means the text changed since. Click it to see all versions in Details.
 - Every change the assistant saves is a version, and what you had just before is kept too. Your own typing becomes a version at most every ten minutes, and when you approve, send or save one by hand.
 - **Make current** brings an earlier version back by saving it as a new one.
 - A **published** item (a sent post, or a live page) is locked. Choose **Back to draft** to change it; a live page goes offline until you approve and publish it again.
@@ -54,14 +75,14 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview** an
 - **Make the left column wider or narrower** by dragging the grip on its right edge (320 to 720 pixels; double-click to reset, or focus it and use the arrow keys). The width is remembered.
 
 - **Hide or show** the whole sidebar with the button near the bottom of the navigation bar, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
-- **Fold sections.** Click a section's title (Draft, Hashtags, Colours…) to fold or unfold it. Folded fields cannot be reached with Tab, so they do not get in the way of the keyboard.
-- The editor in the Write tab can be **dragged taller or shorter** from its bottom-right corner.
+- **Fold sections.** Click a section's title (Writing, Sharing, Colours…) to fold or unfold it. Folded fields cannot be reached with Tab, so they do not get in the way of the keyboard.
+- The editor in Details can be **dragged taller or shorter** from its bottom-right corner.
 
 All of this is remembered: it is saved on the server as the `layout` preference, so it is the same in any browser that uses the same server.
 
 ## Drawers
 
-The conversation history and an item's versions slide in from the right as a drawer (`components/ui/drawer.tsx`) that does not dim or block the studio; Esc closes it. Settings pages use the same component drawn as a page (`InlineDrawers`), so a panel looks the same in both places.
+Settings pages are built from the drawer component (`components/ui/drawer.tsx`) drawn as a page (`InlineDrawers`). The studio opens none.
 
 ## Canvas
 
@@ -77,6 +98,8 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/components/studio/fields.tsx` | `Section`, the foldable group |
 | `web/src/components/studio/Studio.tsx` | Sidebar hide/show and the shortcut |
 | `web/src/components/shell/Rail.tsx` | The navigation bar, its panels, and the bar on narrow screens |
+| `web/src/components/studio/Details.tsx` | The Details column |
+| `web/src/lib/details.ts` | Its groups, counters and what is missing, from the content schema (`lib/content/`) |
 | `web/src/components/settings/Settings.tsx` | The settings pages |
 | `web/src/lib/nav.ts` | Addresses, the settings list and who sees each entry |
 
@@ -88,7 +111,7 @@ An article is **approved** (marked final) rather than published. Its Full previe
 
 ### Editing a long article
 
-Open the **expanded editor** (the arrows in the Article section) for long writing.
+Open the **expanded editor** (the arrows in Writing) for long writing.
 
 - **Fixed toolbar.** The toolbar, the table controls (shown while the cursor is in a table) and the link field stay at the top. Only the text scrolls. The footer stays at the bottom with the word count, the reading time (about 200 words a minute), the character count and the save status.
 - **Floating menu.** Select some text and a small menu appears above it: bold, italic, link and heading. Link opens the link field in the toolbar.
@@ -105,4 +128,4 @@ LinkedIn cannot receive an article from outside, so you paste it into its articl
 
 ## History
 
-The clock icon in the **Draft** section opens an item's history in the right drawer: what it said when it was created, approved, sent, restored, saved by hand, and after a stretch of editing (at most one automatic version every ten minutes). Open a version to read it, **Restore** it if it is the one you want, or **Save a version** with a note before a big rewrite. Restoring is an edit like any other: an approved item goes back to draft, and what it said just before is kept as a version too. Pictures in an article are stored once however many versions use them. See [Data model](data-model.md#history).
+**Record and versions** in Details lists what an item said when it was created, approved, sent, restored, saved by hand, and after a stretch of editing (at most one automatic version every ten minutes). Open a version to read it, **Make current** if it is the one you want, or save a version with a note before a big rewrite. Restoring is an edit like any other: an approved item goes back to draft, and what it said just before is kept as a version too. Versions also hold the audience, topic and campaign, not the review notes. Pictures in an article are stored once however many versions use them. See [Data model](data-model.md#history).

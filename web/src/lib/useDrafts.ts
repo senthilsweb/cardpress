@@ -217,6 +217,22 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const removeImage = useCallback((imageId: string) => decide((id) => api.removeImage(id, imageId)), [decide]);
   const clearAttachment = useCallback(() => decide((id) => api.clearAttachment(id)), [decide]);
   const plan = useCallback((p: { scheduledAt?: string; timezone?: string }) => decide((id) => api.planDraft(id, p)), [decide]);
+  /**
+   * Save fields that are not part of the draft's own save. They take their turn behind pending changes, and whatever
+   * acts next (approve, switching items) waits for them.
+   */
+  const aside = useCallback((id: string, send: () => Promise<Draft>) => {
+    window.clearTimeout(timer.current);
+    const done = saving.current.then(save).then(send).then((saved) => {
+      commit(ref.current.map((x) => (x.id !== saved.id ? x : dirty.current === saved.id ? { ...x, revision: saved.revision, version: saved.version, versionIsCurrent: saved.versionIsCurrent, audience: saved.audience, topic: saved.topic, campaign: saved.campaign, reviewNotes: saved.reviewNotes, slug: saved.slug, summary: saved.summary } : meta(x, saved))));
+      return id;
+    });
+    saving.current = done.then(() => undefined, () => undefined);
+    return done.then(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const setPlanning = useCallback((id: string, fields: Parameters<typeof api.setPlanning>[1]) => aside(id, () => api.setPlanning(id, fields)), [aside]);
+  const setPageFields = useCallback((id: string, fields: Parameters<typeof api.setPageFields>[1]) => aside(id, () => api.setPageFields(id, fields)), [aside]);
   /** Re-read the open draft's status: a post sent from it changes it behind the screen. */
   const refreshStatus = useCallback(async () => {
     const id = idRef.current;
@@ -234,7 +250,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush]);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, rev, restoreVersion, saveState, update, select, create, fresh, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
+  return { drafts, current, rev, restoreVersion, saveState, update, select, create, fresh, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, setPlanning, setPageFields, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;
