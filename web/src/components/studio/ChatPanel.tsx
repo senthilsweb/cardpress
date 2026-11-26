@@ -8,6 +8,7 @@ import type { Draft, DraftKind } from "@/lib/draft";
 import { ChatHistory } from "./ChatHistory";
 import { ReplyCard, ReplyWords } from "./ReplyCard";
 import { ProposalCard } from "./ProposalCard";
+import { ReplyActions } from "./Choices";
 import { ChatInput, SourceChip } from "./ChatInput";
 import { cn } from "@/lib/utils";
 import { costText } from "@/lib/history";
@@ -51,8 +52,8 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
   );
 }
 
-function Thread({ conv, chat, onApply, onShow, onVersion }: {
-  conv: Conversation; chat: ChatStore;
+function Thread({ conv, chat, drafts, onApply, onShow, onVersion }: {
+  conv: Conversation; chat: ChatStore; drafts: Draft[];
   onVersion: (draftId: string, version: number) => void;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   onShow: (draftId?: string) => void;
@@ -61,7 +62,7 @@ function Thread({ conv, chat, onApply, onShow, onVersion }: {
   const messages = conv.messages ?? [];
   const proposals = conv.proposals ?? [];
   // a conversation opens at its end
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [conv.id, messages.length, proposals.length, chat.streaming]);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [conv.id, messages.length, proposals.length, conv.changes?.length, conv.choices?.length, chat.streaming]);
 
   const approve = (p: Proposal) => async (content: ProposalEdit, opts: { useTitle: boolean; edited: boolean }) => {
     const draftId = await onApply(content, { useTitle: opts.useTitle });
@@ -84,6 +85,7 @@ function Thread({ conv, chat, onApply, onShow, onVersion }: {
           {/* a failed or stopped reply may have no words of its own */}
           {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.detail?.reports?.length ? <ReplyWords reports={m.detail.reports} /> : m.content}</Bubble>}
           {m.role === "assistant" && <ReplyCard message={m} onVersion={onVersion} />}
+          {m.role === "assistant" && <ReplyActions conv={conv} messageId={m.id} drafts={drafts} onVersion={onVersion} />}
           {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
             <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">
               {(conv.sources ?? []).filter((x) => x.messageId === m.id).map((x) => <SourceChip key={x.id} source={x} />)}
@@ -175,7 +177,7 @@ export function ChatPanel({ chat, onApply, onShow, onVersion, draftId, viewing, 
       )}
       {/* the thread and the box stay mounted, so an unsent message is not lost */}
       <div className={cn("min-h-0 flex-1 overflow-y-auto", listing && "hidden")} aria-live="polite">
-        {conv ? <Thread conv={conv} chat={chat} onApply={onApply} onShow={onShow} onVersion={onVersion} /> : <Welcome chat={chat} />}
+        {conv ? <Thread conv={conv} chat={chat} drafts={drafts} onApply={onApply} onShow={onShow} onVersion={onVersion} /> : <Welcome chat={chat} />}
       </div>
 
       {chat.error && <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-destructive">{chat.error}</p>}

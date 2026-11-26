@@ -29,7 +29,7 @@ The index is created at start-up only on libSQL, never in a migration, so the sa
 - With the content schema, a field marked `x-embed` (title, summary, headline, body, hashtags, topic, audience) is included. Review notes never are.
 
 ## Storage
-Migration `0024_embeddings` (numbered after the choices migration):
+Migration `0026_embeddings`:
 ```sql
 CREATE TABLE embeddings (
   id          INTEGER PRIMARY KEY,          -- rowid, for vector_top_k
@@ -54,7 +54,7 @@ CREATE INDEX embeddings_profile ON embeddings (profile_id);
 - After a post's job is marked published, or after `PublishPage` succeeds, a background worker embeds that version, replacing the item's rows in one transaction.
 - Failures (no key, service down, rate limit) set `embed_error`. The worker retries with backoff, and catches up at start-up on items whose `embedded_version` is behind.
 - A command `cardpress embed --all` fills in items published before this change. It asks nothing and only reads published versions.
-- Back to draft: rows stay (the item was public). A new publish replaces them. Delete: removed by the cascade.
+- Back to draft: the rows are removed, so search finds only what is published now (decided by the owner on 2026-11-26). Delete, of an item or a brand: removed explicitly, not left to the cascade.
 
 ## The query a later search will use (for the record)
 ```sql

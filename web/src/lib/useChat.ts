@@ -165,8 +165,21 @@ export function useChat(profileId: string) {
     refreshList().catch(() => undefined); // the waiting count on the tab changes
   }, [refreshList]);
 
+  /** Save what a reply changed, with the picked options, or undo it. Resolves false, with the reason in `error`, if refused. */
+  const act = useCallback(async (convId: string, fn: () => Promise<Conversation>) => {
+    setBusy(true); setError(null);
+    try {
+      const c = await fn();
+      patch(convId, () => c);
+      return true;
+    } catch (e) {
+      setError(message(e));
+      return false;
+    } finally { setBusy(false); }
+  }, []);
+
   const pendingCount = list.reduce((n, c) => n + (c.pending ?? 0), 0);
-  return { agent, list, current, loaded, pendingCount, streaming, progress, busy, error, setError, send, submit, stop, removeSource, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
+  return { agent, list, current, loaded, pendingCount, streaming, progress, busy, error, setError, send, submit, act, stop, removeSource, open, remove, decide, newConversation: () => { setCurrent(null); setError(null); } };
 }
 
 export type ChatStore = ReturnType<typeof useChat>;

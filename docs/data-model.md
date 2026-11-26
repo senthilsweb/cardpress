@@ -81,7 +81,9 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | `draft_versions.revision` | 0021 | the state of the draft a version holds |
 | `chat_usage` | 0020 | `id` (PK), `conversation_id`, `message_id`, `session_id`, `total_cents` (the session's running total), `added_cents`, `active_seconds`, `created_at` |
 | `conversation_sources` | 0018 | `id` (PK), `conversation_id`, `message_id`, `kind` (`url`, `text`, `md`, `docx`, `pdf`), `name`, `url`, `chars`, `truncated`, `text`, `data` (a PDF as attached), `delivered`, `created_at` |
-| `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`, `status` (`done`, `failed` or `stopped`), `detail` (JSON: steps, saved versions, check results, error). Unique `(conversation_id, seq)` |
+| `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`, `status` (`done`, `failed` or `stopped`), `detail` (JSON: steps, items changed, check results, error). Unique `(conversation_id, seq)` |
+| `chat_changes` | 0025 | `id` (PK), `conversation_id`, `message_id`, `draft_id`, `before` (JSON, held while it can be undone), `before_revision`, `after_revision`, `status` (`open`, `pending`, `saved`, `undone`, `passed`), `version`, `created_at` |
+| `choices` | 0025 | `id` (PK), `conversation_id`, `message_id`, `draft_id`, `field`, `options` (JSON, recommended first), `status` (`pending`, `chosen`, `dismissed`, `superseded`), `chosen`, `created_at`, `decided_at` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 
 ### Outside agents
@@ -118,6 +120,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0022 | `conversations`: `graded`, `seen` |
 | 0023 | `drafts`: `audience`, `topic`, `campaign`, `review_notes` (none published); `draft_versions`: the first three |
 | 0024 | `chat_messages`: `status`, `detail` |
+| 0025 | `chat_changes` (what a reply changed, for save and undo) and `choices` (options offered) |
 
 ## A post's own file
 

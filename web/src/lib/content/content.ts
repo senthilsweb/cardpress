@@ -7,7 +7,7 @@
 import { z } from "zod";
 
 /** Moves when a field, a limit or a tool input changes. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type Writer = "agent" | "person" | "system";
 export type Kind = "post" | "article";
@@ -179,4 +179,17 @@ export const ReportReplyInput = z.strictObject({
   next: z.string().max(120).optional(),
 });
 
-export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput, report_reply: ReportReplyInput };
+/** The fields an assistant may offer options for: those marked `choices` above. */
+export const ChoiceField = z.enum(["headline", "eyebrow", "subtitle", "tag", "title", "altText", "summary", "hashtags"]);
+
+/** `offer_choices`: options the person picks from in the chat, the recommended or saved one first. */
+export const OfferChoicesInput = z.strictObject({
+  conversationId: z.string(),
+  draftId,
+  fields: z.array(z.strictObject({
+    field: ChoiceField,
+    options: z.array(z.strictObject({ value: z.union([z.string(), z.array(Hashtag)]), note: z.string().max(80).optional() })).min(2).max(6),
+  })).min(1).max(5),
+});
+
+export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput, report_reply: ReportReplyInput, offer_choices: OfferChoicesInput };

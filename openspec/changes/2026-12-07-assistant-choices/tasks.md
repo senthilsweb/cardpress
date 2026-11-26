@@ -1,7 +1,7 @@
-# Tasks (not started)
-- [ ] Migration `0023`, service, `offer_choices` tool, apply and dismiss
-- [ ] Chat options card; options beside the field in Details
-- [ ] Live preview on the canvas, never saved by autosave
-- [ ] Tell the assistant what was chosen (the `changes` block)
-- [ ] Agent project: tool access for writers and coordinator, skill and rubric lines, contract version 6
-- [ ] Tests, docs, browser check; one paid live test (ask first)
+# Tasks
+- [x] Migration `0025`, services, `offer_choices`, save and undo requests
+- [x] Chat card; options under the field in Details; live preview
+- [x] Agent project: instructions, skills, rubrics, schema version 3
+- [x] Tests, docs, browser check with the local stand-in
+- [ ] Deploy the server, apply the agents, set the manifest
+- [ ] One paid live test (ask first)

@@ -141,9 +141,18 @@ func TestUndoPutsBackOneReply(t *testing.T) {
 	if err != nil || statuses(got) != "passed undone" || DraftText(w.draft(id).Doc) != "One." || len(w.versions(id)) != 1 {
 		t.Fatal(err, statuses(got), len(w.versions(id)))
 	}
+	// when a version held the state put back, it is current again
+	_, third := w.reply(func(*agent.Studio) { w.body(id, "Kept.") })
+	if _, err := w.c.SaveReply(w.ctx, w.conv, third, SaveRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	_, fourth := w.reply(func(*agent.Studio) { w.body(id, "Dropped.") })
+	if _, err := w.c.Undo(w.ctx, w.conv, fourth); err != nil || !w.draft(id).VersionIsCurrent {
+		t.Fatal(err, w.draft(id).VersionIsCurrent)
+	}
 	// what was put back was the assistant's, so the next change keeps no version of it
 	w.reply(func(*agent.Studio) { w.body(id, "Three.") })
-	if n := len(w.versions(id)); n != 1 {
+	if n := len(w.versions(id)); n != 2 {
 		t.Fatal(n)
 	}
 }
@@ -221,7 +230,7 @@ func TestOptionsArePickedAndSaved(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if len(got.Choices) != 3 || got.Choices[2].Status != ChoicePending {
+	if len(got.Choices) != 3 || got.Choices[2].Status != ChoicePending || got.Choices[0].Status != ChoiceSuperseded {
 		t.Fatalf("%+v", got.Choices)
 	}
 	if err := w.s.OfferChoices(w.ctx, w.conv, id, offer); err == nil {

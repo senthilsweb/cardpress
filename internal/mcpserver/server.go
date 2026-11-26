@@ -125,7 +125,7 @@ func New(d Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{Name: "offer_choices", Title: "Offer options to pick from", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},
 		Description: "While answering in the chat, show the person options for fields of an item (headline, eyebrow, subtitle, tag, title, altText, " +
 			"summary, hashtags) as buttons to pick from: 2 to 6 for each field, the recommended one first, each with an optional short note. " +
-			"Save the recommended value with the other tools first. It changes no draft; do not list the same options in your reply."}, t.offerChoices)
+			"The first is the one you recommend, or the value already saved. It changes no draft; do not list the same options in your reply."}, t.offerChoices)
 
 	changes := &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)}
 	replaces := &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}

@@ -123,6 +123,19 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
+  /** Save what is waiting, and say where each item then stands. */
+  const settled = useCallback(async () => {
+    flushPendingEdits();
+    await flush();
+    return Object.fromEntries(ref.current.map((d) => [d.id, d.revision]));
+  }, [flush]);
+
+  /** Read items again after the server changed them on request (a reply saved or undone). */
+  const reload = useCallback(async (ids: string[]) => {
+    for (const id of ids) receive(await api.getDraft(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const commit = (next: Draft[]) => { ref.current = next; setDrafts(next); };
 
   const update = useCallback((patch: Patch) => {
@@ -250,7 +263,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush]);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, rev, restoreVersion, saveState, update, select, create, fresh, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, setPlanning, setPageFields, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
+  return { drafts, current, settled, reload, rev, restoreVersion, saveState, update, select, create, fresh, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, setPlanning, setPageFields, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

@@ -3,13 +3,16 @@ import { Label } from "@/components/ui/label";
 import { counter, labelOfField, type FieldName } from "@/lib/details";
 import type { DraftKind } from "@/lib/draft";
 import { cn } from "@/lib/utils";
+import { FieldChoices } from "./Choices";
 
 /**
  * One field of the Details form: its name from the content schema, a counter, and a mark when someone else has just
  * changed it. The mark goes once the field is looked at.
  */
-export function FormField({ name, kind, value, label, htmlFor, hint, changed, onSeen, children }: {
+export function FormField({ name, kind, draftId, value, label, htmlFor, hint, changed, onSeen, children }: {
   name: FieldName; kind: DraftKind;
+  /** The item on screen: options offered for this field are shown under it. */
+  draftId?: string;
   /** What is counted; leave out for a field with no length. */
   value?: string | readonly string[];
   /** Another name than the schema's, where the card's layout calls it something else. */
@@ -29,6 +32,7 @@ export function FormField({ name, kind, value, label, htmlFor, hint, changed, on
         {count && <span className={cn("font-mono text-[10.5px]", count.state === "over" ? "text-destructive" : count.state === "aside" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>{count.text}</span>}
       </div>
       {children}
+      {draftId && <FieldChoices draftId={draftId} field={name} />}
       {hint && <p className="text-[11px] leading-snug text-muted-foreground">{hint}</p>}
     </div>
   );

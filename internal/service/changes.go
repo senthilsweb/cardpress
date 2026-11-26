@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -86,7 +87,7 @@ func (s *Studio) assistantWrite(ctx context.Context, cur Draft) (label string, d
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", nil, err
 	}
-	if last != cur.Revision {
+	if last != cur.Revision && s.written(ctx, cur) {
 		if err := keepCurrent(ctx, s.db, cur.ID, "before an assistant change"); err != nil {
 			return "", nil, err
 		}
@@ -136,6 +137,15 @@ func startChange(ctx context.Context, db execer, convID string, d Draft) error {
 	_, err := db.ExecContext(ctx, `INSERT INTO chat_changes (id, conversation_id, draft_id, before, before_revision, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		newID(), convID, d.ID, string(b), d.Revision, time.Now().UTC().Format(time.RFC3339))
 	return err
+}
+
+// written says whether there is anything in an item worth keeping: text, a title or words on its card.
+func (s *Studio) written(ctx context.Context, d Draft) bool {
+	if strings.TrimSpace(DraftText(d.Doc)) != "" || d.Title != "" || hasPictures(d.Doc) {
+		return true
+	}
+	card, _, err := s.Card(ctx, d.ID)
+	return err != nil || card.Eyebrow+card.Title+card.Subtitle+card.Tag+card.QuoteAuthor+card.StatValue != ""
 }
 
 // openChanges notes how the conversation's items stand as a reply begins.
@@ -194,7 +204,7 @@ func (c *Chat) settle(ctx context.Context, convID, messageID string) error {
 		{`DELETE FROM chat_changes WHERE conversation_id = ? AND status = 'open' AND after_revision = 0`, []any{convID}},
 		{`UPDATE chat_changes SET status = 'passed', before = '' WHERE status = 'pending' AND draft_id IN (SELECT draft_id FROM chat_changes WHERE conversation_id = ? AND status = 'open')`, []any{convID}},
 		{`UPDATE chat_changes SET status = 'pending', message_id = ? WHERE conversation_id = ? AND status = 'open'`, []any{messageID, convID}},
-		{`UPDATE choices SET status = 'superseded' WHERE status = 'pending' AND message_id <> '' AND EXISTS (SELECT 1 FROM choices n WHERE n.message_id = '' AND n.conversation_id = ? AND n.draft_id = choices.draft_id AND n.field = choices.field)`, []any{convID}},
+		{`UPDATE choices SET status = 'superseded' WHERE status IN ('pending', 'chosen') AND message_id <> '' AND EXISTS (SELECT 1 FROM choices n WHERE n.message_id = '' AND n.conversation_id = ? AND n.draft_id = choices.draft_id AND n.field = choices.field)`, []any{convID}},
 		{`UPDATE choices SET message_id = ? WHERE conversation_id = ? AND message_id = ''`, []any{messageID, convID}},
 	} {
 		if _, err := c.db.ExecContext(ctx, step.q, step.args...); err != nil {
@@ -282,6 +292,10 @@ func (c *Chat) Undo(ctx context.Context, convID, messageID string) (Conversation
 		}
 		d, err := c.Studio.putBack(ctx, p.draftID, p.afterRev, was)
 		if err != nil {
+			return Conversation{}, err
+		}
+		// a version that held the item before the reply holds it again
+		if _, err := c.db.ExecContext(ctx, `UPDATE draft_versions SET revision = ? WHERE draft_id = ? AND revision = ?`, d.Revision, p.draftID, p.beforeRev); err != nil {
 			return Conversation{}, err
 		}
 		// when the state put back was itself an assistant's, it still counts as one, so it is not kept as the person's work

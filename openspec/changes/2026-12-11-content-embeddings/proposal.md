@@ -9,7 +9,7 @@ Finding earlier work today means matching words in a title. The owner wants to s
 - When an item is **published** (a post sent to LinkedIn, or an article's public page put up), its text is turned into embeddings and stored in the database, in Turso's native vector type.
 - Articles are split into passages; a post is one passage. Each passage has its own vector.
 - Embedding happens after publishing, in the background. Publishing never waits for it or fails because of it; a failed embedding is retried.
-- An item taken back to draft keeps its vectors until it is published again, then they are replaced. Deleting the record deletes them.
+- Taking an item back to draft removes its vectors; publishing again creates them. Deleting the record or its brand deletes them.
 - The model, the number of dimensions and the provider key are settings. With no key set, nothing is embedded and nothing else changes.
 
 ## Rules that stay

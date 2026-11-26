@@ -1,21 +1,20 @@
-# Choosing between the assistant's options
+# Choosing options, and saving a reply as a version
 
-**Status:** proposed. Specification only: nothing is built. Builds on `2026-12-06-content-schema`.
+**Status:** built (approved by the owner on 2026-11-26 after trying the live chat). Not yet tried with the real agents.
 
 ## Why
-The assistant sometimes answers with several titles or lines. They arrive as chat text, so the person has to copy one into the right field by hand.
+The assistant answered with several titles as chat text, so the person had to copy one by hand. And every attempt it made became a version, filling the history.
 
 ## What changes
-- A new tool, `offer_choices`: the assistant saves its recommended value as usual and offers the alternatives as data.
-- The chat shows each field as a set of options (radio buttons; a drop-down when there are more than four), with the recommended one marked. The same options appear beside the field in Details.
-- **Selecting an option changes the card and text on screen at once**, as a preview.
-- **Use selected** writes the choices to the draft at once, as one new version. No model is called, so it costs nothing.
-- The assistant learns of the choice with the person's next message.
+- A new tool, `offer_choices`. The chat shows each field's options as radio buttons (a drop-down above four), recommended first; the same options appear under the field in Details.
+- Selecting an option previews it on the canvas at once. Nothing is saved.
+- **An assistant's change in a chat reply goes into the draft but is not a version.** **Save as version** applies the picked options and saves it. **Undo** puts the item back as it was before that reply. No model is called by either.
+- This replaces "every assistant change is a version" (`2026-12-05-versions-and-publish-lock`) for the built-in chat. Outside agents have no button, so their changes stay versions.
 
 ## Rules that stay
 - Only fields the schema marks for choices. Never the look, never the status.
 - Published and scheduled items cannot be changed.
-- Ignoring the options keeps what was saved. A preview is never saved until Use selected.
+- What the person typed is kept as a version before an assistant changes it.
 
 ## Out of scope
-Choosing between whole bodies of text, and the assistant waiting for an answer before it continues.
+Choosing between whole bodies of text, the assistant waiting for an answer, and undoing a change of attachment.
