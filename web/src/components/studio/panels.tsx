@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
-  AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Plus, Quote, RotateCcw, Shuffle, Trash2, UserRound,
+  AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
 } from "lucide-react";
-import type { BackgroundId, Design, LayoutId, MarkKind, Palette, Profile } from "@/lib/types";
-import { bgById, categoryOf, CATEGORIES, groupsIn } from "@/card/backgrounds";
+import type { Design, LayoutId, MarkKind, Palette, Profile } from "@/lib/types";
+import { bgById, categoryOf } from "@/card/backgrounds";
+import { BackgroundPicker } from "./BackgroundPicker";
 import { LAYOUTS } from "@/card/Card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,10 +27,12 @@ const LAYOUT_ICONS: Record<LayoutId, typeof LayoutPanelLeft> = {
 
 /* ======================================================= Design */
 export function DesignPanel({ design, set, profile, palette }: { design: Design; set: SetDesign; profile: Profile; palette: Palette }) {
-  const chosen = categoryOf(bgById(design.background));
-  const [category, setCategory] = useState(chosen);
-  // another card, or a change from elsewhere: show where its background is
-  useEffect(() => setCategory(chosen), [chosen, design.background]);
+  const [browsing, setBrowsing] = useState(false);
+  const bg = bgById(design.background);
+  const missing =
+    (bg.needs === "photos" && !design.photos.length) ||
+    (bg.needs === "screenshot" && !design.screenshot) ||
+    (bg.needs === "image" && !design.bgImage);
   return (
     <>
       <Section title="Layout">
@@ -64,48 +67,27 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
           </Button>
         }
       >
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger aria-label="Background category">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {groupsIn(category).map(({ group, items }) => (
-          <div key={group} className="space-y-1.5">
-            {group && <h4 className="text-[11.5px] font-medium text-muted-foreground">{group}</h4>}
-            <div className="grid grid-cols-2 gap-2">
-              {items.map((b) => {
-                const on = design.background === b.id;
-                const missing =
-                  (b.needs === "photos" && !design.photos.length) ||
-                  (b.needs === "screenshot" && !design.screenshot) ||
-                  (b.needs === "image" && !design.bgImage);
-                return (
-                  <button
-                    key={b.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => set({ background: b.id as BackgroundId })}
-                    className={cn("group cursor-pointer overflow-hidden rounded-md border text-left transition-colors", on ? "border-brand ring-1 ring-brand" : "border-border hover:border-brand/50")}
-                  >
-                    <div className="aspect-video w-full">
-                      <MiniBackground id={b.id} palette={palette} seed={design.seed} photos={design.photos} screenshot={design.screenshot} image={design.bgImage} />
-                    </div>
-                    <div className="bg-card px-2 py-1.5">
-                      <div className="flex items-center justify-between gap-1 text-[12px] font-medium">
-                        {b.name}
-                        {missing && <Badge variant="warn">add</Badge>}
-                      </div>
-                      <div className="truncate text-[10.5px] text-muted-foreground">{b.hint}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        <button
+          type="button"
+          onClick={() => setBrowsing(true)}
+          aria-label={`Background: ${bg.name}. Browse backgrounds`}
+          className="block w-full cursor-pointer overflow-hidden rounded-md border border-border text-left transition-colors hover:border-brand/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <div className="aspect-video w-full">
+            <MiniBackground id={bg.id} palette={palette} seed={design.seed} photos={design.photos} screenshot={design.screenshot} image={design.bgImage} />
           </div>
-        ))}
+          <div className="border-t border-border bg-card px-2.5 py-1.5">
+            <div className="flex items-center justify-between gap-1 text-[12px] font-medium">
+              {bg.name}
+              {missing && <Badge variant="warn">add</Badge>}
+            </div>
+            <div className="truncate text-[10.5px] text-muted-foreground">{bg.group || categoryOf(bg)}</div>
+          </div>
+        </button>
+        <Button variant="outline" size="sm" className="w-full" onClick={() => setBrowsing(true)}>
+          <Search /> Browse backgrounds
+        </Button>
+        <BackgroundPicker open={browsing} onOpenChange={setBrowsing} design={design} profile={profile} onUse={set} />
       </Section>
 
       <Section title="Images">

@@ -1,6 +1,6 @@
 # Greeting texts and a template picker
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built; waiting for agreement.
+**Status:** in progress (asked for and agreed by the owner on 2026-11-26). Part 1, the picker, is built and not yet deployed.
 
 ## Why
 - A greeting card needs words as well as art, and people reuse the same greetings.
@@ -39,16 +39,19 @@ The Design column shows the chosen background and a **Browse** button. It opens 
 - The server holds the list in memory and drops it on every add, edit or delete, so the next read is fresh. This assumes one server machine.
 
 ### 3. In chat
-- A read tool, `list_greetings(occasion, query)`. The assistant offers saved greetings and new ones of its own through `offer_choices`, as headline options.
-- No new subagent: a greeting is a few words, and a subagent adds cost and waiting. Revisit if greetings need rules of their own.
+Greetings are kept apart from post and article writing (the owner's decision):
+- **Their own schema:** a Zod model for seasonal greetings (occasion, greeting text, short supporting line, keywords) in the agent repository, generating the tool schemas.
+- **Their own subagent:** a greetings writer. The coordinator hands greeting requests to it and offers what it returns through `offer_choices` as headline options.
+- A read tool, `list_greetings(occasion, query)`, so saved greetings are offered alongside new ones.
+- A greetings skill with the occasion's wording rules, and a rubric if grading proves worth its cost.
 
-## Proposed order
+## Order
 1. Picker (web only).
 2. Greetings in the database, with Settings and the picker list.
-3. Chat tool (needs an agent deploy and one paid test).
+3. Greetings schema, subagent and tool (needs an agent deploy and one paid test).
 
 ## Open questions
-| Question | Suggested |
+| Question | Going with, unless the owner says otherwise |
 |---|---|
 | Headline on the card, or the library title? | Headline; also fill an empty title |
 | Greetings shared, or per brand? | Seeded ones shared; added ones belong to a brand |

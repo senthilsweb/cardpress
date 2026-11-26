@@ -33,6 +33,10 @@ export interface BackgroundDef {
   category?: string;
   /** A heading inside the category, for variations of one theme. */
   group?: string;
+  /** Other words the search finds it by. */
+  keywords?: string[];
+  /** Id of a standard palette that suits it, offered in the picker. */
+  palette?: string;
   needs?: "photos" | "screenshot" | "image";
   /** Dense art: the card clears a strip behind the footer, and behind the logo where the art runs under it. */
   dense?: boolean;

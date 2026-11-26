@@ -107,7 +107,7 @@ function falling(c: BgCtx) {
   );
 }
 
-const theme = { category: SEASONAL, group: "Thanksgiving", dense: true };
+const theme = { category: SEASONAL, group: "Thanksgiving", dense: true, palette: "autumn-cream", keywords: ["thanks", "gratitude", "autumn", "fall", "maple", "harvest", "greeting"] };
 const defs: BackgroundDef[] = [
   { id: "maple-weave", name: "Maple weave", hint: "Interlaced autumn leaves", render: weave, ...theme },
   { id: "maple-lines", name: "Maple line art", hint: "Outlined leaves, lighter", render: lineArt, ...theme },

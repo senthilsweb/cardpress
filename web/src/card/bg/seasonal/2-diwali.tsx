@@ -122,7 +122,7 @@ function garlands(c: BgCtx) {
   );
 }
 
-const theme = { category: SEASONAL, group: "Diwali", dense: true };
+const theme = { category: SEASONAL, group: "Diwali", dense: true, palette: "festival-night", keywords: ["deepavali", "festival of lights", "lamp", "diya", "greeting"] };
 const defs: BackgroundDef[] = [
   { id: "diwali-diyas", name: "Diyas", hint: "Rows of lit lamps", render: diyas, ...theme },
   { id: "diwali-rangoli", name: "Rangoli", hint: "Colourful floor pattern", render: rangoli, ...theme },
