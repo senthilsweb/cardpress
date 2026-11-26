@@ -1,6 +1,6 @@
 # Library
 
-The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from **Library** in the navigation, or go to `/library/`. **Posts** and **Articles** under it narrow the list (`/library/?kind=post`); the drop-downs above the list do the same and also choose a status.
+The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from **Library** in the navigation, or go to `/library/`. Its panel's **Posts** and **Articles** narrow the list (`/library/?kind=post`); the drop-downs above the list do the same and also choose a status.
 
 ## The list
 

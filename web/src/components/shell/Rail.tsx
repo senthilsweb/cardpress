@@ -1,18 +1,18 @@
-import { useEffect, useState } from "react";
-import { Check, ChevronDown, ChevronsUpDown, FileText, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, CircleHelp, FileText, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { DOCS_URL, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export interface RailProps {
   area: Area;
-  /** The entry under the area that is open: a settings section, or the library's "post" or "article" ("" for all). */
+  /** The page under the area that is open: a settings section, or the library's "post" or "article" ("" for all). */
   sub?: string;
   brands: Profile[];
   activeId: string;
@@ -25,19 +25,15 @@ export interface RailProps {
   panel?: { hidden: boolean; toggle: () => void };
   /** Called before going to another page, to save what is being typed. */
   onLeave?: () => void;
-  /** An entry under the area already open is handled on the page instead of loading it again. */
+  /** A page under the area already open is handled on the page instead of loading it again. */
   onSub?: (sub: string) => void;
 }
 
-interface Entry { id: string; label: string; href: string }
-interface Item { id: Area; label: string; href: string; icon: React.ReactNode; children?: Entry[] }
+interface Entry { id: string; label: string; href: string; external?: boolean }
+interface Group { title?: string; entries: Entry[] }
+interface Item { id: Area | "help"; label: string; href?: string; icon: React.ReactNode; groups?: Group[] }
 
-const FOLD_KEY = "cardpress.nav.folded";
-function useFolded() {
-  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } });
-  useEffect(() => { try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch { /* only not remembered */ } }, [folded]);
-  return [folded, () => setFolded((f) => !f)] as const;
-}
+const REPO = "https://github.com/senthilsweb/cardpress";
 
 /** The brand's square: its colour and initials. */
 function BrandTile({ name, color }: { name: string; color: string }) {
@@ -49,38 +45,65 @@ function BrandTile({ name, color }: { name: string; color: string }) {
 }
 
 /**
- * The navigation on the left of every signed-in page. Open, it shows the CardPress mark with the open brand under it
- * (a menu to switch brand), the areas with their pages nested under them, and the person. Folded, only icons are left,
- * and an area's pages open in a small menu beside it. On narrow screens it is a bar along the bottom.
+ * The navigation: a narrow dark bar on the left of every signed-in page. The CardPress mark at the top opens the brand
+ * menu. An area with pages (Library, Settings, Help) opens a panel beside the bar listing them; Studio goes straight to
+ * the studio. The person is at the bottom. On narrow screens it is a bar along the bottom.
  */
 export function Rail({ area, sub, brands, activeId, colors, switching = false, onSwitchBrand, theme, onToggleTheme, panel, onLeave, onSub }: RailProps) {
   const { user, can } = useSession();
-  const [folded, toggleFold] = useFolded();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState<Item["id"] | null>(null);
+  const root = useRef<HTMLDivElement>(null);
   const active = brands.find((b) => b.id === activeId) ?? brands[0];
   const color = colors[active?.id] ?? "#888";
   const go = (href: string) => { onLeave?.(); window.location.href = href; };
 
+  const settings = visibleSections(!!user, can);
+  const pick = (ids: string[]) => settings.filter((s) => ids.includes(s.id)).map((s) => ({ id: s.id, label: s.label, href: settingsHref(s.id) }));
   const items: Item[] = [
     { id: "studio", label: "Studio", href: studioHref(), icon: <PenLine /> },
-    { id: "library", label: "Library", href: libraryHref(), icon: <FileText />, children: [
+    { id: "library", label: "Library", icon: <FileText />, groups: [{ entries: [
       { id: "", label: "All", href: libraryHref() },
       { id: "post", label: "Posts", href: libraryHref("post") },
       { id: "article", label: "Articles", href: libraryHref("article") },
+    ] }] },
+    { id: "settings", label: "Settings", icon: <Settings />, groups: [
+      { entries: pick(["account", "api-keys"]) },
+      { title: "Brands", entries: pick(["brands", "social"]) },
+      { title: "Administration", entries: pick(["users", "assistant"]) },
+    ].filter((g) => g.entries.length) },
+    { id: "help", label: "Help", icon: <CircleHelp />, groups: [
+      { entries: [
+        { id: "docs", label: "Docs", href: DOCS_URL, external: true },
+      ] },
+      { title: "Support", entries: [
+        { id: "issue", label: "Report a problem", href: `${REPO}/issues/new`, external: true },
+        { id: "repo", label: "Source code", href: REPO, external: true },
+      ] },
     ] },
-    { id: "settings", label: "Settings", href: settingsHref(), icon: <Settings />,
-      children: visibleSections(!!user, can).map((s) => ({ id: s.id, label: s.label, href: settingsHref(s.id) })) },
   ];
-  /** Follow an entry: on its own area's page the page handles it, elsewhere the page is loaded. */
+  const shown = items.find((i) => i.id === open);
+
+  // the panel closes on Esc or a press outside it
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(null); };
+    const down = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(null); };
+    window.addEventListener("keydown", key);
+    window.addEventListener("pointerdown", down);
+    return () => { window.removeEventListener("keydown", key); window.removeEventListener("pointerdown", down); };
+  }, [open]);
+
   const follow = (e: React.MouseEvent, it: Item, entry: Entry) => {
+    setOpen(null);
+    if (entry.external) return;
     if (it.id === area && onSub) { e.preventDefault(); onSub(entry.id); window.history.replaceState(null, "", entry.href); return; }
     onLeave?.();
   };
 
-  const brandMenu = (trigger: React.ReactNode, side: "bottom" | "right" | "top") => (
+  const brandMenu = (trigger: React.ReactNode, side: "right" | "top") => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" sideOffset={8} className="w-[280px]">
+      <DropdownMenuContent side={side} align="start" sideOffset={10} className="w-[280px]">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Brands</DropdownMenuLabel>
         {brands.map((b) => (
           <DropdownMenuItem key={b.id} onSelect={() => { if (b.id !== activeId) onSwitchBrand(b.id); }} className={cn("gap-3 py-2", b.id === activeId && "bg-muted")}>
@@ -99,131 +122,91 @@ export function Rail({ area, sub, brands, activeId, colors, switching = false, o
     </DropdownMenu>
   );
 
-  const row = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:shrink-0";
-  const tool = "grid h-9 w-9 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:h-[18px] [&_svg]:w-[18px]";
-  const tip = (label: string, node: React.ReactNode) => (
-    <Tooltip>
+  const icon = (on: boolean) => cn(
+    "grid h-11 w-11 cursor-pointer place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#8fd3c2] [&_svg]:h-[21px] [&_svg]:w-[21px]",
+    on ? "bg-white/10 text-white" : "text-[#8fd3c2] hover:bg-white/5 hover:text-white",
+  );
+  const tip = (label: string, node: React.ReactNode, hide = false) => (
+    <Tooltip open={hide ? false : undefined}>
       <TooltipTrigger asChild>{node}</TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
-  const brandLabel = `CardPress, brand ${active?.name ?? ""}. Switch brand`;
 
   return (
-    <TooltipProvider delayDuration={250}>
+    <TooltipProvider delayDuration={200}>
       {/* narrow screens: a bar along the bottom */}
-      <nav aria-label="Main" className="order-last flex shrink-0 items-center gap-1 border-t border-border bg-card px-2 py-1.5 lg:hidden">
-        {brandMenu(
-          <button type="button" aria-label={brandLabel} className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <LogoMark size={30} />
-          </button>, "top")}
+      <nav aria-label="Main" className="order-last flex shrink-0 items-center gap-1 bg-[#0b2a24] px-2 py-1.5 lg:hidden">
+        {brandMenu(<button type="button" aria-label={`Brand ${active?.name ?? ""}. Switch brand`} className="cursor-pointer rounded-lg p-0.5"><LogoMark size={30} /></button>, "top")}
         <ul className="flex flex-1 items-center justify-around">
-          {items.map((it) => (
-            <li key={it.id}>
-              <a href={it.href} onClick={onLeave} aria-current={it.id === area ? "page" : undefined}
-                className={cn("flex flex-col items-center gap-0.5 rounded-md px-3 py-1 text-[10.5px] font-medium [&_svg]:h-[18px] [&_svg]:w-[18px]", it.id === area ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
-                {it.icon}{it.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} />
-      </nav>
-
-      {/* wide screens: the column on the left, open or folded */}
-      <nav aria-label="Main" className={cn("hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 motion-reduce:transition-none lg:flex", folded ? "w-16 items-center px-2" : "w-60 px-3")}>
-        <div className={cn("flex h-16 w-full shrink-0 items-center", folded && "justify-center")}>
-          {brandMenu(folded ? (
-            <button type="button" aria-label={brandLabel} title={active?.name} className="cursor-pointer rounded-lg p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-muted">
-              <LogoMark size={32} />
-            </button>
-          ) : (
-            <button type="button" aria-label={brandLabel} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-1.5 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-muted">
-              <LogoMark size={34} />
-              <span className="min-w-0 flex-1 leading-none">
-                <span className="block text-[19px] font-bold tracking-tight">CardPress</span>
-                <span className="mt-1 flex items-center gap-1 text-[11.5px] text-muted-foreground">
-                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
-                  <span className="truncate">{switching ? "Opening…" : active?.name}</span>
-                </span>
-              </span>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            </button>
-          ), folded ? "right" : "bottom")}
-        </div>
-
-        <ul className={cn("mt-2 flex w-full flex-col gap-0.5", folded && "items-center")}>
-          {items.map((it) => {
-            const here = it.id === area;
-            if (folded) {
-              const icon = <span className={cn(tool, here && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>{it.icon}</span>;
-              return (
-                <li key={it.id}>
-                  {it.children?.length ? (
-                    <DropdownMenu>
-                      {tip(it.label, <DropdownMenuTrigger asChild><button type="button" aria-label={it.label} aria-current={here ? "page" : undefined} className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">{icon}</button></DropdownMenuTrigger>)}
-                      <DropdownMenuContent side="right" align="start" sideOffset={8} className="min-w-[200px]">
-                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{it.label}</DropdownMenuLabel>
-                        {it.children.map((c) => (
-                          <DropdownMenuItem key={c.id || "all"} asChild className={cn(here && sub === c.id && "bg-muted font-medium")}>
-                            <a href={c.href} onClick={(e) => follow(e, it, c)}>{c.label}</a>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : tip(it.label, <a href={it.href} aria-label={it.label} aria-current={here ? "page" : undefined} onClick={onLeave} className="block rounded-md">{icon}</a>)}
-                </li>
-              );
-            }
-            const open = !!it.children?.length && (openGroups[it.id] ?? here);
+          {items.filter((i) => i.id !== "help").map((it) => {
+            const href = it.href ?? (it.id === "library" ? libraryHref() : settingsHref());
             return (
               <li key={it.id}>
-                <div className="flex items-center">
-                  <a href={it.href} aria-current={here && !it.children ? "page" : undefined} onClick={onLeave}
-                    className={cn(row, here ? (it.children ? "font-semibold text-foreground hover:bg-muted" : "bg-primary font-medium text-primary-foreground") : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-                    {it.icon}<span className="flex-1">{it.label}</span>
-                  </a>
-                  {!!it.children?.length && (
-                    <button type="button" aria-label={`${open ? "Fold" : "Show"} ${it.label}`} aria-expanded={open} onClick={() => setOpenGroups((g) => ({ ...g, [it.id]: !open }))}
-                      className="ml-0.5 grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
-                      <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
-                    </button>
-                  )}
-                </div>
-                {open && (
-                  <ul className="mb-1 ml-[19px] mt-0.5 flex flex-col gap-0.5 border-l border-border pl-2.5">
-                    {it.children!.map((c) => {
-                      const on = here && sub === c.id;
-                      return (
-                        <li key={c.id || "all"}>
-                          <a href={c.href} aria-current={on ? "page" : undefined} onClick={(e) => follow(e, it, c)}
-                            className={cn("block rounded-md px-2.5 py-1.5 text-[13.5px]", on ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-                            {c.label}
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                <a href={href} onClick={onLeave} aria-current={it.id === area ? "page" : undefined}
+                  className={cn("flex flex-col items-center gap-0.5 rounded-md px-3 py-1 text-[10.5px] font-medium [&_svg]:h-[18px] [&_svg]:w-[18px]", it.id === area ? "bg-white/10 text-white" : "text-[#8fd3c2]")}>
+                  {it.icon}{it.label}
+                </a>
               </li>
             );
           })}
         </ul>
-
-        <div className="flex-1" />
-        <div className={cn("flex w-full flex-col gap-0.5 border-t border-border py-2", folded && "items-center")}>
-          {panel && (folded
-            ? tip(`${panel.hidden ? "Show" : "Hide"} the work column (Ctrl/⌘ + \\)`,
-                <button type="button" onClick={panel.toggle} aria-pressed={panel.hidden} aria-label={panel.hidden ? "Show the work column" : "Hide the work column"} className={tool}>{panel.hidden ? <PanelLeftOpen /> : <PanelLeftClose />}</button>)
-            : <button type="button" onClick={panel.toggle} aria-pressed={panel.hidden} title="Ctrl/⌘ + \" className={cn(row, "cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground")}>{panel.hidden ? <PanelLeftOpen /> : <PanelLeftClose />} {panel.hidden ? "Show work column" : "Hide work column"}</button>)}
-          {folded
-            ? tip("Expand the navigation", <button type="button" onClick={toggleFold} aria-label="Expand the navigation" className={tool}><ChevronsUpDown className="rotate-90" /></button>)
-            : <button type="button" onClick={toggleFold} className={cn(row, "cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground")}><ChevronsUpDown className="rotate-90" /> Collapse</button>}
-          <div className={cn("pt-1", !folded && "w-full")}>
-            <AccountMenu variant={folded ? "avatar" : "row"} name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} />
-          </div>
-        </div>
+        <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} />
       </nav>
+
+      {/* wide screens: the dark bar, and the panel of the area pressed */}
+      <div ref={root} className="relative z-40 hidden shrink-0 lg:flex">
+        <nav aria-label="Main" className="flex w-16 flex-col items-center gap-1.5 bg-[#0b2a24] py-4">
+          {brandMenu(
+            <button type="button" aria-label={`CardPress, brand ${active?.name ?? ""}. Switch brand`} title={`Brand: ${active?.name ?? ""}`}
+              className="mb-4 cursor-pointer rounded-lg p-1 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[#8fd3c2] data-[state=open]:bg-white/10">
+              <LogoMark size={34} />
+            </button>, "right")}
+          {items.map((it) => {
+            const here = it.id === area;
+            return (
+              <div key={it.id}>
+                {it.groups ? tip(it.label,
+                  <button type="button" aria-label={it.label} aria-expanded={open === it.id} aria-current={here ? "page" : undefined}
+                    onClick={() => setOpen(open === it.id ? null : it.id)} className={icon(here || open === it.id)}>{it.icon}</button>, open === it.id)
+                  : tip(it.label, <a href={it.href} aria-label={it.label} aria-current={here ? "page" : undefined} onClick={() => { setOpen(null); onLeave?.(); }} className={icon(here)}>{it.icon}</a>)}
+              </div>
+            );
+          })}
+          <div className="flex-1" />
+          {panel && tip(`${panel.hidden ? "Show" : "Hide"} the work column (Ctrl/⌘ + \\)`,
+            <button type="button" onClick={panel.toggle} aria-pressed={panel.hidden} aria-label={panel.hidden ? "Show the work column" : "Hide the work column"} className={icon(false)}>
+              {panel.hidden ? <PanelLeftOpen /> : <PanelLeftClose />}
+            </button>)}
+          <div className="mt-2"><AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} /></div>
+        </nav>
+
+        {shown?.groups && (
+          <div role="region" aria-label={shown.label}
+            className="absolute inset-y-0 left-16 w-72 overflow-y-auto border-l border-white/5 bg-[#06201b] px-5 py-6 text-[#8fd3c2] shadow-[8px_0_30px_rgba(0,0,0,0.25)]">
+            <h2 className="mb-3 text-[17px] font-semibold text-white">{shown.label}</h2>
+            {shown.groups.map((g, i) => (
+              <div key={i} className={cn(i > 0 && "mt-6")}>
+                {g.title && <h3 className="mb-2 text-[15px] font-semibold text-white">{g.title}</h3>}
+                <ul className="flex flex-col">
+                  {g.entries.map((e) => {
+                    const on = shown.id === area && sub === e.id;
+                    return (
+                      <li key={e.id || "all"}>
+                        <a href={e.href} onClick={(ev) => follow(ev, shown, e)} aria-current={on ? "page" : undefined}
+                          {...(e.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                          className={cn("block rounded-md px-3 py-2 text-[14.5px] hover:bg-white/5 hover:text-white", on && "bg-white/10 font-medium text-white")}>
+                          {e.label}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 }
