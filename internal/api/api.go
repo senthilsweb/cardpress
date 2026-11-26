@@ -69,6 +69,8 @@ type Studio interface {
 // Library is the part of the library service the HTTP API needs.
 type Library interface {
 	List(ctx context.Context, q service.LibraryQuery) (service.LibraryPage, error)
+	Calendar(ctx context.Context, q service.CalendarQuery) ([]service.CalendarEntry, error)
+	Ready(ctx context.Context, profileID string, all bool) ([]service.ReadyItem, error)
 }
 
 // Publishing is the part of the publishing service the HTTP API needs.
@@ -243,6 +245,8 @@ func (s *server) table() []routeDef {
 		{"POST", "/publish/jobs", rule{scopeBrandBody, service.PermPublish}, s.createJob},
 		{"GET", "/publish/jobs", write(scopeBrandQuery), s.listJobs},
 		{"GET", "/library", write(scopeBrandQuery), s.library},
+		{"GET", "/calendar", write(scopeBrandQuery), s.calendar},
+		{"GET", "/calendar/ready", write(scopeBrandQuery), s.calendarReady},
 		{"GET", "/publish/jobs/{id}", write(scopeJob), s.getJob},
 		{"GET", "/publish/jobs/{id}/attempts", write(scopeJob), s.jobAttempts},
 		{"GET", "/publish/jobs/{id}/image", write(scopeJob), s.jobImage},
@@ -1284,6 +1288,36 @@ func (s *server) library(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+// calendar answers ?profileId= (or scope=all) &from= &to= (RFC 3339) with the posts and planned articles in between.
+func (s *server) calendar(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	from, errFrom := time.Parse(time.RFC3339, q.Get("from"))
+	to, errTo := time.Parse(time.RFC3339, q.Get("to"))
+	if errFrom != nil || errTo != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid", "from and to must be RFC 3339 times, such as 2026-11-01T00:00:00Z")
+		return
+	}
+	entries, err := s.Library.Calendar(r.Context(), service.CalendarQuery{ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", From: from, To: to})
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	if entries == nil {
+		entries = []service.CalendarEntry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
+}
+
+func (s *server) calendarReady(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	items, err := s.Library.Ready(r.Context(), q.Get("profileId"), q.Get("scope") == "all")
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (s *server) getJob(w http.ResponseWriter, r *http.Request) {

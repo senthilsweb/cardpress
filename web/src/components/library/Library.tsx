@@ -356,7 +356,7 @@ function ItemPage({ at, data, onBack, onGone, onPatch }: { at: ItemRef; data: Li
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">{item.title || "Untitled"}</h1>
           {item.type === "job"
-            ? <JobDetail id={item.id} page={pagePath(item)} onGone={onGone} />
+            ? <JobDetail id={item.id} page={pagePath(item)} onGone={onGone} onStatus={(status) => { setItem((x) => (x ? { ...x, status } : x)); onPatch({ status }); }} />
             : <DraftDetail item={item} data={data} onPatch={(p) => { setItem((x) => (x ? { ...x, ...p } : x)); onPatch(p); }} onGone={onGone} />}
         </>
       )}
@@ -545,12 +545,16 @@ function Poster({ id }: { id: string }) {
 }
 
 /** The whole record of a post: what was sent, when, and what LinkedIn answered. */
-function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGone: () => void }) {
+function JobDetail({ id, page, onGone, onStatus }: { id: string; page: string | null; onGone: () => void; /** The post was moved or cancelled. */ onStatus?: (status: Job["status"]) => void }) {
   const { can } = useSession();
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [cancelAsk, setCancelAsk] = useState(false);
+  const [tz, setTz] = useState(defaultTimezone());
+  const [local, setLocal] = useState(() => toLocalInput(new Date(Date.now() + 24 * 3600_000), defaultTimezone()));
   useEffect(() => {
     let live = true;
     api.getJob(id).then((j) => live && setJob(j)).catch((e) => live && setError(message(e)));
@@ -570,6 +574,14 @@ function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGo
     try { await api.deleteJob(id); onGone(); } catch (e) { setError(message(e)); setBusy(false); }
   };
   const removable = can("publish") && job.status !== "scheduled" && job.status !== "publishing";
+  // a post not yet sent can be moved to another time or cancelled; a sent one is read-only
+  const movable = can("publish") && ["scheduled", "missed", "failed", "needs_review"].includes(job.status);
+  const cancellable = can("publish") && ["scheduled", "missed", "failed", "needs_review"].includes(job.status);
+  const sched = resolveSchedule(local, tz);
+  const change = async (fn: () => Promise<Job>, done: string) => {
+    setBusy(true); setError(null);
+    try { const j = await fn(); setJob(j); onStatus?.(j.status); setMoving(false); setCancelAsk(false); toast.success(done); } catch (e) { setError(message(e)); } finally { setBusy(false); }
+  };
   return (
     <div className="mt-3 space-y-3 rounded-md border border-border bg-card p-3 text-sm">
       <Poster id={id} />
@@ -587,7 +599,9 @@ function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGo
       <div className="flex flex-wrap items-center gap-2">
         {job.postUrl && <a href={job.postUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline">View on LinkedIn <ExternalLink className="h-3 w-3" /></a>}
         {page && <a href={page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand hover:underline"><Globe className="h-3 w-3" /> Public page</a>}
-        {job.status === "published" && <Check className="h-3.5 w-3.5 text-brand" aria-label="Published" />}
+        {job.status === "published" && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Check className="h-3.5 w-3.5 text-brand" /> Sent. Read-only.</span>}
+        {movable && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setMoving((v) => !v); if (job.scheduledAt) { setTz(job.timezone || defaultTimezone()); setLocal(toLocalInput(new Date(job.scheduledAt), job.timezone || defaultTimezone())); } }}><CalendarClock /> Move…</Button>}
+        {cancellable && <Button size="sm" variant={cancelAsk ? "destructive" : "ghost"} disabled={busy} onClick={() => (cancelAsk ? void change(() => api.cancelJob(id), "Cancelled") : setCancelAsk(true))}><X /> {cancelAsk ? "Confirm: cancel the post" : "Cancel post"}</Button>}
         {removable && (
           <Button size="sm" variant={confirm ? "destructive" : "ghost"} className="ml-auto" disabled={busy} onClick={() => void remove()}
             title="Removes this record. The post stays on LinkedIn.">
@@ -596,6 +610,19 @@ function JobDetail({ id, page, onGone }: { id: string; page: string | null; onGo
         )}
       </div>
       {confirm && <p className="text-xs text-muted-foreground">This removes the record here. The post stays on LinkedIn.</p>}
+      {cancelAsk && <p className="text-xs text-muted-foreground">The post will not be sent. Its draft stays approved, so it can be scheduled again.</p>}
+      {moving && (
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <ScheduleFields idPrefix={`move-${id}`} local={local} tz={tz} onLocal={setLocal} onTz={setTz} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setMoving(false)}>Keep the time</Button>
+            <Button size="sm" variant="brand" disabled={busy || !!sched.problem || !sched.at}
+              onClick={() => sched.at && void change(() => api.rescheduleJob(id, sched.at!.toISOString().replace(/\.\d{3}Z$/, "Z"), tz), "Moved")}>
+              <CalendarClock /> Move here
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

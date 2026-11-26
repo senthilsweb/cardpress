@@ -51,6 +51,7 @@ import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
+import type { CalendarEntry, ReadyItem } from "./calendar";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
@@ -269,6 +270,13 @@ export const api = {
     if (f.q.trim()) q.set("q", f.q.trim());
     return call<LibraryPage>("GET", `/library?${q}`);
   },
+  calendar: (brand: string, from: string, to: string) => {
+    const q = new URLSearchParams({ from, to });
+    if (brand === "all") q.set("scope", "all"); else q.set("profileId", brand);
+    return call<{ entries: CalendarEntry[] }>("GET", `/calendar?${q}`).then((r) => r.entries);
+  },
+  calendarReady: (brand: string) =>
+    call<{ items: ReadyItem[] }>("GET", brand === "all" ? "/calendar/ready?scope=all" : `/calendar/ready?profileId=${encodeURIComponent(brand)}`).then((r) => r.items),
   jobAttempts: (id: string) => call<{ attempts: Attempt[] }>("GET", `/publish/jobs/${encodeURIComponent(id)}/attempts`).then((r) => r.attempts),
   publishJobNow: (id: string, acceptDuplicate = false) => call<Job>("POST", `/publish/jobs/${encodeURIComponent(id)}/publish-now`, { acceptDuplicate }),
   rescheduleJob: (id: string, scheduledAt: string, timezone: string) => call<Job>("PUT", `/publish/jobs/${encodeURIComponent(id)}/schedule`, { scheduledAt, timezone }),

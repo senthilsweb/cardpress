@@ -7,7 +7,7 @@ How the screens are arranged, and what is remembered.
 Every page has a narrow dark **navigation bar** on the left:
 
 - **The CardPress mark** at the top opens the brand menu: switch brand, **New brand**, **Manage brands**.
-- **Studio** goes to the studio.
+- **Studio** and **Calendar** go to their pages.
 - **Library**, **Settings** and **Help** each open a panel beside the bar listing their pages:
   - Library: All, Posts, Articles.
   - Settings: Account, API keys; Brands and Social accounts; for admins, Users and Assistant.

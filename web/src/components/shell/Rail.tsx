@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, CircleHelp, FileText, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, Check, CircleHelp, FileText, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { DOCS_URL, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, DOCS_URL, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,7 @@ export function Rail({ area, sub, brands, activeId, colors, switching = false, o
       { id: "post", label: "Posts", href: libraryHref("post") },
       { id: "article", label: "Articles", href: libraryHref("article") },
     ] }] },
+    { id: "calendar", label: "Calendar", href: calendarHref(), icon: <CalendarDays /> },
     { id: "settings", label: "Settings", icon: <Settings />, groups: [
       { entries: pick(["account", "api-keys"]) },
       { title: "Brands", entries: pick(["brands", "social"]) },

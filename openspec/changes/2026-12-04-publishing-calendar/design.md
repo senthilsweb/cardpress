@@ -1,5 +1,10 @@
 # Design
 
+**As built (2026-11-25):**
+- Selecting an item opens its page in the library (`/library/?item=…`), as the owner chose for the grid. Move and Cancel are on that page; a sent post is read-only.
+- Ready to schedule is a popup opened from the toolbar or a day's **+**, not a second column.
+- A post is scheduled from its preview in the studio, because its card image is drawn in the browser there. The calendar plans articles itself.
+
 - Route `/calendar/`, in the frame of `2026-12-08-studio-clarity`: Calendar on the rail. The secondary list holds the brand filter, a small month and Ready to schedule. The calendar fills the rest of the window.
 - Data from the existing jobs and drafts: a new read `GET /api/v1/calendar?from=&to=&profileId=` returning `{at, timeZone, type: job|plan, status, draftId, kind, title, brand}`. `at` is UTC; the page shows it in the viewer's time zone, and the item pane also shows the item's own zone when it differs.
 - Day view: the hours of one day, each item at its time. Opening a day from the month goes here.

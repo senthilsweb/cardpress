@@ -5,9 +5,10 @@ const base = () => import.meta.env.BASE_URL;
 export const DOCS_URL = "https://www.senthilsweb.com/cardpress/";
 export const studioHref = (query = "") => `${base()}studio/${query}`;
 export const libraryHref = (kind?: "post" | "article") => `${base()}library/${kind ? `?kind=${kind}` : ""}`;
+export const calendarHref = (query = "") => `${base()}calendar/${query}`;
 export const settingsHref = (section?: SettingsSection, query = "") => `${base()}settings/${section ? `${section}/` : ""}${query}`;
 
-export type Area = "studio" | "library" | "settings";
+export type Area = "studio" | "library" | "calendar" | "settings";
 
 export type SettingsSection = "account" | "brands" | "social" | "api-keys" | "users" | "assistant";
 

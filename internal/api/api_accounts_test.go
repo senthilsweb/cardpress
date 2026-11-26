@@ -506,6 +506,18 @@ func TestNobodyReachesAnotherPersonsWork(t *testing.T) {
 	if b.json("GET", "/api/v1/library?scope=all", "", &page); len(page.Items) != 0 {
 		t.Fatalf("b sees %d library items", len(page.Items))
 	}
+	// the calendar is narrowed the same way
+	span := "&from=" + time.Now().Add(-24*time.Hour).UTC().Format(time.RFC3339) + "&to=" + time.Now().Add(30*24*time.Hour).UTC().Format(time.RFC3339)
+	var cal struct{ Entries []service.CalendarEntry }
+	if a.json("GET", "/api/v1/calendar?profileId=a-brand"+span, "", &cal); len(cal.Entries) == 0 {
+		t.Fatal("the owner sees nothing on the calendar")
+	}
+	if b.json("GET", "/api/v1/calendar?scope=all"+span, "", &cal); len(cal.Entries) != 0 {
+		t.Fatalf("b sees %d calendar entries", len(cal.Entries))
+	}
+	if code := b.do("GET", "/api/v1/calendar?profileId=a-brand"+span, "").Code; code == 200 {
+		t.Fatal("b read another person's calendar")
+	}
 }
 
 type keyBody struct {
