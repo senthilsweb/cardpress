@@ -33,7 +33,7 @@
       "x-standard": {
         "article": {
           "minWords": 4,
-          "maxWords": 12
+          "maxWords": 18
         }
       },
       "x-choices": true,

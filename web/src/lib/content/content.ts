@@ -74,7 +74,7 @@ export const CardText = z.strictObject({
 /** A hashtag without its "#": letters of any alphabet, digits and underscores. */
 export const Hashtag = z.string().max(100).regex(/^[\p{L}\p{N}_]+$/u);
 
-const title = field(z.string().max(200), { label: "Title", column: "drafts.title", writer: "agent", kinds: both, requiredFor: ["publishPage"], standard: { article: { minWords: 4, maxWords: 12 } }, choices: true, embed: true });
+const title = field(z.string().max(200), { label: "Title", column: "drafts.title", writer: "agent", kinds: both, requiredFor: ["publishPage"], standard: { article: { minWords: 4, maxWords: 18 } }, choices: true, embed: true });
 const altText = field(z.string().max(1000), { label: "Alt text", column: "drafts.alt_text", writer: "agent", kinds: both, choices: true });
 const hashtags = field(z.array(Hashtag).max(30), { label: "Hashtags", column: "drafts.hashtags", writer: "agent", kinds: ["post"], standard: { post: { minItems: 3, maxItems: 5 } }, choices: true, embed: true });
 const summary = field(z.string().max(300), { label: "Summary", column: "drafts.summary", writer: "agent", kinds: ["article"], standard: { article: { maxLength: 160 } }, choices: true, embed: true });
