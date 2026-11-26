@@ -1,4 +1,4 @@
-// Package cma is the adapter that connects the chat to the Claude Managed Agents defined in the social-card-agent
+// Package cma is the adapter that connects the chat to the Claude Managed Agents defined in the cardpress-agent
 // repository.
 //
 // One managed session is kept per conversation. The agents work in the studio through this server's MCP endpoint, as the
