@@ -34,7 +34,7 @@ The server listens on `127.0.0.1` only. Open <http://localhost:8080> for the lan
 3. Choose a size in the bar above the canvas (LinkedIn, X, Instagram, Facebook), or **All sizes** to see them together.
 4. **Download PNG**, **Copy** the image, or **All sizes .zip**.
 
-Design and Details are in the left column. Set your name, handle, logo and fonts once under **Settings**, **Brands**, **Look**.
+Design and Details are in the left column. Set your name, handle, logo and fonts once under **Settings**, **Brands**, **Edit**.
 
 ## Write a post
 

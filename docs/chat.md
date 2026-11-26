@@ -38,7 +38,7 @@ A reply that fails is kept too, with the reason; what it had changed can still b
 
 When there is a choice to make (three titles, two card headlines), the reply shows it as radio buttons, or a drop-down when there are more than four, with the recommended one first. The same options appear under the field in Details.
 
-- Any text on the card can be offered: headline, eyebrow, subtitle, tag, the two footers, quote author and number. Where leaving it off is a choice, **None** is one of the options. You can also just say "remove the eyebrow". An empty footer shows your brand's handle or website; hiding the footer is set under **Design**.
+- Any text on the card can be offered: headline, eyebrow, subtitle, tag, the two footers, quote author and number. Where leaving it off is a choice, **None** is one of the options. You can also just say "remove the eyebrow": only what you name is cleared, even if you typed it yourself. An empty footer shows your brand's handle or website; hiding the footer is set under **Design**.
 - **Picking** one shows it on the canvas at once, marked **Previewing. Not saved.**
 - **Save as version** puts the picked options into the item and saves it as a version. No model is called, so it costs nothing.
 - **Keep as is** drops the preview.

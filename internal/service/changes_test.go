@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -292,5 +293,37 @@ func TestAnItemMadeDuringAReplyWaitsToBeSavedToo(t *testing.T) {
 	w.body(article, "From outside.")
 	if len(w.versions(article)) < 2 {
 		t.Fatal(w.versions(article))
+	}
+}
+
+// Asked to clear a field, the assistant clears that one, whoever filled it; what was there is kept as a version.
+func TestClearingOneFieldLeavesTheOthersAsThePersonTypedThem(t *testing.T) {
+	w := newWriter(t)
+	var id string
+	w.reply(func(st *agent.Studio) { id = st.PostID; w.body(id, "One.") })
+	card, d, err := w.s.Card(w.ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	card.Eyebrow, card.Title, card.Subtitle, card.Footer = "Typed eyebrow", "Typed headline", "Typed subtitle", "Typed footer"
+	in := inputOf(d)
+	in.Design, _ = json.Marshal(card)
+	if _, err := w.s.UpdateDraft(w.ctx, id, in); err != nil {
+		t.Fatal(err)
+	}
+	_, last := w.reply(func(*agent.Studio) {
+		empty := ""
+		if _, _, _, err := w.s.PatchCardText(w.ctx, id, CardText{Eyebrow: &empty}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if card, _, _ = w.s.Card(w.ctx, id); card.Eyebrow != "" || card.Title != "Typed headline" || card.Subtitle != "Typed subtitle" || card.Footer != "Typed footer" {
+		t.Fatalf("%+v", card)
+	}
+	if _, err := w.c.Undo(w.ctx, w.conv, last); err != nil {
+		t.Fatal(err)
+	}
+	if card, _, _ = w.s.Card(w.ctx, id); card.Eyebrow != "Typed eyebrow" {
+		t.Fatalf("%+v", card)
 	}
 }
