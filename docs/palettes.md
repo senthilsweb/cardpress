@@ -15,3 +15,7 @@ Aubergine is not the default. New designs start on Ink.
 ## Saved profiles
 
 Profiles are stored in the database. On load, `withStandardPalettes` appends any standard palette whose id is missing and leaves existing and edited palettes alone. To add a palette for everyone, add it to `standardPalettes`.
+
+## Seasonal colours
+
+Five sets go with the seasonal greeting backgrounds and appear for every brand: Autumn cream, Autumn night, Festival night, Midnight gold and Lunar red.

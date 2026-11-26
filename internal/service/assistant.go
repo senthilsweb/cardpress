@@ -216,6 +216,12 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 		}
 		*f.to = *f.from
 	}
+	if t.Footer != nil {
+		card.emptied("footer", *t.Footer)
+	}
+	if t.FooterLeft != nil {
+		card.emptied("footerLeft", *t.FooterLeft)
+	}
 	raw, err := json.Marshal(card)
 	if err != nil {
 		return card, cur, Effects{}, err

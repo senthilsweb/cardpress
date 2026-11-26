@@ -3,12 +3,14 @@ import type { Perm } from "./session";
 /** Where each part of the app lives. */
 const base = () => import.meta.env.BASE_URL;
 export const DOCS_URL = "https://www.senthilsweb.com/cardpress/";
+/** The user guide, a page of the app. */
+export const helpHref = () => `${base()}help/`;
 export const studioHref = (query = "") => `${base()}studio/${query}`;
 export const libraryHref = (kind?: "post" | "article") => `${base()}library/${kind ? `?kind=${kind}` : ""}`;
 export const calendarHref = (query = "") => `${base()}calendar/${query}`;
 export const settingsHref = (section?: SettingsSection, query = "") => `${base()}settings/${section ? `${section}/` : ""}${query}`;
 
-export type Area = "studio" | "library" | "calendar" | "settings";
+export type Area = "studio" | "library" | "calendar" | "settings" | "help";
 
 export type SettingsSection = "account" | "brands" | "social" | "api-keys" | "users" | "assistant";
 

@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AccountMenu } from "@/components/studio/AccountMenu";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { calendarHref, DOCS_URL, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, helpHref, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,9 +31,7 @@ export interface RailProps {
 
 interface Entry { id: string; label: string; href: string; external?: boolean }
 interface Group { title?: string; entries: Entry[] }
-interface Item { id: Area | "help"; label: string; href?: string; icon: React.ReactNode; groups?: Group[] }
-
-const REPO = "https://github.com/senthilsweb/cardpress";
+interface Item { id: Area; label: string; href?: string; icon: React.ReactNode; groups?: Group[] }
 
 /** The brand's square: its colour and initials. */
 function BrandTile({ name, color }: { name: string; color: string }) {
@@ -46,8 +44,8 @@ function BrandTile({ name, color }: { name: string; color: string }) {
 
 /**
  * The navigation: a narrow dark bar on the left of every signed-in page. The CardPress mark at the top opens the brand
- * menu. An area with pages (Library, Settings, Help) opens a panel beside the bar listing them; Studio goes straight to
- * the studio. The person is at the bottom. On narrow screens it is a bar along the bottom.
+ * menu. An area with pages (Library, Settings) opens a panel beside the bar listing them; the others go straight to
+ * their page. The person is at the bottom. On narrow screens it is a bar along the bottom.
  */
 export function Rail({ area, sub, brands, activeId, colors, switching = false, onSwitchBrand, theme, onToggleTheme, panel, onLeave, onSub }: RailProps) {
   const { user, can } = useSession();
@@ -72,15 +70,7 @@ export function Rail({ area, sub, brands, activeId, colors, switching = false, o
       { title: "Brands", entries: pick(["brands", "social"]) },
       { title: "Administration", entries: pick(["users", "assistant"]) },
     ].filter((g) => g.entries.length) },
-    { id: "help", label: "Help", icon: <CircleHelp />, groups: [
-      { entries: [
-        { id: "docs", label: "Docs", href: DOCS_URL, external: true },
-      ] },
-      { title: "Support", entries: [
-        { id: "issue", label: "Report a problem", href: `${REPO}/issues/new`, external: true },
-        { id: "repo", label: "Source code", href: REPO, external: true },
-      ] },
-    ] },
+    { id: "help", label: "User guide", href: helpHref(), icon: <CircleHelp /> },
   ];
   const shown = items.find((i) => i.id === open);
 

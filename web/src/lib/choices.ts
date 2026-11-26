@@ -1,3 +1,4 @@
+import { withFooterFlags } from "./cardDesign";
 /** The assistant's options and what a reply changed: what the chat shows for them, and the preview of a picked option. */
 
 import type { Change, Choice, Conversation } from "./chat";
@@ -17,9 +18,8 @@ const LABEL: Record<string, string> = {
 };
 export const choiceLabel = (field: string) => LABEL[field] ?? field;
 
-/** What an option says. An empty one takes the words off the card; an empty footer shows the brand's own. */
-export const optionText = (v: string | string[], field = "") =>
-  Array.isArray(v) ? v.map((t) => `#${t}`).join(" ") : v || (field.startsWith("footer") ? "Brand default" : "None");
+/** What an option says. An empty one takes the words off the card. */
+export const optionText = (v: string | string[]) => (Array.isArray(v) ? v.map((t) => `#${t}`).join(" ") : v || "None");
 
 /** An offer that can still be picked from. */
 export const open = (c: Choice) => c.status === "pending" || c.status === "chosen";
@@ -56,8 +56,9 @@ export function preview(d: Draft, card: Design, choices: Choice[], picks: Picks)
     const value = c.options[i].value;
     const key = CARD[c.field];
     if (key) {
-      if ((design[key] ?? "") === value) continue;
-      design = { ...design, [key]: value };
+      const next = { ...design, ...withFooterFlags({ [key]: value } as Partial<Design>) };
+      if ((design[key] ?? "") === value && next.noFooter === design.noFooter && next.noFooterLeft === design.noFooterLeft) continue;
+      design = next;
       draft = { ...draft, design };
     } else {
       if (JSON.stringify(draft[c.field as keyof Draft]) === JSON.stringify(value)) continue;

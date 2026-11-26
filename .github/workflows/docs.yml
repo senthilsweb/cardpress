@@ -3,7 +3,7 @@ name: Docs site
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "mkdocs.yml", "web/guide/**", ".github/workflows/docs.yml"]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,8 @@ jobs:
         run: |
           pip install --quiet "mkdocs-material==9.*" "mkdocs<2"
           mkdocs build --strict
+      - name: Build the user guide into /guide
+        run: node web/guide/build.mjs site/guide
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
 

@@ -36,8 +36,10 @@ Optional `needs: "photos" | "screenshot" | "image"` shows an "add" badge until t
 
 | Field | Use |
 |---|---|
-| `category` | The list it appears in, picked in Design → Background. Without it: **Abstract** |
+| `category` | The list it appears in, picked in the background picker (Design → Background → Browse). Without it: **Abstract** |
 | `group` | A heading inside the category, for example an occasion |
+| `keywords` | Other words the picker's search finds it by |
+| `palette` | Id of a standard palette the picker offers with it |
 
 A new category appears as soon as one background names it. **Seasonal greetings** lives in `web/src/card/bg/seasonal/`, one file per occasion, each exporting its variations:
 

@@ -116,7 +116,7 @@ function clouds(c: BgCtx) {
   );
 }
 
-const theme = { category: SEASONAL, group: "Chinese New Year", dense: true };
+const theme = { category: SEASONAL, group: "Chinese New Year", dense: true, palette: "lunar-red", keywords: ["lunar", "spring festival", "red", "greeting"] };
 const defs: BackgroundDef[] = [
   { id: "lunar-lanterns", name: "Red lanterns", hint: "Hanging lanterns", render: lanterns, ...theme },
   { id: "lunar-blossom", name: "Plum blossom", hint: "Flowering branch", render: blossom, ...theme },

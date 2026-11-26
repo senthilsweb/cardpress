@@ -7,13 +7,12 @@ How the screens are arranged, and what is remembered.
 Every page has a narrow dark **navigation bar** on the left:
 
 - **The CardPress mark** at the top opens the brand menu: switch brand, **New brand**, **Manage brands**.
-- **Studio** and **Calendar** go to their pages.
-- **Library**, **Settings** and **Help** each open a panel beside the bar listing their pages:
+- **Studio**, **Calendar** and **User guide** go to their pages. The guide (`/help/`) is built from `web/guide/pages`; the same pages are published on the web.
+- **Library** and **Settings** each open a panel beside the bar listing their pages:
   - Library: All, Posts, Articles.
   - Settings: Account, API keys; Brands and Social accounts; for admins, Users and Assistant.
-  - Help: Docs, Report a problem, Source code.
 - Choosing a page closes the panel, as do **Esc** and a click outside it.
-- At the bottom are **hide the work column** (studio only, also **Ctrl/⌘ + \\**) and **you**. Your menu has the light or dark mode, **Docs** and **Sign out**.
+- At the bottom are **hide the work column** (studio only, also **Ctrl/⌘ + \\**) and **you**. Your menu has the light or dark mode, **User guide** and **Sign out**.
 
 Nothing is placed along the top of the window. Each setting is its own page: `/settings/account/`, `/settings/brands/`, `/settings/social/`, `/settings/api-keys/`, `/settings/users/`, `/settings/assistant/`. Old addresses such as `/studio/?open=accounts` go to the matching page.
 
@@ -39,6 +38,10 @@ The left column has three sides. Your choice is remembered.
 - **Chat**: the [assistant](chat.md), shown first.
 - **Details**: every field of the item on screen, once.
 - **Design**: how its card looks (layout, background, images, colours, fonts).
+
+**Design → Background → Browse backgrounds** opens a picker: search (an occasion such as "thanks" or "diwali" works), categories on the left, and your own card drawn with each background. A seasonal one offers matching colours. Nothing changes until you press **Use**.
+
+A footer field that has never been written shows the brand's handle (right) or website (left). Once you clear it, or the assistant does, it stays empty; **Use the brand's** under the field brings it back.
 
 ### Details
 

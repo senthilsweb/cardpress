@@ -15,28 +15,31 @@ const CardDesignVersion = 1
 // never described twice. It is the strongly typed form of the editor's Design; the server refuses anything it could not
 // render. Images are data URLs, so a stored design is complete in itself.
 type CardDesign struct {
-	SizeID      string            `json:"sizeId"`
-	Layout      string            `json:"layout"`
-	Background  string            `json:"background"`
-	PaletteID   string            `json:"paletteId"`
-	Seed        int               `json:"seed"`
-	Eyebrow     string            `json:"eyebrow"`
-	Title       string            `json:"title"`
-	Subtitle    string            `json:"subtitle"`
-	Footer      string            `json:"footer"`
-	FooterLeft  string            `json:"footerLeft,omitempty"`
-	Tag         string            `json:"tag"`
-	QuoteAuthor string            `json:"quoteAuthor"`
-	StatValue   string            `json:"statValue"`
-	TitleScale  float64           `json:"titleScale"`
-	Intensity   float64           `json:"intensity"`
-	BottomFade  float64           `json:"bottomFade"`
-	ShowLogo    bool              `json:"showLogo"`
-	ShowFooter  bool              `json:"showFooter"`
-	Photos      []string          `json:"photos"`
-	Screenshot  string            `json:"screenshot,omitempty"`
-	BgImage     string            `json:"bgImage,omitempty"`
-	Fonts       map[string]string `json:"fonts,omitempty"`
+	SizeID      string  `json:"sizeId"`
+	Layout      string  `json:"layout"`
+	Background  string  `json:"background"`
+	PaletteID   string  `json:"paletteId"`
+	Seed        int     `json:"seed"`
+	Eyebrow     string  `json:"eyebrow"`
+	Title       string  `json:"title"`
+	Subtitle    string  `json:"subtitle"`
+	Footer      string  `json:"footer"`
+	FooterLeft  string  `json:"footerLeft"`
+	Tag         string  `json:"tag"`
+	QuoteAuthor string  `json:"quoteAuthor"`
+	StatValue   string  `json:"statValue"`
+	TitleScale  float64 `json:"titleScale"`
+	Intensity   float64 `json:"intensity"`
+	BottomFade  float64 `json:"bottomFade"`
+	ShowLogo    bool    `json:"showLogo"`
+	ShowFooter  bool    `json:"showFooter"`
+	// An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose.
+	NoFooter     bool              `json:"noFooter,omitempty"`
+	NoFooterLeft bool              `json:"noFooterLeft,omitempty"`
+	Photos       []string          `json:"photos"`
+	Screenshot   string            `json:"screenshot,omitempty"`
+	BgImage      string            `json:"bgImage,omitempty"`
+	Fonts        map[string]string `json:"fonts,omitempty"`
 
 	// Caption is a leftover of older designs (captions now live in drafts). It is accepted and dropped.
 	Caption json.RawMessage `json:"caption,omitempty"`
@@ -52,6 +55,16 @@ const (
 	maxDesignImage  = 8 << 20
 	maxDesignPhotos = 12
 )
+
+// emptied records that a footer was written: empty then means no text, not the brand's own.
+func (d *CardDesign) emptied(field, text string) {
+	switch field {
+	case "footer":
+		d.NoFooter = text == ""
+	case "footerLeft":
+		d.NoFooterLeft = text == ""
+	}
+}
 
 // ParseCardDesign reads and checks a design. Unknown fields are refused, so a misspelt one is not silently lost.
 func ParseCardDesign(raw []byte) (CardDesign, error) {

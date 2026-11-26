@@ -1,0 +1,81 @@
+<p>Social accounts are connected once for each brand, under <b>Settings → Social accounts</b>. Open the right brand first.</p>
+<div class="table"><table>
+<tr><th>Network</th><th>Publish from CardPress</th><th>Until then</th></tr>
+<tr><td>LinkedIn</td><td>Yes</td><td></td></tr>
+<tr><td>X</td><td>Not yet. Keys can be saved.</td><td>Download the image and post by hand</td></tr>
+<tr><td>Instagram</td><td>Not yet. Values can be saved.</td><td>Download the image and post by hand</td></tr>
+<tr><td>Facebook</td><td>No. Image sizes only.</td><td>Download the image and post by hand</td></tr>
+</table></div>
+<figure><img src="img/social.jpg" alt="Social accounts with tabs for LinkedIn, X and Instagram"><figcaption>Settings → Social accounts</figcaption></figure>
+<p>The steps below were checked against each network's developer information on 26 November 2026. Names on the networks' own screens change from time to time.</p>
+
+<h2>LinkedIn: what is needed</h2>
+<div class="table"><table>
+<tr><th>Field</th><th>What it is</th></tr>
+<tr><td>Client ID, Client secret</td><td>Identify the LinkedIn app. Used by <b>Test connection</b>.</td></tr>
+<tr><td>Access token</td><td>Permission to post. Lasts about 60 days.</td></tr>
+<tr><td>Author URN</td><td>Who posts: a person or a company page</td></tr>
+</table></div>
+
+<h2>LinkedIn: post as a person</h2>
+<h3>1. Create the app</h3>
+<ol>
+<li>Open <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener">linkedin.com/developers/apps</a> and press <b>Create app</b>.</li>
+<li>Enter a name and a logo. LinkedIn asks for a company page; any page managed by the account works, and nothing is posted to it.</li>
+<li>On the app's <b>Settings</b> tab, press <b>Verify</b> beside the page, and open the link it makes while signed in as an admin of that page.</li>
+</ol>
+<h3>2. Add the products</h3>
+<p>On the <b>Products</b> tab, request <b>Share on LinkedIn</b> and <b>Sign In with LinkedIn using OpenID Connect</b>. Both are usually added at once.</p>
+<h3>3. Get the values</h3>
+<ol>
+<li>On the <b>Auth</b> tab, copy the <b>Client ID</b> and <b>Primary Client Secret</b>.</li>
+<li>Open the <a href="https://www.linkedin.com/developers/tools/oauth/token-generator" target="_blank" rel="noopener">token generator</a>, select the app, tick <code>openid</code>, <code>profile</code> and <code>w_member_social</code>, and press <b>Request access token</b>. Copy the token.</li>
+</ol>
+<h3>4. Find the Author URN</h3>
+<p>This is the one step done outside a web page. In the Terminal app on a Mac, run the two lines below. After the first line, paste the token and press Enter; it stays hidden.</p>
+<pre><code>read -s TOKEN
+curl -s https://api.linkedin.com/v2/userinfo -H "Authorization: Bearer $TOKEN"</code></pre>
+<p>The answer contains <code>"sub"</code> followed by a short code. The Author URN is <code>urn:li:person:</code> followed by that code.</p>
+<h3>5. Save and test</h3>
+<ol>
+<li>In CardPress open <b>Settings → Social accounts → LinkedIn</b>.</li>
+<li>Enter the four values and press <b>Save</b>.</li>
+<li>Press <b>Test connection</b>. It shows whether the token is valid and when it ends.</li>
+</ol>
+<div class="note"><p>A token works like a password. Do not send it by email or chat, or paste it anywhere except the field above.</p></div>
+
+<h2>LinkedIn: post as a company page</h2>
+<p>Posting as a page needs LinkedIn's approval of the <b>Community Management API</b>. LinkedIn offers it to registered organisations and reviews each request, which can take some time.</p>
+<ol>
+<li>Create a separate app for this, linked to the company page. LinkedIn requires this product to be the only one on its app.</li>
+<li>Request <b>Community Management API</b> on the <b>Products</b> tab and answer LinkedIn's questions.</li>
+<li>After approval, make a token with <code>w_organization_social</code>. The person making it must be an admin of the page.</li>
+<li>Use the Author URN <code>urn:li:organization:</code> followed by the page's number, shown in the address of the page's admin view.</li>
+</ol>
+<p>A brand posts as one author. To post both as a person and as a page, use two brands.</p>
+
+<h2>LinkedIn: renew the token</h2>
+<p>About every 60 days, make a new token in the token generator, paste it into <b>Access token</b>, press <b>Save</b>, then <b>Test connection</b>.</p>
+
+<h2>X</h2>
+<p>CardPress does not publish to X yet. The values can be saved for later.</p>
+<ol>
+<li>Open <a href="https://console.x.com" target="_blank" rel="noopener">console.x.com</a>, sign in and create an app.</li>
+<li>In the app's user authentication settings, set the permission to <b>Read and write</b>.</li>
+<li>Under <b>Keys and tokens</b>, generate the <b>API key and secret</b> and the <b>Access token and secret</b>. Generate them after setting the permission. Each is shown only once.</li>
+<li>In CardPress open the <b>X</b> tab, enter the four values and press <b>Save</b>.</li>
+</ol>
+<p>X may charge for posting through an app. Check X's current terms.</p>
+
+<h2>Instagram</h2>
+<p>CardPress does not publish to Instagram yet. The values can be saved for later.</p>
+<ol>
+<li>Make the Instagram account a <b>Business</b> or <b>Creator</b> account, and link it to a Facebook Page.</li>
+<li>Create an app at <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener">developers.facebook.com/apps</a> and add Instagram to it.</li>
+<li>Collect the <b>App ID</b>, <b>App secret</b>, a <b>long-lived access token</b> (about 60 days) and the <b>Business account ID</b>.</li>
+<li>In CardPress open the <b>Instagram</b> tab, enter them and press <b>Save</b>.</li>
+</ol>
+<p>Using accounts that belong to others, such as a client's, can need Meta's review of the app and business verification.</p>
+
+<h2>Saved values</h2>
+<p>A saved secret shows only its last characters and cannot be shown again. Type a new value to replace it. The bin removes a value; press it twice. A brand never uses another brand's values.</p>

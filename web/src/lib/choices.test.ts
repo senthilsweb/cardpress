@@ -28,7 +28,7 @@ describe("taking words off the card", () => {
   const c = offer("e", "eyebrow", ["Notes", ""]);
   it("previews an empty option and names it", () => {
     expect(preview(draft, { ...card, eyebrow: "Notes" }, [c], { e: 1 }).design.eyebrow).toBe("");
-    expect([optionText("", "eyebrow"), optionText("", "footerLeft")]).toEqual(["None", "Brand default"]);
+    expect(optionText("")).toBe("None");
   });
 });
 

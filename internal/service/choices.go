@@ -123,6 +123,7 @@ func (s *Studio) withField(ctx context.Context, cur Draft, fc *fieldChange, fiel
 			return err
 		}
 		*cardWord(&card, field) = text
+		card.emptied(field, text)
 		if err := card.validate(); err != nil {
 			return err
 		}

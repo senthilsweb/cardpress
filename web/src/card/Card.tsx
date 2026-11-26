@@ -167,8 +167,8 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
   ) : null;
 
   // Small print at the very bottom: a quiet link on the left and the main one right-aligned at the bottom right.
-  const footLeft = design.footerLeft || profile.website;
-  const footRight = design.footer || profile.handle;
+  const footLeft = design.footerLeft || (design.noFooterLeft ? "" : profile.website);
+  const footRight = design.footer || (design.noFooter ? "" : profile.handle);
   const clip: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
   const footer = design.showFooter && (footLeft || footRight) ? (
     <div style={{ position: "absolute", left: pad, right: pad, bottom: 2.6 * u, display: "flex", alignItems: "baseline", gap: 3 * u, fontFamily: MONO, fontSize: 1.5 * u, letterSpacing: "0.02em", color: pal.text }}>

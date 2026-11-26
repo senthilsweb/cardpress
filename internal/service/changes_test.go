@@ -327,3 +327,20 @@ func TestClearingOneFieldLeavesTheOthersAsThePersonTypedThem(t *testing.T) {
 		t.Fatalf("%+v", card)
 	}
 }
+
+func TestEmptiedFooterStaysEmpty(t *testing.T) {
+	c := defaultCard()
+	c.emptied("footerLeft", "")
+	c.emptied("footer", "me")
+	raw, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseCardDesign(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.NoFooterLeft || got.NoFooter || !strings.Contains(string(raw), `"footerLeft":""`) {
+		t.Fatalf("got %s", raw)
+	}
+}

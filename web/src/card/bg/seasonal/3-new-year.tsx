@@ -109,7 +109,7 @@ function clock(c: BgCtx) {
   );
 }
 
-const theme = { category: SEASONAL, group: "New Year", dense: true };
+const theme = { category: SEASONAL, group: "New Year", dense: true, palette: "midnight-gold", keywords: ["happy new year", "celebration", "party", "greeting"] };
 const defs: BackgroundDef[] = [
   { id: "newyear-fireworks", name: "Fireworks", hint: "Bursts in the night sky", render: fireworks, ...theme },
   { id: "newyear-confetti", name: "Confetti", hint: "Streamers and confetti", render: confetti, ...theme },

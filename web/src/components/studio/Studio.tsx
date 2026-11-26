@@ -23,6 +23,7 @@ import { toCardDesign } from "@/lib/cardDesign";
 import { lockReason } from "@/lib/lock";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
+import { fullDesign, withFooterFlags } from "@/lib/cardDesign";
 import { brandColor } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Network, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
@@ -82,7 +83,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const profile = profiles.find((p) => p.id === initial.activeId) ?? profiles[0] ?? DEFAULT_PROFILES[0];
   // the brand's design is where a new item starts; each item then keeps its own (see Draft.design)
   const brandDesign: Design = useMemo(() => {
-    const d = { ...DEFAULT_DESIGN, ...(designs[profile.id] ?? {}) };
+    const saved = designs[profile.id];
+    const d = saved ? fullDesign(DEFAULT_DESIGN, saved) : { ...DEFAULT_DESIGN };
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
     return d;
   }, [designs, profile]);
@@ -90,7 +92,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   /** The card an item is shown with: its own, or the brand's starting card when it has none. */
   const designOf = useCallback((own?: Design): Design => {
     if (!own) return brandDesign;
-    const d = { ...DEFAULT_DESIGN, ...own };
+    const d = fullDesign(DEFAULT_DESIGN, own);
     if (!profile.palettes.some((p) => p.id === d.paletteId)) d.paletteId = profile.palettes[0].id;
     return d;
   }, [brandDesign, profile]);
@@ -249,7 +251,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const locked = lockReason(store.current);
   const set = useCallback((patch: Partial<Design>) => {
     if (locked) { toast("The card cannot be changed", { description: locked }); return; }
-    const next = { ...design, ...patch };
+    const next = { ...design, ...withFooterFlags(patch) };
     setDesigns((all) => ({ ...all, [profile.id]: next })); // the brand's starting point follows the latest card
     store.update({ design: next });
   }, [design, profile.id, setDesigns, store, locked]);

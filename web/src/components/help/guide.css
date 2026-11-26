@@ -1,0 +1,21 @@
+/* The guide's pages are plain HTML, so they are styled here, in the app's colours. */
+.guide { font-size: 15px; line-height: 1.7; }
+.guide p { margin: .7rem 0; }
+.guide a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.guide h2 { margin: 2.2rem 0 .6rem; font-size: 1.2rem; font-weight: 600; scroll-margin-top: 1rem; }
+.guide h3 { margin: 1.4rem 0 .4rem; font-size: 1rem; font-weight: 600; }
+.guide ul, .guide ol { margin: .6rem 0; padding-left: 1.4rem; }
+.guide ul { list-style: disc; }
+.guide ol { list-style: decimal; }
+.guide li { margin: .25rem 0; }
+.guide code { border: 1px solid var(--border); border-radius: 5px; background: var(--muted); padding: .05em .35em; font-size: .86em; overflow-wrap: anywhere; }
+.guide pre { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); padding: .8rem 1rem; }
+.guide pre code { border: 0; background: none; padding: 0; overflow-wrap: normal; }
+.guide .table { overflow-x: auto; margin: .8rem 0; }
+.guide table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.guide th, .guide td { border: 1px solid var(--border); padding: .45rem .7rem; text-align: left; vertical-align: top; }
+.guide th { background: var(--muted); font-weight: 600; }
+.guide figure { margin: 1.2rem 0; }
+.guide figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 10px; }
+.guide figcaption { margin-top: .4rem; font-size: 12.5px; color: var(--muted-foreground); }
+.guide .note { margin: 1.2rem 0; border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; background: var(--accent); padding: .2rem 1rem; }
