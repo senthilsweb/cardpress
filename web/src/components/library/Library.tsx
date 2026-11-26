@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, Check, Globe, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, Columns3, Globe, List, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Table2, Trash2, Undo2, X } from "lucide-react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { Grid } from "./Grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +24,7 @@ import { api } from "@/lib/api";
 import type { Draft } from "@/lib/draft";
 import { downloadBlob } from "@/lib/export";
 import { defaultTimezone, formatInZone, toLocalInput, type Job } from "@/lib/jobs";
-import { draftLink, LIBRARY_STATUS_LABEL, PAGE_SIZES, pageNumbers, pagePath, STATUS_FILTERS, type LibraryFilter, type LibraryItem, type LibraryPage } from "@/lib/library";
+import { COLUMNS, DEFAULT_SORT, defaultColumns, deleteSummary, draftLink, LIBRARY_STATUS_LABEL, nextSort, PAGE_SIZES, pageNumbers, pagePath, rowKey, STATUS_FILTERS, type ColumnId, type LibraryFilter, type LibraryItem, type LibraryPage, type LibrarySort } from "@/lib/library";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { DEFAULT_DESIGN } from "@/lib/profiles";
 import { sizeById } from "@/lib/sizes";
@@ -53,8 +58,21 @@ function StatusBadge({ s }: { s: LibraryItem["status"] }) {
   return <Badge variant="outline">{label}</Badge>;
 }
 
+const VIEW_KEY = "cardpress.library.view";
+const COLUMNS_KEY = "cardpress.library.columns";
+const savedView = (): "grid" | "list" => {
+  try { const v = localStorage.getItem(VIEW_KEY); if (v === "grid" || v === "list") return v; } catch { /* not remembered */ }
+  return window.matchMedia("(min-width: 1024px)").matches ? "grid" : "list";
+};
+const savedColumns = (): ColumnId[] => {
+  try { const v = JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? "null"); if (Array.isArray(v)) return v.filter((c) => COLUMNS.some((x) => x.id === c)); } catch { /* not remembered */ }
+  return defaultColumns();
+};
+const remember = (key: string, value: unknown) => { try { localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value)); } catch { /* not remembered */ } };
+
 function Page({ data }: { data: LibraryBoot }) {
   const [theme, toggleTheme] = useTheme(data.theme);
+  const { can } = useSession();
   // the navigation's Posts and Articles open the library with ?kind=
   const [filter, setFilter] = useState<LibraryFilter>(() => {
     const k = new URLSearchParams(window.location.search).get("kind");
@@ -63,6 +81,13 @@ function Page({ data }: { data: LibraryBoot }) {
   const [typed, setTyped] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(savedSize);
+  const [sort, setSort] = useState<LibrarySort>(DEFAULT_SORT);
+  const [view, setView] = useState(savedView);
+  const [columns, setColumns] = useState(savedColumns);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewing, setViewing] = useState<LibraryItem | null>(null);
+  const [asking, setAsking] = useState<LibraryItem[] | null>(null); // rows waiting for a delete to be confirmed
+  const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState<LibraryPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,19 +97,19 @@ function Page({ data }: { data: LibraryBoot }) {
   const brand = data.profiles.find((p) => p.id === (filter.brand === "all" ? data.activeId : filter.brand)) ?? data.profiles[0];
   const names = Object.fromEntries(data.profiles.map((p) => [p.id, p.name]));
 
-  // search waits for a pause in typing, and any change of filter goes back to the first page
+  // search waits for a pause in typing, and any change of filter or order goes back to the first page
   useEffect(() => {
     const t = window.setTimeout(() => setFilter((f) => (f.q === typed ? f : { ...f, q: typed })), 300);
     return () => window.clearTimeout(t);
   }, [typed]);
-  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, pageSize]);
+  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, pageSize, sort]);
 
   const load = useCallback(async (quiet = false) => {
     const id = ++run.current;
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const r = await api.library(filter, data.activeId, page, pageSize);
+      const r = await api.library(filter, data.activeId, page, pageSize, sort);
       if (id !== run.current) return;
       setResult(r);
       if (r.page !== page) setPage(r.page); // the page asked for was past the end
@@ -93,21 +118,45 @@ function Page({ data }: { data: LibraryBoot }) {
     } finally {
       if (id === run.current) setLoading(false);
     }
-  }, [filter, data.activeId, page, pageSize]);
-  useEffect(() => { setOpenId(null); void load(); }, [load]);
+  }, [filter, data.activeId, page, pageSize, sort]);
+  useEffect(() => { setOpenId(null); setSelected(new Set()); void load(); }, [load]);
 
-  const changeSize = (n: number) => {
-    setPageSize(n);
-    try { localStorage.setItem(SIZE_KEY, String(n)); } catch { /* the choice is just not remembered */ }
+  const changeSize = (n: number) => { setPageSize(n); remember(SIZE_KEY, String(n)); };
+  const changeView = (v: "grid" | "list") => { setView(v); remember(VIEW_KEY, v); setViewing(null); };
+  const toggleColumn = (id: ColumnId) => {
+    const next = columns.includes(id) ? columns.filter((c) => c !== id) : COLUMNS.map((c) => c.id).filter((c) => c === id || columns.includes(c));
+    setColumns(next); remember(COLUMNS_KEY, next);
   };
   const items = result?.items ?? [];
   /** A row changed in place: show it at once, then look again so the list agrees with the server. */
   const patchItem = (id: string, patch: Partial<LibraryItem>) => {
     setResult((r) => (r ? { ...r, items: r.items.map((x) => (x.id === id ? { ...x, ...patch } : x)) } : r));
   };
-  const gone = () => { setOpenId(null); void load(true); };
+  const gone = () => { setOpenId(null); setViewing(null); void load(true); };
 
-  // the brand at the top of the rail is the brand the library opens on; switching it shows that brand's items
+  /** Delete the rows the person confirmed, one by one, each checked by the server as a single delete would be. */
+  const confirmDelete = async () => {
+    if (!asking) return;
+    setDeleting(true);
+    const failed: string[] = [];
+    for (const it of asking) {
+      try { await (it.type === "draft" ? api.deleteDraft(it.id) : api.deleteJob(it.id)); }
+      catch (e) { failed.push(`${it.title || "Untitled"}: ${message(e)}`); }
+    }
+    setDeleting(false); setAsking(null); setSelected(new Set());
+    if (viewing && asking.some((x) => rowKey(x) === rowKey(viewing))) setViewing(null);
+    const done = asking.length - failed.length;
+    if (done) toast.success(done === 1 ? "Deleted" : `Deleted ${done}`);
+    if (failed.length) toast.error(`${failed.length} could not be deleted`, { description: failed.join("\n") });
+    void load(true);
+  };
+  const backToDraft = async (it: LibraryItem) => {
+    try { const d = await api.unapproveDraft(it.id); patchItem(it.id, { status: d.status }); toast.success("Back to draft"); }
+    catch (e) { toast.error(message(e)); }
+  };
+  const chosen = items.filter((it) => selected.has(rowKey(it)));
+
+  // the brand at the top of the navigation is the brand the library opens on; switching it shows that brand's items
   const [railBrand, setRailBrand] = useState(data.activeId);
   const switchBrand = (id: string) => {
     setRailBrand(id);
@@ -115,18 +164,46 @@ function Page({ data }: { data: LibraryBoot }) {
     api.putPreference("activeProfile", id).catch(() => undefined); // only means the choice is not remembered
   };
   const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "";
+  const grid = view === "grid";
 
   return (
     <div className="flex h-dvh flex-col lg:flex-row">
       <Toaster theme={theme} />
       <Rail area="library" sub={filter.kind} onSub={(k) => setFilter((f) => ({ ...f, kind: k === "post" || k === "article" ? k : "" }))} brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
 
+      <div className="flex min-h-0 min-w-0 flex-1">
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {filter.brand === "all" ? "Posts and articles for every brand" : `Posts and articles for ${brand.name}`}
-          </p>
+        <div className={cn("px-4 py-6 sm:px-6", grid ? "max-w-none" : "mx-auto max-w-3xl")}>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {filter.brand === "all" ? "Posts and articles for every brand" : `Posts and articles for ${brand.name}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {grid && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 /> Columns</Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[190px]">
+                    {COLUMNS.map((c) => (
+                      <DropdownMenuItem key={c.id} onSelect={(e) => { e.preventDefault(); toggleColumn(c.id); }}>
+                        <span className="grid h-4 w-4 place-items-center rounded-sm border border-border">{columns.includes(c.id) && <Check className="h-3 w-3" />}</span> {c.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <div className="flex rounded-md border border-border bg-card p-0.5" role="group" aria-label="Show as">
+                {([["grid", "Grid", <Table2 key="g" />], ["list", "List", <List key="l" />]] as const).map(([v, label, icon]) => (
+                  <button key={v} type="button" aria-pressed={view === v} onClick={() => changeView(v)}
+                    className={cn("flex cursor-pointer items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium [&_svg]:h-3.5 [&_svg]:w-3.5", view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <div className="relative min-w-[200px] flex-1">
@@ -158,13 +235,31 @@ function Page({ data }: { data: LibraryBoot }) {
             </Select>
           </div>
 
+          {grid && chosen.length > 0 && (
+            <div role="status" className="mt-3 flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
+              <span>{chosen.length} selected</span>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+              <Button size="sm" variant="destructive" className="ml-auto" onClick={() => setAsking(chosen)}><Trash2 /> Delete {chosen.length}</Button>
+            </div>
+          )}
+
           {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
           {loading && !result ? (
             <p className="mt-8 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>
           ) : items.length === 0 ? (
             <p className="mt-8 text-sm text-muted-foreground">
-              {filtered ? "Nothing matches." : <>Nothing yet. Write a post in the <a className="text-brand hover:underline" href={studioHref()}>editor</a>.</>}
+              {filtered ? "Nothing matches." : <>Nothing yet. Write a post in the <a className="text-brand hover:underline" href={studioHref()}>studio</a>.</>}
             </p>
+          ) : grid ? (
+            <div className="mt-4">
+              <Grid items={items} columns={filter.brand === "all" ? columns : columns.filter((c) => c !== "brand")} sort={sort} onSort={(k) => setSort((s) => nextSort(s, k))}
+                selected={selected} onSelected={setSelected} viewing={viewing ? rowKey(viewing) : undefined} loading={loading}
+                brandName={(id) => names[id] ?? id} when={day}
+                thumb={(it) => (it.type === "job" ? <Thumb id={it.id} /> : <CardThumb design={it.design} profile={data.profiles.find((p) => p.id === it.profileId)} />)}
+                badge={(it) => <StatusBadge s={it.status} />}
+                onView={(it) => setViewing(it)} editHref={(it) => draftLink(base(), it)} scheduleHref={(it) => draftLink(base(), it) + "&open=preview"}
+                onBackToDraft={(it) => void backToDraft(it)} onDelete={(rows) => setAsking(rows)} />
+            </div>
           ) : (
             <ul className={"mt-4 divide-y divide-border border-y border-border" + (loading ? " opacity-60" : "")} aria-busy={loading}>
               {items.map((it) => (
@@ -177,6 +272,36 @@ function Page({ data }: { data: LibraryBoot }) {
           {result && result.total > 0 && <Pager r={result} onPage={setPage} onSize={changeSize} />}
         </div>
       </main>
+
+      {grid && viewing && (
+        // the item beside the grid: part of the page, so the list stays in view
+        <aside aria-label="The selected item" className="flex min-h-0 w-[min(480px,45vw)] shrink-0 flex-col border-l border-border bg-background">
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
+            <StatusBadge s={viewing.status} />
+            <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{viewing.title || "Untitled"}</h2>
+            <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => setViewing(null)}><X /></Button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+            {viewing.type === "job"
+              ? <JobDetail key={viewing.id} id={viewing.id} page={pagePath(viewing)} onGone={gone} />
+              : <DraftDetail key={viewing.id} item={viewing} data={data} onPatch={(p) => { patchItem(viewing.id, p); setViewing((v) => (v ? { ...v, ...p } : v)); }} onGone={gone} />}
+          </div>
+        </aside>
+      )}
+      </div>
+
+      <Dialog open={!!asking} onOpenChange={(o) => { if (!o && !deleting) setAsking(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{asking && asking.length > 1 ? `Delete ${asking.length} items?` : `Delete “${asking?.[0]?.title || "Untitled"}”?`}</DialogTitle>
+            <DialogDescription>{asking ? deleteSummary(asking).text : ""}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" disabled={deleting} onClick={() => setAsking(null)}>Cancel</Button>
+            <Button variant="destructive" size="sm" disabled={deleting || !can("write")} onClick={() => void confirmDelete()}>{deleting ? <Loader2 className="animate-spin" /> : <Trash2 />} Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

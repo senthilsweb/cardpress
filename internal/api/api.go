@@ -1277,7 +1277,7 @@ func (s *server) library(w http.ResponseWriter, r *http.Request) {
 	size, _ := strconv.Atoi(q.Get("pageSize"))
 	page, err := s.Library.List(r.Context(), service.LibraryQuery{
 		ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Kind: q.Get("kind"), Status: q.Get("status"),
-		Q: q.Get("q"), Page: pageNo, PageSize: size,
+		Q: q.Get("q"), Page: pageNo, PageSize: size, Sort: q.Get("sort"), Order: q.Get("order"),
 	})
 	if err != nil {
 		fail(w, r, err)

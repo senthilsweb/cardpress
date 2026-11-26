@@ -264,3 +264,60 @@ func TestLibraryRowsSayWhichHaveALivePage(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestLibrarySortsByAColumnEitherWayAndRefusesOthers(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	l.draft(t, "p", "post", docOf(para("Banana bread")))
+	l.advance(time.Minute)
+	l.draft(t, "p", "article", docOf(heading("Apple pie"), para("crust")))
+	l.advance(time.Minute)
+	l.draft(t, "p", "post", docOf(para("Cherry tart")))
+
+	titles := func(q LibraryQuery) string {
+		t.Helper()
+		p, err := l.lib.List(ctx, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var s []string
+		for _, i := range p.Items {
+			s = append(s, strings.Fields(i.Title)[0])
+		}
+		return strings.Join(s, ",")
+	}
+	for name, tc := range map[string]struct {
+		q    LibraryQuery
+		want string
+	}{
+		"newest first by default": {LibraryQuery{ProfileID: "p"}, "Cherry,Apple,Banana"},
+		"oldest first":            {LibraryQuery{ProfileID: "p", Sort: "at", Order: "asc"}, "Banana,Apple,Cherry"},
+		"title A to Z":            {LibraryQuery{ProfileID: "p", Sort: "title", Order: "asc"}, "Apple,Banana,Cherry"},
+		"title Z to A":            {LibraryQuery{ProfileID: "p", Sort: "title", Order: "desc"}, "Cherry,Banana,Apple"},
+		"kind, then newest":       {LibraryQuery{ProfileID: "p", Sort: "kind", Order: "asc"}, "Apple,Cherry,Banana"},
+	} {
+		if got := titles(tc.q); got != tc.want {
+			t.Errorf("%s: %s, want %s", name, got, tc.want)
+		}
+	}
+	if _, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Sort: "doc"}); err == nil {
+		t.Error("an unknown sort should be refused")
+	}
+	if _, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p", Order: "up"}); err == nil {
+		t.Error("an unknown order should be refused")
+	}
+}
+
+func TestLibraryRowsCarryTheirLatestVersion(t *testing.T) {
+	l, ctx := newLib(t), context.Background()
+	d := l.draft(t, "p", "post", docOf(para("Versioned words")))
+	if _, err := l.st.Approve(ctx, d.ID); err != nil { // approving keeps a version
+		t.Fatal(err)
+	}
+	p, err := l.lib.List(ctx, LibraryQuery{ProfileID: "p"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Items[0].Version < 1 {
+		t.Fatalf("version %d, want at least 1", p.Items[0].Version)
+	}
+}

@@ -50,7 +50,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
-import type { LibraryFilter, LibraryPage } from "./library";
+import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
@@ -260,8 +260,9 @@ export const api = {
     return call<Job>("POST", "/publish/jobs", form);
   },
   getJob: (id: string) => call<Job>("GET", `/publish/jobs/${encodeURIComponent(id)}`),
-  library: (f: LibraryFilter, activeId: string, page: number, pageSize: number) => {
+  library: (f: LibraryFilter, activeId: string, page: number, pageSize: number, sort?: LibrarySort) => {
     const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (sort) { q.set("sort", sort.sort); q.set("order", sort.order); }
     if (f.brand === "all") q.set("scope", "all"); else q.set("profileId", f.brand || activeId);
     if (f.kind) q.set("kind", f.kind);
     if (f.status) q.set("status", f.status);
