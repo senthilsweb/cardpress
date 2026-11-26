@@ -11,9 +11,9 @@ Every page has a narrow dark **navigation bar** on the left:
 - **Library**, **Settings** and **Help** each open a panel beside the bar listing their pages:
   - Library: All, Posts, Articles.
   - Settings: Account, API keys; Brands and Social accounts; for admins, Users and Assistant.
-  - Help: Docs, Report a problem, Source code.
+  - Help: Quick guide, Full guide; Report a problem, Technical docs, Source code.
 - Choosing a page closes the panel, as do **Esc** and a click outside it.
-- At the bottom are **hide the work column** (studio only, also **Ctrl/⌘ + \\**) and **you**. Your menu has the light or dark mode, **Docs** and **Sign out**.
+- At the bottom are **hide the work column** (studio only, also **Ctrl/⌘ + \\**) and **you**. Your menu has the light or dark mode, **Guide** and **Sign out**.
 
 Nothing is placed along the top of the window. Each setting is its own page: `/settings/account/`, `/settings/brands/`, `/settings/social/`, `/settings/api-keys/`, `/settings/users/`, `/settings/assistant/`. Old addresses such as `/studio/?open=accounts` go to the matching page.
 

@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AccountMenu } from "@/components/studio/AccountMenu";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { calendarHref, DOCS_URL, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, DOCS_URL, GUIDE_URL, helpHref, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -74,10 +74,12 @@ export function Rail({ area, sub, brands, activeId, colors, switching = false, o
     ].filter((g) => g.entries.length) },
     { id: "help", label: "Help", icon: <CircleHelp />, groups: [
       { entries: [
-        { id: "docs", label: "Docs", href: DOCS_URL, external: true },
+        { id: "quick", label: "Quick guide", href: helpHref(), external: true },
+        { id: "guide", label: "Full guide", href: GUIDE_URL, external: true },
       ] },
       { title: "Support", entries: [
         { id: "issue", label: "Report a problem", href: `${REPO}/issues/new`, external: true },
+        { id: "docs", label: "Technical docs", href: DOCS_URL, external: true },
         { id: "repo", label: "Source code", href: REPO, external: true },
       ] },
     ] },

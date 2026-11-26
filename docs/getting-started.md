@@ -39,7 +39,7 @@ Design and Details are in the left column. Set your name, handle, logo and fonts
 ## Write a post
 
 1. In **Chat**, say what to write, attach a file or add a link with the paperclip if you have one, and press send.
-2. Read the proposal. **Approve and use** copies it into a draft, **Edit** changes it first, **Reject** dismisses it.
+2. The assistant writes into the draft. Pick any options it offers, then **Save as version**, or **Undo**.
 3. In **Details**, refine the text, hashtags and alt text. **Full preview** shows the LinkedIn feed as it will look.
 
 No assistant is set up by default. To add one, see [Claude Managed Agent](cma-agent.md).

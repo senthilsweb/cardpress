@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "node guide/build.mjs quick && astro dev",
+    "build": "node guide/build.mjs quick && astro build",
     "preview": "astro preview",
     "check": "tsc --noEmit",
     "test": "vitest run"

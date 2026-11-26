@@ -3,6 +3,9 @@ import type { Perm } from "./session";
 /** Where each part of the app lives. */
 const base = () => import.meta.env.BASE_URL;
 export const DOCS_URL = "https://www.senthilsweb.com/cardpress/";
+/** The user guide: the full one on the web. The one-page guide is part of the app (`helpHref`). */
+export const GUIDE_URL = `${DOCS_URL}guide/`;
+export const helpHref = () => `${base()}help/`;
 export const studioHref = (query = "") => `${base()}studio/${query}`;
 export const libraryHref = (kind?: "post" | "article") => `${base()}library/${kind ? `?kind=${kind}` : ""}`;
 export const calendarHref = (query = "") => `${base()}calendar/${query}`;

@@ -1,6 +1,6 @@
 # User guide
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built.
+**Status:** built (asked for by the owner on 2026-11-26), not yet deployed. Source: `web/guide/`; `node web/guide/build.mjs full <folder>` builds the full guide.
 
 ## Why
 The documentation mixes use of the product with installation and code. Someone writing posts needs only how to use it.
