@@ -21,3 +21,12 @@
 #### Scenario: Published
 - **WHEN** the item is published or scheduled
 - **THEN** the options cannot be applied and the reason is shown
+
+### Requirement: See it before choosing
+#### Scenario: Select a headline
+- **WHEN** the person selects another headline
+- **THEN** the card on screen shows it at once, and nothing is saved
+
+#### Scenario: Keep as is
+- **WHEN** the person chooses Keep as is
+- **THEN** the screen returns to the saved values

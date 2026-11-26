@@ -32,3 +32,13 @@
 #### Scenario: Another person's brand
 - **WHEN** a person who is not an admin opens the calendar
 - **THEN** only items of their own brands are shown
+
+### Requirement: See the time
+#### Scenario: A day
+- **WHEN** the person opens a day
+- **THEN** each item is shown at its time, in the person's time zone
+
+### Requirement: Published items are read-only
+#### Scenario: Already sent
+- **WHEN** the person selects a published item
+- **THEN** it opens read-only with the time it was sent, and offers no move, cancel or edit

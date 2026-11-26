@@ -40,5 +40,12 @@ JSON Schema 2020-12. One object with a property per field and these extra keys: 
 | Manifest | `schema` and `schema_version` |
 | CardPress | Renders the Details panel (labels, counters, missing items); checks that each field exists and no standard exceeds the hard limit. Without an assistant it uses a built-in copy |
 
-## Open question
-Do you want new governing fields that the database does not hold today, such as audience, topic, campaign, call to action or reviewer notes? Each needs a column and a decision on who writes it.
+## New fields (confirmed by the owner)
+| Field | New column | Writer | Hard | Notes |
+|---|---|---|---|---|
+| audience | `drafts.audience` | A and P | 200 | who it is for; the writers use it |
+| topic | `drafts.topic` | A and P | 100 | for finding and grouping |
+| campaign | `drafts.campaign` | P | 100 | |
+| reviewNotes | `drafts.review_notes` | P (approvers) | 2,000 | never published; the writers read it on a revision |
+
+None is required to approve. Who writes each is a proposal to confirm.

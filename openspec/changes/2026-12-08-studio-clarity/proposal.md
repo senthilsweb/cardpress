@@ -1,6 +1,6 @@
 # A clearer studio
 
-**Status:** proposed. Specification only: nothing is built.
+**Status:** the layout was accepted by the owner on 2026-11-25. Nothing is built.
 
 ## Why
 The owner finds the studio confusing. What causes it:

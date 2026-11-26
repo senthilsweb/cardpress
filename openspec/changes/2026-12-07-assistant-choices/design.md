@@ -36,7 +36,13 @@ Card headline
                                    [ Keep as is ]  [ Use selected ]
 ```
 
+## Live preview
+- Picking a radio button or drop-down value shows it on the canvas immediately: the card for card words, the post or article for text. A banner says "Previewing. Not saved."
+- The preview is laid over the draft on screen only. Autosave and the live updates never write it.
+- **Use selected** saves; **Keep as is**, opening another item or leaving the page drops the preview.
+- Previewing an option for an item that is not on screen switches to it.
+
 ## The agent files
-- Writers offer 3 titles and 2 card headlines with a first draft, and other options only when asked. (To confirm: this adds a little cost to each first draft.)
+- Writers offer 3 titles and 2 card headlines with every first draft (confirmed by the owner), and other options when asked.
 - The reply names the fields with options and does not list them as text.
 - A rubric line: every offered value meets the field's standard.

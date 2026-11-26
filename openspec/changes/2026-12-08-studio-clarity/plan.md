@@ -5,9 +5,11 @@ Each step is shown on a local copy first. A pull request follows the owner's con
 | Step | Change | Needs agent redeploy |
 |---|---|---|
 | 0 | Start fresh with New (built, on `feature/start-fresh`) | no |
-| 1 | Full-page calendar (`2026-12-04-publishing-calendar`) | no |
-| 2 | Content schema (`2026-12-06-content-schema`) | yes |
-| 3 | A clearer studio (`2026-12-08-studio-clarity`), which draws Details from the schema | no |
-| 4 | Choosing options (`2026-12-07-assistant-choices`) | yes |
+| 1 | Full-page calendar with day view (`2026-12-04-publishing-calendar`) | no |
+| 2 | Grid of posts and articles (`2026-12-09-content-grid`) | no |
+| 3 | The whole conversation, reopened (`2026-12-10-chat-history`) | no |
+| 4 | Content schema and new fields (`2026-12-06-content-schema`) | yes |
+| 5 | A clearer studio (`2026-12-08-studio-clarity`), which draws Details from the schema | no |
+| 6 | Choosing options with live preview (`2026-12-07-assistant-choices`) | yes |
 
-Steps 0 and 1 can go out together as the first pull request.
+Steps 0 to 2 can go out together as the first pull request.

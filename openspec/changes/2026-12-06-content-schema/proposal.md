@@ -24,5 +24,8 @@ The person also cannot see these fields together: who may change them, what is m
 - The server's own checks are the limit. The schema may be stricter (writing standards), never looser.
 - Look, status, approval and publishing are never set by an agent.
 
+## New fields
+Audience, topic, campaign and review notes become columns of a draft (see `design.md`).
+
 ## Out of scope
-New database columns (such as audience, campaign or tone). See the open question in `design.md`.
+Fields beyond those four.
