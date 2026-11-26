@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Palette, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -86,7 +86,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
+export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
   open: boolean;
   onClose: () => void;
   active: Profile[];
@@ -94,6 +94,8 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   activeId: string;
   colors: Record<string, string>;
   onOpen: (id: string) => Promise<void>;
+  /** Edit a brand's logo, fonts and colours. */
+  onLook?: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => Promise<void>;
   onDuplicate: (p: Profile) => void;
   onArchive: (id: string) => Promise<{ scheduled: number }>;
@@ -142,6 +144,7 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {!isOpen && <Button size="sm" variant="outline" disabled={!!busy} onClick={() => void run(`open-${p.id}`, () => onOpen(p.id))}>Open</Button>}
+            {onLook && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => onLook(p.id)}><Palette /> Look</Button>}
             <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => onDuplicate(p)}><Copy /> Duplicate</Button>
             <Button size="sm" variant="ghost" disabled={!!busy || active.length < 2} title={active.length < 2 ? "Keep at least one brand" : undefined} onClick={() => setConfirm({ kind: "archive", id: p.id })}><Archive /> Archive</Button>
           </div>

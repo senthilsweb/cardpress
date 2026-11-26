@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, SlidersHorizontal, MessageSquareText } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, SlidersHorizontal, MessageSquareText } from "lucide-react";
 import { Card } from "@/card/Card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Rail } from "@/components/shell/Rail";
 import { LEGACY_OPEN, settingsHref } from "@/lib/nav";
-import { ContentPanel, DesignPanel, ProfilePanel } from "./panels";
-import { Composer } from "./Composer";
+import { DesignPanel } from "./panels";
+import { Details } from "./Details";
 import { ChatPanel } from "./ChatPanel";
-import { ChatHistoryDrawer } from "./ChatHistoryDrawer";
 import { StageBar, type StageView } from "./StageBar";
 import { SideGrip } from "./SideGrip";
 import { ArticleView } from "./ArticleView";
@@ -29,7 +27,7 @@ import type { Design, Profile } from "@/lib/types";
 import type { Draft } from "@/lib/draft";
 import { useSyncedState } from "@/lib/store";
 import { useTheme } from "@/lib/useTheme";
-import { VersionsDrawer } from "./VersionsDrawer";
+import { changedFields, type FieldName } from "@/lib/details";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { SessionProvider } from "./SessionProvider";
 import { BuiltWith } from "./Logo";
@@ -97,7 +95,6 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const design: Design = useMemo(() => designOf(store.current?.design), [designOf, store.current?.design]);
   const jobs = useJobs(profile.id);
   const chat = useChat(profile.id);
-  const [tab, setTab] = useState("design");
   const [layout, setLayout] = useSyncedState<Layout>(initial.layout, (v) => api.putPreference("layout", v));
   const layoutCtx = useMemo(() => ({
     isCollapsed: (id: string) => layout.collapsed[id] === true,
@@ -113,8 +110,10 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
-  // the right-hand drawers share one edge, so only one is open at a time (settings are pages: see /settings/)
-  const [panel, setPanel] = useState<"chats" | "history" | null>(null);
+  // the card is on the canvas while its words are being worked on, and the versions open in Details when asked for
+  const [cardFocus, setCardFocus] = useState(false);
+  const [versionsAsked, setVersionsAsked] = useState(0);
+  const [version, setVersion] = useState<{ draftId: string; seq: number }>();
   /** Go to another page, saving what is being typed first. */
   const go = (href: string) => { flushPendingEdits(); window.location.href = href; };
   // the library can send someone straight to a draft's Full preview (to schedule it)
@@ -129,17 +128,16 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   useEffect(() => { const on = () => setWindowWidth(window.innerWidth); window.addEventListener("resize", on); return () => window.removeEventListener("resize", on); }, []);
   const sideWidth = dragWidth ?? clampSidebar(layout.sidebarWidth ?? SIDEBAR_WIDTH, windowWidth);
   const mode = layout.mode;
-  const setMode = (m: Layout["mode"]) => { flushPendingEdits(); setEditorExpanded(false); setPhonePreview(false); setLayout((l) => ({ ...l, mode: m, sidebarCollapsed: false })); };
-  /** Open the editing tabs on one of them. */
-  const showEdit = (t: string) => { flushPendingEdits(); setTab(t); setPhonePreview(false); setLayout((l) => ({ ...l, mode: "edit", sidebarCollapsed: false })); };
+  const setMode = (m: Layout["mode"]) => { flushPendingEdits(); setEditorExpanded(false); setPhonePreview(false); setCardFocus(false); setLayout((l) => ({ ...l, mode: m, sidebarCollapsed: false })); };
+  const showDetails = () => setMode("details");
   // another page (the library) can ask for a draft: /studio/?draft=<id>, or its Full preview with &open=preview.
   // The old drawer addresses (?open=account, users, accounts, brands) go to their settings pages.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const want = q.get("open"), draft = q.get("draft");
     if (want && LEGACY_OPEN[want]) { window.location.replace(settingsHref(LEGACY_OPEN[want])); return; }
-    if (want === "preview") { setPreviewRequested(true); showEdit("post"); }
-    if (draft) { void store.select(draft); showEdit("post"); }
+    if (want === "preview") { setPreviewRequested(true); showDetails(); }
+    if (draft) { void store.select(draft); showDetails(); }
     if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -183,6 +181,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     if (!conv || (store.current && linksDraft(conv, store.current.id))) return;
     const about = [conv.postDraftId, conv.articleDraftId].find((d) => d && store.drafts.some((x) => x.id === d));
     if (about) { flushPendingEdits(); await store.select(about); }
+  };
+  /** Open a version that a reply saved, with its item. */
+  const openVersion = async (draftId: string, seq: number) => {
+    if (!store.drafts.some((d) => d.id === draftId)) { toast("That draft no longer exists"); return; }
+    await openItem(draftId);
+    setVersion({ draftId, seq });
+    showDetails();
+    setVersionsAsked((n) => n + 1);
   };
   // on arrival, the chat shows the conversation about the item on screen, if there is one
   const matched = useRef(false);
@@ -312,7 +318,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
 
   /* ---------- the views ---------- */
   const kind = store.current?.kind ?? "post";
-  const designing = mode === "edit" && tab !== "post"; // changing the card: the card is what to look at
+  const designing = mode === "design" || (mode === "details" && cardFocus); // changing the card: the card is what to look at
   const canBoth = !!pair.post && !!pair.article && box.w >= 900;
   const showBoth = canBoth && layout.both && !designing;
   const reading = !showBoth && kind === "article" && !designing;
@@ -321,11 +327,15 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const changed = (["post", "article"] as const).filter((k) => pair[k] && unseen.includes(pair[k]!.id));
   const showView = (v: StageView) => {
     setLayout((l) => ({ ...l, both: v === "both" }));
-    if (v === "both") setTab("post"); // the card tabs show one card, so leave them
-    else if (pair[v]) void openItem(pair[v]!.id);
+    if (v === "both") { if (mode === "design") setMode("details"); setCardFocus(false); } // the card's look is worked on one card at a time
+    else if (pair[v]) { setCardFocus(false); void openItem(pair[v]!.id); }
   };
-  // an item of this conversation changed by the assistant while another is on screen is marked
+  // an item of this conversation changed by the assistant while another is on screen is marked, and so are the fields
+  // it changed, until they are looked at
   const revisions = useRef(new Map<string, number>());
+  const before = useRef(new Map<string, Draft>());
+  const [marks, setMarks] = useState<Record<string, FieldName[]>>({});
+  const seen = useCallback((name: FieldName) => { const id = store.current?.id; if (id) setMarks((m) => (m[id]?.includes(name) ? { ...m, [id]: m[id].filter((x) => x !== name) } : m)); }, [store.current?.id]);
   useEffect(() => {
     const changed: string[] = [];
     // the list knows the items made for the message being answered, the open conversation may not yet
@@ -333,7 +343,13 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     for (const d of store.drafts) {
       const was = revisions.current.get(d.id);
       if (chat.busy && was !== undefined && d.revision > was && d.id !== store.current?.id && mine && linksDraft(mine, d.id)) changed.push(d.id);
+      const prev = before.current.get(d.id);
+      if (chat.busy && prev && d.revision > prev.revision && mine && linksDraft(mine, d.id)) {
+        const fields = changedFields(prev, d);
+        if (fields.length) setMarks((m) => ({ ...m, [d.id]: [...new Set([...(m[d.id] ?? []), ...fields])] }));
+      }
       revisions.current.set(d.id, d.revision);
+      before.current.set(d.id, d);
     }
     if (changed.length) setUnseen((u) => [...new Set([...u, ...changed])]);
   }, [store.drafts]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -347,8 +363,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     const own = designOf(d.design);
     return (
       <ArticleView draft={d} design={own} profile={profile} palette={profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0]} width={width}
-        onEdit={() => { void openItem(d.id).then(() => { showEdit("post"); setEditorExpanded(true); }); }}
-        onPreview={() => { void openItem(d.id).then(() => { setPreviewRequested(true); showEdit("post"); }); }} />
+        onEdit={() => { void openItem(d.id).then(() => { showDetails(); setEditorExpanded(true); }); }}
+        onPreview={() => { void openItem(d.id).then(() => { setPreviewRequested(true); showDetails(); }); }} />
     );
   };
   const postPane = (d: Draft, width: number) => {
@@ -393,40 +409,22 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             <div className="hidden border-b border-border px-3 py-2 lg:block">
               <div className="flex rounded-md border border-border bg-background p-0.5" role="group" aria-label="Left column">
                 {modeButton("chat", "Chat", <MessageSquareText />)}
-                {modeButton("edit", "Edit", <SlidersHorizontal />)}
+                {modeButton("details", "Details", <SlidersHorizontal />)}
+                {modeButton("design", "Design", <PaletteIcon />)}
               </div>
             </div>
             {/* the chat stays mounted, so an unsent message is not lost by switching */}
             <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
-              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} onNew={() => void startFresh()} onDelete={(id) => void deleteChat(id)} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} profileId={profile.id} drafts={store.drafts} onOpen={(id) => void openConversation(id)} onDelete={(id) => void deleteChat(id)} onVersion={(id, seq) => void openVersion(id, seq)}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
-            {mode === "edit" && <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
-              <div className="border-b border-border px-3 py-2.5">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="design" className="gap-1 px-1 text-[12.5px]"><PaletteIcon /> Design</TabsTrigger>
-                  <TabsTrigger value="content" className="gap-1 px-1 text-[12.5px]"><Type /> Text</TabsTrigger>
-                  <TabsTrigger value="post" className="gap-1 px-1 text-[12.5px]"><MessageSquareText /> Write</TabsTrigger>
-                  <TabsTrigger value="profile" className="gap-1 px-1 text-[12.5px]"><User /> Brand</TabsTrigger>
-                </TabsList>
+            {mode === "details" && (
+              <div className="min-h-0 flex-1">
+                <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={seen} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked} version={version}
+                  openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => go(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} />
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
-                <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => go(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
-                <TabsContent value="profile" className="mt-0">
-                  <ProfilePanel
-                    profile={profile}
-                    profiles={[profile]}
-                    paletteId={palette.id}
-                    updateProfile={updateProfile}
-                    setPaletteId={(id) => set({ paletteId: id })}
-                    resetProfiles={resetBrand}
-                    importProfiles={importBrand}
-                  />
-                </TabsContent>
-              </div>
-            </Tabs>}
+            )}
+            {mode === "design" && <div className="min-h-0 flex-1 overflow-y-auto"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></div>}
             <div className="hidden shrink-0 border-t border-border px-2 py-1.5 lg:block">
               <BuiltWith className="px-2" />
             </div>
@@ -435,8 +433,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           {!sidebarHidden && <SideGrip width={sideWidth} onResize={setDragWidth} onDone={(w) => { setDragWidth(null); setLayout((l) => ({ ...l, sidebarWidth: w })); }} />}
 
           {/* canvas */}
-          <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:hidden")}>
-            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => setPanel(panel === "history" ? null : "history")} />
+          <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:order-first max-lg:flex-none max-lg:[&>*:not(:first-child)]:hidden")}>
+            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => { setVersion(undefined); showDetails(); setVersionsAsked((n) => n + 1); }} />
             {/* sizes and export belong to the card, so they show with it */}
             <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">
@@ -522,7 +520,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             <div ref={setEditorHost} className={cn("absolute inset-0 z-20", !editorExpanded && "hidden")} />
           </main>
           <nav aria-label="Show" className="flex shrink-0 gap-1 border-t border-border bg-card p-1.5 lg:hidden">
-            {([["chat", "Chat"], ["preview", "Preview"], ["edit", "Edit"]] as const).map(([k, text]) => {
+            {([["chat", "Chat"], ["preview", "Preview"], ["details", "Details"], ["design", "Design"]] as const).map(([k, text]) => {
               const on = k === "preview" ? phonePreview : !phonePreview && mode === k;
               return <button key={k} type="button" aria-pressed={on} onClick={() => (k === "preview" ? setPhonePreview(true) : setMode(k))}
                 className={cn("flex-1 cursor-pointer rounded px-2 py-2 text-[13px] font-semibold", on ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{text}{k === "chat" && chat.pendingCount > 0 ? ` (${chat.pendingCount})` : ""}</button>;
@@ -530,9 +528,6 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           </nav>
         </div>
       </div>
-      <ChatHistoryDrawer open={panel === "chats"} onClose={() => setPanel(null)} profileId={profile.id} recent={chat.list} currentId={chat.current?.id} drafts={store.drafts} busy={chat.busy}
-        onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); void startFresh(); }} />
-      <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />
      </LayoutContext.Provider>
 
       {/* off-screen export stage: full-size cards, no transforms */}

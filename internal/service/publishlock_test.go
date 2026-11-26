@@ -27,7 +27,7 @@ func TestAPublishedItemCannotChangeUntilItIsADraftAgain(t *testing.T) {
 		edit.AltText = "changed"
 		_, e1 := s.UpdateDraft(ctx, d.ID, edit)
 		_, _, e2 := s.PatchDraft(ctx, d.ID, DraftPatch{Title: &title})
-		_, _, _, e3 := s.PatchCardText(ctx, d.ID, CardText{Title: &title})
+		_, _, _, e3 := s.PatchCardText(ctx, d.ID, CardText{Headline: &title})
 		_, e4 := s.ClearAttachment(ctx, d.ID)
 		_, e5 := s.RestoreVersion(ctx, d.ID, 1)
 		for i, err := range []error{e1, e2, e3, e4, e5} {
@@ -75,7 +75,7 @@ func TestEveryAssistantChangeAndEveryRestoreIsAVersion(t *testing.T) {
 	if err != nil || with.Version != 4 || !with.VersionIsCurrent {
 		t.Fatalf("%v %+v", err, with)
 	}
-	if _, after, _, err := s.PatchCardText(ctx, d.ID, CardText{Title: &title}); err != nil || after.Version != 5 {
+	if _, after, _, err := s.PatchCardText(ctx, d.ID, CardText{Headline: &title}); err != nil || after.Version != 5 {
 		t.Fatalf("no extra version before the next change: %v %+v", err, after)
 	}
 	write("From the assistant, two.")

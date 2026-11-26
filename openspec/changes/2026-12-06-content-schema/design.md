@@ -102,3 +102,20 @@ The studio keeps a copy of the generated files, so it builds and runs without th
 | reviewNotes | `drafts.review_notes` | P (approvers) | 2,000 | never published; the writers read it on a revision |
 
 None is required to approve. Who writes each is a proposal to confirm.
+
+## As built (studio side, step 4)
+- `npm run schema -- --studio <checkout>` writes `internal/content/` (schemas) and `web/src/lib/content/` (models and content schema).
+- The tool inputs keep today's names: the card headline is `title` in `update_card_text` until contract 6.
+- The tool test compares property names, types and required fields. Descriptions and limits are not compared; the server enforces limits when saving.
+- The manifest's `schema` is optional until version 6, and checked when present.
+- Planning fields are changed with `PATCH /api/v1/drafts/{id}/planning`. Saving a draft never touches them, an approved item stays approved, and a published or waiting item accepts them from a person. An assistant is still refused on a published or waiting item.
+- Review notes need the approve permission. Versions hold audience, topic and campaign, not review notes; a version saved earlier leaves them alone when restored.
+- An assistant could save a page address over 80 characters; it is now refused.
+- Hashtags: the standard is 3 to 5; the rubric still allows none when the person or the brand notes ask for that.
+
+## As built (agent side, step 7)
+- `npm run schema` writes `content.schema.json` beside each skill, and a limits block into the two rubrics and three skills (between `<!-- limits … -->` marks), so the numbers a writer and the grader read are generated. Quality lines stay hand-written. `npm test` and `build-manifest.sh` fail when anything is stale.
+- The skills carry the limits in their own text as well as the schema file, so a writer need not read the file to know them.
+- A writer's record has `title` and `headline`; the coordinator puts the headline on the card. A post's `title` is its name in the studio.
+- Writers follow `audience` and `reviewNotes`, and add a `topic` when a draft has none.
+- Schema version 2 (the card tool takes `headline`). The studio accepts manifest 5 and 6 and the old `title` name, so server and agents deploy one after the other.

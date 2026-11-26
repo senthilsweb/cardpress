@@ -42,6 +42,11 @@ export interface Draft {
   summary?: string;
   pageAt?: string;
   hasCover?: boolean;
+  /** Planning, never published. Changed with api.setPlanning, not by saving the draft. */
+  audience?: string;
+  topic?: string;
+  campaign?: string;
+  reviewNotes?: string;
   /** What a post goes out with: the designed card, or a file of its own (a picture, or a PDF document with a title). */
   attachment?: "card" | "image" | "document" | "images" | "video";
   attachmentTitle?: string;

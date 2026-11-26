@@ -7,8 +7,8 @@ export interface Layout {
   collapsed: Record<string, boolean>;
   /** Height in pixels the user dragged the sidebar editor to. */
   editorHeight?: number;
-  /** What the left column holds: the chat, or the editing tabs. */
-  mode: "chat" | "edit";
+  /** What the left column holds: the chat, the item's fields, or the card's look. */
+  mode: "chat" | "details" | "design";
   /** Show a post and its article side by side, when there is room. */
   both: boolean;
   /** Width in pixels the left column was dragged to; absent for the usual width. */
@@ -32,7 +32,7 @@ export function parseLayout(v: unknown): Layout {
   }
   const h = typeof o.editorHeight === "number" && o.editorHeight >= 120 && o.editorHeight <= 4000 ? Math.round(o.editorHeight) : undefined;
   const w = typeof o.sidebarWidth === "number" && Number.isFinite(o.sidebarWidth) ? { sidebarWidth: clampSidebar(o.sidebarWidth) } : {};
-  return { sidebarCollapsed: o.sidebarCollapsed === true, collapsed, editorHeight: h, mode: o.mode === "edit" ? "edit" : "chat", both: o.both === true, ...w };
+  return { sidebarCollapsed: o.sidebarCollapsed === true, collapsed, editorHeight: h, mode: o.mode === "details" || o.mode === "edit" ? "details" : o.mode === "design" ? "design" : "chat", both: o.both === true, ...w };
 }
 
 interface Ctx {
@@ -41,6 +41,9 @@ interface Ctx {
   editorHeight?: number;
   setEditorHeight: (h: number) => void;
 }
+
+/** Whether a section is open. One that starts folded keeps the opposite note: that it was opened. */
+export const sectionOpen = (noted: boolean, startsFolded: boolean) => noted === startsFolded;
 
 /** Without a provider every section is open and nothing is saved, so a Section works anywhere. */
 export const LayoutContext = createContext<Ctx>({ isCollapsed: () => false, toggle: () => undefined, setEditorHeight: () => undefined });

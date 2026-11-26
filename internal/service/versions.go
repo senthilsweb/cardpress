@@ -67,6 +67,10 @@ type Version struct {
 	CreatedBy     string          `json:"createdBy,omitempty"`
 	CreatedByName string          `json:"createdByName,omitempty"`
 	CreatedAt     string          `json:"createdAt"`
+	// Planning fields as they were; absent on a version saved before there were any.
+	Audience *string `json:"audience,omitempty"`
+	Topic    *string `json:"topic,omitempty"`
+	Campaign *string `json:"campaign,omitempty"`
 	// Preview is the start of the text, to tell versions apart in a list.
 	Preview string `json:"preview,omitempty"`
 }
@@ -173,10 +177,10 @@ func nextSeq(ctx context.Context, q execer, draftID string) (int, error) {
 // snapshotDraft saves the draft's current state as a version. An "auto" snapshot is only taken when something changed and
 // enough time has passed since the last one; any other label is always taken.
 func snapshotDraft(ctx context.Context, db *sql.DB, draftID, label, note string) error {
-	var kind, title, doc, tags, alt, design string
+	var kind, title, doc, tags, alt, design, audience, topic, campaign string
 	var uni, dv, revision int
-	err := db.QueryRowContext(ctx, `SELECT kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, revision FROM drafts WHERE id = ?`, draftID).
-		Scan(&kind, &title, &doc, &tags, &alt, &uni, &design, &dv, &revision)
+	err := db.QueryRowContext(ctx, `SELECT kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, revision, audience, topic, campaign FROM drafts WHERE id = ?`, draftID).
+		Scan(&kind, &title, &doc, &tags, &alt, &uni, &design, &dv, &revision, &audience, &topic, &campaign)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -219,9 +223,9 @@ func snapshotDraft(ctx context.Context, db *sql.DB, draftID, label, note string)
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO draft_versions (id, draft_id, seq, label, note, kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, blobs, created_by, created_at, revision)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		newID(), draftID, seq, label, note, kind, title, string(light), tags, alt, uni, design, dv, string(hj), actorID(ctx), versionNow().Format(time.RFC3339), revision); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO draft_versions (id, draft_id, seq, label, note, kind, title, doc, hashtags, alt_text, unicode_styles, design, design_version, blobs, created_by, created_at, revision, audience, topic, campaign)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		newID(), draftID, seq, label, note, kind, title, string(light), tags, alt, uni, design, dv, string(hj), actorID(ctx), versionNow().Format(time.RFC3339), revision, audience, topic, campaign); err != nil {
 		return err
 	}
 	if err := prune(ctx, tx, draftID); err != nil {
@@ -376,9 +380,9 @@ func (s *Studio) Version(ctx context.Context, draftID string, seq int) (Version,
 	var doc, tags, design string
 	var uni, dv int
 	err := s.db.QueryRowContext(ctx, `SELECT v.id, v.label, v.note, v.kind, v.title, v.doc, v.hashtags, v.alt_text, v.unicode_styles, v.design, v.design_version, v.created_by,
-		COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = v.created_by), ''), v.created_at
+		COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = v.created_by), ''), v.created_at, v.audience, v.topic, v.campaign
 		FROM draft_versions v WHERE v.draft_id = ? AND v.seq = ?`, draftID, seq).
-		Scan(&v.ID, &v.Label, &v.Note, &v.Kind, &v.Title, &doc, &tags, &v.AltText, &uni, &design, &dv, &v.CreatedBy, &v.CreatedByName, &v.CreatedAt)
+		Scan(&v.ID, &v.Label, &v.Note, &v.Kind, &v.Title, &doc, &tags, &v.AltText, &uni, &design, &dv, &v.CreatedBy, &v.CreatedByName, &v.CreatedAt, &v.Audience, &v.Topic, &v.Campaign)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Version{}, ErrNotFound
 	}
@@ -422,7 +426,10 @@ func (s *Studio) RestoreVersion(ctx context.Context, draftID string, seq int) (D
 	// bringing an old version back makes a new one, which is then the current one
 	s.writing.Lock()
 	defer s.writing.Unlock()
-	d, err := s.updateDraft(ctx, draftID, in, VersionRestored, fmt.Sprintf("from version %d", seq))
+	if cur, err = s.GetDraft(ctx, draftID); err != nil {
+		return Draft{}, err
+	}
+	d, err := s.updateWithPlanning(ctx, cur, in, PlanningPatch{Audience: v.Audience, Topic: v.Topic, Campaign: v.Campaign}, VersionRestored, fmt.Sprintf("from version %d", seq))
 	if err != nil {
 		return Draft{}, err
 	}

@@ -14,9 +14,10 @@ CardPress can be used by an AI agent through the [Model Context Protocol](https:
 | `propose_content` | Suggest a post or an article. It becomes a **pending proposal**. | Adds a proposal, nothing else |
 | `get_proposal` | See whether a proposal was approved, edited or rejected, and the final text | No |
 | `get_design` | A draft's card: every design field and the draft's revision. Images only as present or absent | No |
-| `update_card_text` | Change the words on a card: eyebrow, title, subtitle, the two footers, tag, quote author, stat | Yes, those words |
+| `report_reply` | Give a short answer in the studio's chat | No |
+| `update_card_text` | Change the words on a card: eyebrow, headline, subtitle, the two footers, tag, quote author, stat | Yes, those words |
 | `create_draft` | An empty post or article with the brand's starting card | Adds a draft |
-| `update_draft` | Change the named fields of a draft: text, title, summary, page address, hashtags, alt text, bold and italic. Replacing the text needs the revision that was read | Yes |
+| `update_draft` | Change the named fields of a draft: text, title, summary, page address, hashtags, alt text, bold and italic, audience and topic. Replacing the text needs the revision that was read | Yes |
 | `set_attachment` | Send a post with its card, or with a video at a public address | Yes |
 | `list_connections` | Which networks are connected. No credential values; posting is not available | No |
 | `list_memories`, `save_memory`, `delete_memory` | Notes about a brand, up to 50 of 2,000 characters | The notes only |

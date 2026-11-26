@@ -1,6 +1,6 @@
 import { useId, useRef, type ReactNode } from "react";
 import { ChevronDown, ImagePlus, Trash2 } from "lucide-react";
-import { useLayout } from "@/lib/layout";
+import { sectionOpen, useLayout } from "@/lib/layout";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,10 +14,10 @@ import { cn } from "@/lib/utils";
  * A titled group in the sidebar. Click the title to fold it. The fold state is saved by `id`
  * (the title when no id is given), so pass an id when the title can change.
  */
-export function Section({ title, id, children, action }: { title: string; id?: string; children: ReactNode; action?: ReactNode }) {
+export function Section({ title, id, children, action, folded = false }: { title: string; id?: string; children: ReactNode; action?: ReactNode; /** Starts folded. */ folded?: boolean }) {
   const key = id ?? title;
   const { isCollapsed, toggle } = useLayout();
-  const open = !isCollapsed(key);
+  const open = sectionOpen(isCollapsed(key), folded);
   const bodyId = useId();
   return (
     <section className="border-b border-border px-4 last:border-b-0">

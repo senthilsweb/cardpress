@@ -27,6 +27,7 @@ export function PageBar({ draft, renderCover, onPublish, onUnpublish }: {
   const path = pagePath({ kind: draft.kind, slug: draft.slug, pageAt: draft.pageAt });
   const section = draft.kind === "article" ? "articles" : "posts";
   const live = path !== null;
+  const article = draft.kind === "article";
 
   if (draft.status === "draft") {
     return <p className="text-xs text-muted-foreground">Approve this {draft.kind} to give it a public page.</p>;
@@ -39,7 +40,9 @@ export function PageBar({ draft, renderCover, onPublish, onUnpublish }: {
   const publish = () => run(async () => {
     let cover: Blob | undefined;
     try { cover = await renderCover(); } catch { /* a page without a preview image is still a page */ }
-    await onPublish({ slug: slug.trim() || undefined, summary: summary.trim() || undefined }, cover);
+    // an article's address and description are written in Details; a post's are asked for here
+    const meta = article ? { slug: draft.slug, summary: draft.summary } : { slug: slug.trim(), summary: summary.trim() };
+    await onPublish({ slug: meta.slug || undefined, summary: meta.summary || undefined }, cover);
   }, live ? "Page updated" : "Page is live");
 
   return (
@@ -56,6 +59,12 @@ export function PageBar({ draft, renderCover, onPublish, onUnpublish }: {
       </div>
       {open && (
         <div className="space-y-2 rounded-md border border-border bg-card p-3 text-xs">
+          {article ? (
+            <dl className="grid grid-cols-[6rem_1fr] gap-y-1">
+              <dt className="font-medium">Address</dt><dd className="break-all text-muted-foreground">/{section}/{draft.slug || "made from the title"}</dd>
+              <dt className="font-medium">Description</dt><dd className="text-muted-foreground">{draft.summary || "The first paragraph"}</dd>
+            </dl>
+          ) : (<>
           <div className="space-y-1">
             <label htmlFor="page-slug" className="font-medium">Address</label>
             <div className="flex items-center gap-1">
@@ -67,6 +76,7 @@ export function PageBar({ draft, renderCover, onPublish, onUnpublish }: {
             <label htmlFor="page-summary" className="font-medium">Description</label>
             <Textarea id="page-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} maxLength={300} placeholder="Shown in search results and link previews. Left empty, it is the first paragraph." />
           </div>
+          </>)}
           <p className="text-muted-foreground">Anyone with the address can read it. A change to the {draft.kind} takes it down until you approve and publish again.</p>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Back</Button>

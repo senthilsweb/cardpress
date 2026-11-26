@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -54,6 +55,32 @@ type sight struct {
 	Text     map[string]string `json:"text"` // a fingerprint of each text field
 }
 
+// CardForAssistant is a design as an assistant reads it: pictures as present or absent, the headline by that name.
+func CardForAssistant(c CardDesign) (map[string]any, error) {
+	m, err := cardMap(c)
+	if err != nil {
+		return nil, err
+	}
+	return named(m), nil
+}
+
+// named renames the stored headline in a card map. What was seen is kept under the stored names.
+func named(m map[string]any) map[string]any {
+	out := maps.Clone(m)
+	if v, ok := out[StoredHeadline]; ok {
+		delete(out, StoredHeadline)
+		out[Headline] = v
+	}
+	return out
+}
+
+func cardName(stored string) string {
+	if stored == StoredHeadline {
+		return Headline
+	}
+	return stored
+}
+
 // cardMap is a design with its pictures as present or absent.
 func cardMap(c CardDesign) (map[string]any, error) {
 	b, err := json.Marshal(c)
@@ -86,6 +113,7 @@ func (c *Chat) look(ctx context.Context, draftID string) (sight, Draft, error) {
 	return sight{Revision: d.Revision, Card: m, Text: map[string]string{
 		"body": fingerprint(DraftText(d.Doc)), "title": fingerprint(d.Title), "summary": fingerprint(d.Summary),
 		"hashtags": fingerprint(string(tags)), "altText": fingerprint(d.AltText),
+		"audience": fingerprint(d.Audience), "topic": fingerprint(d.Topic), "campaign": fingerprint(d.Campaign), "reviewNotes": fingerprint(d.ReviewNotes),
 	}}, d, nil
 }
 
@@ -96,16 +124,17 @@ func changedSince(was, now sight) []string {
 		a, _ := json.Marshal(was.Card[k])
 		b, _ := json.Marshal(v)
 		if string(a) != string(b) {
-			out = append(out, k+": "+string(b))
+			out = append(out, cardName(k)+": "+string(b))
 		}
 	}
 	for k := range was.Card {
 		if _, still := now.Card[k]; !still {
-			out = append(out, k+": (cleared)")
+			out = append(out, cardName(k)+": (cleared)")
 		}
 	}
 	for k, v := range now.Text {
-		if was.Text[k] != v {
+		// a field that did not exist when the item was last seen, and is empty, is not news
+		if old, known := was.Text[k]; old != v && (known || v != fingerprint("")) {
 			out = append(out, k+": changed")
 		}
 	}
@@ -192,7 +221,7 @@ func (c *Chat) prepare(ctx context.Context, conv Conversation, req ChatRequest) 
 		}
 		was, known := seen[id]
 		if !known {
-			b, _ := json.Marshal(now.Card)
+			b, _ := json.Marshal(named(now.Card))
 			st.Cards = append(st.Cards, agent.Card{DraftID: id, Revision: d.Revision, Design: string(b)})
 		} else if was.Revision != d.Revision {
 			if lines := changedSince(was, now); len(lines) > 0 {

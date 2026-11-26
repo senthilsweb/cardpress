@@ -28,7 +28,7 @@ ANTHROPIC_WORKSPACE_ID=...                        # only for a key that covers s
 
 Optional: `CARDPRESS_AGENT_BUDGET_CENTS` (spend cap per conversation, default `200` = $2, `0` = none) and `CARDPRESS_AGENT_TIMEOUT` (longest wait for one reply, default `12m`).
 
-The server refuses to start if the manifest's version is not the one it speaks, or if the manifest's MCP address is not `CARDPRESS_PUBLIC_URL` + `/mcp`, because the agents would then be writing to a different server.
+The server speaks manifest version 6, which carries the content schema, and still accepts version 5, so the server can be deployed before the agents. It refuses to start if the manifest's version is neither, if the manifest allows more than the server accepts, or if the manifest's MCP address is not `CARDPRESS_PUBLIC_URL` + `/mcp`, because the agents would then be writing to a different server.
 
 On Fly, a file path on your machine does not exist there: give the manifest as an https address, or store the JSON itself with `fly secrets set CARDPRESS_AGENT_MANIFEST="$(cat manifest.json)"`.
 
@@ -39,7 +39,8 @@ With accounts on, **only the admin** can send messages, and only in **brands the
 ## What happens in a conversation
 
 - Tick **Post**, **Article** or both. CardPress creates the draft if the conversation has none and tells the agent which one to write.
-- The **first** draft of each kind is graded against its rubric and revised up to three times. The reply ends with the verdict. Later messages are ordinary requests.
+- The **first** draft of each kind is graded against its rubric and revised up to three times. The verdict is shown on a card under the reply. Later messages are ordinary requests.
+- The agent answers through the `report_reply` tool; the studio shows that answer and nothing else it writes.
 - The agents save through [MCP](mcp.md). Every save is a new version, so you can go back. Published and scheduled items are locked.
 - The agents can change the words on the card, never its look. They cannot publish.
 - If you edit a draft or card yourself, the next message tells the agent what changed.

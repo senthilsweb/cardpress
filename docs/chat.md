@@ -6,7 +6,7 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 
 ## Using it
 
-1. The assistant is the **Chat** side of the left column, and is what opens first. **Edit** holds the Design, Text, Write and Brand tabs. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
+1. The assistant is the **Chat** side of the left column, and is what opens first. **Details** and **Design** sit beside it. An unsent message stays when you switch. The Chat switch shows a number when proposals are waiting for you.
    Type what you want in the message box and send it with the **send** button (or Enter; Shift+Enter adds a line). While a reply is being written the button becomes **Stop**: what you said is kept, the thread notes that the reply was stopped, and you carry on. The conversation is about the item on screen.
    To give it something to write from, use the **paperclip** in the box:
    - **Attach a file:** PDF, Word (`.docx`), Markdown or text, up to 10 MB. You can also drop files onto the box.
@@ -14,12 +14,26 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
    - **Paste text:** at least 40 characters. A paste over 1,500 characters becomes a source by itself.
 
    A conversation holds up to ten sources, added at any point, and you can send them with or without a message. If one cannot be read, you are told why and nothing is sent. Text is kept up to 200,000 characters from a file or 40,000 from a web page; a cut source says so. A scanned PDF has no text to read, and a password-protected one cannot be opened.
-2. Tick **Post**, **Article** or both, then send. The draft appears on the canvas and fills in when the agent saves it. The first draft is checked against a rubric and the reply says whether it passed.
+2. Tick **Post**, **Article** or both, then send. The draft appears on the canvas and fills in when the agent saves it. The first draft is checked against a rubric, and a card under the reply says whether it passed.
 3. Reply to ask for changes. Each save is a new [version](workspace.md), so nothing is lost.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
 5. Conversations are saved on the server, so they are there after a reload. **New** [starts fresh](workspace.md). The bin deletes the open conversation and starts fresh; the post or article it wrote is kept.
-6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
+6. The conversation's name at the top of Chat opens the list in place; choosing one returns to it. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; older ones load as you scroll to the end, and search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
 7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
+
+## A short reply
+
+While the assistant works, the thread shows the step it is on. It then answers with a sentence or two, up to four points, a question when it needs you and at most one suggestion. Its running commentary is not shown or kept. If it gives no such answer, you see the last thing it said, cut short.
+
+## What a reply keeps
+
+Under a reply, a card shows:
+
+- **Saved: Article v2** for each item the assistant saved; it opens that version in Details.
+- the check result of a first draft, with what was wrong if it did not pass;
+- **What it did**, the steps it took, folded.
+
+A reply that fails is kept too, with the reason and anything it had saved. A stopped one says **Stopped**. All of it is there when the conversation is opened again. Conversations from before this show what was stored then.
 
 ## Proposals from an outside agent
 
@@ -59,5 +73,5 @@ A proposal is validated before it is stored: the kind must be `post` or `article
 | `POST /api/v1/chat/conversations` | `{"profileId", "url"}` or `{"profileId", "text"}` |
 | `GET /api/v1/chat/conversations?profileId=` | The list, and which agent is answering |
 | `GET /api/v1/chat/conversations/{id}` / `DELETE` | One conversation with its messages and proposals / delete it |
-| `POST /api/v1/chat/conversations/{id}/messages` | `{"content", "write": ["post","article"], "viewing"}`. Streams `user`, `progress`, `delta`, `proposal`, `message`, then `done` (or `error`). An empty message sends waiting sources. Only one reply at a time per conversation. |
+| `POST /api/v1/chat/conversations/{id}/messages` | `{"content", "write": ["post","article"], "viewing"}`. Streams `user`, `progress`, `delta` (only a note when a session was restarted), `proposal`, `message`, then `done` (or `error`). An empty message sends waiting sources. Only one reply at a time per conversation. |
 | `POST /api/v1/chat/proposals/{id}/decision` | `{"status": "approved"\|"rejected", "draftId", "edited": {…}}` |

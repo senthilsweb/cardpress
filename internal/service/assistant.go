@@ -29,12 +29,15 @@ type DraftPatch struct {
 	Hashtags      *[]string
 	AltText       *string
 	UnicodeStyles *bool
+	Audience      *string
+	Topic         *string
 }
 
-// CardText is the words drawn on a card: the only part of a design an assistant may change.
+// CardText is the words drawn on a card: the only part of a design an assistant may change. The headline is stored as
+// the design's "title"; an assistant calls it "headline", so that it is not taken for the item's title.
 type CardText struct {
 	Eyebrow     *string `json:"eyebrow,omitempty"`
-	Title       *string `json:"title,omitempty"`
+	Headline    *string `json:"headline,omitempty"`
 	Subtitle    *string `json:"subtitle,omitempty"`
 	Footer      *string `json:"footer,omitempty"`
 	FooterLeft  *string `json:"footerLeft,omitempty"`
@@ -44,7 +47,13 @@ type CardText struct {
 }
 
 // CardTextFields are the names CardText accepts.
-var CardTextFields = []string{"eyebrow", "title", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue"}
+var CardTextFields = []string{"eyebrow", "headline", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue"}
+
+// Headline is the card headline's name to an assistant, and StoredHeadline its name in a saved design.
+const (
+	Headline       = "headline"
+	StoredHeadline = "title"
+)
 
 // Effects are the side results of a change a person should hear about.
 type Effects struct {
@@ -162,46 +171,22 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 		in.UnicodeStyles = *p.UnicodeStyles
 	}
 	// the summary and address belong to the public page; they are checked here and stored beside the rest
-	slug, summary := cur.Slug, cur.Summary
-	if p.Slug != nil {
-		if slug = strings.TrimSpace(*p.Slug); slug != "" && !assistantSlug.MatchString(slug) {
-			return cur, Effects{}, invalid("an address is lower-case letters, digits and single hyphens, up to 80 characters")
-		}
-		var other int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM drafts WHERE kind = ? AND slug = ? AND slug <> '' AND id <> ?`, cur.Kind, slug, id).Scan(&other); err != nil {
-			return cur, Effects{}, err
-		}
-		if other > 0 {
-			return cur, Effects{}, fmt.Errorf("%w: that address is already used", ErrConflict)
-		}
-	}
-	if p.Summary != nil {
-		if summary = strings.TrimSpace(*p.Summary); utf8.RuneCountInString(summary) > maxAssistantSummary {
-			return cur, Effects{}, invalid("a summary is limited to %d characters", maxAssistantSummary)
-		}
+	slug, summary, err := s.pageFields(ctx, cur, PageFields{Slug: p.Slug, Summary: p.Summary})
+	if err != nil {
+		return cur, Effects{}, err
 	}
 	// what the person had is kept, whatever the ten minutes between automatic versions; what the assistant saves is a version too
 	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
 		return cur, Effects{}, err
 	}
-	d, err := s.updateDraft(ctx, id, in, VersionAssistant, "")
+	d, err := s.updateWithPlanning(ctx, cur, in, PlanningPatch{Audience: p.Audience, Topic: p.Topic}, VersionAssistant, "")
 	if err != nil {
 		return d, Effects{}, err
 	}
 	if slug != cur.Slug || summary != cur.Summary {
-		saved := d.Revision
-		if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET slug = ?, summary = ?, revision = revision + 1, status = CASE WHEN status = 'scheduled' THEN status ELSE 'draft' END, approved_at = '', approved_by = '', page_at = '', cover = NULL, updated_at = ? WHERE id = ?`,
-			slug, summary, s.draftStamp(), id); err != nil {
+		if d, err = s.writePageFields(ctx, d, slug, summary); err != nil {
 			return d, Effects{}, err
 		}
-		// neither is part of a version, so the version just saved still holds the draft as it stands
-		if _, err := s.db.ExecContext(ctx, `UPDATE draft_versions SET revision = revision + 1 WHERE draft_id = ? AND revision = ?`, id, saved); err != nil {
-			return d, Effects{}, err
-		}
-		if d, err = s.GetDraft(ctx, id); err != nil {
-			return d, Effects{}, err
-		}
-		s.changed(d)
 	}
 	return d, effects(cur, d), nil
 }
@@ -217,7 +202,7 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	for _, f := range []struct {
 		to   *string
 		from *string
-	}{{&card.Eyebrow, t.Eyebrow}, {&card.Title, t.Title}, {&card.Subtitle, t.Subtitle}, {&card.Footer, t.Footer},
+	}{{&card.Eyebrow, t.Eyebrow}, {&card.Title, t.Headline}, {&card.Subtitle, t.Subtitle}, {&card.Footer, t.Footer},
 		{&card.FooterLeft, t.FooterLeft}, {&card.Tag, t.Tag}, {&card.QuoteAuthor, t.QuoteAuthor}, {&card.StatValue, t.StatValue}} {
 		if f.from == nil {
 			continue
@@ -251,12 +236,7 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	return card, d, effects(cur, d), nil
 }
 
-const (
-	maxAssistantBody    = 100_000
-	maxAssistantSummary = 300
-)
-
-var assistantSlug = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+const maxAssistantBody = 100_000
 
 /* ------------------------------------------------------------------ text to document */
 

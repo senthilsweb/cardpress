@@ -182,9 +182,7 @@ func (s *sdkStream) Err() error       { return s.s.Err() }
 func (s *sdkStream) Close() error     { return s.s.Close() }
 
 func (a *sdkAPI) stream(ctx context.Context, sid string) (eventStream, error) {
-	st := a.c.Beta.Sessions.Events.StreamEvents(ctx, sid, anthropic.BetaSessionEventStreamParams{
-		EventDeltas: []anthropic.BetaManagedAgentsDeltaType{"agent.message"}, // show the reply as it is written
-	})
+	st := a.c.Beta.Sessions.Events.StreamEvents(ctx, sid, anthropic.BetaSessionEventStreamParams{})
 	if err := st.Err(); err != nil {
 		st.Close()
 		return nil, gone(err)

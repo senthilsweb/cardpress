@@ -94,7 +94,8 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		}
 	}
 
-	var replies []string
+	var reports []agent.Report
+	graded := false
 	run := func(send func() (string, error), kind string) error { // kind: what is graded, or empty
 		// open the stream first, so nothing the agent does is missed, then send
 		st, err := c.api.stream(ctx, sid)
@@ -114,11 +115,9 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		if err := c.follow(ctx, sid, st, t, &st); err != nil {
 			return err
 		}
-		if r := t.reply(); r != "" {
-			if t.verdict != "" {
-				emit(agent.Event{Type: "delta", Text: "\n\n" + t.verdict})
-			}
-			replies = append(replies, r)
+		graded = graded || t.verdict != nil
+		if r := t.answer(); r != nil {
+			reports = append(reports, *r)
 		}
 		return nil
 	}
@@ -164,8 +163,12 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 	if err != nil {
 		return agent.Output{}, err
 	}
-	out := agent.Output{SessionID: sid, Reply: agent.CleanReply(strings.Join(replies, "\n\n"))}
-	if out.Reply == "" {
+	texts := make([]string, len(reports))
+	for i, r := range reports {
+		texts[i] = r.Text()
+	}
+	out := agent.Output{SessionID: sid, Reply: agent.CleanReply(strings.Join(texts, "\n\n")), Reports: reports}
+	if out.Reply == "" && !graded {
 		return agent.Output{}, errors.New("the agent finished without saying anything")
 	}
 	uc, ucancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)

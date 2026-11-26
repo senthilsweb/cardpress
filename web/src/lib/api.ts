@@ -209,6 +209,10 @@ export const api = {
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
+  /** Change the named planning fields; allowed at any status. */
+  setPlanning: (id: string, fields: Partial<Pick<Draft, "audience" | "topic" | "campaign" | "reviewNotes">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/planning`, fields),
+  /** Change the address and description of an item's page. An approved item goes back to draft. */
+  setPageFields: (id: string, fields: Partial<Pick<Draft, "slug" | "summary">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/page-fields`, fields),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
   listen,
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
@@ -290,6 +294,8 @@ export const api = {
     return res.blob();
   },
   listConversations: (profileId: string, q = "") => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  /** The conversations changed before this one. */
+  olderConversations: (profileId: string, after: string) => call<{ conversations: Conversation[] }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}&after=${encodeURIComponent(after)}`).then((r) => r.conversations),
   listNotes: (profileId: string) => call<{ notes: BrandNote[] }>("GET", `/chat/memories?profileId=${encodeURIComponent(profileId)}`).then((r) => r.notes),
   deleteNote: (profileId: string, key: string) => call<void>("DELETE", `/chat/memories/${encodeURIComponent(key)}?profileId=${encodeURIComponent(profileId)}`),
   startConversation: (profileId: string, input: { url?: string; text?: string; draftId?: string }) => call<Conversation>("POST", "/chat/conversations", { profileId, ...input }),

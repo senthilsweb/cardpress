@@ -43,6 +43,8 @@ type Studio interface {
 	GetDraft(ctx context.Context, id string) (service.Draft, error)
 	CreateDraft(ctx context.Context, in service.DraftInput) (service.Draft, error)
 	UpdateDraft(ctx context.Context, id string, in service.DraftInput) (service.Draft, error)
+	SetPlanning(ctx context.Context, id string, p service.PlanningPatch) (service.Draft, error)
+	SetPageFields(ctx context.Context, id string, p service.PageFields) (service.Draft, error)
 	DeleteDraft(ctx context.Context, id string) error
 	Approve(ctx context.Context, id string) (service.Draft, error)
 	Unapprove(ctx context.Context, id string) (service.Draft, error)
@@ -91,6 +93,7 @@ type Publishing interface {
 
 // Chatting is the part of the chat service the HTTP API needs.
 type Chatting interface {
+	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
@@ -217,6 +220,8 @@ func (s *server) table() []routeDef {
 		{"GET", "/drafts/{id}", write(scopeDraft), s.getDraft},
 		{"PUT", "/drafts/{id}", write(scopeDraft), s.updateDraft},
 		{"DELETE", "/drafts/{id}", write(scopeDraft), s.deleteDraft},
+		{"PATCH", "/drafts/{id}/planning", write(scopeDraft), s.setPlanning},
+		{"PATCH", "/drafts/{id}/page-fields", write(scopeDraft), s.setPageFields},
 		{"POST", "/drafts/{id}/approve", rule{scopeDraft, service.PermApprove}, s.approveDraft},
 		{"POST", "/drafts/{id}/unapprove", write(scopeDraft), s.unapproveDraft},
 		{"GET", "/drafts/{id}/attachment", write(scopeDraft), s.getAttachment},
@@ -305,7 +310,7 @@ func (s *server) cors(next http.Handler) http.Handler {
 			h.Add("Vary", "Origin")
 			h.Set("Access-Control-Expose-Headers", "X-Request-Id")
 			if r.Method == http.MethodOptions {
-				h.Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+				h.Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
@@ -452,6 +457,34 @@ func (s *server) updateDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := s.Studio.UpdateDraft(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// setPlanning changes the named planning fields: audience, topic, campaign, reviewNotes.
+func (s *server) setPlanning(w http.ResponseWriter, r *http.Request) {
+	var p service.PlanningPatch
+	if !decode(w, r, &p) {
+		return
+	}
+	d, err := s.Studio.SetPlanning(r.Context(), r.PathValue("id"), p)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// setPageFields changes the address and description of an item's public page: slug, summary.
+func (s *server) setPageFields(w http.ResponseWriter, r *http.Request) {
+	var p service.PageFields
+	if !decode(w, r, &p) {
+		return
+	}
+	d, err := s.Studio.SetPageFields(r.Context(), r.PathValue("id"), p)
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -934,7 +967,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid", "the profileId query parameter is required")
 		return
 	}
-	list, err := s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
+	var list []service.Conversation
+	var err error
+	if after := r.URL.Query().Get("after"); after != "" {
+		list, err = s.Chat.Older(r.Context(), profileID, after)
+	} else {
+		list, err = s.Chat.Search(r.Context(), profileID, r.URL.Query().Get("q"))
+	}
 	if err != nil {
 		fail(w, r, err)
 		return

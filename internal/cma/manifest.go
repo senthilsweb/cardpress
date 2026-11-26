@@ -10,10 +10,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/senthilsweb/cardpress/internal/content"
 )
 
-// ManifestVersion is the contract version this adapter speaks.
-const ManifestVersion = 5
+// ManifestVersion is the contract version this adapter speaks. Version 5 is still accepted, so that the server and the
+// agents can be deployed one after the other.
+const (
+	ManifestVersion = 6
+	oldestManifest  = 5
+)
 
 // Outcome is how a first draft of one kind is asked for and graded.
 type Outcome struct {
@@ -32,6 +38,9 @@ type Manifest struct {
 	VaultID       string             `json:"vault_id"`
 	MCPServerURL  string             `json:"mcp_server_url"`
 	Outcomes      map[string]Outcome `json:"outcomes"`
+	// Schema is the content schema the agents were built with, and SchemaVersion its version. Required from version 6.
+	Schema        json.RawMessage `json:"schema,omitempty"`
+	SchemaVersion int             `json:"schema_version,omitempty"`
 }
 
 const maxManifest = 1 << 20
@@ -72,8 +81,8 @@ func LoadManifest(ctx context.Context, from string) (Manifest, error) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return m, fmt.Errorf("the manifest is not valid JSON: %w", err)
 	}
-	if m.Version != ManifestVersion {
-		return m, fmt.Errorf("the manifest is version %d; this server speaks version %d", m.Version, ManifestVersion)
+	if m.Version < oldestManifest || m.Version > ManifestVersion {
+		return m, fmt.Errorf("the manifest is version %d; this server speaks versions %d to %d", m.Version, oldestManifest, ManifestVersion)
 	}
 	for name, v := range map[string]string{"agent_id": m.AgentID, "environment_id": m.EnvironmentID, "vault_id": m.VaultID} {
 		if v == "" {
@@ -83,6 +92,22 @@ func LoadManifest(ctx context.Context, from string) (Manifest, error) {
 	for _, kind := range []string{"post", "article"} {
 		if m.Outcomes[kind].Rubric == "" {
 			return m, fmt.Errorf("the manifest has no rubric for %s", kind)
+		}
+	}
+	if len(m.Schema) == 0 {
+		if m.Version >= ManifestVersion {
+			return m, fmt.Errorf("the manifest has no schema")
+		}
+	} else {
+		if err := content.Check(m.Schema); err != nil {
+			return m, fmt.Errorf("the manifest's schema is refused: %w", err)
+		}
+		var s struct {
+			Version int `json:"x-schemaVersion"`
+		}
+		_ = json.Unmarshal(m.Schema, &s) // Check has parsed it
+		if m.SchemaVersion != 0 && m.SchemaVersion != s.Version {
+			return m, fmt.Errorf("the manifest says schema version %d but carries version %d", m.SchemaVersion, s.Version)
 		}
 	}
 	if v := m.AgentVersion; v != "" {

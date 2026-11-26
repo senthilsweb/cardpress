@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -52,19 +53,6 @@ type designOut struct {
 }
 
 // designView is the card with pictures reported as present or absent, never as bytes.
-func designView(card service.CardDesign) (map[string]any, error) {
-	b, err := json.Marshal(card)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, err
-	}
-	m["photos"], m["screenshot"], m["bgImage"] = len(card.Photos) > 0, card.Screenshot != "", card.BgImage != ""
-	return m, nil
-}
-
 func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRefIn) (*mcp.CallToolResult, designOut, error) {
 	if _, err := t.draft(ctx, in.DraftID); err != nil {
 		return nil, designOut{}, toolError(err)
@@ -73,7 +61,7 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	view, err := designView(card)
+	view, err := service.CardForAssistant(card)
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
@@ -83,11 +71,20 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 type cardTextIn struct {
 	DraftID string `json:"draftId" jsonschema:"the draft id"`
 	// a map, so that a field this tool must not touch is seen and refused with a reason
-	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, title, subtitle, footer, footerLeft, tag, quoteAuthor, statValue"`
+	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue"`
 }
 
 func cardText(changes map[string]any) (service.CardText, error) {
 	var out service.CardText
+	// agents built before contract 6 call the headline "title"
+	if v, ok := changes[service.StoredHeadline]; ok {
+		if _, both := changes[service.Headline]; both {
+			return out, errors.New("Nothing was changed: send headline only.")
+		}
+		changes = maps.Clone(changes)
+		delete(changes, service.StoredHeadline)
+		changes[service.Headline] = v
+	}
 	if len(changes) == 0 {
 		return out, errors.New("Give at least one text field to change: " + strings.Join(service.CardTextFields, ", ") + ".")
 	}
@@ -103,7 +100,7 @@ func cardText(changes map[string]any) (service.CardText, error) {
 	}
 	if len(refused) > 0 {
 		sort.Strings(refused)
-		return out, errors.New("Nothing was changed: " + strings.Join(refused, ", ") + " is not card text. How a card looks (layout, background, colours, size, fonts, images) is set by the person in the studio, under Edit, Design.")
+		return out, errors.New("Nothing was changed: " + strings.Join(refused, ", ") + " is not card text. How a card looks (layout, background, colours, size, fonts, images) is set by the person in the studio, under Design.")
 	}
 	b, _ := json.Marshal(changes)
 	return out, json.Unmarshal(b, &out)
@@ -124,7 +121,7 @@ func (t tools) updateCardText(ctx context.Context, _ *mcp.CallToolRequest, in ca
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	view, err := designView(card)
+	view, err := service.CardForAssistant(card)
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
@@ -167,6 +164,8 @@ type updateIn struct {
 	Hashtags      *[]string `json:"hashtags,omitempty" jsonschema:"hashtags without the #, posts only"`
 	AltText       *string   `json:"altText,omitempty" jsonschema:"a description of the card image for screen readers"`
 	UnicodeStyles *bool     `json:"unicodeStyles,omitempty" jsonschema:"keep bold and italic in a post as Unicode letters"`
+	Audience      *string   `json:"audience,omitempty" jsonschema:"who the item is for, in one line; never published"`
+	Topic         *string   `json:"topic,omitempty" jsonschema:"what the item is about, in a few words; never published"`
 }
 
 func (t tools) updateDraft(ctx context.Context, _ *mcp.CallToolRequest, in updateIn) (*mcp.CallToolResult, writtenOut, error) {
@@ -176,11 +175,12 @@ func (t tools) updateDraft(ctx context.Context, _ *mcp.CallToolRequest, in updat
 	if _, err := t.draft(ctx, in.DraftID); err != nil {
 		return nil, writtenOut{}, toolError(err)
 	}
-	if in.Body == nil && in.Title == nil && in.Summary == nil && in.Slug == nil && in.Hashtags == nil && in.AltText == nil && in.UnicodeStyles == nil {
-		return nil, writtenOut{}, errors.New("Nothing to change: send at least one of body, title, summary, slug, hashtags, altText, unicodeStyles.")
+	if in.Body == nil && in.Title == nil && in.Summary == nil && in.Slug == nil && in.Hashtags == nil && in.AltText == nil && in.UnicodeStyles == nil && in.Audience == nil && in.Topic == nil {
+		return nil, writtenOut{}, errors.New("Nothing to change: send at least one of body, title, summary, slug, hashtags, altText, unicodeStyles, audience, topic.")
 	}
 	d, eff, err := t.d.Writer.PatchDraft(ctx, in.DraftID, service.DraftPatch{Revision: in.Revision, Body: in.Body, Title: in.Title,
-		Summary: in.Summary, Slug: in.Slug, Hashtags: in.Hashtags, AltText: in.AltText, UnicodeStyles: in.UnicodeStyles})
+		Summary: in.Summary, Slug: in.Slug, Hashtags: in.Hashtags, AltText: in.AltText, UnicodeStyles: in.UnicodeStyles,
+		Audience: in.Audience, Topic: in.Topic})
 	if err != nil {
 		return nil, writtenOut{}, toolError(err)
 	}

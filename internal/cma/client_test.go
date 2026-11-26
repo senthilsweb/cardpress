@@ -10,12 +10,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/agent"
+	"github.com/senthilsweb/cardpress/internal/content"
 )
 
 var manifest = Manifest{Version: 5, AgentID: "agent_1", AgentVersion: "3", EnvironmentID: "env_1", VaultID: "vlt_1", Outcomes: map[string]Outcome{
@@ -49,6 +51,12 @@ func (f *fake) emit(format string, a ...any) {
 func (f *fake) say(text string) {
 	b, _ := json.Marshal(text)
 	f.emit(`{"type":"agent.message","content":[{"type":"text","text":%s}]}`, b)
+}
+
+// report is a report_reply call and the studio's answer to it.
+func (f *fake) report(input string, refused bool) {
+	f.emit(`{"type":"agent.mcp_tool_use","name":"report_reply","input":%s}`, input)
+	f.emit(`{"type":"agent.mcp_tool_result","mcp_tool_use_id":"sevt_%d","is_error":%t}`, f.n, refused)
 }
 func (f *fake) idle(reason string) {
 	f.emit(`{"type":"session.status_idle","stop_reason":{"type":%q}}`, reason)
@@ -208,10 +216,19 @@ func TestFirstDraftsAreGradedOneAfterTheOtherWithEverySource(t *testing.T) {
 	f := &fake{scripts: []func(*fake){grade("Post saved.", "satisfied"), grade("Article saved.", "max_iterations_reached")}}
 	st := studio()
 	st.ArticleID, st.Write, st.Grade = "d2", []string{"post", "article"}, []string{"post", "article"}
-	out, _, err := ask(t, f, agent.Input{Studio: st, Sources: []agent.Source{{Text: "THE SOURCE", New: false}}})
-	want := "Post saved.\n\nPost check passed (round 2).\n\nArticle saved.\n\nArticle check not passed: The ending repeats."
-	if err != nil || out.Reply != want {
+	out, events, err := ask(t, f, agent.Input{Studio: st, Sources: []agent.Source{{Text: "THE SOURCE", New: false}}})
+	if err != nil || out.Reply != "Post saved.\n\nArticle saved." {
 		t.Fatalf("%v %q", err, out.Reply)
+	}
+	var checks []agent.Check
+	for _, e := range events {
+		if e.Type == "check" {
+			checks = append(checks, *e.Check)
+		}
+	}
+	want := []agent.Check{{Kind: "post", Passed: true, Round: 2}, {Kind: "article", Round: 2, Note: "The ending repeats."}}
+	if !slices.Equal(checks, want) {
+		t.Fatalf("%+v", checks)
 	}
 	if strings.Join(f.rubrics, ",") != "POST RUBRIC,ARTICLE RUBRIC" {
 		t.Fatal(f.rubrics)
@@ -295,10 +312,14 @@ func TestTheManifest(t *testing.T) {
 	}
 	for want, from := range map[string]string{
 		"CARDPRESS_AGENT_MANIFEST": "", "could not read": "/no/such/file", "not valid JSON": "{nope",
-		"version 4":      strings.Replace(string(b), `"version":5`, `"version":4`, 1),
-		"vault_id":       strings.Replace(string(b), `"vlt_1"`, `""`, 1),
-		"for article":    strings.Replace(string(b), "ARTICLE RUBRIC", "", 1),
-		"version number": strings.Replace(string(b), `"agent_version":"3"`, `"agent_version":"latest"`, 1),
+		"version 4":                       strings.Replace(string(b), `"version":5`, `"version":4`, 1),
+		"version 7":                       strings.Replace(string(b), `"version":5`, `"version":7`, 1),
+		"has no schema":                   strings.Replace(string(b), `"version":5`, `"version":6`, 1),
+		"carries version":                 strings.Replace(string(b), `{"version":5`, `{"schema":`+string(content.Schema)+`,"schema_version":1,"version":5`, 1),
+		"vault_id":                        strings.Replace(string(b), `"vlt_1"`, `""`, 1),
+		"for article":                     strings.Replace(string(b), "ARTICLE RUBRIC", "", 1),
+		"which this server does not have": strings.Replace(string(b), `{"version":5`, `{"schema":{"x-schemaVersion":1,"properties":{"mood":{}}},"version":5`, 1),
+		"version number":                  strings.Replace(string(b), `"agent_version":"3"`, `"agent_version":"latest"`, 1),
 	} {
 		if _, err := LoadManifest(ctx, from); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v", want, err)
@@ -353,5 +374,61 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 	}
 	if _, err := a.history(ctx, "nope"); !errors.Is(err, errSessionGone) {
 		t.Errorf("unknown session: %v", err)
+	}
+}
+
+// A version 6 manifest, as the agent project builds it, carries the schema.
+func TestLoadManifestVersion6(t *testing.T) {
+	m := manifest
+	m.Version, m.Schema, m.SchemaVersion = ManifestVersion, content.Schema, 2
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := LoadManifest(context.Background(), string(b)); err != nil || got.SchemaVersion != 2 {
+		t.Fatalf("%v %+v", err, got.SchemaVersion)
+	}
+}
+
+func TestOnlyTheAcceptedReportIsTheReply(t *testing.T) {
+	part := func(message string) func(*fake) {
+		return func(f *fake) {
+			f.say("Let me read the draft first, then I will write it.")
+			f.report(`{"conversationId":"c","outcome":"done","message":"First try."}`, false)
+			f.report(`{"conversationId":"c","outcome":"done","message":"`+message+`","points":["Short"],"next":"Add a link"}`, false)
+			f.report(`{"conversationId":"c","outcome":"done","message":"Refused by the studio."}`, true)
+			f.say("Anything else I can do?")
+			f.idle("end_turn")
+			f.emit(`{"type":"span.outcome_evaluation_end","result":"satisfied","iteration":0}`)
+			f.idle("end_turn")
+		}
+	}
+	f := &fake{scripts: []func(*fake){part("Wrote the post."), part("Wrote the article.")}}
+	st := studio()
+	st.ArticleID, st.Write, st.Grade = "d2", []string{"post", "article"}, []string{"post", "article"}
+	out, events, err := ask(t, f, agent.Input{Studio: st})
+	if err != nil || len(out.Reports) != 2 || out.Reports[0].Message != "Wrote the post." || out.Reports[1].Message != "Wrote the article." {
+		t.Fatalf("%v %+v", err, out.Reports)
+	}
+	if out.Reply != "Wrote the post.\n- Short\nNext: Add a link\n\nWrote the article.\n- Short\nNext: Add a link" {
+		t.Fatalf("%q", out.Reply)
+	}
+	for _, e := range events {
+		if e.Type == "delta" {
+			t.Fatalf("the running text was passed on: %q", e.Text)
+		}
+	}
+}
+
+func TestWithoutAReportTheLastWordsAreShownCutShort(t *testing.T) {
+	f := &fake{scripts: []func(*fake){func(f *fake) {
+		f.say("Reading.")
+		f.report(`{"conversationId":"c","outcome":"done","message":"`+strings.Repeat("x", 241)+`"}`, false)
+		f.say(strings.Repeat("word ", 200))
+		f.idle("end_turn")
+	}}}
+	out, _, err := ask(t, f, agent.Input{Studio: studio()})
+	if err != nil || len(out.Reports) != 1 || out.Reports[0].Outcome != "" || !strings.HasSuffix(out.Reply, "…") || len([]rune(out.Reply)) > 401 {
+		t.Fatalf("%v %+v", err, out)
 	}
 }

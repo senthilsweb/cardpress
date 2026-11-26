@@ -11,53 +11,18 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { addGoogleFont, FONT_ROLES, resolveFonts, useFonts, ensureFont } from "@/lib/fonts";
-import { AreaField, ColorField, Field, ImageField, Section, SliderField, SwitchField, TextField } from "./fields";
+import { ColorField, Field, ImageField, Section, SliderField, SwitchField, TextField } from "./fields";
 import { MiniBackground } from "./preview";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/export";
+import { settingsHref } from "@/lib/nav";
+import { flushPendingEdits } from "@/lib/pendingEdits";
 
 type SetDesign = (patch: Partial<Design>) => void;
 
 const LAYOUT_ICONS: Record<LayoutId, typeof LayoutPanelLeft> = {
   hero: LayoutPanelLeft, center: AlignCenter, cover: BookOpen, quote: Quote, stat: Hash, split: UserRound,
 };
-
-/* ======================================================= Content */
-export function ContentPanel({ design, set }: { design: Design; set: SetDesign }) {
-  const L = design.layout;
-  return (
-    <>
-      <Section title="Text">
-        {L === "cover" && <TextField id="tag" label="Series tag" value={design.tag} onChange={(v) => set({ tag: v })} placeholder="Part 3 · AI-DLC" />}
-        {L !== "quote" && <TextField id="eyebrow" label="Eyebrow" value={design.eyebrow} onChange={(v) => set({ eyebrow: v })} />}
-        {L === "stat" && <TextField id="stat" label="Big number" value={design.statValue} onChange={(v) => set({ statValue: v })} placeholder="10x" />}
-        <AreaField id="title" label={L === "quote" ? "Quote" : L === "stat" ? "What the number means" : "Title"} value={design.title} onChange={(v) => set({ title: v })} hint="Press Enter for a new line." rows={L === "quote" ? 4 : 2} />
-        {L === "quote" ? (
-          <TextField id="author" label="Author" value={design.quoteAuthor} onChange={(v) => set({ quoteAuthor: v })} />
-        ) : (
-          <TextField id="subtitle" label="Subtitle" value={design.subtitle} onChange={(v) => set({ subtitle: v })} hint="Use | to split into points." />
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <TextField id="footerl" label="Footer, left" value={design.footerLeft ?? ""} onChange={(v) => set({ footerLeft: v })} placeholder="your website" hint="Empty = your website." />
-          <TextField id="footer" label="Footer, right" value={design.footer} onChange={(v) => set({ footer: v })} placeholder="your handle" hint="Bottom right. Empty = your handle." />
-        </div>
-      </Section>
-      <Section title="Images">
-        <ImageField
-          label="Photos for the mosaic"
-          hint="For Photo mosaic. The first one also stands in as the headshot."
-          values={design.photos}
-          onChange={(v) => set({ photos: v })}
-          multiple
-          max={12}
-          maxPx={700}
-        />
-        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} />
-        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} />
-      </Section>
-    </>
-  );
-}
 
 /* ======================================================= Design */
 export function DesignPanel({ design, set, profile, palette }: { design: Design; set: SetDesign; profile: Profile; palette: Palette }) {
@@ -125,6 +90,20 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         </div>
       </Section>
 
+      <Section title="Images">
+        <ImageField
+          label="Photos for the mosaic"
+          hint="For Photo mosaic. The first one also stands in as the headshot."
+          values={design.photos}
+          onChange={(v) => set({ photos: v })}
+          multiple
+          max={12}
+          maxPx={700}
+        />
+        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} />
+        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} />
+      </Section>
+
       <Section title="Colours">
         <div className="grid grid-cols-2 gap-2">
           {profile.palettes.map((p) => {
@@ -146,11 +125,11 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground">Edit colour sets in Profile.</p>
+        <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand colours, fonts and logo</a></p>
       </Section>
 
       <Section title="Fonts (this card)">
-        <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the profile fonts.</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the brand fonts.</p>
         <div className="grid grid-cols-2 gap-2">
           {FONT_ROLES.map((r) => {
             const inherited = resolveFonts(profile)[r.id];

@@ -56,6 +56,9 @@ type ChatMessage struct {
 	Role      string `json:"role"`
 	Content   string `json:"content"`
 	CreatedAt string `json:"createdAt"`
+	// Status is how a reply ended: done, failed or stopped.
+	Status string      `json:"status"`
+	Detail *ChatDetail `json:"detail,omitempty"`
 }
 
 // ProposalView is content the agent suggested. It reaches a draft only when a person approves it.
@@ -255,6 +258,12 @@ func (c *Chat) List(ctx context.Context, profileID string) ([]Conversation, erro
 	return c.list(ctx, "", profileID)
 }
 
+// Older returns the conversations that come after this one in the list: those changed before it.
+func (c *Chat) Older(ctx context.Context, profileID, afterID string) ([]Conversation, error) {
+	const at = `(SELECT o.updated_at FROM conversations o WHERE o.id = ?)`
+	return c.list(ctx, `AND (updated_at < `+at+` OR (updated_at = `+at+` AND id > ?))`, profileID, afterID, afterID, afterID)
+}
+
 func (c *Chat) list(ctx context.Context, where, profileID string, args ...any) ([]Conversation, error) {
 	rows, err := c.db.QueryContext(ctx, `SELECT `+convCols+` FROM conversations WHERE profile_id = ? `+where+` ORDER BY updated_at DESC, id LIMIT `+strconv.Itoa(maxListed), append([]any{profileID}, args...)...)
 	if err != nil {
@@ -298,9 +307,9 @@ func (c *Chat) Get(ctx context.Context, id string) (Conversation, error) {
 }
 
 func (c *Chat) messages(ctx context.Context, id string, limit int) ([]ChatMessage, error) {
-	q := `SELECT id, seq, role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY seq`
+	q := `SELECT id, seq, role, content, created_at, status, detail FROM chat_messages WHERE conversation_id = ? ORDER BY seq`
 	if limit > 0 { // the newest `limit`, still oldest first
-		q = fmt.Sprintf(`SELECT * FROM (SELECT id, seq, role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY seq DESC LIMIT %d) ORDER BY seq`, limit)
+		q = fmt.Sprintf(`SELECT * FROM (SELECT id, seq, role, content, created_at, status, detail FROM chat_messages WHERE conversation_id = ? ORDER BY seq DESC LIMIT %d) ORDER BY seq`, limit)
 	}
 	rows, err := c.db.QueryContext(ctx, q, id)
 	if err != nil {
@@ -309,9 +318,16 @@ func (c *Chat) messages(ctx context.Context, id string, limit int) ([]ChatMessag
 	out := []ChatMessage{}
 	for rows.Next() {
 		var m ChatMessage
-		if err := rows.Scan(&m.ID, &m.Seq, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+		var detail string
+		if err := rows.Scan(&m.ID, &m.Seq, &m.Role, &m.Content, &m.CreatedAt, &m.Status, &detail); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if detail != "" {
+			var d ChatDetail
+			if json.Unmarshal([]byte(detail), &d) == nil {
+				m.Detail = &d
+			}
 		}
 		out = append(out, m)
 	}
@@ -473,11 +489,12 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		return err
 	}
 	emit(ChatEvent{"user", user})
-	// a person who stops a reply sees that it was stopped, also after a reload
+	// a reply that fails or is stopped is kept too, with what it had saved by then
+	rec, stored := &recorder{}, false
 	defer func() {
-		if err != nil && errors.Is(ctx.Err(), context.Canceled) {
-			if _, serr := c.addMessage(context.WithoutCancel(ctx), id, user.Seq+1, "assistant", stoppedReply); serr != nil {
-				log.Printf("chat: could not record a stopped reply: %v", serr)
+		if err != nil && !stored {
+			if serr := c.keepUnfinished(ctx, id, user.Seq+1, rec, err); serr != nil {
+				log.Printf("chat: could not record an unfinished reply: %v", serr)
 			}
 		}
 	}()
@@ -503,11 +520,18 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 			return err
 		}
 	}
+	if err := c.watch(ctx, rec, studio); err != nil {
+		return err
+	}
 	in := agent.Input{SessionID: session, Sources: sources, Studio: studio}
 	for _, m := range history {
+		if m.Status == ReplyFailed {
+			m.Content = failedInHistory
+		}
 		in.Messages = append(in.Messages, agent.Message{Role: m.Role, Content: m.Content})
 	}
 	progress := func(e agent.Event) {
+		rec.add(e)
 		if e.Type == "delta" || e.Type == "progress" {
 			emit(ChatEvent{e.Type, map[string]string{"text": e.Text}})
 		}
@@ -542,10 +566,15 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		return agentErr("The agent could not reply: %v", err)
 	}
 	reply := agent.CleanReply(out.Reply)
-	if reply == "" && out.Proposal == nil {
+	detail, err := c.close(ctx, rec)
+	if err != nil {
+		return err
+	}
+	// a reply may be nothing but what it saved or how the check went
+	if reply == "" && out.Proposal == nil && len(detail.Saved) == 0 && len(detail.Checks) == 0 {
 		return agentErr("The agent sent an empty reply.")
 	}
-	if reply == "" {
+	if reply == "" && out.Proposal != nil {
 		reply = "Here is a draft."
 	}
 	if out.Proposal != nil {
@@ -554,13 +583,18 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		}
 	}
 
+	detail.Reports = out.Reports
 	if in.Restarted {
 		reply = restartNote + "\n\n" + reply
+		if len(detail.Reports) > 0 {
+			detail.Reports = append([]agent.Report{{Message: restartNote}}, detail.Reports...)
+		}
 	}
-	assistant, prop, err := c.storeReply(ctx, id, user.Seq+1, reply, out.Proposal)
+	assistant, prop, err := c.storeReply(ctx, id, user.Seq+1, reply, out.Proposal, detail)
 	if err != nil {
 		return err
 	}
+	stored = true
 	if out.SessionID != "" {
 		session = out.SessionID
 	}
@@ -585,9 +619,24 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 }
 
 func (c *Chat) addMessage(ctx context.Context, convID string, seq int, role, content string) (ChatMessage, error) {
-	m := ChatMessage{ID: newID(), Seq: seq, Role: role, Content: content, CreatedAt: c.stamp()}
-	if _, err := c.db.ExecContext(ctx, `INSERT INTO chat_messages (id, conversation_id, seq, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		m.ID, convID, m.Seq, m.Role, m.Content, m.CreatedAt); err != nil {
+	return c.insertMessage(ctx, convID, ChatMessage{Seq: seq, Role: role, Content: content, Status: ReplyDone})
+}
+
+// addReply stores a reply that has no proposal, with how it ended.
+func (c *Chat) addReply(ctx context.Context, convID string, seq int, content, status string, d ChatDetail) (ChatMessage, error) {
+	return c.insertMessage(ctx, convID, ChatMessage{Seq: seq, Role: "assistant", Content: content, Status: status, Detail: &d})
+}
+
+func (c *Chat) insertMessage(ctx context.Context, convID string, m ChatMessage) (ChatMessage, error) {
+	m.ID, m.CreatedAt = newID(), c.stamp()
+	detail := ""
+	if m.Detail != nil {
+		if detail = m.Detail.stored(); detail == "" {
+			m.Detail = nil
+		}
+	}
+	if _, err := c.db.ExecContext(ctx, `INSERT INTO chat_messages (id, conversation_id, seq, role, content, created_at, status, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, convID, m.Seq, m.Role, m.Content, m.CreatedAt, m.Status, detail); err != nil {
 		return m, err
 	}
 	_, err := c.db.ExecContext(ctx, `UPDATE conversations SET updated_at = ? WHERE id = ?`, m.CreatedAt, convID)
@@ -611,15 +660,18 @@ func (c *Chat) session(ctx context.Context, id string) (string, error) {
 }
 
 // storeReply saves the agent's reply and proposal together, and marks earlier undecided proposals as superseded.
-func (c *Chat) storeReply(ctx context.Context, convID string, seq int, reply string, p *agent.Proposal) (ChatMessage, *ProposalView, error) {
+func (c *Chat) storeReply(ctx context.Context, convID string, seq int, reply string, p *agent.Proposal, d ChatDetail) (ChatMessage, *ProposalView, error) {
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return ChatMessage{}, nil, err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	m := ChatMessage{ID: newID(), Seq: seq, Role: "assistant", Content: reply, CreatedAt: c.stamp()}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO chat_messages (id, conversation_id, seq, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		m.ID, convID, m.Seq, m.Role, m.Content, m.CreatedAt); err != nil {
+	m := ChatMessage{ID: newID(), Seq: seq, Role: "assistant", Content: reply, CreatedAt: c.stamp(), Status: ReplyDone}
+	if !d.empty() {
+		m.Detail = &d
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO chat_messages (id, conversation_id, seq, role, content, created_at, status, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, convID, m.Seq, m.Role, m.Content, m.CreatedAt, m.Status, d.stored()); err != nil {
 		return m, nil, err
 	}
 	var view *ProposalView
@@ -787,7 +839,7 @@ func (c *Chat) Propose(ctx context.Context, in ExternalProposal) (ProposalView, 
 		what = "article"
 	}
 	reply := fmt.Sprintf("%s proposed a %s: “%s”. Review it below. Nothing changes until you approve it.", caller, what, firstLine(p.Title+" ", 80))
-	_, view, err := c.storeReply(ctx, convID, seq, reply, &p)
+	_, view, err := c.storeReply(ctx, convID, seq, reply, &p, ChatDetail{})
 	if err != nil {
 		return ProposalView{}, err
 	}
@@ -801,6 +853,12 @@ func (c *Chat) Proposal(ctx context.Context, id string) (ProposalView, error) {
 		return p, ErrNotFound
 	}
 	return p, err
+}
+
+// ConversationBrand returns the brand a conversation belongs to, for checking who may answer in it.
+func (c *Chat) ConversationBrand(ctx context.Context, id string) (string, error) {
+	v, err := c.load(ctx, id)
+	return v.ProfileID, err
 }
 
 // ProposalBrand returns the brand a proposal belongs to (through its conversation), for checking who may act on it.
