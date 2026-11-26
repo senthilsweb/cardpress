@@ -101,6 +101,9 @@ type Conversation struct {
 	// CostCents is what the conversation has cost at list price; absent when no cost has been recorded.
 	CostCents *int           `json:"costCents,omitempty"`
 	Proposals []ProposalView `json:"proposals,omitempty"`
+	// Changes are what each reply changed, and whether that is saved; Choices the options it offered.
+	Changes []ChangeView `json:"changes,omitempty"`
+	Choices []ChoiceView `json:"choices,omitempty"`
 }
 
 // ChatEvent is progress while a reply is written. Name is "user", "delta", "proposal" or "message".
@@ -302,7 +305,13 @@ func (c *Chat) Get(ctx context.Context, id string) (Conversation, error) {
 	if err != nil {
 		return v, err
 	}
-	v.Proposals, err = c.proposals(ctx, id)
+	if v.Proposals, err = c.proposals(ctx, id); err != nil {
+		return v, err
+	}
+	if v.Changes, err = c.changes(ctx, id); err != nil {
+		return v, err
+	}
+	v.Choices, err = c.choices(ctx, id)
 	return v, err
 }
 
@@ -396,7 +405,7 @@ func (c *Chat) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	for _, q := range []string{`DELETE FROM chat_usage WHERE conversation_id = ?`, `DELETE FROM conversation_sources WHERE conversation_id = ?`, `DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
+	for _, q := range []string{`DELETE FROM chat_usage WHERE conversation_id = ?`, `DELETE FROM chat_changes WHERE conversation_id = ?`, `DELETE FROM choices WHERE conversation_id = ?`, `DELETE FROM conversation_sources WHERE conversation_id = ?`, `DELETE FROM proposals WHERE conversation_id = ?`, `DELETE FROM chat_messages WHERE conversation_id = ?`} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {
 			return err
 		}
@@ -595,6 +604,11 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		return err
 	}
 	stored = true
+	if studio != nil {
+		if err := c.settle(ctx, id, assistant.ID); err != nil {
+			return err
+		}
+	}
 	if out.SessionID != "" {
 		session = out.SessionID
 	}

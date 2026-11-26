@@ -4,7 +4,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"sync"
@@ -25,11 +24,12 @@ const (
 	failedInHistory = "(That reply failed.)"
 )
 
-// SavedVersion is an item the assistant saved while writing a reply, at the last version it saved.
+// SavedVersion is an item the assistant changed while writing a reply. Replies from before changes waited for the
+// person to save them also hold the version it saved.
 type SavedVersion struct {
 	DraftID string `json:"draftId"`
 	Kind    string `json:"kind"`
-	Version int    `json:"version"`
+	Version int    `json:"version,omitempty"`
 }
 
 // ChatDetail is what happened while a reply was written.
@@ -59,8 +59,7 @@ func (d ChatDetail) stored() string {
 type recorder struct {
 	mu     sync.Mutex
 	detail ChatDetail
-	// since is each item's newest version when the reply began.
-	since map[string]int
+	convID string // set once the reply's changes are being recorded
 }
 
 func (r *recorder) add(e agent.Event) {
@@ -84,42 +83,21 @@ func (c *Chat) watch(ctx context.Context, r *recorder, st *agent.Studio) error {
 	if st == nil {
 		return nil
 	}
-	r.since = map[string]int{}
-	for _, id := range []string{st.PostID, st.ArticleID} {
-		if id == "" {
-			continue
-		}
-		var n sql.NullInt64
-		if err := c.db.QueryRowContext(ctx, `SELECT MAX(seq) FROM draft_versions WHERE draft_id = ?`, id).Scan(&n); err != nil {
-			return err
-		}
-		r.since[id] = int(n.Int64)
-	}
-	return nil
+	r.convID = st.ConversationID
+	return c.openChanges(ctx, st.ConversationID, []string{st.PostID, st.ArticleID})
 }
 
-// close returns what is to be kept, with the versions saved since watch.
+// close returns what is to be kept, with the items changed since watch.
 func (c *Chat) close(ctx context.Context, r *recorder) (ChatDetail, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	d := r.detail
-	d.Saved = nil
-	for _, kind := range []string{KindPost, KindArticle} { // the post first, whatever the map's order
-		for id, since := range r.since {
-			v := SavedVersion{DraftID: id}
-			err := c.db.QueryRowContext(ctx, `SELECT kind, seq FROM draft_versions WHERE draft_id = ? AND seq > ? AND label = ? ORDER BY seq DESC LIMIT 1`, id, since, VersionAssistant).Scan(&v.Kind, &v.Version)
-			if errors.Is(err, sql.ErrNoRows) {
-				continue
-			}
-			if err != nil {
-				return d, err
-			}
-			if v.Kind == kind {
-				d.Saved = append(d.Saved, v)
-			}
-		}
+	if r.convID == "" {
+		return d, nil
 	}
-	return d, nil
+	var err error
+	d.Saved, err = c.written(ctx, r.convID)
+	return d, err
 }
 
 // keepUnfinished stores the reply that did not finish: what happened and why it ended. Text the assistant had written is
@@ -140,6 +118,9 @@ func (c *Chat) keepUnfinished(ctx context.Context, convID string, seq int, r *re
 			d.Error = ae.Msg
 		}
 	}
-	_, err = c.addReply(ctx, convID, seq, content, status, d)
-	return err
+	m, err := c.addReply(ctx, convID, seq, content, status, d)
+	if err != nil || r.convID == "" {
+		return err
+	}
+	return c.settle(ctx, convID, m.ID)
 }

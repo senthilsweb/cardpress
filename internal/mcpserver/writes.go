@@ -138,6 +138,8 @@ type writtenOut struct {
 type createIn struct {
 	ProfileID string `json:"profileId" jsonschema:"the profile id from list_profiles"`
 	Kind      string `json:"kind" jsonschema:"post or article"`
+	// ConversationID ties the new item to the chat reply being written.
+	ConversationID string `json:"conversationId,omitempty" jsonschema:"in a chat: the conversationId from the studio block"`
 }
 
 func (t tools) createDraft(ctx context.Context, _ *mcp.CallToolRequest, in createIn) (*mcp.CallToolResult, writtenOut, error) {
@@ -150,6 +152,18 @@ func (t tools) createDraft(ctx context.Context, _ *mcp.CallToolRequest, in creat
 	d, err := t.d.Writer.NewAssistantDraft(ctx, in.ProfileID, strings.TrimSpace(in.Kind))
 	if err != nil {
 		return nil, writtenOut{}, toolError(err)
+	}
+	if in.ConversationID != "" {
+		brand, err := t.d.Proposals.ConversationBrand(ctx, in.ConversationID)
+		if err == nil {
+			err = t.brand(ctx, brand)
+		}
+		if err == nil {
+			err = t.d.Writer.JoinReply(ctx, in.ConversationID, d.ID)
+		}
+		if err != nil {
+			return nil, writtenOut{}, toolError(err)
+		}
 	}
 	return nil, writtenOut{draftOut: describe(d)}, nil
 }

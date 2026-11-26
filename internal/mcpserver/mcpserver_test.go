@@ -119,7 +119,7 @@ func TestTheToolListHasNothingThatPublishesSchedulesOrTouchesCredentials(t *test
 		t.Fatal(err)
 	}
 	// the tools that change something, and no others, are not read-only
-	writes := map[string]bool{"propose_content": true, "update_card_text": true, "create_draft": true, "update_draft": true, "set_attachment": true, "save_memory": true, "delete_memory": true}
+	writes := map[string]bool{"propose_content": true, "update_card_text": true, "create_draft": true, "update_draft": true, "set_attachment": true, "save_memory": true, "delete_memory": true, "offer_choices": true}
 	var names []string
 	forbidden := regexp.MustCompile(`(?i)publish|schedul|cancel|approve|credential|secret|token|setting|password|api_?key|send|post_|run|delete_draft|update_design`)
 	for _, tool := range list.Tools {
@@ -134,7 +134,7 @@ func TestTheToolListHasNothingThatPublishesSchedulesOrTouchesCredentials(t *test
 	}
 	sort.Strings(names)
 	want := []string{"create_draft", "delete_memory", "fetch_source", "get_design", "get_draft", "get_job", "get_proposal", "list_connections", "list_design_presets",
-		"list_drafts", "list_jobs", "list_memories", "list_profiles", "propose_content", "report_reply", "save_memory", "set_attachment", "update_card_text", "update_draft"}
+		"list_drafts", "list_jobs", "list_memories", "list_profiles", "offer_choices", "propose_content", "report_reply", "save_memory", "set_attachment", "update_card_text", "update_draft"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools = %v\nwant    %v\nadding a tool must be a deliberate, reviewed change", names, want)
 	}
@@ -158,9 +158,10 @@ func TestTheToolsCanOnlyCallTheListedMethods(t *testing.T) {
 	sort.Strings(reachable)
 	// Access.BrandOwner, Proposals.ProposalBrand and Proposals.ConversationBrand only read who owns a brand, to keep a key to its own person's work.
 	// Connections.View never carries a secret.
+	// Writer.JoinReply ties a new item to the reply being written; Writer.OfferChoices keeps options and changes no draft.
 	want := []string{"Access.BrandOwner", "Connections.View", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List",
 		"Notes.DeleteMemory", "Notes.ListMemories", "Notes.SaveMemory", "Profiles.Profiles", "Proposals.ConversationBrand", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose",
-		"Writer.Card", "Writer.ClearAttachment", "Writer.NewAssistantDraft", "Writer.PatchCardText", "Writer.PatchDraft", "Writer.SetAttachmentTitle", "Writer.SetVideo"}
+		"Writer.Card", "Writer.ClearAttachment", "Writer.JoinReply", "Writer.NewAssistantDraft", "Writer.OfferChoices", "Writer.PatchCardText", "Writer.PatchDraft", "Writer.SetAttachmentTitle", "Writer.SetVideo"}
 	if !reflect.DeepEqual(reachable, want) {
 		t.Fatalf("methods reachable from tools:\n got  %v\n want %v", reachable, want)
 	}
