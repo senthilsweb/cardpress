@@ -24,6 +24,8 @@ type ChatStudio interface {
 	Card(ctx context.Context, draftID string) (CardDesign, Draft, error)
 	BrandOwner(ctx context.Context, profileID string) (string, bool, error)
 	ListMemories(ctx context.Context, profileID string) ([]Memory, error)
+	putBack(ctx context.Context, draftID string, revision int, was snapshot) (Draft, error)
+	saveWith(ctx context.Context, draftID string, revision int, picks []fieldPick) (Draft, int, error)
 }
 
 // ChatRequest is what comes with a message besides its words.

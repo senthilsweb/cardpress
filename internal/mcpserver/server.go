@@ -40,6 +40,8 @@ type Deps struct {
 		SetVideo(ctx context.Context, id, address string) (service.Draft, error)
 		SetAttachmentTitle(ctx context.Context, id, title string) (service.Draft, error)
 		ClearAttachment(ctx context.Context, id string) (service.Draft, error)
+		JoinReply(ctx context.Context, conversationID, draftID string) error
+		OfferChoices(ctx context.Context, conversationID, draftID string, sets []service.ChoiceSet) error
 	}
 	// Notes are the short things an assistant remembers about a brand.
 	Notes interface {
@@ -120,6 +122,11 @@ func New(d Deps) *mcp.Server {
 			"message (240 characters), and when useful points (4, each 120), question (200, needed with needs_answer) and next (120). " +
 			"Plain text, never the text of a post or article. It changes nothing."}, t.reportReply)
 
+	mcp.AddTool(s, &mcp.Tool{Name: "offer_choices", Title: "Offer options to pick from", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},
+		Description: "While answering in the chat, show the person options for fields of an item (any card text, title, altText, " +
+			"summary, hashtags) as buttons to pick from: 2 to 6 for each field, the recommended one first, each with an optional short note. " +
+			"The first is the one you recommend, or the value already saved. It changes no draft; do not list the same options in your reply."}, t.offerChoices)
+
 	changes := &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)}
 	replaces := &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(false)}
 	mcp.AddTool(s, &mcp.Tool{Name: "get_design", Title: "Read a card", Annotations: readOnly,
@@ -128,10 +135,10 @@ func New(d Deps) *mcp.Server {
 		Description: "Change only the words drawn on a draft's card: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue. " +
 			"Send only the fields that change. Layout, colours, background, size, fonts and images cannot be changed: the person sets them in the studio."}, t.updateCardText)
 	mcp.AddTool(s, &mcp.Tool{Name: "create_draft", Title: "Start a draft", Annotations: changes,
-		Description: "Make an empty post or article with the brand's starting card. Returns its id and revision."}, t.createDraft)
+		Description: "Make an empty post or article with the brand's starting card. In a chat, pass conversationId. Returns its id and revision."}, t.createDraft)
 	mcp.AddTool(s, &mcp.Tool{Name: "update_draft", Title: "Change a draft's text", Annotations: replaces,
 		Description: "Change only the named fields of a draft: body (needs the revision you read), title, summary, slug, hashtags, altText, unicodeStyles, audience, topic. " +
-			"Each change is saved as a new version. A published item cannot be changed until the person brings it back to draft; changing an approved one returns it to draft. It publishes nothing."}, t.updateDraft)
+			"In a chat reply (a draft of the conversation) the person decides whether to save the change as a version; otherwise each change is a version. A published item cannot be changed until the person brings it back to draft; changing an approved one returns it to draft. It publishes nothing."}, t.updateDraft)
 	mcp.AddTool(s, &mcp.Tool{Name: "set_attachment", Title: "Choose what a post carries", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(true)},
 		Description: "Make a post go out with its card, or with a video at a public address. It publishes nothing."}, t.setAttachment)
 	mcp.AddTool(s, &mcp.Tool{Name: "list_connections", Title: "List connected networks", Annotations: readOnly,

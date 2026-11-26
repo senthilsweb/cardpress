@@ -102,7 +102,7 @@ function BrandsPage({ brands, colors, sync, setActive }: {
   const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).get("new") === "1");
   const [copyOf, setCopyOf] = useState<Profile | undefined>(undefined);
   const current = brands.profiles.find((p) => p.id === brands.activeId) ?? brands.profiles[0];
-  // ?look=<brand> opens that brand's colours, fonts and logo
+  // ?look=<brand> opens that brand for editing
   const [looking, setLooking] = useState(() => new URLSearchParams(window.location.search).get("look"));
   const look = (id: string | null) => { setLooking(id); window.history.replaceState(null, "", settingsHref("brands", id ? `?look=${encodeURIComponent(id)}` : "")); };
   const close = () => { setAdding(false); setCopyOf(undefined); window.history.replaceState(null, "", settingsHref("brands")); };

@@ -61,7 +61,7 @@ func TestAReplyKeepsWhatHappenedAlsoWhenItFails(t *testing.T) {
 	got, _ := c.Get(ctx, conv.ID)
 	d := got.Messages[1].Detail
 	if got.Messages[1].Status != ReplyDone || d == nil || strings.Join(d.Steps, "; ") != "Reading the draft; Saving the draft" ||
-		len(d.Checks) != 1 || !d.Checks[0].Passed || len(d.Saved) != 1 || d.Saved[0].DraftID != got.PostDraftID || d.Saved[0].Kind != "post" || d.Saved[0].Version != 2 {
+		len(d.Checks) != 1 || !d.Checks[0].Passed || len(d.Saved) != 1 || d.Saved[0].DraftID != got.PostDraftID || d.Saved[0].Kind != "post" || len(got.Changes) != 1 || got.Changes[0].Status != ChangePending {
 		t.Fatalf("%+v %+v", got.Messages[1], d)
 	}
 
@@ -71,7 +71,7 @@ func TestAReplyKeepsWhatHappenedAlsoWhenItFails(t *testing.T) {
 	}
 	got, _ = c.Get(ctx, conv.ID)
 	m := got.Messages[3]
-	if m.Status != ReplyFailed || m.Content != "" || !strings.Contains(m.Detail.Error, "upstream is down") || len(m.Detail.Saved) != 1 || m.Detail.Saved[0].Version <= 2 || len(m.Detail.Checks) != 0 {
+	if m.Status != ReplyFailed || m.Content != "" || !strings.Contains(m.Detail.Error, "upstream is down") || len(m.Detail.Saved) != 1 || len(m.Detail.Checks) != 0 {
 		t.Fatalf("%+v %+v", m, m.Detail)
 	}
 

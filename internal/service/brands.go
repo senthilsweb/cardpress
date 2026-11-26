@@ -226,6 +226,8 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 	// would make the environment credentials post as a different account.
 	for _, q := range []string{
 		`DELETE FROM proposals WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,
+		`DELETE FROM chat_changes WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,
+		`DELETE FROM choices WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,
 		`DELETE FROM chat_messages WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,
 		`DELETE FROM conversation_sources WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,
 		`DELETE FROM chat_usage WHERE conversation_id IN (SELECT id FROM conversations WHERE profile_id = ?)`,

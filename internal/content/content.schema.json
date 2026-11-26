@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CardPress content",
-  "x-schemaVersion": 2,
+  "x-schemaVersion": 3,
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -380,6 +380,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -391,6 +392,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -402,6 +404,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -413,6 +416,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 60
     }

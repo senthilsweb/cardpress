@@ -33,7 +33,16 @@ export interface ChatSource {
   truncated: boolean;
 }
 
-export interface SavedVersion { draftId: string; kind: DraftKind; version: number }
+/** An item a reply changed. `version` is set only on replies from when every change was saved at once. */
+export interface SavedVersion { draftId: string; kind: DraftKind; version?: number }
+/** What a reply changed in an item, and whether that is saved as a version. `revision` is the item as the reply left it. */
+export interface Change { messageId: string; draftId: string; kind: DraftKind; status: "pending" | "saved" | "undone" | "passed"; revision: number; version?: number }
+/** Options offered for one field, the recommended one first. `chosen` is -1 until one is saved. */
+export interface Choice {
+  id: string; messageId: string; draftId: string; kind: DraftKind; field: string;
+  options: { value: string | string[]; note?: string }[];
+  status: "pending" | "chosen" | "dismissed" | "superseded"; chosen: number;
+}
 export interface ReplyCheck { kind: DraftKind; passed: boolean; round?: number; note?: string }
 /** The assistant's short answer. One with no outcome was not reported: its last words, or a note from the studio. */
 export interface ReplyReport { outcome?: "done" | "needs_answer" | "not_done"; message: string; points?: string[]; question?: string; next?: string }
@@ -69,6 +78,8 @@ export interface Conversation {
   updatedAt: string;
   messages?: ChatMessage[];
   proposals?: Proposal[];
+  changes?: Change[];
+  choices?: Choice[];
   sources?: ChatSource[];
   /** What it has cost at list price, in cents; absent when nothing was recorded. */
   costCents?: number;

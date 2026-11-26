@@ -380,12 +380,18 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 // A version 6 manifest, as the agent project builds it, carries the schema.
 func TestLoadManifestVersion6(t *testing.T) {
 	m := manifest
-	m.Version, m.Schema, m.SchemaVersion = ManifestVersion, content.Schema, 2
+	var built struct {
+		Version int `json:"x-schemaVersion"`
+	}
+	if err := json.Unmarshal(content.Schema, &built); err != nil {
+		t.Fatal(err)
+	}
+	m.Version, m.Schema, m.SchemaVersion = ManifestVersion, content.Schema, built.Version
 	b, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := LoadManifest(context.Background(), string(b)); err != nil || got.SchemaVersion != 2 {
+	if got, err := LoadManifest(context.Background(), string(b)); err != nil || got.SchemaVersion != built.Version {
 		t.Fatalf("%v %+v", err, got.SchemaVersion)
 	}
 }

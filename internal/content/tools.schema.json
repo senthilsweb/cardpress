@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schemaVersion": 2,
+  "x-schemaVersion": 3,
   "tools": {
     "update_draft": {
       "type": "object",
@@ -151,6 +151,88 @@
         "conversationId",
         "outcome",
         "message"
+      ],
+      "additionalProperties": false
+    },
+    "offer_choices": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "draftId": {
+          "type": "string"
+        },
+        "fields": {
+          "minItems": 1,
+          "maxItems": 12,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "headline",
+                  "eyebrow",
+                  "subtitle",
+                  "tag",
+                  "footer",
+                  "footerLeft",
+                  "quoteAuthor",
+                  "statValue",
+                  "title",
+                  "altText",
+                  "summary",
+                  "hashtags"
+                ]
+              },
+              "options": {
+                "minItems": 2,
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[\\p{L}\\p{N}_]+$"
+                          }
+                        }
+                      ]
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 80
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "field",
+              "options"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "conversationId",
+        "draftId",
+        "fields"
       ],
       "additionalProperties": false
     }

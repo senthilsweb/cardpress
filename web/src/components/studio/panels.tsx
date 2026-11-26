@@ -125,7 +125,7 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand colours, fonts and logo</a></p>
+        <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand name, colours, fonts and logo</a></p>
       </Section>
 
       <Section title="Fonts (this card)">

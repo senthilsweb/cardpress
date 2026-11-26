@@ -15,6 +15,8 @@ import { ChatPanel } from "./ChatPanel";
 import { StageBar, type StageView } from "./StageBar";
 import { SideGrip } from "./SideGrip";
 import { ArticleView } from "./ArticleView";
+import { ChoiceContext, useChoices } from "@/lib/useChoices";
+import { preview } from "@/lib/choices";
 import { conversationFor, linksDraft, pairFor } from "@/lib/workspace";
 import { useMedia } from "@/lib/useMedia";
 import { toCardDesign } from "@/lib/cardDesign";
@@ -143,7 +145,6 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   }, []);
   useEffect(() => { if (editorExpanded) setPhonePreview(true); }, [editorExpanded]); // the large editor is drawn over the canvas
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
-  const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
   /* ---------- what the canvas shows, and the conversation about it ---------- */
   const pair = useMemo(() => pairFor(store.current, store.drafts, chat.list, chat.current?.id), [store.current, store.drafts, chat.list, chat.current?.id]);
   const [unseen, setUnseen] = useState<string[]>([]); // items that changed while another was on screen
@@ -167,6 +168,10 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
       if (!chat.busy) chat.newConversation();
     } catch (e) { toast.error("Could not start a new draft", { description: (e as Error).message }); }
   };
+  // options picked in the chat or in Details are shown on the canvas, and saved only when the person says so
+  const choices = useChoices(chat, store, (id) => void openItem(id));
+  /** An item as it would look with what is picked. */
+  const withPicks = (d: Draft) => preview(d, designOf(d.design), choices.choices, choices.picks);
   const deleteChat = async (id: string) => { await chat.remove(id); await startFresh(id); };
   const deleteItem = async (id: string) => {
     const wasOpen = store.current?.id === id;
@@ -310,7 +315,11 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const [canvasRef, box] = useBox<HTMLDivElement>();
   const maxW = Math.max(200, box.w - 64), maxH = Math.max(200, box.h - 72);
 
-  const cardProps = { design, profile, palette };
+  const onScreen = store.current ? withPicks(store.current) : undefined;
+  const shownDesign = onScreen?.design ?? design;
+  const caption = onScreen ? serializeDraft(onScreen.draft).text : "";
+  /** The card on the canvas, which may be a preview; exports draw the saved one. */
+  const cardProps = { design: shownDesign, profile, palette };
   // a feed preview shows what the post carries, and only for the networks that can take it
   const media = usePostMedia(store.current);
   const cannot = (net: Network) => (feed ? whyNot(net, media.media) : null);
@@ -360,20 +369,20 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   // side by side, the pane that is not being worked on needs its own card and file
   const postMedia = usePostMedia(showBoth ? pair.post : undefined);
   const articleView = (d: Draft, width: number) => {
-    const own = designOf(d.design);
+    const { draft: seenDraft, design: own } = withPicks(d);
     return (
-      <ArticleView draft={d} design={own} profile={profile} palette={profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0]} width={width}
+      <ArticleView draft={seenDraft} design={own} profile={profile} palette={profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0]} width={width}
         onEdit={() => { void openItem(d.id).then(() => { showDetails(); setEditorExpanded(true); }); }}
         onPreview={() => { void openItem(d.id).then(() => { setPreviewRequested(true); showDetails(); }); }} />
     );
   };
   const postPane = (d: Draft, width: number) => {
-    const own = designOf(d.design), paneSize = sizeById(own.sizeId), why = whyNot(paneSize.net, postMedia.media);
+    const { draft: seenDraft, design: own } = withPicks(d), paneSize = sizeById(own.sizeId), why = whyNot(paneSize.net, postMedia.media);
     const pal = profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0];
     return (
       <div className="flex min-h-full items-start justify-center p-6">
         {why ? <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {paneSize.net} preview: {why}.</p>
-          : <FeedFrame design={own} profile={profile} palette={pal} {...postMedia.frame} size={paneSize} caption={serializeDraft(d).text} width={Math.max(240, Math.min(width - 48, 520))} />}
+          : <FeedFrame design={own} profile={profile} palette={pal} {...postMedia.frame} size={paneSize} caption={serializeDraft(seenDraft).text} width={Math.max(240, Math.min(width - 48, 520))} />}
       </div>
     );
   };
@@ -388,6 +397,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   return (
     <TooltipProvider delayDuration={250}>
      <LayoutContext.Provider value={layoutCtx}>
+     <ChoiceContext.Provider value={choices}>
       <Toaster theme={theme} />
       <div className="flex h-dvh flex-col lg:flex-row">
         <Rail area="studio" brands={profiles} activeId={profile.id} colors={brandColors} switching={switching} onSwitchBrand={(id) => void switchBrand(id)}
@@ -481,6 +491,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <Button variant="brand" size="sm" onClick={doDownload} disabled={!!busy || !one}>{busy === "download" ? <Loader2 className="animate-spin" /> : <Download />} Download PNG</Button>
             </div>
 
+            {(showBoth ? [pair.post, pair.article] : [store.current]).some((d) => d && withPicks(d).on) && (
+              <p role="status" className="border-b border-border bg-accent px-4 py-1.5 text-center text-xs font-medium text-brand">Previewing. Not saved.</p>
+            )}
             <div ref={canvasRef} className="canvas-grid min-h-0 flex-1 overflow-auto">
               {showBoth && pair.post && pair.article ? (
                 <div className="grid h-full grid-cols-2">
@@ -528,12 +541,13 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
           </nav>
         </div>
       </div>
+     </ChoiceContext.Provider>
      </LayoutContext.Provider>
 
       {/* off-screen export stage: full-size cards, no transforms */}
       <div aria-hidden style={{ position: "fixed", left: -100000, top: 0, pointerEvents: "none" }}>
         {stage.map((s) => (
-          <Card key={s.id} ref={(el) => { stageRefs.current[s.id] = el; }} {...cardProps} size={s} />
+          <Card key={s.id} ref={(el) => { stageRefs.current[s.id] = el; }} design={design} profile={profile} palette={palette} size={s} />
         ))}
       </div>
     </TooltipProvider>

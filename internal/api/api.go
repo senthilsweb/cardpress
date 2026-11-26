@@ -106,6 +106,8 @@ type Chatting interface {
 	SendWith(ctx context.Context, id, content string, req service.ChatRequest, emit func(service.ChatEvent)) error
 	Decide(ctx context.Context, proposalID string, d service.Decision) (service.ProposalView, error)
 	ProposalBrand(ctx context.Context, proposalID string) (string, error)
+	SaveReply(ctx context.Context, id, messageID string, req service.SaveRequest) (service.Conversation, error)
+	Undo(ctx context.Context, id, messageID string) (service.Conversation, error)
 }
 
 // Settings is the part of the settings service the HTTP API needs.
@@ -269,6 +271,8 @@ func (s *server) table() []routeDef {
 		{"POST", "/chat/conversations/{id}/messages", write(scopeConversation), s.sendMessage},
 		{"POST", "/chat/conversations/{id}/sources", write(scopeConversation), s.addSource},
 		{"DELETE", "/chat/conversations/{id}/sources/{sid}", write(scopeConversation), s.removeSource},
+		{"POST", "/chat/conversations/{id}/replies/{mid}/save", write(scopeConversation), s.saveReply},
+		{"POST", "/chat/conversations/{id}/replies/{mid}/undo", write(scopeConversation), s.undoReply},
 		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
@@ -1118,6 +1122,30 @@ func (s *server) removeSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// saveReply saves what a reply changed, with any options picked, as versions. No assistant is called.
+func (s *server) saveReply(w http.ResponseWriter, r *http.Request) {
+	var body service.SaveRequest
+	if !decode(w, r, &body) {
+		return
+	}
+	v, err := s.Chat.SaveReply(r.Context(), r.PathValue("id"), r.PathValue("mid"), body)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+// undoReply puts the items a reply changed back as they were.
+func (s *server) undoReply(w http.ResponseWriter, r *http.Request) {
+	v, err := s.Chat.Undo(r.Context(), r.PathValue("id"), r.PathValue("mid"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 // sendMessage answers as a stream of server-sent events: "user" (the stored message), "delta" (text as it is written),

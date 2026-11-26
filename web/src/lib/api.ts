@@ -310,6 +310,10 @@ export const api = {
   deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
   streamMessage,
   /** Record a person's answer. Approving does not save or publish anything: the browser applies the content to a draft. */
+  /** Save what a reply changed as versions, with the picked options. No assistant is called. */
+  saveReply: (id: string, messageId: string, body: { picks: { choiceId: string; option: number }[]; revisions: Record<string, number> }) =>
+    call<Conversation>("POST", `/chat/conversations/${encodeURIComponent(id)}/replies/${encodeURIComponent(messageId)}/save`, body),
+  undoReply: (id: string, messageId: string) => call<Conversation>("POST", `/chat/conversations/${encodeURIComponent(id)}/replies/${encodeURIComponent(messageId)}/undo`),
   decideProposal: (id: string, body: { status: "approved" | "rejected"; draftId?: string; edited?: ProposalEdit }) =>
     call<Proposal>("POST", `/chat/proposals/${encodeURIComponent(id)}/decision`, body),
   importLegacy: (body: { profiles: unknown[]; designs: Record<string, unknown>; preferences: Record<string, unknown> }) =>

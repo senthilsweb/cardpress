@@ -12,7 +12,7 @@ export function checkLine(c: ReplyCheck): string {
 }
 
 /** Whether a reply has anything to put on a card under its words. */
-export const hasOutcome = (d?: ReplyDetail) => !!(d?.saved?.length || d?.checks?.length || d?.steps?.length);
+export const hasOutcome = (d?: ReplyDetail) => !!(d?.saved?.some((s) => s.version) || d?.checks?.length || d?.steps?.length);
 
 /** The newest conversations followed by older ones loaded since, each once, as the newest list has it. */
 export function withOlder(recent: Conversation[], older: Conversation[]): Conversation[] {

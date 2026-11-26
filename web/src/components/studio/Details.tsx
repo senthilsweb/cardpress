@@ -174,7 +174,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   const stop = blockers(d, { value: ser.text, length: ser.length, limit: isPost ? LINKEDIN_LIMIT : undefined });
   const stopped = blockerLine(stop);
   const card = (key: "eyebrow" | "title" | "subtitle" | "tag" | "footer" | "footerLeft" | "quoteAuthor" | "statValue") => (design[key] ?? "") as string;
-  const field = (name: FieldName) => ({ name, kind, changed: changed.includes(name), onSeen });
+  const field = (name: FieldName) => ({ name, kind, draftId: draft.id, changed: changed.includes(name), onSeen });
   const L = design.layout;
   /** The card's words, with the ones this layout does not draw said so. */
   const words_ = [

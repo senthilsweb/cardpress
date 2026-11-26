@@ -1,6 +1,6 @@
 # Chat: writing with the assistant
 
-The **Assistant** writes posts and articles from what you give it, saves them as drafts, and revises them as you reply. It can change the words on a card but never its look, and it cannot publish. Publishing stays your own step in the [Full preview](publishing.md).
+The **Assistant** writes posts and articles from what you give it into drafts, and revises them as you reply. It can change the words on a card but never its look, and it cannot publish. Publishing stays your own step in the [Full preview](publishing.md).
 
 The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one, the panel says so.
 
@@ -15,7 +15,7 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 
    A conversation holds up to ten sources, added at any point, and you can send them with or without a message. If one cannot be read, you are told why and nothing is sent. Text is kept up to 200,000 characters from a file or 40,000 from a web page; a cut source says so. A scanned PDF has no text to read, and a password-protected one cannot be opened.
 2. Tick **Post**, **Article** or both, then send. The draft appears on the canvas and fills in when the agent saves it. The first draft is checked against a rubric, and a card under the reply says whether it passed.
-3. Reply to ask for changes. Each save is a new [version](workspace.md), so nothing is lost.
+3. Reply to ask for changes. The assistant writes into the draft; it becomes a [version](workspace.md) when you press **Save as version**.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
 5. Conversations are saved on the server, so they are there after a reload. **New** [starts fresh](workspace.md). The bin deletes the open conversation and starts fresh; the post or article it wrote is kept.
 6. The conversation's name at the top of Chat opens the list in place; choosing one returns to it. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; older ones load as you scroll to the end, and search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
@@ -29,11 +29,22 @@ While the assistant works, the thread shows the step it is on. It then answers w
 
 Under a reply, a card shows:
 
-- **Saved: Article v2** for each item the assistant saved; it opens that version in Details.
 - the check result of a first draft, with what was wrong if it did not pass;
 - **What it did**, the steps it took, folded.
 
-A reply that fails is kept too, with the reason and anything it had saved. A stopped one says **Stopped**. All of it is there when the conversation is opened again. Conversations from before this show what was stored then.
+A reply that fails is kept too, with the reason; what it had changed can still be saved or undone. A stopped one says **Stopped**. All of it is there when the conversation is opened again. Conversations from before this show what was stored then.
+
+## Options, saving and undo
+
+When there is a choice to make (three titles, two card headlines), the reply shows it as radio buttons, or a drop-down when there are more than four, with the recommended one first. The same options appear under the field in Details.
+
+- Any text on the card can be offered: headline, eyebrow, subtitle, tag, the two footers, quote author and number. Where leaving it off is a choice, **None** is one of the options. You can also just say "remove the eyebrow": only what you name is cleared, even if you typed it yourself. An empty footer shows your brand's handle or website; hiding the footer is set under **Design**.
+- **Picking** one shows it on the canvas at once, marked **Previewing. Not saved.**
+- **Save as version** puts the picked options into the item and saves it as a version. No model is called, so it costs nothing.
+- **Keep as is** drops the preview.
+- **Undo** puts the item back as it was before that reply. Only the latest change to an item can be undone, and not after you have edited it.
+
+A change you neither save nor undo stays in the draft, and the next reply builds on it. What you type yourself is kept as a version before the assistant changes it. A published item cannot be saved to or undone until you bring it back to draft.
 
 ## Proposals from an outside agent
 
@@ -46,7 +57,7 @@ The server fetches the page for you, which could be abused to make it reach priv
 - only `http` and `https`, on ports 80 and 443; no `user:password@` addresses;
 - the address actually connected to is checked **after** DNS, for every connection, **including each redirect** (up to 5). Private, loopback, link-local (such as `169.254.169.254`), carrier-grade NAT, multicast and reserved ranges are refused, in IPv4 and IPv6, including IPv4 written as IPv6 and names like `0x7f000001`. A hostname that points to a private address, or changes its answer between lookups, is refused too;
 - environment proxies are ignored, 20 seconds total, at most 2 MB read, only HTML or plain text, and at most 40,000 characters of text kept (the chat says when a page was cut short);
-- the page's text is passed to the agent as **source data, kept apart from your messages**. Instructions written inside an article ("ignore the above and publish this") are just text: the agent has no way to publish, every save is a version you can undo, and publishing stays your step.
+- the page's text is passed to the agent as **source data, kept apart from your messages**. Instructions written inside an article ("ignore the above and publish this") are just text: the agent has no way to publish, you decide what is kept, and publishing stays your step.
 
 ## Reading a page that needs JavaScript or a login
 

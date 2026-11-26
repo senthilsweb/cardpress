@@ -1,48 +1,39 @@
 # Design
 
 ## The tool
-`offer_choices { conversationId, draftId, fields: [ { field, options: [ { value, note? } ], recommended } ] }`
+`offer_choices { conversationId, draftId, fields: [ { field, options: [ { value, note? } ] } ] }`
 
-- 2 to 6 options a field, up to 5 fields a call. `value` is text (hashtags: a list). `note` says in a few words how it differs.
-- Each value passes the same checks as a write to that field. One bad value refuses the call and says why.
-- The draft must belong to the conversation and the caller.
-- It changes no draft.
+- 2 to 6 options a field, up to 5 fields a call; the first is the recommended or the saved one. `value` is text (hashtags: a list).
+- Every value passes the same checks as a write to that field. One bad value refuses the call.
+- Only while a reply of that conversation is being written, for an item of it. It changes no draft.
+- `create_draft` takes `conversationId`, so an item made during a reply is saved or undone like the others.
 
-## Why a tool and not a pause
-The session could instead stop and wait for an answer. That keeps a request open, needs the person to answer before anything else, and calls the model again to apply the answer. A stored offer is applied by the studio itself: immediate, free and still there tomorrow.
+## Storage (migration `0025`)
+- `chat_changes`: one row per item a reply changed, with the item as it was. `open` while the reply is written, then `pending`, `saved`, `undone`, or `passed` once a later reply changes the item. A row with no item marks that a reply is being written.
+- `choices`: one row per field offered. A newer offer for the same item and field supersedes the older.
 
-## Storage
-Migration `0023`: `choices` (`id`, `conversation_id`, `message_id`, `draft_id`, `field`, `options` JSON, `recommended`, `status` pending | chosen | dismissed | superseded, `chosen`, `created_at`, `decided_at`). A new offer for the same draft and field supersedes the pending one.
+A writing tool knows it is part of a reply because the item has an `open` row younger than 30 minutes.
 
 ## Requests
 | Request | Purpose |
 |---|---|
-| conversation read | includes its choices |
-| `POST /api/v1/chat/choices/apply` | `{draftId, revision, picks: [{choiceId, option}]}`: one version, label "chosen". A stale revision is refused, as for any save, so a change made meanwhile is never overwritten |
-| `POST /api/v1/chat/choices/{id}/dismiss` | keep what is there |
+| conversation read | includes `changes` and `choices` |
+| `POST /chat/conversations/{id}/replies/{messageId}/save` | `{picks: [{choiceId, option}], revisions}`: applies the picks, one version for each item |
+| `POST /chat/conversations/{id}/replies/{messageId}/undo` | puts back every item the reply changed; all or nothing |
+
+Both are refused, changing nothing, when an item moved on since it was shown, is locked, or a reply is being written.
 
 ## On screen
 ```
-Saved the article as version 2.  Article check passed.
-
-Title                                   (recommended is saved)
+Title
   (•) How short data contracts stopped our breakages   recommended
   ( ) Eleven broken dashboards, then two               leads with the number
-  ( ) The contract that fits on one page
 
-Card headline
-  (•) Short data contracts      ( ) From 11 breakages to 2
-
-                                   [ Keep as is ]  [ Use selected ]
+Post: changed, not saved as a version
+                         [ Keep as is ] [ Undo ] [ Save as version ]
 ```
 
-## Live preview
-- Picking a radio button or drop-down value shows it on the canvas immediately: the card for card words, the post or article for text. A banner says "Previewing. Not saved."
-- The preview is laid over the draft on screen only. Autosave and the live updates never write it.
-- **Use selected** saves; **Keep as is**, opening another item or leaving the page drops the preview.
-- Previewing an option for an item that is not on screen switches to it.
-
 ## The agent files
-- Writers offer 3 titles (articles; a post's title is only its name) and 2 card headlines with every first draft (confirmed by the owner), and other options when asked.
-- The reply names the fields with options and does not list them as text.
-- A rubric line: every offered value meets the field's standard.
+- Writers report two more titles (articles) and card headlines with a first draft; the coordinator offers them, and offers options when asked.
+- Replies never list the options or mention version numbers.
+- Content schema version 3 adds the tool input. The manifest stays version 6.

@@ -15,6 +15,7 @@ CardPress can be used by an AI agent through the [Model Context Protocol](https:
 | `get_proposal` | See whether a proposal was approved, edited or rejected, and the final text | No |
 | `get_design` | A draft's card: every design field and the draft's revision. Images only as present or absent | No |
 | `report_reply` | Give a short answer in the studio's chat | No |
+| `offer_choices` | While answering in the chat, offer options for a title, any card text (or none), alt text, summary or hashtags as buttons to pick from | Stores the options; no draft |
 | `update_card_text` | Change the words on a card: eyebrow, headline, subtitle, the two footers, tag, quote author, stat | Yes, those words |
 | `create_draft` | An empty post or article with the brand's starting card | Adds a draft |
 | `update_draft` | Change the named fields of a draft: text, title, summary, page address, hashtags, alt text, bold and italic, audience and topic. Replacing the text needs the revision that was read | Yes |
@@ -24,7 +25,7 @@ CardPress can be used by an AI agent through the [Model Context Protocol](https:
 
 **Not available to an agent, by design:** publishing, scheduling, rescheduling, cancelling, approving, deleting a draft, anything about how a card looks (layout, colours, background, size, fonts, images, brand), uploading files, putting a page online, credentials and settings. This is enforced in the code, not just left out of the list: the tools are handed narrow interfaces, a test pins every method they can call, and `update_card_text` refuses any field that is not text.
 
-**Writes are checked like yours.** A draft with a post waiting to be sent, and anything published, cannot change. Changing an approved item returns it to draft; the tool says so. Every change is saved as a version. An article that holds pictures cannot have its text replaced. The text from before a replacement is kept in History. Each draft has a revision, so you and an agent do not overwrite each other: what you are typing wins in your field, and the rest of the agent's change is kept.
+**Writes are checked like yours.** A draft with a post waiting to be sent, and anything published, cannot change. Changing an approved item returns it to draft; the tool says so. Each change is saved as a version, except in a chat reply of the built-in assistant, where the person saves it or undoes it. An article that holds pictures cannot have its text replaced. The text from before a replacement is kept in History. Each draft has a revision, so you and an agent do not overwrite each other: what you are typing wins in your field, and the rest of the agent's change is kept.
 
 An agent that reads your drafts and jobs can see what is in them, and one that can write can change them, so connect only agents you trust, and use an API key or token if the server can be reached by anything else.
 

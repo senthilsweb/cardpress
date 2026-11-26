@@ -161,7 +161,8 @@ func TestTheWritingToolsKeepToOnesOwnBrands(t *testing.T) {
 	_, _, checks["update_card_text"] = tl.updateCardText(mine, nil, cardTextIn{d.ID, map[string]any{"title": "x"}})
 	title := "x"
 	_, _, checks["update_draft"] = tl.updateDraft(mine, nil, updateIn{DraftID: d.ID, Title: &title})
-	_, _, checks["create_draft"] = tl.createDraft(mine, nil, createIn{"theirs", "post"})
+	_, _, checks["create_draft"] = tl.createDraft(mine, nil, createIn{ProfileID: "theirs", Kind: "post"})
+	_, _, checks["offer_choices"] = tl.offerChoices(mine, nil, offerIn{ConversationID: "none", DraftID: d.ID})
 	_, _, checks["set_attachment"] = tl.setAttachment(mine, nil, attachIn{DraftID: d.ID, Type: "card"})
 	_, _, checks["list_connections"] = tl.listConnections(mine, nil, profileIn{"theirs"})
 	_, _, checks["list_memories"] = tl.listMemories(mine, nil, profileIn{"theirs"})

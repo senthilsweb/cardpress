@@ -30,7 +30,7 @@ A brand is an identity (name, handle, logo, fonts, colour sets) with its own car
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
-- **Look** (Settings, Brands) edits a brand's logo, fonts and colour sets, with its card beside them. Credentials set through environment variables belong to the first brand only.
+- **Edit** (Settings, Brands) changes a brand's name, handle, website, logo, fonts and colour sets, with its card beside them. Credentials set through environment variables belong to the first brand only.
 
 ## Chat, Details and Design
 The left column has three sides. Your choice is remembered.
@@ -67,7 +67,7 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview**, *
 
 ## Versions and published items
 - Above the canvas, **v4** is the newest saved version of the item; **· edited** means the text changed since. Click it to see all versions in Details.
-- Every change the assistant saves is a version, and what you had just before is kept too. Your own typing becomes a version at most every ten minutes, and when you approve, send or save one by hand.
+- A change by the built-in assistant becomes a version when you press **Save as version** under its reply; what you had typed is kept first. Each change by an outside agent is a version. Your own typing becomes a version at most every ten minutes, and when you approve, send or save one by hand.
 - **Make current** brings an earlier version back by saving it as a new one.
 - A **published** item (a sent post, or a live page) is locked. Choose **Back to draft** to change it; a live page goes offline until you approve and publish it again.
 

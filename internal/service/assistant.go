@@ -175,11 +175,12 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 	if err != nil {
 		return cur, Effects{}, err
 	}
-	// what the person had is kept, whatever the ten minutes between automatic versions; what the assistant saves is a version too
-	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
+	// what the person had is kept, whatever the ten minutes between automatic versions
+	label, done, err := s.assistantWrite(ctx, cur)
+	if err != nil {
 		return cur, Effects{}, err
 	}
-	d, err := s.updateWithPlanning(ctx, cur, in, PlanningPatch{Audience: p.Audience, Topic: p.Topic}, VersionAssistant, "")
+	d, err := s.updateWithPlanning(ctx, cur, in, PlanningPatch{Audience: p.Audience, Topic: p.Topic}, label, "")
 	if err != nil {
 		return d, Effects{}, err
 	}
@@ -187,6 +188,9 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 		if d, err = s.writePageFields(ctx, d, slug, summary); err != nil {
 			return d, Effects{}, err
 		}
+	}
+	if err := done(d.Revision); err != nil {
+		return d, Effects{}, err
 	}
 	return d, effects(cur, d), nil
 }
@@ -221,11 +225,15 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	if err := editable(cur); err != nil {
 		return card, cur, Effects{}, err
 	}
-	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
+	label, done, err := s.assistantWrite(ctx, cur)
+	if err != nil {
 		return card, cur, Effects{}, err
 	}
-	d, err := s.updateDraft(ctx, id, in, VersionAssistant, "card text")
+	d, err := s.updateDraft(ctx, id, in, label, "card text")
 	if err != nil {
+		return card, d, Effects{}, err
+	}
+	if err := done(d.Revision); err != nil {
 		return card, d, Effects{}, err
 	}
 	// as in the studio, the brand's starting card follows the latest one

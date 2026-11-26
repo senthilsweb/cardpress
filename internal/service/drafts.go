@@ -290,7 +290,7 @@ func (s *Studio) updateDraft(ctx context.Context, id string, in DraftInput, labe
 	if err != nil {
 		return Draft{}, err
 	}
-	if changed {
+	if changed && label != "" { // a chat reply's change becomes a version only when the person saves it
 		_ = snapshotDraft(ctx, s.db, id, label, note)
 	}
 	if takeOffline {
@@ -463,6 +463,11 @@ func (s *Studio) DeleteDraft(ctx context.Context, id string) error {
 	}
 	// a conversation that was about it stays, without it
 	for _, q := range []string{`UPDATE conversations SET post_draft_id = '' WHERE post_draft_id = ?`, `UPDATE conversations SET article_draft_id = '' WHERE article_draft_id = ?`} {
+		if _, err := s.db.ExecContext(ctx, q, id); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{`DELETE FROM chat_changes WHERE draft_id = ?`, `DELETE FROM choices WHERE draft_id = ?`} {
 		if _, err := s.db.ExecContext(ctx, q, id); err != nil {
 			return err
 		}

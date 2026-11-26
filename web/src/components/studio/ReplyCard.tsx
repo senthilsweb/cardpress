@@ -40,10 +40,10 @@ export function ReplyCard({ message, onVersion }: { message: ChatMessage; onVers
         </div>
       )}
       {message.status === "stopped" && <p className="flex items-center gap-1.5 text-muted-foreground"><CircleSlash className="h-3.5 w-3.5" /> Stopped</p>}
-      {d?.saved && d.saved.length > 0 && (
+      {d?.saved && d.saved.some((s) => s.version) && (
         <div className="flex flex-wrap gap-1.5">
-          {d.saved.map((s) => (
-            <Button key={s.draftId} variant="outline" size="sm" title="Open this version" onClick={() => onVersion(s.draftId, s.version)}><History /> {savedLine(s)}</Button>
+          {d.saved.filter((s) => s.version).map((s) => (
+            <Button key={s.draftId} variant="outline" size="sm" title="Open this version" onClick={() => onVersion(s.draftId, s.version!)}><History /> {savedLine(s)}</Button>
           ))}
         </div>
       )}

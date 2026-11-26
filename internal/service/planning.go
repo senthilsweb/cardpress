@@ -138,8 +138,10 @@ func (s *Studio) updateWithPlanning(ctx context.Context, cur Draft, in DraftInpu
 	if _, err := s.db.ExecContext(ctx, `UPDATE drafts SET revision = revision + 1 WHERE id = ?`, cur.ID); err != nil {
 		return d, err
 	}
-	if err := snapshotDraft(ctx, s.db, cur.ID, label, note); err != nil {
-		return d, err
+	if label != "" {
+		if err := snapshotDraft(ctx, s.db, cur.ID, label, note); err != nil {
+			return d, err
+		}
 	}
 	if d, err = s.GetDraft(ctx, cur.ID); err == nil {
 		s.changed(d)
