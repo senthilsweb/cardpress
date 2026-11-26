@@ -1,6 +1,6 @@
-# Publishing calendar (future bolt)
+# Publishing calendar
 
-**Status:** proposed for a later bolt. Specification only: nothing is built.
+**Status:** the owner asked for it on 2026-11-25. To be built once the plan is confirmed. Nothing is built yet.
 
 ## Why
 Posts can be scheduled and articles given a planned date, but only one item at a time from its preview. There is no view of what goes out when.
