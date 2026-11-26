@@ -1,14 +1,32 @@
 # Workspace
 
-How the studio screen is arranged, and what is remembered.
+How the screens are arranged, and what is remembered.
+
+## Navigation
+
+Every page has a narrow **rail** on the far left: the CardPress mark, the open brand, then **Studio**, **Library** and **Settings**. At the bottom are the button that hides the side column (in the studio), the light or dark mode button, and **you**: your initials open a short menu with your name, email and role, **Docs** and **Sign out**. Nothing is placed along the top of the window.
+
+Beside the rail is the **side column** of the area you are in:
+
+| Area | Side column |
+|---|---|
+| Studio | Chat and Edit (see below) |
+| Library | All, Posts, Articles, and the statuses |
+| Settings | Account, Brands, Social accounts, API keys, Users (admins), Assistant (admins) |
+
+Each setting is its own page: `/settings/account/`, `/settings/brands/`, `/settings/social/`, `/settings/api-keys/`, `/settings/users/`, `/settings/assistant/`. Old addresses such as `/studio/?open=accounts` go to the matching page.
+
+On a narrow screen the rail is a bar along the bottom. Settings opens on its list; choosing an entry opens its page, with **Settings** at the top to go back.
+
+Popups are kept for quick choices and confirmations: the brand menu, your menu, confirmations, the schedule form, the expanded editor and the full preview. In the studio, the conversation history and an item's versions still open on the right.
 
 ## Brands
 
-A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The open brand is shown at the right of the header.
+A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The open brand is the coloured square near the top of the rail.
 
-- **Switch**: click the brand in the header and pick another. The whole studio changes to that brand, and the last one you opened is remembered on the server.
-- **New brand…**: a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
-- **Manage brands…**: open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
+- **Switch**: click the brand on the rail and pick another. The whole studio changes to that brand, and the last one you opened is remembered on the server.
+- **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
+- **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
 - The **Brand** tab edits the open brand. Credentials set through environment variables belong to the first brand only.
@@ -34,7 +52,7 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview** an
 ## Sidebar
 - **Make the left column wider or narrower** by dragging the grip on its right edge (320 to 720 pixels; double-click to reset, or focus it and use the arrow keys). The width is remembered.
 
-- **Hide or show** the whole sidebar with the button at the left of the header, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
+- **Hide or show** the whole sidebar with the button near the bottom of the rail, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
 - **Fold sections.** Click a section's title (Draft, Hashtags, Colours…) to fold or unfold it. Folded fields cannot be reached with Tab, so they do not get in the way of the keyboard.
 - The editor in the Write tab can be **dragged taller or shorter** from its bottom-right corner.
 
@@ -42,7 +60,7 @@ All of this is remembered: it is saved on the server as the `layout` preference,
 
 ## Drawers
 
-Settings and other tool panels slide in from the right as a drawer (`components/ui/drawer.tsx`), for example **Social accounts** from the account menu. A drawer does not dim or block the studio. Its header matches the app header, the body scrolls, and the action buttons are frozen in a footer. Esc closes it.
+The conversation history and an item's versions slide in from the right as a drawer (`components/ui/drawer.tsx`) that does not dim or block the studio; Esc closes it. Settings pages use the same component drawn as a page (`InlineDrawers`), so a panel looks the same in both places.
 
 ## Canvas
 
@@ -57,10 +75,9 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/lib/layout.tsx` | The `Layout` type, safe parsing of the saved value, and the context sections read |
 | `web/src/components/studio/fields.tsx` | `Section`, the foldable group |
 | `web/src/components/studio/Studio.tsx` | Sidebar hide/show and the shortcut |
-
-## Account menu
-
-The footer at the bottom of the sidebar shows **you** (your initials, name and role). Click it and a menu opens upward: **Library**, **Account settings** (your details and **Change password**), **Users** (admins), **Social accounts** (editors and admins), **Manage brands**, the light or dark mode, these docs, and **Sign out**. See [Accounts and roles](accounts.md). When the sidebar is hidden, a small round button with your initials at the left of the header opens the same menu. The header keeps the sidebar toggle, the brand switcher and the Assistant.
+| `web/src/components/shell/Rail.tsx` | The rail and the side column's heading and entries |
+| `web/src/components/settings/Settings.tsx` | The settings pages |
+| `web/src/lib/nav.ts` | Addresses, the settings list and who sees each entry |
 
 ## The article editor
 

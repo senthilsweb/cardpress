@@ -5,7 +5,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { brandProblem, buildBrand } from "@/lib/brands";
+import { brandProblem, buildBrand, initials } from "@/lib/brands";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 
@@ -16,7 +16,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** The open brand, and a menu to switch, add or manage brands. */
-export function BrandSwitcher({ brands, activeId, colors, busy, onSwitch, onNew, onManage }: {
+export function BrandSwitcher({ brands, activeId, colors, busy, onSwitch, onNew, onManage, variant = "header" }: {
   brands: Profile[];
   activeId: string;
   colors: Record<string, string>;
@@ -24,18 +24,29 @@ export function BrandSwitcher({ brands, activeId, colors, busy, onSwitch, onNew,
   onSwitch: (id: string) => void;
   onNew: () => void;
   onManage: () => void;
+  /** "rail" is the square at the top of the rail: the brand's colour and initials, the menu opening beside it. */
+  variant?: "header" | "rail";
 }) {
   const active = brands.find((b) => b.id === activeId) ?? brands[0];
+  const rail = variant === "rail";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="max-w-[220px] gap-2 px-2" aria-label={`Brand: ${active?.name ?? ""}. Switch brand`} disabled={busy}>
-          {busy ? <Loader2 className="animate-spin" /> : <Dot color={colors[active?.id] ?? "#888"} />}
-          <span className="hidden truncate sm:inline">{active?.name}</span>
-          <ChevronDown className="opacity-60" />
-        </Button>
+        {rail ? (
+          <button type="button" aria-label={`Brand: ${active?.name ?? ""}. Switch brand`} title={active?.name} disabled={busy}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg text-[11px] font-bold text-white outline-none ring-offset-2 ring-offset-card focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:ring-2 data-[state=open]:ring-brand"
+            style={{ background: colors[active?.id] ?? "#888" }}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : initials(active?.name ?? "")}
+          </button>
+        ) : (
+          <Button variant="ghost" size="sm" className="max-w-[220px] gap-2 px-2" aria-label={`Brand: ${active?.name ?? ""}. Switch brand`} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : <Dot color={colors[active?.id] ?? "#888"} />}
+            <span className="hidden truncate sm:inline">{active?.name}</span>
+            <ChevronDown className="opacity-60" />
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[230px]">
+      <DropdownMenuContent align={rail ? "start" : "end"} side={rail ? "right" : "bottom"} sideOffset={rail ? 10 : 4} className="min-w-[230px]">
         {brands.map((b) => (
           <DropdownMenuItem key={b.id} onSelect={() => { if (b.id !== activeId) onSwitch(b.id); }}>
             <Dot color={colors[b.id] ?? "#888"} />
@@ -124,7 +135,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onMove, onDuplicate, onArchive, onRestore, onDelete }: {
+export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
   open: boolean;
   onClose: () => void;
   active: Profile[];
@@ -137,6 +148,8 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   onArchive: (id: string) => Promise<{ scheduled: number }>;
   onRestore: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  /** On the Brands page: a New brand button in place of Done. */
+  onNew?: () => void;
 }) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -187,7 +200,9 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Brands" footer={<div className="flex justify-end"><Button variant="outline" size="sm" onClick={onClose}>Done</Button></div>}>
+    <Drawer open={open} onClose={onClose} title="Brands" footer={<div className="flex justify-end">{onNew
+      ? <Button variant="brand" size="sm" onClick={onNew}><Plus /> New brand</Button>
+      : <Button variant="outline" size="sm" onClick={onClose}>Done</Button>}</div>}>
       <div className="space-y-4 px-4 py-4">
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}

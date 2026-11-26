@@ -53,11 +53,11 @@ The session is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` over https). Brows
 
 ## From the app
 
-The account menu (your name at the bottom of the sidebar) has **Account settings** (your names, phone and date of birth, **Change password**, and **API keys**), **Users** (admins: add a person, change a role, disable or enable, set a password) and **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
+**Settings** (the gear on the left rail) has **Account** (your names, phone and date of birth, and **Password**), **API keys**, and for admins **Users** (add a person, change a role, disable or enable, set a password) and **Assistant**. Your initials at the bottom of the rail open **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
 
 ## API keys, the token and MCP
 
-A person can make **API keys** (Account settings, API keys) for programs such as an MCP client. A key acts as that person with the **Editor scope**: it can write, approve and publish on their own work, never more than the person may do, never as an admin, and never on anyone else's work. Keys are stored as hashes, shown once, and revoked at once. See [MCP](mcp.md#api-keys).
+A person can make **API keys** (Settings, API keys) for programs such as an MCP client. A key acts as that person with the **Editor scope**: it can write, approve and publish on their own work, never more than the person may do, never as an admin, and never on anyone else's work. Keys are stored as hashes, shown once, and revoked at once. See [MCP](mcp.md#api-keys).
 
 `CARDPRESS_API_TOKEN` still works for machines and scripts: a request with `Authorization: Bearer <token>` acts as an admin, with or without any account. **MCP over HTTP needs a key or the token as soon as any account exists**, because MCP works outside any one person's workspace. `cardpress mcp` over stdio runs as a process on your own machine and is not affected.
 
@@ -77,6 +77,6 @@ A person can make **API keys** (Account settings, API keys) for programs such as
 | Who may call each route (the policy table) | `internal/api/auth.go`, `table()` in `internal/api/api.go` |
 | Ownership of brands and what each list shows | `internal/service/studio.go`, `brands.go`, `library.go` |
 | Sign-in and sign-up pages | `web/src/components/auth/AuthPage.tsx` |
-| Account settings, Users | `web/src/components/studio/AccountSettings.tsx`, `UsersDrawer.tsx` |
+| Settings pages | `web/src/components/settings/Settings.tsx`, with `studio/AccountSettings.tsx` and `UsersDrawer.tsx` |
 
 Every route of the API is listed once in the table with the scope it names (a brand, a draft, a post, a conversation) and the permission a role must hold. A test walks the whole table as a second person against the first person's ids and expects the same answer a missing thing would get (`404`).

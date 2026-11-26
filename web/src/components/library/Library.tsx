@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CalendarClock, Check, Globe, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, Globe, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { AccountMenu, studioHref } from "@/components/studio/AccountMenu";
+import { studioHref } from "@/lib/nav";
+import { Rail, SecondaryHeader, SecondaryLink } from "@/components/shell/Rail";
 import { Attempts, Thumb } from "@/components/studio/JobQueue";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
 import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog";
-import { BuiltWith, Logo } from "@/components/studio/Logo";
+import { BuiltWith } from "@/components/studio/Logo";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { useSession } from "@/lib/session";
 import { ScaledCard } from "@/components/studio/preview";
@@ -103,31 +104,36 @@ function Page({ data }: { data: LibraryBoot }) {
   };
   const gone = () => { setOpenId(null); void load(true); };
 
-  const menu = (variant: "footer" | "avatar") => (
-    <AccountMenu variant={variant} page="library" name={brand.name} handle={brand.handle} color={data.colors[brand.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} />
-  );
+  // the brand at the top of the rail is the brand the library opens on; switching it shows that brand's items
+  const [railBrand, setRailBrand] = useState(data.activeId);
+  const switchBrand = (id: string) => {
+    setRailBrand(id);
+    setFilter((f) => ({ ...f, brand: id }));
+    api.putPreference("activeProfile", id).catch(() => undefined); // only means the choice is not remembered
+  };
   const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "";
 
   return (
-    <div className="flex h-dvh">
+    <div className="flex h-dvh flex-col lg:flex-row">
       <Toaster theme={theme} />
-      <aside className="hidden w-[380px] shrink-0 flex-col border-r border-border bg-card lg:flex">
-        <div className="px-4 py-3"><Logo /></div>
-        <nav className="flex flex-col gap-0.5 px-2 pt-2 text-sm" aria-label="Pages">
-          <a href={studioHref()} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"><PenLine className="h-4 w-4" /> Editor</a>
-          <a href="" aria-current="page" className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-2 font-medium"><FileText className="h-4 w-4" /> Library</a>
+      <Rail area="library" brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
+        <SecondaryHeader title="Library" />
+        <nav aria-label="Views" className="flex flex-col gap-0.5 p-2">
+          {([["", "All"], ["post", "Posts"], ["article", "Articles"]] as const).map(([k, label]) => (
+            <SecondaryLink key={k || "all"} current={filter.kind === k} onClick={() => setFilter((f) => ({ ...f, kind: k }))}>{label}</SecondaryLink>
+          ))}
+          <p className="eyebrow px-2.5 pb-1 pt-4">Status</p>
+          {STATUS_FILTERS.map((st) => (
+            <SecondaryLink key={st.value || "any"} current={filter.status === st.value} onClick={() => setFilter((f) => ({ ...f, status: st.value }))}>{st.value ? st.label : "Any"}</SecondaryLink>
+          ))}
         </nav>
         <div className="flex-1" />
-        <div className="border-t border-border p-2">{menu("footer")}<BuiltWith className="px-2 pb-1 pt-2" /></div>
+        <BuiltWith className="px-4 pb-3" />
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-          <div className="mb-5 flex items-center gap-3 lg:hidden">
-            {menu("avatar")}
-            <Logo />
-          </div>
-          <a href={studioHref()} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Back to the editor</a>
           <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {filter.brand === "all" ? "Posts and articles for every brand" : `Posts and articles for ${brand.name}`}
@@ -148,7 +154,7 @@ function Page({ data }: { data: LibraryBoot }) {
               </Select>
             )}
             <Select value={filter.kind || "any"} onValueChange={(v) => setFilter((f) => ({ ...f, kind: v === "any" ? "" : (v as "post" | "article") }))}>
-              <SelectTrigger className="w-[170px]" aria-label="Kind"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[170px] lg:hidden" aria-label="Kind"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">Posts and articles</SelectItem>
                 <SelectItem value="post">Posts</SelectItem>
@@ -156,7 +162,7 @@ function Page({ data }: { data: LibraryBoot }) {
               </SelectContent>
             </Select>
             <Select value={filter.status || "any"} onValueChange={(v) => setFilter((f) => ({ ...f, status: v === "any" ? "" : v }))}>
-              <SelectTrigger className="w-[140px]" aria-label="Status"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[140px] lg:hidden" aria-label="Status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_FILTERS.map((s) => <SelectItem key={s.value || "any"} value={s.value || "any"}>{s.label}</SelectItem>)}
               </SelectContent>

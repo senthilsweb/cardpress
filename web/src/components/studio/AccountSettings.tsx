@@ -12,9 +12,13 @@ import { formatInZone } from "@/lib/jobs";
 import { joinDate, roleLabel, splitDate, useSession } from "@/lib/session";
 
 /** Your own details and password. Email and role are changed by an administrator. */
-export function AccountSettings({ open, onClose }: { open: boolean; onClose: () => void }) {
+type Part = "profile" | "password" | "keys";
+const PART_LABEL: Record<Part, string> = { profile: "Profile", password: "Password", keys: "API keys" };
+
+/** `parts` picks the tabs: the Account settings page shows profile and password, API keys has its own page. */
+export function AccountSettings({ open, onClose, parts = ["profile", "password", "keys"], title = "Account settings" }: { open: boolean; onClose: () => void; parts?: Part[]; title?: string }) {
   const { user, setUser } = useSession();
-  const [tab, setTab] = useState("profile");
+  const [tab, setTab] = useState<string>(parts[0]);
   const [f, setF] = useState({ firstName: "", lastName: "", phone: "" });
   const [dob, setDob] = useState({ y: "", m: "", d: "" });
   const [pw, setPw] = useState({ current: "", next: "", again: "" });
@@ -53,23 +57,21 @@ export function AccountSettings({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <Drawer
-      open={open} onClose={onClose} title="Account settings" resizeKey="account"
-      subheader={
+      open={open} onClose={onClose} title={title} resizeKey="account"
+      subheader={parts.length > 1 && (
         <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }} className="px-3 py-2">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="password">Password</TabsTrigger>
-            <TabsTrigger value="keys">API keys</TabsTrigger>
+          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${parts.length}, minmax(0, 1fr))` }}>
+            {parts.map((p) => <TabsTrigger key={p} value={p}>{PART_LABEL[p]}</TabsTrigger>)}
           </TabsList>
         </Tabs>
-      }
-      footer={
+      )}
+      footer={tab !== "keys" && (
         <div className="flex items-center justify-end gap-2">
           {error && <p role="alert" className="mr-auto text-xs text-destructive">{error}</p>}
           {tab === "profile" && <Button variant="brand" size="sm" onClick={() => void saveProfile()} disabled={busy || !profileReady}>{busy && <Loader2 className="animate-spin" />} Save</Button>}
           {tab === "password" && <Button variant="brand" size="sm" onClick={() => void changePassword()} disabled={busy || !pwReady}>{busy && <Loader2 className="animate-spin" />} Change password</Button>}
         </div>
-      }
+      )}
     >
       <Tabs value={tab} className="space-y-4 p-4">
         <TabsContent value="profile" className="mt-0 space-y-4">

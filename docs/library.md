@@ -1,6 +1,6 @@
 # Library
 
-The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from the account menu (your brand at the bottom of the sidebar), or go to `/library/`.
+The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from **Library** on the left rail, or go to `/library/`. The side column picks posts or articles and a status; on a narrow screen the same choices are drop-downs above the list.
 
 ## The list
 

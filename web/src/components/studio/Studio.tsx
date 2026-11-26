@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, SlidersHorizontal, MessageSquareText, PanelLeftClose, PanelLeftOpen, } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, Type, User, SlidersHorizontal, MessageSquareText } from "lucide-react";
 import { Card } from "@/card/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Rail } from "@/components/shell/Rail";
+import { LEGACY_OPEN, settingsHref } from "@/lib/nav";
 import { ContentPanel, DesignPanel, ProfilePanel } from "./panels";
 import { Composer } from "./Composer";
-import { SocialSettings } from "./SocialSettings";
-import { BrandSwitcher, ManageBrandsDrawer, NewBrandDrawer } from "./Brands";
 import { ChatPanel } from "./ChatPanel";
 import { ChatHistoryDrawer } from "./ChatHistoryDrawer";
 import { StageBar, type StageView } from "./StageBar";
@@ -22,20 +22,17 @@ import { useMedia } from "@/lib/useMedia";
 import { toCardDesign } from "@/lib/cardDesign";
 import { lockReason } from "@/lib/lock";
 import { FeedFrame, ScaledCard } from "./preview";
-import { DEFAULT_DESIGN, DEFAULT_PROFILES, completeProfiles, withStandardPalettes } from "@/lib/profiles";
-import { blankDesign, brandColor, move } from "@/lib/brands";
+import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
+import { brandColor } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Network, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
 import type { Draft } from "@/lib/draft";
 import { useSyncedState } from "@/lib/store";
 import { useTheme } from "@/lib/useTheme";
-import { AccountMenu } from "./AccountMenu";
-import { AccountSettings } from "./AccountSettings";
-import { UsersDrawer } from "./UsersDrawer";
 import { VersionsDrawer } from "./VersionsDrawer";
 import { flushPendingEdits } from "@/lib/pendingEdits";
 import { SessionProvider } from "./SessionProvider";
-import { BuiltWith, Logo } from "./Logo";
+import { BuiltWith } from "./Logo";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useDrafts } from "@/lib/useDrafts";
@@ -78,8 +75,8 @@ export default function Studio() {
 function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: string) => Promise<void> }) {
   const [theme, toggleTheme] = useTheme(initial.theme);
   useState(() => { hydrateCustomFonts(initial.customFonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); }); });
-  const [profiles, setProfiles, , replaceProfiles] = useSyncedState<Profile[]>(initial.profiles, (v) => api.putProfiles(v));
-  const [archived, setArchived] = useState<Profile[]>(initial.archived);
+  const [profiles, setProfiles] = useSyncedState<Profile[]>(initial.profiles, (v) => api.putProfiles(v));
+  const archived = initial.archived;
   // designs are keyed by profile id
   const [designs, setDesigns, saveError] = useSyncedState<Record<string, Design>>(initial.designs, (v) => api.putDesigns(v));
   const profile = profiles.find((p) => p.id === initial.activeId) ?? profiles[0] ?? DEFAULT_PROFILES[0];
@@ -116,8 +113,10 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
-  // the right-hand drawers share one edge, so only one is open at a time
-  const [panel, setPanel] = useState<"chats" | "accounts" | "newBrand" | "manage" | "account" | "users" | "history" | null>(null);
+  // the right-hand drawers share one edge, so only one is open at a time (settings are pages: see /settings/)
+  const [panel, setPanel] = useState<"chats" | "history" | null>(null);
+  /** Go to another page, saving what is being typed first. */
+  const go = (href: string) => { flushPendingEdits(); window.location.href = href; };
   // the library can send someone straight to a draft's Full preview (to schedule it)
   const [previewRequested, setPreviewRequested] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(false);
@@ -133,19 +132,17 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const setMode = (m: Layout["mode"]) => { flushPendingEdits(); setEditorExpanded(false); setPhonePreview(false); setLayout((l) => ({ ...l, mode: m, sidebarCollapsed: false })); };
   /** Open the editing tabs on one of them. */
   const showEdit = (t: string) => { flushPendingEdits(); setTab(t); setPhonePreview(false); setLayout((l) => ({ ...l, mode: "edit", sidebarCollapsed: false })); };
-  // another page (the library) can ask for a drawer or a draft: /studio/?open=accounts|brands, /studio/?draft=<id>
+  // another page (the library) can ask for a draft: /studio/?draft=<id>, or its Full preview with &open=preview.
+  // The old drawer addresses (?open=account, users, accounts, brands) go to their settings pages.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const want = q.get("open"), draft = q.get("draft");
-    if (want === "accounts" || want === "brands") setPanel(want === "accounts" ? "accounts" : "manage");
-    if (want === "account" || want === "users") setPanel(want);
+    if (want && LEGACY_OPEN[want]) { window.location.replace(settingsHref(LEGACY_OPEN[want])); return; }
     if (want === "preview") { setPreviewRequested(true); showEdit("post"); }
     if (draft) { void store.select(draft); showEdit("post"); }
     if (want || draft || q.get("brand")) window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const settingsOpen = panel === "accounts";
-  const setSettingsOpen = (o: boolean) => setPanel(o ? "accounts" : null);
   useEffect(() => { if (editorExpanded) setPhonePreview(true); }, [editorExpanded]); // the large editor is drawn over the canvas
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   const caption = useMemo(() => (store.current ? serializeDraft(store.current).text : ""), [store.current]);
@@ -228,41 +225,12 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const brandNames = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p.name])), [profiles]);
   const brandColors = useMemo(() => Object.fromEntries([...profiles, ...archived].map((p) => [p.id, brandColor(p, designs[p.id])])), [profiles, archived, designs]);
   const [switching, setSwitching] = useState(false);
-  const [copyOf, setCopyOf] = useState<Profile | undefined>(undefined);
   const switchBrand = async (id: string) => {
     if (switching || id === profile.id) return;
     setSwitching(true);
     try { await openBrand(id); } // the studio is replaced when this succeeds
     catch (e) { flash(`Could not open the brand: ${(e as Error).message}`); setSwitching(false); }
   };
-  /** Read the brand list again, so what is shown is what the server has. */
-  const syncBrands = async () => {
-    const st = await api.state();
-    replaceProfiles(withStandardPalettes(st.profiles as Profile[]));
-    setArchived(Array.isArray(st.archived) ? completeProfiles(st.archived as Profile[]) : []);
-  };
-  const createBrand = async (p: Profile, from: Profile | undefined, open: boolean) => {
-    await api.createProfile(p);
-    // the new brand's card: a copy starts from the other brand's card, a blank one from the default card without footer text
-    const base = from ? { ...DEFAULT_DESIGN, ...(designs[from.id] ?? {}) } : blankDesign(DEFAULT_DESIGN);
-    await api.putDesigns({ ...designs, [p.id]: base });
-    if (open) await openBrand(p.id); else await syncBrands();
-  };
-  const duplicateBrand = async (p: Profile) => { setCopyOf(p); setPanel("newBrand"); };
-  const moveBrand = async (id: string, dir: -1 | 1) => {
-    await api.orderProfiles(move(profiles.map((b) => b.id), id, dir));
-    await syncBrands();
-  };
-  const archiveBrand = async (id: string) => {
-    const res = await api.archiveProfile(id);
-    if (id === profile.id) {
-      const next = profiles.find((b) => b.id !== id);
-      if (next) await openBrand(next.id);
-    } else await syncBrands();
-    return res;
-  };
-  const restoreBrand = async (id: string) => { await api.restoreProfile(id); await syncBrands(); };
-  const deleteBrand = async (id: string) => { await api.deleteProfile(id); await syncBrands(); };
 
   const palette = profile.palettes.find((p) => p.id === design.paletteId) ?? profile.palettes[0];
   const size = sizeById(design.sizeId);
@@ -405,22 +373,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     <TooltipProvider delayDuration={250}>
      <LayoutContext.Provider value={layoutCtx}>
       <Toaster theme={theme} />
-      <div className="flex h-dvh flex-col">
-        {/* header – mirrors senthilsweb.com: mono wordmark, thin bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border app-header px-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="max-lg:hidden" onClick={toggleSidebar} aria-label={sidebarHidden ? "Show sidebar" : "Hide sidebar"} aria-pressed={sidebarHidden}>
-                {sidebarHidden ? <PanelLeftOpen /> : <PanelLeftClose />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{sidebarHidden ? "Show sidebar" : "Hide sidebar"} (Ctrl/⌘ + \)</TooltipContent>
-          </Tooltip>
-          {sidebarHidden && <AccountMenu variant="avatar" page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />}
-          <Logo />
-          <div className="flex-1" />
-          <BrandSwitcher brands={profiles} activeId={profile.id} colors={brandColors} busy={switching} onSwitch={(id) => void switchBrand(id)} onNew={() => { setCopyOf(undefined); setPanel("newBrand"); }} onManage={() => setPanel("manage")} />
-        </header>
+      <div className="flex h-dvh flex-col lg:flex-row">
+        <Rail area="studio" brands={profiles} activeId={profile.id} colors={brandColors} switching={switching} onSwitchBrand={(id) => void switchBrand(id)}
+          theme={theme} onToggleTheme={toggleTheme} panel={{ hidden: sidebarHidden, toggle: toggleSidebar }} onLeave={flushPendingEdits} />
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {/* sidebar */}
@@ -458,7 +413,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => go(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -472,9 +427,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 </TabsContent>
               </div>
             </Tabs>}
-            <div className="shrink-0 border-t border-border p-2">
-              <AccountMenu page="studio" name={profile.name} handle={profile.handle} color={brandColors[profile.id] ?? "#888"} theme={theme} onToggleTheme={toggleTheme} onAccounts={() => setSettingsOpen(true)} onManageBrands={() => setPanel("manage")} onSettings={() => setPanel("account")} onUsers={() => setPanel("users")} />
-              <BuiltWith className="px-2 pb-1 pt-2" />
+            <div className="hidden shrink-0 border-t border-border px-2 py-1.5 lg:block">
+              <BuiltWith className="px-2" />
             </div>
            </div>
           </aside>
@@ -578,18 +532,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
       </div>
       <ChatHistoryDrawer open={panel === "chats"} onClose={() => setPanel(null)} profileId={profile.id} recent={chat.list} currentId={chat.current?.id} drafts={store.drafts} busy={chat.busy}
         onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); void startFresh(); }} />
-      <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
-      <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
       <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />
-      <SocialSettings open={settingsOpen} onOpenChange={setSettingsOpen} profileId={profile.id} brandName={profile.name} />
-      <NewBrandDrawer
-        open={panel === "newBrand"} onClose={() => setPanel(null)} brands={profiles} current={profile} source={copyOf}
-        onCreate={(p, from) => createBrand(p, from, true)}
-      />
-      <ManageBrandsDrawer
-        open={panel === "manage"} onClose={() => setPanel(null)} active={profiles} archived={archived} activeId={profile.id} colors={brandColors}
-        onOpen={switchBrand} onMove={moveBrand} onDuplicate={(p) => void duplicateBrand(p)} onArchive={archiveBrand} onRestore={restoreBrand} onDelete={deleteBrand}
-      />
      </LayoutContext.Provider>
 
       {/* off-screen export stage: full-size cards, no transforms */}
