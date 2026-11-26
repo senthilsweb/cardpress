@@ -17,7 +17,7 @@
 │ ▾ Record                │                                               │
 │   Written by, approved  │                                               │
 ├─────────────────────────┤                                               │
-│ Draft · 1 missing: Address                                              │
+│ Draft · 1 missing: Body │                                               │
 │           [ Approve ]   │                                               │
 └─────────────────────────┴───────────────────────────────────────────────┘
 ```
