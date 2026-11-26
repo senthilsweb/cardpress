@@ -6,7 +6,7 @@ Writer: **A** the agent may write it (and the person), **P** only the person, **
 
 | Field | Column | Post | Article | Writer | Hard | Standard | Needed to | Choices |
 |---|---|---|---|---|---|---|---|---|
-| title | `drafts.title` | name | headline | A | 200 | article 4–12 words | publish a page | yes |
+| title | `drafts.title` | name | headline | A | 200 | article 4–12 words | publish a page | articles |
 | body | `drafts.doc` | yes | yes | A | 3,000 / 100,000 | 600–1,300 / 600–1,500 words | approve | no |
 | hashtags | `drafts.hashtags` | yes | no | A | 30 | 3–5 | | yes (sets) |
 | summary | `drafts.summary` | no | yes | A | 300 | under 160 | | yes |
@@ -30,7 +30,7 @@ Writer: **A** the agent may write it (and the person), **P** only the person, **
 The standard column starts from today's rubrics. The owner's `house-style.md` changes it in one place.
 
 ## The file
-JSON Schema 2020-12. One object with a property per field and these extra keys: `x-column`, `x-writer` (`agent`, `person`, `system`), `x-kinds`, `x-standard` (per kind), `x-requiredFor`, `x-choices`, `x-label`. A first draft of it is in the agent project, in the matching change folder.
+JSON Schema 2020-12. One object with a property per field and these extra keys: `x-column`, `x-writer` (`agent`, `person`, `system`), `x-kinds`, `x-standard` (per kind), `x-requiredFor`, `x-choices`, `x-label`, `x-embed` (included in the published item's embeddings, see `2026-12-11-content-embeddings`). A first draft of it is in the agent project, in the matching change folder.
 
 ## How each side uses it
 | Where | Use |

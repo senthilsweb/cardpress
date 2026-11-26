@@ -1,7 +1,7 @@
 # Design
 
 - Route `/calendar/`, a full page with the same header and account menu as the Library. The calendar grid takes the whole window below the header: no studio sidebar or canvas around it.
-- Data from the existing jobs and drafts: a new read `GET /api/v1/calendar?from=&to=&profileId=` returning `{at, type: job|plan, status, draftId, kind, title, brand}` in the viewer's time zone.
+- Data from the existing jobs and drafts: a new read `GET /api/v1/calendar?from=&to=&profileId=` returning `{at, timeZone, type: job|plan, status, draftId, kind, title, brand}`. `at` is UTC; the page shows it in the viewer's time zone, and the drawer also shows the item's own zone when it differs.
 - Day view: the hours of one day, each item at its time. Opening a day from the month goes here.
 - Every item in every view shows its time. Narrow screens use the day and week lists.
 - Month view: the grid fills the height of the window, day cells growing with it; as many items as fit in a cell, then "+n". Week view: a list per day with times.

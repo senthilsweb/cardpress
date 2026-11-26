@@ -18,7 +18,7 @@ Migration `0023`: `choices` (`id`, `conversation_id`, `message_id`, `draft_id`, 
 | Request | Purpose |
 |---|---|
 | conversation read | includes its choices |
-| `POST /api/v1/chat/choices/apply` | `{draftId, picks: [{choiceId, option}]}`: one version, label "chosen" |
+| `POST /api/v1/chat/choices/apply` | `{draftId, revision, picks: [{choiceId, option}]}`: one version, label "chosen". A stale revision is refused, as for any save, so a change made meanwhile is never overwritten |
 | `POST /api/v1/chat/choices/{id}/dismiss` | keep what is there |
 
 ## On screen
@@ -43,6 +43,6 @@ Card headline
 - Previewing an option for an item that is not on screen switches to it.
 
 ## The agent files
-- Writers offer 3 titles and 2 card headlines with every first draft (confirmed by the owner), and other options when asked.
+- Writers offer 3 titles (articles; a post's title is only its name) and 2 card headlines with every first draft (confirmed by the owner), and other options when asked.
 - The reply names the fields with options and does not list them as text.
 - A rubric line: every offered value meets the field's standard.

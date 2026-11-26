@@ -29,5 +29,5 @@
 
 ## Server
 - `GET /api/v1/library` gains `sort` and `order`, and the extra columns. Sorting and paging stay on the server.
-- `POST /api/v1/library/delete` `{items}`: each checked like a single delete; the answer says which were refused and why.
+- `POST /api/v1/library/delete` `{items}`: each checked like a single delete; the answer says which were refused and why. The confirmation counts the published ones separately: deleting them removes the record, not the LinkedIn post.
 - The table is built from the studio's own components; the page uses the full width.
