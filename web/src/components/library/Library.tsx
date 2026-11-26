@@ -6,12 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { studioHref } from "@/lib/nav";
-import { Rail, SecondaryHeader, SecondaryLink } from "@/components/shell/Rail";
+import { Rail } from "@/components/shell/Rail";
 import { Attempts, Thumb } from "@/components/studio/JobQueue";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
 import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog";
-import { BuiltWith } from "@/components/studio/Logo";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { useSession } from "@/lib/session";
 import { ScaledCard } from "@/components/studio/preview";
@@ -56,7 +55,11 @@ function StatusBadge({ s }: { s: LibraryItem["status"] }) {
 
 function Page({ data }: { data: LibraryBoot }) {
   const [theme, toggleTheme] = useTheme(data.theme);
-  const [filter, setFilter] = useState<LibraryFilter>({ brand: data.activeId, kind: "", status: "", q: "" });
+  // the navigation's Posts and Articles open the library with ?kind=
+  const [filter, setFilter] = useState<LibraryFilter>(() => {
+    const k = new URLSearchParams(window.location.search).get("kind");
+    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: "", q: "" };
+  });
   const [typed, setTyped] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(savedSize);
@@ -116,21 +119,7 @@ function Page({ data }: { data: LibraryBoot }) {
   return (
     <div className="flex h-dvh flex-col lg:flex-row">
       <Toaster theme={theme} />
-      <Rail area="library" brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
-        <SecondaryHeader title="Library" />
-        <nav aria-label="Views" className="flex flex-col gap-0.5 p-2">
-          {([["", "All"], ["post", "Posts"], ["article", "Articles"]] as const).map(([k, label]) => (
-            <SecondaryLink key={k || "all"} current={filter.kind === k} onClick={() => setFilter((f) => ({ ...f, kind: k }))}>{label}</SecondaryLink>
-          ))}
-          <p className="eyebrow px-2.5 pb-1 pt-4">Status</p>
-          {STATUS_FILTERS.map((st) => (
-            <SecondaryLink key={st.value || "any"} current={filter.status === st.value} onClick={() => setFilter((f) => ({ ...f, status: st.value }))}>{st.value ? st.label : "Any"}</SecondaryLink>
-          ))}
-        </nav>
-        <div className="flex-1" />
-        <BuiltWith className="px-4 pb-3" />
-      </aside>
+      <Rail area="library" sub={filter.kind} onSub={(k) => setFilter((f) => ({ ...f, kind: k === "post" || k === "article" ? k : "" }))} brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -154,7 +143,7 @@ function Page({ data }: { data: LibraryBoot }) {
               </Select>
             )}
             <Select value={filter.kind || "any"} onValueChange={(v) => setFilter((f) => ({ ...f, kind: v === "any" ? "" : (v as "post" | "article") }))}>
-              <SelectTrigger className="w-[170px] lg:hidden" aria-label="Kind"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[170px]" aria-label="Kind"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">Posts and articles</SelectItem>
                 <SelectItem value="post">Posts</SelectItem>
@@ -162,7 +151,7 @@ function Page({ data }: { data: LibraryBoot }) {
               </SelectContent>
             </Select>
             <Select value={filter.status || "any"} onValueChange={(v) => setFilter((f) => ({ ...f, status: v === "any" ? "" : v }))}>
-              <SelectTrigger className="w-[140px] lg:hidden" aria-label="Status"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[140px]" aria-label="Status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_FILTERS.map((s) => <SelectItem key={s.value || "any"} value={s.value || "any"}>{s.label}</SelectItem>)}
               </SelectContent>

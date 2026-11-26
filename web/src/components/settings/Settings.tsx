@@ -9,7 +9,6 @@ import { AccountSettings } from "@/components/studio/AccountSettings";
 import { ManageBrandsDrawer, NewBrandDrawer } from "@/components/studio/Brands";
 import { SocialSettings } from "@/components/studio/SocialSettings";
 import { UsersDrawer } from "@/components/studio/UsersDrawer";
-import { BuiltWith } from "@/components/studio/Logo";
 import { api, type ApiInfo } from "@/lib/api";
 import { blankDesign, brandColor, move } from "@/lib/brands";
 import { sectionFromPath, settingsHref, visibleSections, type SettingsSection } from "@/lib/nav";
@@ -68,16 +67,14 @@ function Page({ data }: { data: LibraryBoot }) {
   return (
     <div className="flex h-dvh flex-col lg:flex-row">
       <Toaster theme={theme} />
-      <Rail area="settings" brands={brands.profiles} activeId={brands.activeId} colors={colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
-      <aside className={cn("flex min-h-0 shrink-0 flex-col border-border bg-card lg:w-60 lg:border-r", shown ? "max-lg:hidden" : "max-lg:flex-1")}>
+      <Rail area="settings" sub={shown} brands={brands.profiles} activeId={brands.activeId} colors={colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <aside className={cn("flex min-h-0 flex-1 flex-col bg-card lg:hidden", shown && "hidden")}>
         <SecondaryHeader title="Settings" />
         <nav aria-label="Settings" className="flex flex-col gap-0.5 p-2">
           {sections.map((s) => (
             <SecondaryLink key={s.id} href={settingsHref(s.id)} current={s.id === shown}>{ICONS[s.id]} {s.label}</SecondaryLink>
           ))}
         </nav>
-        <div className="flex-1" />
-        <BuiltWith className="px-4 pb-3" />
       </aside>
       <main className={cn("min-h-0 min-w-0 flex-1", !shown && "max-lg:hidden")}>
         <a href={settingsHref()} className="flex items-center gap-1.5 border-b border-border px-4 py-2 text-sm text-muted-foreground lg:hidden"><ArrowLeft className="h-4 w-4" /> Settings</a>

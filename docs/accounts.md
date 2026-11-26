@@ -53,7 +53,7 @@ The session is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` over https). Brows
 
 ## From the app
 
-**Settings** (the gear on the left rail) has **Account** (your names, phone and date of birth, and **Password**), **API keys**, and for admins **Users** (add a person, change a role, disable or enable, set a password) and **Assistant**. Your initials at the bottom of the rail open **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
+**Settings** (in the navigation on the left) has **Account** (your names, phone and date of birth, and **Password**), **API keys**, and for admins **Users** (add a person, change a role, disable or enable, set a password) and **Assistant**. Your name at the bottom of the navigation opens **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
 
 ## API keys, the token and MCP
 

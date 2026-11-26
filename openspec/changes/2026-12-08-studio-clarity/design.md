@@ -1,6 +1,13 @@
 # Design
 
 ## The frame (every signed-in page)
+
+**Revised 2026-11-25 after the owner saw it:**
+- The navigation is a standard-width column, 240 px. It folds to icons only, 64 px, and then shows the mark without the name.
+- The CardPress logo, with the open brand under it, opens the brand menu.
+- An area's pages are nested under it in the navigation (Settings: Account, Brands …; Library: All, Posts, Articles). There is no separate second column. When folded, an area's pages open in a small menu beside its icon.
+- The sketch below shows the first version.
+
 ```
 ┌────┬───────────────────┬─────────────────────────────────────────────┐
 │ ◆▾ │ SETTINGS          │ API keys                                     │
