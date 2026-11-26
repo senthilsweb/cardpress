@@ -167,6 +167,8 @@ type updateIn struct {
 	Hashtags      *[]string `json:"hashtags,omitempty" jsonschema:"hashtags without the #, posts only"`
 	AltText       *string   `json:"altText,omitempty" jsonschema:"a description of the card image for screen readers"`
 	UnicodeStyles *bool     `json:"unicodeStyles,omitempty" jsonschema:"keep bold and italic in a post as Unicode letters"`
+	Audience      *string   `json:"audience,omitempty" jsonschema:"who the item is for, in one line; never published"`
+	Topic         *string   `json:"topic,omitempty" jsonschema:"what the item is about, in a few words; never published"`
 }
 
 func (t tools) updateDraft(ctx context.Context, _ *mcp.CallToolRequest, in updateIn) (*mcp.CallToolResult, writtenOut, error) {
@@ -176,11 +178,12 @@ func (t tools) updateDraft(ctx context.Context, _ *mcp.CallToolRequest, in updat
 	if _, err := t.draft(ctx, in.DraftID); err != nil {
 		return nil, writtenOut{}, toolError(err)
 	}
-	if in.Body == nil && in.Title == nil && in.Summary == nil && in.Slug == nil && in.Hashtags == nil && in.AltText == nil && in.UnicodeStyles == nil {
-		return nil, writtenOut{}, errors.New("Nothing to change: send at least one of body, title, summary, slug, hashtags, altText, unicodeStyles.")
+	if in.Body == nil && in.Title == nil && in.Summary == nil && in.Slug == nil && in.Hashtags == nil && in.AltText == nil && in.UnicodeStyles == nil && in.Audience == nil && in.Topic == nil {
+		return nil, writtenOut{}, errors.New("Nothing to change: send at least one of body, title, summary, slug, hashtags, altText, unicodeStyles, audience, topic.")
 	}
 	d, eff, err := t.d.Writer.PatchDraft(ctx, in.DraftID, service.DraftPatch{Revision: in.Revision, Body: in.Body, Title: in.Title,
-		Summary: in.Summary, Slug: in.Slug, Hashtags: in.Hashtags, AltText: in.AltText, UnicodeStyles: in.UnicodeStyles})
+		Summary: in.Summary, Slug: in.Slug, Hashtags: in.Hashtags, AltText: in.AltText, UnicodeStyles: in.UnicodeStyles,
+		Audience: in.Audience, Topic: in.Topic})
 	if err != nil {
 		return nil, writtenOut{}, toolError(err)
 	}

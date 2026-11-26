@@ -15,14 +15,14 @@ Tools that work on a draft take `draftId`; the brand is found from the draft and
 | `list_profiles` | | brands | read |
 | `list_design_presets` | `profileId` | as today. For outside agents; the managed agent does not use it | read |
 | `list_drafts` | `profileId` | drafts with a preview | read |
-| `get_draft` | `id` | kind, status, revision, `title`, `body`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles`, `attachment`, `videoUrl`, `hasPictures` | read |
+| `get_draft` | `id` | kind, status, revision, `title`, `body`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles`, `audience`, `topic`, `campaign`, `reviewNotes`, `attachment`, `videoUrl`, `hasPictures` | read |
 | `get_design` | `draftId` | `design`, `revision`. Images are reported as present or absent, never as bytes | read |
 | `list_connections` | `profileId` | each network: connected, can be posted to | read |
 | `list_memories` | `profileId` | notes | read |
 | `list_jobs`, `get_job` | as today | | read |
 | `fetch_source` | `url` | readable text, marked untrusted | read |
 | `create_draft` | `profileId`, `kind` | `draftId`, `revision`. Starts with the brand's design | write |
-| `update_draft` | `draftId`, `revision?`, any of `body`, `title`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles` | the draft. Only named fields change. `revision` is required with `body` | write |
+| `update_draft` | `draftId`, `revision?`, any of `body`, `title`, `summary`, `slug`, `hashtags`, `altText`, `unicodeStyles`, `audience`, `topic` | the draft. Only named fields change. `revision` is required with `body` | write |
 | `update_card_text` | `draftId`, `changes` | the whole design and `revision`. Only named text fields change | write |
 | `set_attachment` | `draftId`, `type` (`card` or `video`), `videoUrl?`, `title?` | the draft | write |
 | `save_memory` | `profileId`, `key`, `content` | the note | write |
@@ -52,6 +52,8 @@ Refusals the agent must expect, each with a message to repeat to the person:
 - `publish_post`: card image not ready, network not connected, daily limit reached.
 
 A change to an approved draft returns it to draft. The result says so (`returnedToDraft`), and the agent tells the person.
+
+**Planning fields.** `audience` (200) and `topic` (100) are one line each, written by the agent or the person. `campaign` and `reviewNotes` are the person's: no tool writes them. None of the four is published. They are additions within version 5: agents that do not know them are unaffected.
 
 **Versions.** Every change saved through `update_draft` or `update_card_text` is a new version. Results and `get_draft` carry `version`, the newest one's number; the agent tells the person which version it saved. Bringing an earlier version back is done by the person in the studio.
 
@@ -89,7 +91,7 @@ The person's message.
 | `studio` | every message |
 | `notes` | the first message of a session |
 | `card` | the first time a draft is part of the conversation |
-| `changes` | when the person changed a draft since the agent last saw it. Design fields carry the new value; text fields say `changed` |
+| `changes` | when the person changed a draft since the agent last saw it. Design fields carry the new value; text and planning fields say `changed` |
 | `source` | once in a conversation, with the message the person added it to; again in every outcome description |
 | `history` | only when CardPress had to start a new session for an existing conversation |
 

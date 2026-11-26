@@ -295,10 +295,11 @@ func TestTheManifest(t *testing.T) {
 	}
 	for want, from := range map[string]string{
 		"CARDPRESS_AGENT_MANIFEST": "", "could not read": "/no/such/file", "not valid JSON": "{nope",
-		"version 4":      strings.Replace(string(b), `"version":5`, `"version":4`, 1),
-		"vault_id":       strings.Replace(string(b), `"vlt_1"`, `""`, 1),
-		"for article":    strings.Replace(string(b), "ARTICLE RUBRIC", "", 1),
-		"version number": strings.Replace(string(b), `"agent_version":"3"`, `"agent_version":"latest"`, 1),
+		"version 4":                       strings.Replace(string(b), `"version":5`, `"version":4`, 1),
+		"vault_id":                        strings.Replace(string(b), `"vlt_1"`, `""`, 1),
+		"for article":                     strings.Replace(string(b), "ARTICLE RUBRIC", "", 1),
+		"which this server does not have": strings.Replace(string(b), `{"version":5`, `{"schema":{"x-schemaVersion":1,"properties":{"mood":{}}},"version":5`, 1),
+		"version number":                  strings.Replace(string(b), `"agent_version":"3"`, `"agent_version":"latest"`, 1),
 	} {
 		if _, err := LoadManifest(ctx, from); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v", want, err)

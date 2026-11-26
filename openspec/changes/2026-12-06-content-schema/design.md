@@ -102,3 +102,13 @@ The studio keeps a copy of the generated files, so it builds and runs without th
 | reviewNotes | `drafts.review_notes` | P (approvers) | 2,000 | never published; the writers read it on a revision |
 
 None is required to approve. Who writes each is a proposal to confirm.
+
+## As built (studio side, step 4)
+- `npm run schema -- --studio <checkout>` writes `internal/content/` (schemas) and `web/src/lib/content/` (models and content schema).
+- The tool inputs keep today's names: the card headline is `title` in `update_card_text` until contract 6.
+- The tool test compares property names, types and required fields. Descriptions and limits are not compared; the server enforces limits when saving.
+- The manifest's `schema` is optional until version 6, and checked when present.
+- Planning fields are changed with `PATCH /api/v1/drafts/{id}/planning`. Saving a draft never touches them, an approved item stays approved, and a published or waiting item accepts them from a person. An assistant is still refused on a published or waiting item.
+- Review notes need the approve permission. Versions hold audience, topic and campaign, not review notes; a version saved earlier leaves them alone when restored.
+- An assistant could save a page address over 80 characters; it is now refused.
+- Open for step 7: the post rubric allows no hashtags, while the standard here is 3 to 5.

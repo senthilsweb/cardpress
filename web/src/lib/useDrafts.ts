@@ -17,7 +17,7 @@ const toInput = (d: Draft): DraftInput => ({
 });
 
 /** What the server decides about a draft (its approval and planned date), as opposed to what the person writes. */
-const meta = (x: Draft, s: Draft): Draft => ({ ...x, revision: s.revision, version: s.version, versionIsCurrent: s.versionIsCurrent, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, updatedAt: s.updatedAt });
+const meta = (x: Draft, s: Draft): Draft => ({ ...x, revision: s.revision, version: s.version, versionIsCurrent: s.versionIsCurrent, status: s.status, approvedAt: s.approvedAt, scheduledAt: s.scheduledAt, timezone: s.timezone, slug: s.slug, summary: s.summary, pageAt: s.pageAt, hasCover: s.hasCover, attachment: s.attachment, attachmentTitle: s.attachmentTitle, images: s.images, videoUrl: s.videoUrl, videoSize: s.videoSize, attachmentSize: s.attachmentSize, audience: s.audience, topic: s.topic, campaign: s.campaign, reviewNotes: s.reviewNotes, updatedAt: s.updatedAt });
 
 /**
  * The profile's drafts and the one being edited. Changes show at once and are saved after a short pause;

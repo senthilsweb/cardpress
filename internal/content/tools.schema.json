@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-schemaVersion": 1,
+  "tools": {
+    "update_draft": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^([a-z0-9]+(-[a-z0-9]+)*)?$"
+        },
+        "hashtags": {
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[\\p{L}\\p{N}_]+$"
+          }
+        },
+        "altText": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "unicodeStyles": {
+          "type": "boolean"
+        },
+        "audience": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "topic": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "draftId"
+      ],
+      "additionalProperties": false
+    },
+    "update_card_text": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string"
+        },
+        "changes": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "eyebrow": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "subtitle": {
+              "type": "string",
+              "maxLength": 600
+            },
+            "tag": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "footer": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "footerLeft": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "quoteAuthor": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "statValue": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "draftId",
+        "changes"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

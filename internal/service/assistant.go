@@ -29,6 +29,8 @@ type DraftPatch struct {
 	Hashtags      *[]string
 	AltText       *string
 	UnicodeStyles *bool
+	Audience      *string
+	Topic         *string
 }
 
 // CardText is the words drawn on a card: the only part of a design an assistant may change.
@@ -164,7 +166,7 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 	// the summary and address belong to the public page; they are checked here and stored beside the rest
 	slug, summary := cur.Slug, cur.Summary
 	if p.Slug != nil {
-		if slug = strings.TrimSpace(*p.Slug); slug != "" && !assistantSlug.MatchString(slug) {
+		if slug = strings.TrimSpace(*p.Slug); slug != "" && (len(slug) > maxSlugLen || !assistantSlug.MatchString(slug)) {
 			return cur, Effects{}, invalid("an address is lower-case letters, digits and single hyphens, up to 80 characters")
 		}
 		var other int
@@ -184,7 +186,7 @@ func (s *Studio) PatchDraft(ctx context.Context, id string, p DraftPatch) (Draft
 	if err := keepCurrent(ctx, s.db, id, "before an assistant change"); err != nil {
 		return cur, Effects{}, err
 	}
-	d, err := s.updateDraft(ctx, id, in, VersionAssistant, "")
+	d, err := s.updateWithPlanning(ctx, cur, in, PlanningPatch{Audience: p.Audience, Topic: p.Topic}, VersionAssistant, "")
 	if err != nil {
 		return d, Effects{}, err
 	}

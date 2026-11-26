@@ -86,6 +86,7 @@ func (c *Chat) look(ctx context.Context, draftID string) (sight, Draft, error) {
 	return sight{Revision: d.Revision, Card: m, Text: map[string]string{
 		"body": fingerprint(DraftText(d.Doc)), "title": fingerprint(d.Title), "summary": fingerprint(d.Summary),
 		"hashtags": fingerprint(string(tags)), "altText": fingerprint(d.AltText),
+		"audience": fingerprint(d.Audience), "topic": fingerprint(d.Topic), "campaign": fingerprint(d.Campaign), "reviewNotes": fingerprint(d.ReviewNotes),
 	}}, d, nil
 }
 
@@ -105,7 +106,8 @@ func changedSince(was, now sight) []string {
 		}
 	}
 	for k, v := range now.Text {
-		if was.Text[k] != v {
+		// a field that did not exist when the item was last seen, and is empty, is not news
+		if old, known := was.Text[k]; old != v && (known || v != fingerprint("")) {
 			out = append(out, k+": changed")
 		}
 	}

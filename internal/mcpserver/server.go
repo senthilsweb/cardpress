@@ -123,7 +123,7 @@ func New(d Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{Name: "create_draft", Title: "Start a draft", Annotations: changes,
 		Description: "Make an empty post or article with the brand's starting card. Returns its id and revision."}, t.createDraft)
 	mcp.AddTool(s, &mcp.Tool{Name: "update_draft", Title: "Change a draft's text", Annotations: replaces,
-		Description: "Change only the named fields of a draft: body (needs the revision you read), title, summary, slug, hashtags, altText, unicodeStyles. " +
+		Description: "Change only the named fields of a draft: body (needs the revision you read), title, summary, slug, hashtags, altText, unicodeStyles, audience, topic. " +
 			"Each change is saved as a new version. A published item cannot be changed until the person brings it back to draft; changing an approved one returns it to draft. It publishes nothing."}, t.updateDraft)
 	mcp.AddTool(s, &mcp.Tool{Name: "set_attachment", Title: "Choose what a post carries", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(true)},
 		Description: "Make a post go out with its card, or with a video at a public address. It publishes nothing."}, t.setAttachment)

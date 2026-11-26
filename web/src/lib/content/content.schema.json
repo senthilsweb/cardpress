@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CardPress content",
+  "x-schemaVersion": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "x-label": "Type",
+      "x-column": "drafts.kind",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "enum": [
+        "post",
+        "article"
+      ]
+    },
+    "title": {
+      "x-label": "Title",
+      "x-column": "drafts.title",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-requiredFor": [
+        "publishPage"
+      ],
+      "x-standard": {
+        "article": {
+          "minWords": 4,
+          "maxWords": 12
+        }
+      },
+      "x-choices": true,
+      "x-embed": true,
+      "type": "string",
+      "maxLength": 200
+    },
+    "body": {
+      "x-label": "Body",
+      "x-column": "drafts.doc",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-requiredFor": [
+        "approve"
+      ],
+      "x-standard": {
+        "post": {
+          "minLength": 600,
+          "maxLength": 1300
+        },
+        "article": {
+          "minWords": 600,
+          "maxWords": 1500
+        }
+      },
+      "x-embed": true,
+      "x-hardMaxLength": {
+        "post": 3000,
+        "article": 100000
+      },
+      "type": "string",
+      "maxLength": 100000
+    },
+    "hashtags": {
+      "x-label": "Hashtags",
+      "x-column": "drafts.hashtags",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post"
+      ],
+      "x-standard": {
+        "post": {
+          "minItems": 3,
+          "maxItems": 5
+        }
+      },
+      "x-choices": true,
+      "x-embed": true,
+      "maxItems": 30,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 100,
+        "pattern": "^[\\p{L}\\p{N}_]+$"
+      }
+    },
+    "altText": {
+      "x-label": "Alt text",
+      "x-column": "drafts.alt_text",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-choices": true,
+      "type": "string",
+      "maxLength": 1000
+    },
+    "unicodeStyles": {
+      "x-label": "Unicode styles",
+      "x-column": "drafts.unicode_styles",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post"
+      ],
+      "type": "boolean"
+    },
+    "attachment": {
+      "x-label": "Attachment",
+      "x-column": "drafts.attachment_kind",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post"
+      ],
+      "x-requiredFor": [
+        "send"
+      ],
+      "type": "string",
+      "enum": [
+        "card",
+        "image",
+        "images",
+        "document",
+        "video"
+      ]
+    },
+    "audience": {
+      "x-label": "Audience",
+      "x-column": "drafts.audience",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-embed": true,
+      "type": "string",
+      "maxLength": 200
+    },
+    "topic": {
+      "x-label": "Topic",
+      "x-column": "drafts.topic",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-embed": true,
+      "type": "string",
+      "maxLength": 100
+    },
+    "campaign": {
+      "x-label": "Campaign",
+      "x-column": "drafts.campaign",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 100
+    },
+    "reviewNotes": {
+      "x-label": "Review notes",
+      "x-column": "drafts.review_notes",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 2000
+    },
+    "status": {
+      "x-label": "Status",
+      "x-column": "drafts.status",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "enum": [
+        "draft",
+        "approved",
+        "scheduled",
+        "published"
+      ]
+    },
+    "scheduledAt": {
+      "x-label": "Planned date",
+      "x-column": "drafts.scheduled_at",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-requiredFor": [
+        "schedule"
+      ],
+      "type": "string"
+    },
+    "timezone": {
+      "x-label": "Time zone",
+      "x-column": "drafts.timezone",
+      "x-writer": "person",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string"
+    },
+    "revision": {
+      "x-label": "Revision",
+      "x-column": "drafts.revision",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "version": {
+      "x-label": "Version",
+      "x-column": "draft_versions.seq",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "createdBy": {
+      "x-label": "Created by",
+      "x-column": "drafts.created_by",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string"
+    },
+    "approvedBy": {
+      "x-label": "Approved by",
+      "x-column": "drafts.approved_by",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string"
+    },
+    "approvedAt": {
+      "x-label": "Approved at",
+      "x-column": "drafts.approved_at",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string"
+    },
+    "pageAt": {
+      "x-label": "Published at",
+      "x-column": "drafts.page_at",
+      "x-writer": "system",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string"
+    },
+    "summary": {
+      "x-label": "Summary",
+      "x-column": "drafts.summary",
+      "x-writer": "agent",
+      "x-kinds": [
+        "article"
+      ],
+      "x-standard": {
+        "article": {
+          "maxLength": 160
+        }
+      },
+      "x-choices": true,
+      "x-embed": true,
+      "type": "string",
+      "maxLength": 300
+    },
+    "slug": {
+      "x-label": "Address",
+      "x-column": "drafts.slug",
+      "x-writer": "agent",
+      "x-kinds": [
+        "article"
+      ],
+      "x-requiredFor": [
+        "publishPage"
+      ],
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^([a-z0-9]+(-[a-z0-9]+)*)?$"
+    },
+    "headline": {
+      "x-label": "Headline",
+      "x-column": "drafts.design.title",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-standard": {
+        "post": {
+          "minWords": 3,
+          "maxWords": 9
+        },
+        "article": {
+          "minWords": 3,
+          "maxWords": 9
+        }
+      },
+      "x-choices": true,
+      "x-embed": true,
+      "x-toolName": "title",
+      "type": "string",
+      "maxLength": 400
+    },
+    "eyebrow": {
+      "x-label": "Eyebrow",
+      "x-column": "drafts.design.eyebrow",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-choices": true,
+      "type": "string",
+      "maxLength": 200
+    },
+    "subtitle": {
+      "x-label": "Subtitle",
+      "x-column": "drafts.design.subtitle",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-choices": true,
+      "type": "string",
+      "maxLength": 600
+    },
+    "tag": {
+      "x-label": "Tag",
+      "x-column": "drafts.design.tag",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-choices": true,
+      "type": "string",
+      "maxLength": 100
+    },
+    "footer": {
+      "x-label": "Footer",
+      "x-column": "drafts.design.footer",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 200
+    },
+    "footerLeft": {
+      "x-label": "Footer, left",
+      "x-column": "drafts.design.footerLeft",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 200
+    },
+    "quoteAuthor": {
+      "x-label": "Quote author",
+      "x-column": "drafts.design.quoteAuthor",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 200
+    },
+    "statValue": {
+      "x-label": "Number",
+      "x-column": "drafts.design.statValue",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "type": "string",
+      "maxLength": 60
+    }
+  }
+}

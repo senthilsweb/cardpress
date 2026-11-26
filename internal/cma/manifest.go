@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/senthilsweb/cardpress/internal/content"
 )
 
 // ManifestVersion is the contract version this adapter speaks.
@@ -32,6 +34,8 @@ type Manifest struct {
 	VaultID       string             `json:"vault_id"`
 	MCPServerURL  string             `json:"mcp_server_url"`
 	Outcomes      map[string]Outcome `json:"outcomes"`
+	// Schema is the content schema the agents were built with, when the manifest carries it.
+	Schema json.RawMessage `json:"schema,omitempty"`
 }
 
 const maxManifest = 1 << 20
@@ -83,6 +87,11 @@ func LoadManifest(ctx context.Context, from string) (Manifest, error) {
 	for _, kind := range []string{"post", "article"} {
 		if m.Outcomes[kind].Rubric == "" {
 			return m, fmt.Errorf("the manifest has no rubric for %s", kind)
+		}
+	}
+	if len(m.Schema) > 0 {
+		if err := content.Check(m.Schema); err != nil {
+			return m, fmt.Errorf("the manifest's schema is refused: %w", err)
 		}
 	}
 	if v := m.AgentVersion; v != "" {

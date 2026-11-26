@@ -61,6 +61,11 @@ type Draft struct {
 	Summary  string `json:"summary,omitempty"`
 	PageAt   string `json:"pageAt,omitempty"`
 	HasCover bool   `json:"hasCover"`
+	// Planning: never sent anywhere. See SetPlanning.
+	Audience    string `json:"audience"`
+	Topic       string `json:"topic"`
+	Campaign    string `json:"campaign"`
+	ReviewNotes string `json:"reviewNotes"`
 	// Attachment is what a post goes out with: "card" (the designed card), "image" (a picture of its own) or
 	// "document" (a PDF of its own, which has a title).
 	Attachment      string `json:"attachment"`
@@ -169,7 +174,8 @@ func (s *Studio) draftStamp() string { return s.now().UTC().Format(draftTimeLayo
 const draftCols = `id, revision, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, slug, summary, page_at, (cover IS NOT NULL), attachment_kind, attachment_title, video_url, video_size, COALESCE(length(attachment), 0), created_by, approved_by,
 	COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = created_by), ''), COALESCE((SELECT first_name || ' ' || last_name FROM users u WHERE u.id = approved_by), ''), created_at, updated_at,
 	COALESCE((SELECT MAX(seq) FROM draft_versions v WHERE v.draft_id = drafts.id), 0),
-	COALESCE((SELECT v.revision = drafts.revision FROM draft_versions v WHERE v.draft_id = drafts.id ORDER BY v.seq DESC LIMIT 1), 0)`
+	COALESCE((SELECT v.revision = drafts.revision FROM draft_versions v WHERE v.draft_id = drafts.id ORDER BY v.seq DESC LIMIT 1), 0),
+	audience, topic, campaign, review_notes`
 
 // draftInsertCols are the columns a new draft sets; the rest start empty.
 const draftInsertCols = `id, profile_id, kind, status, doc, hashtags, alt_text, unicode_styles, title, design, design_version, approved_at, scheduled_at, timezone, created_by, created_at, updated_at`
@@ -181,7 +187,8 @@ func scanDraft(r scanner) (Draft, error) {
 	var doc, tags, design string
 	var uni, designVersion, cover int
 	if err := r.Scan(&d.ID, &d.Revision, &d.ProfileID, &d.Kind, &d.Status, &doc, &tags, &d.AltText, &uni, &d.Title, &design, &designVersion,
-		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.AttachmentSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt, &d.Version, &d.VersionIsCurrent); err != nil {
+		&d.ApprovedAt, &d.ScheduledAt, &d.Timezone, &d.Slug, &d.Summary, &d.PageAt, &cover, &d.Attachment, &d.AttachmentTitle, &d.VideoURL, &d.VideoSize, &d.AttachmentSize, &d.CreatedBy, &d.ApprovedBy, &d.CreatedByName, &d.ApprovedByName, &d.CreatedAt, &d.UpdatedAt, &d.Version, &d.VersionIsCurrent,
+		&d.Audience, &d.Topic, &d.Campaign, &d.ReviewNotes); err != nil {
 		return d, err
 	}
 	d.Doc = json.RawMessage(doc)

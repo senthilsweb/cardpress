@@ -123,6 +123,10 @@ type draftOut struct {
 	Hashtags      []string `json:"hashtags"`
 	AltText       string   `json:"altText"`
 	UnicodeStyles bool     `json:"unicodeStyles"`
+	Audience      string   `json:"audience"`
+	Topic         string   `json:"topic"`
+	Campaign      string   `json:"campaign"`
+	ReviewNotes   string   `json:"reviewNotes"`
 	Attachment    string   `json:"attachment"`
 	VideoURL      string   `json:"videoUrl,omitempty"`
 	HasPictures   bool     `json:"hasPictures"`
@@ -133,6 +137,7 @@ type draftOut struct {
 func describe(d service.Draft) draftOut {
 	return draftOut{ID: d.ID, ProfileID: d.ProfileID, Kind: d.Kind, Status: d.Status, Revision: d.Revision, Version: d.Version, Title: d.Title,
 		Body: service.DraftText(d.Doc), Summary: d.Summary, Slug: d.Slug, Hashtags: d.Hashtags, AltText: d.AltText, UnicodeStyles: d.UnicodeStyles,
+		Audience: d.Audience, Topic: d.Topic, Campaign: d.Campaign, ReviewNotes: d.ReviewNotes,
 		Attachment: d.Attachment, VideoURL: d.VideoURL, HasPictures: service.HasPictures(d.Doc), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 

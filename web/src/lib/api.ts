@@ -209,6 +209,8 @@ export const api = {
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
+  /** Change the named planning fields; allowed at any status. */
+  setPlanning: (id: string, fields: Partial<Pick<Draft, "audience" | "topic" | "campaign" | "reviewNotes">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/planning`, fields),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
   listen,
   getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
