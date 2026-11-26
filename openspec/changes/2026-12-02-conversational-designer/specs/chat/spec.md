@@ -39,7 +39,7 @@ The system SHALL send the linked drafts, the item on screen and what to write wi
 - **THEN** the title on the article's card changes
 
 ### Requirement: Agents from the agent repository
-The system SHALL run the chat on the agents described by the manifest of `social-card-agent`.
+The system SHALL run the chat on the agents described by the manifest of `cardpress-agent`.
 
 #### Scenario: No manifest
 - **WHEN** the managed agent is selected and the manifest cannot be read

@@ -2,7 +2,7 @@
 
 ## The MCP tools
 
-The tools, their inputs and their refusals are in [contract.md](contract.md), shared with `social-card-agent`.
+The tools, their inputs and their refusals are in [contract.md](contract.md), shared with `cardpress-agent`.
 
 Existing tools keep their names. `get_draft` returns more fields, and `list_design_presets` is unchanged, including its note that an agent cannot choose the design. The new tools are `get_design`, `create_draft`, `update_draft`, `update_card_text`, `set_attachment`, `list_connections`, `list_memories`, `save_memory`, `delete_memory` and `publish_post`.
 
@@ -49,7 +49,7 @@ Drawing the card on the server was considered and left out: it means a second re
 
 `internal/cma` keeps its shape (one session per conversation, stream first, reconnect and de-duplicate) with these changes:
 
-- **Agents come from `social-card-agent`.** That repository applies its files with `ant apply` and builds a manifest: the coordinator's agent id, the environment id, the vault id and the rubric texts. The app reads it from `CARDPRESS_AGENT_MANIFEST` (a path or an https address). `cardpress agent-setup`, `CARDPRESS_AGENT_ID` and `CARDPRESS_AGENT_ENVIRONMENT_ID` are removed.
+- **Agents come from `cardpress-agent`.** That repository applies its files with `ant apply` and builds a manifest: the coordinator's agent id, the environment id, the vault id and the rubric texts. The app reads it from `CARDPRESS_AGENT_MANIFEST` (a path or an https address). `cardpress agent-setup`, `CARDPRESS_AGENT_ID` and `CARDPRESS_AGENT_ENVIRONMENT_ID` are removed.
 - **Tools are the MCP tools.** The coordinator's `mcp_servers` entry points at this server's `/mcp`. The custom tool `propose_content` and its three-try loop go away. The adapter handles `agent.mcp_tool_use` and `agent.mcp_tool_result` to show progress ("changed the title"), and no longer executes anything itself.
 - **Outcomes.** The first draft of each kind the person ticks is `user.define_outcome` with that kind's rubric (`max_iterations` 3); its description carries every source, because the grader sees nothing else. Both ticked means two outcomes, the post first. Everything else is `user.message`. The grader's verdict and explanation are shown under the draft.
 - **Confirmation.** A `publish_post` call arrives as `session.status_idle` with `requires_action`. The chat stream sends a `confirm` event; the person's answer is sent back as `user.tool_confirmation`. With `CARDPRESS_AGENT_PUBLISH=auto` the session is created with that tool's policy overridden to `always_allow`.
@@ -77,7 +77,7 @@ One conversation is one managed session, so its cost is the session's `usage`: `
 
 - After each turn the adapter reads the session's usage and stores a row in `chat_usage (conversation_id, message_id, list_cost_cents, active_seconds, usage, created_at)`: the cumulative figures, so a turn's cost is the difference from the row before. Because figures are rounded to the cent, a single small turn can read as zero.
 - The chat shows the conversation's cost so far under its title; an admin can list conversations with their costs.
-- Until the chat is connected, `social-card-agent/scripts/session-cost.sh` measures test sessions.
+- Until the chat is connected, `cardpress-agent/scripts/session-cost.sh` measures test sessions.
 - List cost is not the billed price where discounts apply.
 
 ## Safety

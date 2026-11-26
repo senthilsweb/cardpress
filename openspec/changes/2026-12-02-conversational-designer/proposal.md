@@ -1,6 +1,6 @@
 # Conversational designer: the assistant writes the card's words and the post, and can post
 
-**Status:** proposed. Nothing is built. The agent side lives in the separate `social-card-agent` repository and depends on the MCP tools in [contract.md](contract.md), so the MCP work comes first. The screen and sources are in `2026-12-03-chat-workspace`.
+**Status:** proposed. Nothing is built. The agent side lives in the separate `cardpress-agent` repository and depends on the MCP tools in [contract.md](contract.md), so the MCP work comes first. The screen and sources are in `2026-12-03-chat-workspace`.
 
 ## Why
 Today the assistant only suggests text. An agent connected over MCP can read but not act. The person designs the card in the studio: layout, colours, background, fonts, branding. The goal is to do the words by talking, starting from that card: "change the title to ..., shorten the subtitle, put the series name in the tag", see each change on the canvas as the conversation goes on, have the post or article written, then say "post it". How the card looks stays the person's: the agent cannot change it.
@@ -8,7 +8,7 @@ Today the assistant only suggests text. An agent connected over MCP can read but
 ## What changes
 - **MCP gains tools that act.** An agent can read a draft's card design, change the words on the card (title, subtitle, eyebrow, tag, footers, quote author, stat), write a post or an article, set a video, keep notes about a brand, see which networks are connected, and publish a post now. What the Text and Write tabs offer is reachable, with the exceptions under Out of scope. Nothing on the Design tab is.
 - **The canvas follows the conversation.** A change made through MCP reaches every open studio for that brand within a second, without a reload.
-- **The chat talks to a team of agents.** The built-in single writer agent (`cardpress agent-setup`) is replaced by the agents defined in `social-card-agent`: a coordinator, a post writer and an article writer. The first draft of each kind is graded against a rubric and revised until it passes.
+- **The chat talks to a team of agents.** The built-in single writer agent (`cardpress agent-setup`) is replaced by the agents defined in `cardpress-agent`: a coordinator, a post writer and an article writer. The first draft of each kind is graded against a rubric and revised until it passes.
 - **The chat remembers.** Conversations are already stored. Notes the assistant keeps about a brand (voice, preferences, things to avoid) are stored in a new table and offered to it in later conversations.
 - **Posting from the chat.** The assistant can publish a post to a connected network. Only posting now: no scheduling, rescheduling, cancelling or deleting.
 

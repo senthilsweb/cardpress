@@ -1,6 +1,6 @@
-# Contract between CardPress and social-card-agent
+# Contract between CardPress and cardpress-agent
 
-The only things the two repositories share. This file is authoritative; `social-card-agent` keeps a copy in
+The only things the two repositories share. This file is authoritative; `cardpress-agent` keeps a copy in
 `openspec/changes/2026-11-26-studio-contract/contract.md`. Change it here first, then copy it.
 
 Version 6. (Version 6: the card headline is `headline`; the manifest carries the content schema; writers report a headline; the coordinator answers with `report_reply`.) (Version 5: every change an assistant saves is a version, and a published item is refused.) (Version 3: the agent changes the words on a card, never how it looks. Version 4: the writers save their own text with `update_draft`; every outcome carries its sources; a restarted session is sent the earlier messages.)
