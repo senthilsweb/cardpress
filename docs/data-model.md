@@ -116,6 +116,8 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0020 | `chat_usage` |
 | 0021 | `draft_versions.revision` |
 | 0022 | `conversations`: `graded`, `seen` |
+| 0023 | `drafts`: `audience`, `topic`, `campaign`, `review_notes` (none published); `draft_versions`: the first three |
+| 0024 | `chat_messages`: `status`, `detail` |
 
 ## A post's own file
 
