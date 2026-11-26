@@ -35,14 +35,15 @@ export function InlineDrawers({ children }: { children: ReactNode }) {
 
 function InlinePanel({ title, subheader, footer, children, className }: { title: string; subheader?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) {
   const titleId = useId();
+  // one centred column: heading, tabs, the form, and its buttons right under it
   return (
-    <section aria-labelledby={titleId} className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
-      <header className="flex h-14 shrink-0 items-center border-b border-border px-6">
-        <h1 id={titleId} className="truncate text-lg font-semibold tracking-tight">{title}</h1>
-      </header>
-      {subheader && <div className="shrink-0 border-b border-border px-6 py-2.5"><div className="max-w-2xl">{subheader}</div></div>}
-      <div className="min-h-0 flex-1 overflow-y-auto"><div className="max-w-2xl px-2 py-2">{children}</div></div>
-      {footer && <footer className="shrink-0 border-t border-border bg-background px-6 py-3"><div className="max-w-2xl">{footer}</div></footer>}
+    <section aria-labelledby={titleId} className={cn("h-full min-h-0 overflow-y-auto bg-background", className)}>
+      <div className="mx-auto w-full max-w-2xl px-4 pb-10 pt-8">
+        <h1 id={titleId} className="px-4 text-2xl font-semibold tracking-tight">{title}</h1>
+        {subheader && <div className="mt-5 px-4">{subheader}</div>}
+        <div className="mt-2">{children}</div>
+        {footer && <div className="mt-2 px-4">{footer}</div>}
+      </div>
     </section>
   );
 }
