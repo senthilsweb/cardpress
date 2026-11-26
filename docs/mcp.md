@@ -50,7 +50,7 @@ An agent can leave at most 20 unreviewed proposals per profile, so a runaway age
 
 Nothing else is written to standard output. Because the agent launches the program as you, there is no token for this mode; whoever can run it can already read the database.
 
-**Over HTTP.** The running server also answers at **`/mcp`** (streamable HTTP), for example `http://localhost:8080/mcp`. Once any account exists, the client must send `Authorization: Bearer <key>` with an **API key** you make in **Account settings, API keys** (see below), or the server's `CARDPRESS_API_TOKEN`. Check your client's documentation for how to add an HTTP server with a header; for Claude Code that is along the lines of:
+**Over HTTP.** The running server also answers at **`/mcp`** (streamable HTTP), for example `http://localhost:8080/mcp`. Once any account exists, the client must send `Authorization: Bearer <key>` with an **API key** you make in **Settings, API keys** (see below), or the server's `CARDPRESS_API_TOKEN`. Check your client's documentation for how to add an HTTP server with a header; for Claude Code that is along the lines of:
 
 ```bash
 claude mcp add --transport http cardpress http://localhost:8080/mcp --header "Authorization: Bearer cpk_..."
@@ -60,7 +60,7 @@ Turn the HTTP endpoint off with `CARDPRESS_MCP=false` (or `-mcp=false`). The std
 
 ## API keys
 
-Make a key in **Account settings, API keys**: give it a name, and the key is shown **once**, so copy it then. It starts with `cpk_`. The server keeps only a hash of it, so a lost key cannot be recovered, only revoked and replaced. The list shows each key's name, its first characters, its scope, when it was made and when it was last used; **Revoke** ends a key at once.
+Make a key in **Settings, API keys**: give it a name, and the key is shown **once**, so copy it then. It starts with `cpk_`. The server keeps only a hash of it, so a lost key cannot be recovered, only revoked and replaced. The list shows each key's name, its first characters, its scope, when it was made and when it was last used; **Revoke** ends a key at once.
 
 A key **acts as you**, within its **scope**. Today there is one scope, **Editor**: write, approve and publish on your own work. A key never goes beyond what its person may do (a writer's key cannot approve), and it is never an admin, even when the person is one: it reaches your own brands only. Every MCP tool stays inside them, and another person's brand looks the same as one that does not exist. Proposals a key makes belong to you. A key cannot make more keys, change your password or details, or manage people; do those in the app. If you are disabled, your keys stop working.
 

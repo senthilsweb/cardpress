@@ -1,0 +1,14 @@
+---
+import Base from "../../layouts/Base.astro";
+import Settings from "../../components/settings/Settings";
+import { SETTINGS_SECTIONS } from "../../lib/nav";
+
+export function getStaticPaths() {
+  return SETTINGS_SECTIONS.map((s) => ({ params: { section: s.id }, props: { label: s.label } }));
+}
+const { label } = Astro.props;
+---
+<Base title={`${label} · CardPress settings`}>
+  <Settings client:only="react" />
+  <noscript><p style="padding:2rem">CardPress needs JavaScript.</p></noscript>
+</Base>

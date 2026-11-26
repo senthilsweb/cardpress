@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, ChevronDown, Copy, Loader2, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { brandProblem, buildBrand } from "@/lib/brands";
@@ -13,43 +12,6 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Something went
 
 function Dot({ color }: { color: string }) {
   return <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/10" style={{ background: color }} />;
-}
-
-/** The open brand, and a menu to switch, add or manage brands. */
-export function BrandSwitcher({ brands, activeId, colors, busy, onSwitch, onNew, onManage }: {
-  brands: Profile[];
-  activeId: string;
-  colors: Record<string, string>;
-  busy: boolean;
-  onSwitch: (id: string) => void;
-  onNew: () => void;
-  onManage: () => void;
-}) {
-  const active = brands.find((b) => b.id === activeId) ?? brands[0];
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="max-w-[220px] gap-2 px-2" aria-label={`Brand: ${active?.name ?? ""}. Switch brand`} disabled={busy}>
-          {busy ? <Loader2 className="animate-spin" /> : <Dot color={colors[active?.id] ?? "#888"} />}
-          <span className="hidden truncate sm:inline">{active?.name}</span>
-          <ChevronDown className="opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[230px]">
-        {brands.map((b) => (
-          <DropdownMenuItem key={b.id} onSelect={() => { if (b.id !== activeId) onSwitch(b.id); }}>
-            <Dot color={colors[b.id] ?? "#888"} />
-            <span className="min-w-0 flex-1 truncate">{b.name}</span>
-            {b.handle && <span className="truncate text-xs text-muted-foreground">{b.handle}</span>}
-            {b.id === activeId && <Check className="text-brand" aria-label="Open" />}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onNew}><Plus /> New brand…</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onManage}><SlidersHorizontal /> Manage brands…</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 /** Create a brand: blank, or a copy of another brand's look (never its accounts, drafts or posts). */
@@ -124,7 +86,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onMove, onDuplicate, onArchive, onRestore, onDelete }: {
+export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
   open: boolean;
   onClose: () => void;
   active: Profile[];
@@ -137,6 +99,8 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   onArchive: (id: string) => Promise<{ scheduled: number }>;
   onRestore: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  /** On the Brands page: a New brand button in place of Done. */
+  onNew?: () => void;
 }) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -187,7 +151,9 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Brands" footer={<div className="flex justify-end"><Button variant="outline" size="sm" onClick={onClose}>Done</Button></div>}>
+    <Drawer open={open} onClose={onClose} title="Brands" footer={<div className="flex justify-end">{onNew
+      ? <Button variant="brand" size="sm" onClick={onNew}><Plus /> New brand</Button>
+      : <Button variant="outline" size="sm" onClick={onClose}>Done</Button>}</div>}>
       <div className="space-y-4 px-4 py-4">
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}

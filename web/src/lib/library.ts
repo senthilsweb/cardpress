@@ -22,6 +22,10 @@ export interface LibraryItem {
   /** The item has a live public page at `pagePath(item)`. */
   slug?: string;
   pageAt?: string;
+  /** Who wrote it and who approved it, by name, and its latest saved version. */
+  createdBy?: string;
+  approvedBy?: string;
+  version?: number;
 }
 
 /** Where an item's public page is, when it has a live one. */
@@ -74,3 +78,68 @@ export const STATUS_FILTERS: { value: string; label: string }[] = [
 
 /** Where a draft opens in the editor, in its own brand. */
 export const draftLink = (base: string, item: LibraryItem) => `${base}studio/?brand=${encodeURIComponent(item.profileId)}&draft=${encodeURIComponent(item.id)}`;
+
+/* ---------------------------------------------------------------- the grid */
+
+export type SortKey = "at" | "title" | "status" | "kind" | "brand";
+export interface LibrarySort { sort: SortKey; order: "asc" | "desc" }
+export const DEFAULT_SORT: LibrarySort = { sort: "at", order: "desc" };
+
+/** Pressing a column's heading sorts by it; pressing it again turns the order round. Dates start newest first. */
+export function nextSort(cur: LibrarySort, key: SortKey): LibrarySort {
+  if (cur.sort === key) return { sort: key, order: cur.order === "asc" ? "desc" : "asc" };
+  return { sort: key, order: key === "at" ? "desc" : "asc" };
+}
+
+export type ColumnId = "type" | "status" | "when" | "brand" | "createdBy" | "approvedBy" | "version" | "planned" | "page" | "linkedin";
+export const COLUMNS: { id: ColumnId; label: string; sort?: SortKey; shown: boolean }[] = [
+  { id: "type", label: "Type", sort: "kind", shown: true },
+  { id: "status", label: "Status", sort: "status", shown: true },
+  { id: "when", label: "When", sort: "at", shown: true },
+  { id: "brand", label: "Brand", sort: "brand", shown: true },
+  { id: "createdBy", label: "Written by", shown: false },
+  { id: "approvedBy", label: "Approved by", shown: false },
+  { id: "version", label: "Version", shown: false },
+  { id: "planned", label: "Planned", shown: false },
+  { id: "page", label: "Public page", shown: false },
+  { id: "linkedin", label: "LinkedIn", shown: false },
+];
+export const defaultColumns = (): ColumnId[] => COLUMNS.filter((c) => c.shown).map((c) => c.id);
+
+/** A row's key, unique across posts and drafts. */
+export const rowKey = (it: Pick<LibraryItem, "type" | "id">) => `${it.type}:${it.id}`;
+
+type Can = (p: "write" | "approve" | "publish") => boolean;
+
+/** What can be done with a row, and why not when something cannot. The server checks each again. */
+export function rowActions(it: LibraryItem, can: Can) {
+  const draft = it.type === "draft";
+  const job = !draft;
+  const published = it.status === "published";
+  const waiting = it.status === "scheduled" || it.status === "publishing";
+  let deleteWhy: string | null = null;
+  if (draft && it.status !== "draft") deleteWhy = "Bring it back to draft first";
+  if (job && waiting) deleteWhy = "Cancel the scheduled post first";
+  if (job && !can("publish")) deleteWhy = "You cannot delete posts";
+  return {
+    view: true,
+    edit: draft && (it.status === "draft" || it.status === "approved"),
+    schedule: draft && it.status === "approved" && (it.kind === "article" ? can("approve") : can("publish")),
+    backToDraft: draft && it.status === "approved",
+    delete: deleteWhy === null,
+    deleteWhy,
+    /** Deleting a post only removes the record here: the post stays on LinkedIn. */
+    recordOnly: job,
+    readOnly: published || waiting,
+  };
+}
+
+/** What a confirmation should say before deleting these rows. */
+export function deleteSummary(items: LibraryItem[]): { drafts: number; records: number; text: string } {
+  const drafts = items.filter((i) => i.type === "draft").length;
+  const records = items.length - drafts;
+  const parts: string[] = [];
+  if (drafts) parts.push(`${drafts} ${drafts === 1 ? "draft" : "drafts"} and ${drafts === 1 ? "its card" : "their cards"}`);
+  if (records) parts.push(`${records} post ${records === 1 ? "record" : "records"} (the ${records === 1 ? "post stays" : "posts stay"} on LinkedIn)`);
+  return { drafts, records, text: `This deletes ${parts.join(" and ")}. It cannot be undone.` };
+}

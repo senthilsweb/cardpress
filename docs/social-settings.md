@@ -1,6 +1,6 @@
 # Social accounts
 
-Open **Social accounts** from the account menu: click your brand at the bottom of the sidebar. It slides in from the right as a drawer, not a modal: nothing is dimmed or blocked, so you can keep using the studio while it is open. It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. **Esc** or the close button closes it; if you have unsaved changes it asks before discarding them (a dot on a tab shows which network has some).
+Open **Settings, Social accounts** (`/settings/social/`). It holds the keys and tokens the server uses to publish, with a tab for LinkedIn, X and Instagram. **Save** and **Test connection** are frozen at the bottom and act on the selected tab. A dot on a tab shows which network has unsaved changes.
 
 | Network | Fields | Status |
 |---|---|---|
@@ -10,7 +10,7 @@ Open **Social accounts** from the account menu: click your brand at the bottom o
 
 You paste the values in. There is no LinkedIn sign-in (OAuth) flow in the studio yet, and tokens are not refreshed for you: when a LinkedIn token expires (about 60 days), create a new one and enter it again.
 
-## What the drawer does
+## What the page does
 
 - **Secrets are masked.** After saving, a secret shows as `••••` plus its last four characters (or only `••••` if it is short). The full value is never sent back to the browser, so it cannot be revealed later; type a new one to replace it. IDs and URNs are shown in full.
 - **Save** stores only the fields you changed. **Remove** (the bin icon, click twice to confirm) deletes one stored value.

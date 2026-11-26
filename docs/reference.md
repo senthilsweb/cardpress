@@ -21,7 +21,9 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST /drafts/{id}/approve`, `POST .../unapprove`, `PUT .../plan` | Approve (needs `approve`), take approval back, set an article's planned date |
 | `POST/DELETE /drafts/{id}/page` | Put an approved item's public page online or take it down (needs `publish`); see [Public pages](public-pages.md) |
 | `GET/POST /drafts/{id}/versions`, `GET .../{seq}`, `POST .../{seq}/restore` | An item's history: list, save one with a note, read one, restore one |
-| `GET /library` | The library list, with server-side paging, search and filters |
+| `GET /library` | The library list, with server-side paging, sorting (`sort`, `order`), search and filters |
+| `GET /calendar` | Posts and planned articles between `from` and `to` (RFC 3339, at most 45 days). See [Calendar](calendar.md) |
+| `GET /calendar/ready` | Approved posts and articles with no date |
 | `GET /profiles/{id}/settings`, `GET/PUT /profiles/{id}/settings/{network}`, `POST .../test` | One brand's social credentials (secrets are write-only). The older `/settings...` routes act on the first brand |
 | `POST/GET /publish/jobs`, `GET/DELETE /publish/jobs/{id}`, `GET .../attempts` | Publish jobs and what LinkedIn answered on each attempt |
 | `GET /publish/jobs/{id}/image` | The file of a job: the card, or the post's own image or PDF |

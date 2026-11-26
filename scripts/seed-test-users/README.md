@@ -24,4 +24,4 @@ were already there.
 
 What to try: as the **writer**, open Post, write, and notice there is no Approve or Publish; as the **editor**, approve and
 publish your own post and see that you cannot see the writer's; as the **admin**, see everyone's work and approve the writer's
-draft. Account settings has the profile, **Change password** and **API keys**.
+draft. **Settings** has your account (profile and password) and **API keys**.

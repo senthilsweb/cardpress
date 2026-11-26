@@ -1,6 +1,23 @@
 # Library
 
-The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from the account menu (your brand at the bottom of the sidebar), or go to `/library/`.
+The **Library** is the list of everything you have posted, scheduled and drafted, newest first, like a blog index. Open it from **Library** in the navigation, or go to `/library/`. Its panel's **Posts** and **Articles** narrow the list (`/library/?kind=post`); the drop-downs above the list do the same and also choose a status.
+
+## Grid and List
+
+The library shows as a **Grid** (a table, the default on wide screens) or a **List**. The choice is remembered in this browser.
+
+- **Sort:** click a column heading (Title, Type, Status, When, Brand). Click again to reverse the order. Dates start with the newest.
+- **Columns:** shows or hides Type, Status, When, Brand (with All brands), Written by, Approved by, Version, Planned, Public page and LinkedIn.
+- **The row menu (⋯):**
+  - **View** opens the item as its own page (`/library/?item=draft:<id>` or `job:<id>`), read-only when it has been sent or is waiting. Clicking a row does the same. **Library** at the top, or the browser's Back, returns to the grid.
+  - **Edit** opens it in the studio.
+  - **Schedule…** (an approved post) or **Plan a date…** (an approved article).
+  - **Back to draft** (an approved item).
+  - **Delete.**
+- **Select rows** with the boxes, then **Delete** them together.
+  - Only rows that can be deleted can be ticked. A draft must be back in draft first, and a scheduled post must be cancelled first.
+  - The confirmation says what goes. Deleting a sent post removes its record here; the post stays on LinkedIn.
+  - Each row is deleted on its own, with the same checks as a single delete, and the result says which could not be.
 
 ## The list
 

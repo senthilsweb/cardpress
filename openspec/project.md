@@ -7,9 +7,9 @@ Self-hosted studio for LinkedIn and blog social cards in my brand colours and fo
 - Two deployment modes: (1) on-prem single binary with the web app embedded; (2) web app deployed as a Node/JS app, talking to the Go API on a separate host.
 - The LLM and chat prepare content only. Publishing is a deterministic, human-confirmed action; failures are corrected by a person, never retried automatically.
 - The service layer is also exposed over MCP so an external agent can use it.
-- The studio layout is a header, a left column (Chat or Edit) and a canvas (Post, Article or both); new features fit into it.
+- Every signed-in page has an icon rail (Studio, Library, Calendar, Settings), a secondary column for the open area, and the page. There is no navigation along the top. In the studio the secondary column is Chat | Details | Design and the page is the canvas (`changes/2026-12-08-studio-clarity`, once built).
 - A single profile; no profile switcher.
-- Settings and tool panels open in a right-hand, non-modal drawer (header in the app theme, scrolling body, frozen footer for actions), not a centred modal. Use `components/ui/drawer.tsx`.
+- Settings are pages under `/settings/`, listed in the secondary column, not drawers. Popups are kept to the brand switcher, the person's menu, confirmations, the schedule form, and the expanded editor and full preview. Selecting an item in the Library or Calendar opens an item pane that is part of the page. Until that change is built, today's drawers (`components/ui/drawer.tsx`) stay.
 - No authentication yet. An optional shared bearer token guards non-local exposure; real auth is a later change.
 - Run: `make dev`, `make build`, `make run`.
 - Docs: `docs/`. Changes: `openspec/changes/<date>-<slug>/` (proposal.md, tasks.md, specs/).

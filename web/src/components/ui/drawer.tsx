@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { GripVertical, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,37 @@ function useDrawerWidth(key?: string) {
   return [width, setWidth, save] as const;
 }
 
-export function Drawer({ open, onClose, title, subheader, footer, children, className, resizeKey }: {
+/**
+ * Inside this, a Drawer is drawn as the page itself: a settings page shows the same panel, with its heading, body and
+ * frozen footer, filling the page instead of sliding over it. There is nothing to close.
+ */
+const Inline = createContext(false);
+export function InlineDrawers({ children }: { children: ReactNode }) {
+  return <Inline.Provider value={true}>{children}</Inline.Provider>;
+}
+
+function InlinePanel({ title, subheader, footer, children, className }: { title: string; subheader?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) {
+  const titleId = useId();
+  // one centred column: heading, tabs, the form, and its buttons right under it
+  return (
+    <section aria-labelledby={titleId} className={cn("h-full min-h-0 overflow-y-auto bg-background", className)}>
+      <div className="mx-auto w-full max-w-2xl px-4 pb-10 pt-8">
+        <h1 id={titleId} className="px-4 text-2xl font-semibold tracking-tight">{title}</h1>
+        {subheader && <div className="mt-5 px-4">{subheader}</div>}
+        <div className="mt-2">{children}</div>
+        {footer && <div className="mt-2 px-4">{footer}</div>}
+      </div>
+    </section>
+  );
+}
+
+export function Drawer(props: DrawerProps) {
+  const inline = useContext(Inline);
+  if (inline) return props.open ? <InlinePanel {...props} /> : null;
+  return <SlideDrawer {...props} />;
+}
+
+interface DrawerProps {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -36,7 +66,9 @@ export function Drawer({ open, onClose, title, subheader, footer, children, clas
   className?: string;
   /** Adds a grip on the left edge to drag the drawer wider or narrower; the width is remembered under this name. */
   resizeKey?: string;
-}) {
+}
+
+function SlideDrawer({ open, onClose, title, subheader, footer, children, className, resizeKey }: DrawerProps) {
   const [width, setWidth, saveWidth] = useDrawerWidth(resizeKey);
   const drag = useRef<{ startX: number; startW: number } | null>(null);
   const onDown = (e: PointerEvent<HTMLDivElement>) => { e.preventDefault(); document.body.style.userSelect = "none"; drag.current = { startX: e.clientX, startW: width }; e.currentTarget.setPointerCapture(e.pointerId); };

@@ -17,7 +17,7 @@ The assistant is a [Claude Managed Agent](cma-agent.md). On a server without one
 2. Tick **Post**, **Article** or both, then send. The draft appears on the canvas and fills in when the agent saves it. The first draft is checked against a rubric and the reply says whether it passed.
 3. Reply to ask for changes. Each save is a new [version](workspace.md), so nothing is lost.
 4. A conversation keeps one post and one article: see **Post**, **Article** or **Both** above the canvas. Choosing another item in the picker opens the conversation about it.
-5. Conversations are saved on the server, so they are there after a reload. The **+** starts a new one about the item on screen; the bin deletes the open one.
+5. Conversations are saved on the server, so they are there after a reload. **New** [starts fresh](workspace.md). The bin deletes the open conversation and starts fresh; the post or article it wrote is kept.
 6. The **history** button opens the right-hand drawer. **History** lists conversations by Today, Last 7 days and Earlier, with the post or article each is about and, when a real assistant reports it, its cost at list price; search looks through titles, messages and source names. **Notes** shows what the assistant remembers about the brand, and you can remove any of it.
 7. If the assistant can no longer continue a conversation on its side, a new session is started from your saved messages and sources, and the reply says so.
 
