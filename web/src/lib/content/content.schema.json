@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CardPress content",
-  "x-schemaVersion": 1,
+  "x-schemaVersion": 2,
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -333,7 +333,6 @@
       },
       "x-choices": true,
       "x-embed": true,
-      "x-toolName": "title",
       "type": "string",
       "maxLength": 400
     },

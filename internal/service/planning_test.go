@@ -25,13 +25,13 @@ func TestTheSchemaLimitsAreTheServices(t *testing.T) {
 	}
 	// the card's limits are enforced by the design check
 	for _, f := range CardTextFields {
-		name := f
-		if f == "title" {
-			name = "headline"
+		max := content.Server[f].MaxLength
+		stored := f
+		if f == Headline {
+			stored = StoredHeadline
 		}
-		max := content.Server[name].MaxLength
 		for n, ok := range map[int]bool{max: true, max + 1: false} {
-			raw := `{"sizeId":"li-post","layout":"hero","background":"mesh","paletteId":"cream-emerald","titleScale":1,"` + f + `":"` + strings.Repeat("x", n) + `"}`
+			raw := `{"sizeId":"li-post","layout":"hero","background":"mesh","paletteId":"cream-emerald","titleScale":1,"` + stored + `":"` + strings.Repeat("x", n) + `"}`
 			if _, err := ParseCardDesign([]byte(raw)); (err == nil) != ok {
 				t.Errorf("%s at %d characters: %v", f, n, err)
 			}

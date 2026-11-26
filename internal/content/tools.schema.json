@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schemaVersion": 1,
+  "x-schemaVersion": 2,
   "tools": {
     "update_draft": {
       "type": "object",
@@ -69,7 +69,7 @@
         "changes": {
           "type": "object",
           "properties": {
-            "title": {
+            "headline": {
               "type": "string",
               "maxLength": 400
             },

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -52,19 +53,6 @@ type designOut struct {
 }
 
 // designView is the card with pictures reported as present or absent, never as bytes.
-func designView(card service.CardDesign) (map[string]any, error) {
-	b, err := json.Marshal(card)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, err
-	}
-	m["photos"], m["screenshot"], m["bgImage"] = len(card.Photos) > 0, card.Screenshot != "", card.BgImage != ""
-	return m, nil
-}
-
 func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRefIn) (*mcp.CallToolResult, designOut, error) {
 	if _, err := t.draft(ctx, in.DraftID); err != nil {
 		return nil, designOut{}, toolError(err)
@@ -73,7 +61,7 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	view, err := designView(card)
+	view, err := service.CardForAssistant(card)
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
@@ -83,11 +71,20 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 type cardTextIn struct {
 	DraftID string `json:"draftId" jsonschema:"the draft id"`
 	// a map, so that a field this tool must not touch is seen and refused with a reason
-	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, title, subtitle, footer, footerLeft, tag, quoteAuthor, statValue"`
+	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue"`
 }
 
 func cardText(changes map[string]any) (service.CardText, error) {
 	var out service.CardText
+	// agents built before contract 6 call the headline "title"
+	if v, ok := changes[service.StoredHeadline]; ok {
+		if _, both := changes[service.Headline]; both {
+			return out, errors.New("Nothing was changed: send headline only.")
+		}
+		changes = maps.Clone(changes)
+		delete(changes, service.StoredHeadline)
+		changes[service.Headline] = v
+	}
 	if len(changes) == 0 {
 		return out, errors.New("Give at least one text field to change: " + strings.Join(service.CardTextFields, ", ") + ".")
 	}
@@ -124,7 +121,7 @@ func (t tools) updateCardText(ctx context.Context, _ *mcp.CallToolRequest, in ca
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}
-	view, err := designView(card)
+	view, err := service.CardForAssistant(card)
 	if err != nil {
 		return nil, designOut{}, toolError(err)
 	}

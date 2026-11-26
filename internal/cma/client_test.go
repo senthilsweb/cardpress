@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/senthilsweb/cardpress/internal/agent"
+	"github.com/senthilsweb/cardpress/internal/content"
 )
 
 var manifest = Manifest{Version: 5, AgentID: "agent_1", AgentVersion: "3", EnvironmentID: "env_1", VaultID: "vlt_1", Outcomes: map[string]Outcome{
@@ -306,6 +307,9 @@ func TestTheManifest(t *testing.T) {
 	for want, from := range map[string]string{
 		"CARDPRESS_AGENT_MANIFEST": "", "could not read": "/no/such/file", "not valid JSON": "{nope",
 		"version 4":                       strings.Replace(string(b), `"version":5`, `"version":4`, 1),
+		"version 7":                       strings.Replace(string(b), `"version":5`, `"version":7`, 1),
+		"has no schema":                   strings.Replace(string(b), `"version":5`, `"version":6`, 1),
+		"carries version":                 strings.Replace(string(b), `{"version":5`, `{"schema":`+string(content.Schema)+`,"schema_version":1,"version":5`, 1),
 		"vault_id":                        strings.Replace(string(b), `"vlt_1"`, `""`, 1),
 		"for article":                     strings.Replace(string(b), "ARTICLE RUBRIC", "", 1),
 		"which this server does not have": strings.Replace(string(b), `{"version":5`, `{"schema":{"x-schemaVersion":1,"properties":{"mood":{}}},"version":5`, 1),
@@ -364,5 +368,18 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 	}
 	if _, err := a.history(ctx, "nope"); !errors.Is(err, errSessionGone) {
 		t.Errorf("unknown session: %v", err)
+	}
+}
+
+// A version 6 manifest, as the agent project builds it, carries the schema.
+func TestLoadManifestVersion6(t *testing.T) {
+	m := manifest
+	m.Version, m.Schema, m.SchemaVersion = ManifestVersion, content.Schema, 2
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := LoadManifest(context.Background(), string(b)); err != nil || got.SchemaVersion != 2 {
+		t.Fatalf("%v %+v", err, got.SchemaVersion)
 	}
 }

@@ -111,4 +111,11 @@ None is required to approve. Who writes each is a proposal to confirm.
 - Planning fields are changed with `PATCH /api/v1/drafts/{id}/planning`. Saving a draft never touches them, an approved item stays approved, and a published or waiting item accepts them from a person. An assistant is still refused on a published or waiting item.
 - Review notes need the approve permission. Versions hold audience, topic and campaign, not review notes; a version saved earlier leaves them alone when restored.
 - An assistant could save a page address over 80 characters; it is now refused.
-- Open for step 7: the post rubric allows no hashtags, while the standard here is 3 to 5.
+- Hashtags: the standard is 3 to 5; the rubric still allows none when the person or the brand notes ask for that.
+
+## As built (agent side, step 7)
+- `npm run schema` writes `content.schema.json` beside each skill, and a limits block into the two rubrics and three skills (between `<!-- limits … -->` marks), so the numbers a writer and the grader read are generated. Quality lines stay hand-written. `npm test` and `build-manifest.sh` fail when anything is stale.
+- The skills carry the limits in their own text as well as the schema file, so a writer need not read the file to know them.
+- A writer's record has `title` and `headline`; the coordinator puts the headline on the card. A post's `title` is its name in the studio.
+- Writers follow `audience` and `reviewNotes`, and add a `topic` when a draft has none.
+- Schema version 2 (the card tool takes `headline`). The studio accepts manifest 5 and 6 and the old `title` name, so server and agents deploy one after the other.

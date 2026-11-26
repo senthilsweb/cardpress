@@ -7,7 +7,7 @@
 import { z } from "zod";
 
 /** Moves when a field, a limit or a tool input changes. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type Writer = "agent" | "person" | "system";
 export type Kind = "post" | "article";
@@ -37,8 +37,6 @@ export interface FieldMeta {
   choices?: boolean;
   /** Part of the text a published item is searched by. */
   embed?: boolean;
-  /** The name the studio's tools use today, where it is not the field's own. */
-  toolName?: string;
 }
 
 const both: Kind[] = ["post", "article"];
@@ -61,7 +59,7 @@ const word = (name: string, label: string, max: number, more: Partial<FieldMeta>
   field(z.string().max(max), { label, column: `drafts.design.${name}`, writer: "agent", kinds: both, ...more });
 
 export const CardText = z.strictObject({
-  headline: word("title", "Headline", 400, { standard: { post: { minWords: 3, maxWords: 9 }, article: { minWords: 3, maxWords: 9 } }, choices: true, embed: true, toolName: "title" }),
+  headline: word("title", "Headline", 400, { standard: { post: { minWords: 3, maxWords: 9 }, article: { minWords: 3, maxWords: 9 } }, choices: true, embed: true }),
   eyebrow: word("eyebrow", "Eyebrow", 200, { choices: true }),
   subtitle: word("subtitle", "Subtitle", 600, { choices: true }),
   tag: word("tag", "Tag", 100, { choices: true }),
@@ -169,11 +167,6 @@ export const UpdateDraftInput = z.strictObject({
   topic: Planning.shape.topic.optional(),
 });
 
-/** The card's words under the names today's tools use. */
-const cardChanges = z.strictObject(
-  Object.fromEntries(Object.entries(CardText.shape).map(([name, type]) => [metaOf(type).toolName ?? name, type.optional()])),
-);
-
-export const UpdateCardTextInput = z.strictObject({ draftId, changes: cardChanges });
+export const UpdateCardTextInput = z.strictObject({ draftId, changes: CardText.partial() });
 
 export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput };

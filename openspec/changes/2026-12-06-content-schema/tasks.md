@@ -7,5 +7,5 @@ Studio side (plan step 4, no redeploy)
 The screens that show and edit these fields are step 5 (`2026-12-08-studio-clarity`).
 
 Agent side (plan step 7, redeploy)
-- [ ] Skills and rubrics use the generated files; `headline` naming in tools; contract and manifest version 6
+- [x] Skills and rubrics use the generated files; `headline` naming in tools; contract and manifest version 6
 - [ ] Redeploy agents and update the manifest on Fly (ask first)

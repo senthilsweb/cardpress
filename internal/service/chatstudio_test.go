@@ -48,11 +48,11 @@ func TestTheAssistantIsToldWhereThingsStandAndOnlyWhatThePersonChanged(t *testin
 		t.Fatal(err)
 	}
 	title := "Mine"
-	if _, _, _, err := s.PatchCardText(ctx, d.ID, CardText{Title: &title}); err != nil {
+	if _, _, _, err := s.PatchCardText(ctx, d.ID, CardText{Headline: &title}); err != nil {
 		t.Fatal(err)
 	}
 	changed := send("Carry on", ChatRequest{})
-	if len(changed.Changes) != 1 || changed.Changes[0].DraftID != d.ID || strings.Join(changed.Changes[0].Lines, "; ") != `body: changed; title: "Mine"` {
+	if len(changed.Changes) != 1 || changed.Changes[0].DraftID != d.ID || strings.Join(changed.Changes[0].Lines, "; ") != `body: changed; headline: "Mine"` {
 		t.Fatalf("%+v", changed.Changes)
 	}
 	if after := send("And again", ChatRequest{}); len(after.Changes) != 0 {

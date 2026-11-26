@@ -29,12 +29,12 @@ func TestAnAgentWritesTheWordsAndNeverTheLook(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 
-	res, out := call(t, cs, "update_card_text", map[string]any{"draftId": id, "changes": map[string]any{"title": "Ship less", "tag": "Field notes"}})
+	res, out := call(t, cs, "update_card_text", map[string]any{"draftId": id, "changes": map[string]any{"headline": "Ship less", "tag": "Field notes"}})
 	if res.IsError {
 		t.Fatal(errText(res))
 	}
 	card := out["design"].(map[string]any)
-	if card["title"] != "Ship less" || card["tag"] != "Field notes" || card["layout"] != "hero" || out["revision"].(float64) != 2 || card["photos"] != false {
+	if card["headline"] != "Ship less" || card["title"] != nil || card["tag"] != "Field notes" || card["layout"] != "hero" || out["revision"].(float64) != 2 || card["photos"] != false {
 		t.Fatalf("%v", out)
 	}
 	if e := <-events; e.Revision != 2 {
@@ -175,5 +175,16 @@ func TestTheWritingToolsKeepToOnesOwnBrands(t *testing.T) {
 	after, _ := r.studio.GetDraft(ctx, d.ID)
 	if after.Revision != 1 {
 		t.Fatal("someone else's draft changed")
+	}
+}
+
+// Agents deployed before contract 6 call the headline "title".
+func TestAnOlderAgentMayCallTheHeadlineTitle(t *testing.T) {
+	got, err := cardText(map[string]any{"title": "Ship less"})
+	if err != nil || got.Headline == nil || *got.Headline != "Ship less" {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if _, err := cardText(map[string]any{"title": "a", "headline": "b"}); err == nil {
+		t.Fatal("both names were accepted")
 	}
 }

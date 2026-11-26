@@ -33,10 +33,11 @@ type DraftPatch struct {
 	Topic         *string
 }
 
-// CardText is the words drawn on a card: the only part of a design an assistant may change.
+// CardText is the words drawn on a card: the only part of a design an assistant may change. The headline is stored as
+// the design's "title"; an assistant calls it "headline", so that it is not taken for the item's title.
 type CardText struct {
 	Eyebrow     *string `json:"eyebrow,omitempty"`
-	Title       *string `json:"title,omitempty"`
+	Headline    *string `json:"headline,omitempty"`
 	Subtitle    *string `json:"subtitle,omitempty"`
 	Footer      *string `json:"footer,omitempty"`
 	FooterLeft  *string `json:"footerLeft,omitempty"`
@@ -46,7 +47,13 @@ type CardText struct {
 }
 
 // CardTextFields are the names CardText accepts.
-var CardTextFields = []string{"eyebrow", "title", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue"}
+var CardTextFields = []string{"eyebrow", "headline", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue"}
+
+// Headline is the card headline's name to an assistant, and StoredHeadline its name in a saved design.
+const (
+	Headline       = "headline"
+	StoredHeadline = "title"
+)
 
 // Effects are the side results of a change a person should hear about.
 type Effects struct {
@@ -195,7 +202,7 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 	for _, f := range []struct {
 		to   *string
 		from *string
-	}{{&card.Eyebrow, t.Eyebrow}, {&card.Title, t.Title}, {&card.Subtitle, t.Subtitle}, {&card.Footer, t.Footer},
+	}{{&card.Eyebrow, t.Eyebrow}, {&card.Title, t.Headline}, {&card.Subtitle, t.Subtitle}, {&card.Footer, t.Footer},
 		{&card.FooterLeft, t.FooterLeft}, {&card.Tag, t.Tag}, {&card.QuoteAuthor, t.QuoteAuthor}, {&card.StatValue, t.StatValue}} {
 		if f.from == nil {
 			continue
