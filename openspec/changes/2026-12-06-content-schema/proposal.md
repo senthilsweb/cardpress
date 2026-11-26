@@ -1,6 +1,6 @@
 # Content fields: one schema for the studio and the agents
 
-**Status:** proposed. Specification only: nothing is built.
+**Status:** revised 2026-11-25: the owner asked for strongly typed models (Zod or Pydantic) rather than a hand-written schema. Specification only: nothing is built.
 
 ## Why
 The same facts about a post or article are written down in several places: database columns, server checks, tool descriptions, agent skills and grading rubrics. They already disagree:
@@ -15,9 +15,9 @@ The same facts about a post or article are written down in several places: datab
 The person also cannot see these fields together: who may change them, what is missing, and what approval needs.
 
 ## What changes
-- The agent project owns `schema/content.schema.json`: every content and governing field of a post and an article, taken from the database, with its limit, who sets it, and what needs it.
+- The agent project owns the **typed models** (Zod) of a post, an article, their card words and governing fields, taken from the database: each field's type, limit, who sets it and what needs it. JSON Schema is generated from them (`schema/out/content.schema.json`), and so are the tool inputs and the rubric limit lines.
 - The skills and rubrics read their limits from that file instead of repeating them.
-- The manifest carries the schema (manifest and contract version 6). CardPress shows the fields from it and refuses a schema naming a field it does not have.
+- The manifest carries the schema (manifest and contract version 6). CardPress validates against it, builds the Details form from the same models, and refuses a schema naming a field it does not have.
 - The card headline is called `headline` everywhere an agent or a person sees it, so it is no longer confused with `title`.
 
 ## Rules that stay

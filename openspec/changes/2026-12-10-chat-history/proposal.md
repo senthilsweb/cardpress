@@ -12,7 +12,7 @@ All messages, attached sources and outside agents' proposals are loaded when a c
 - Each reply keeps its **steps**, the **versions it saved**, the **check result**, any **options** offered and what was chosen.
 - A failed or stopped reply is kept, with the reason.
 - Opening a conversation shows all of it in order, scrolled to the end, and puts its post and article on screen.
-- The history drawer loads older conversations as you scroll.
+- The conversation list moves from the drawer into the Chat column (`2026-12-08-studio-clarity`), with search, and loads older conversations as you scroll.
 
 ## Out of scope
 Reading history back from the model service; conversations from before this change show what was stored.

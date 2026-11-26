@@ -1,7 +1,7 @@
 # Design
 
 ```
-┌ CardPress   Library ────────────────────────────────────────── account ▾ ┐
+┌ (rail) │ (secondary: All · Posts · Articles · statuses) │ Library ─────────┐
 │ [Search…]  Brand: All ▾  Type ▾  Status ▾        [Grid|List] [Columns ▾] [+ New] │
 │ 2 selected                                                      [ Delete 2 ]     │
 ├──┬─────────┬──────────────────────────┬───────────┬──────────┬──────────┬──┤

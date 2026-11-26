@@ -8,7 +8,7 @@ Posts can be scheduled and articles given a planned date, but only one item at a
 ## What changes
 - A **full-page Calendar**: its own page that fills the window, not a drawer, popup or panel inside the studio. Month, week and **day**, showing scheduled, sent and failed posts and articles with a planned date, per brand or all the person's brands.
 - **Schedule from the calendar:** pick a day, choose an approved post or article, set the time.
-- **Links to it:** a Calendar entry in the account menu, and a calendar action next to each article in the Library list that opens the calendar with that article selected.
+- **Links to it:** Calendar on the rail, and Schedule in each Library row's menu, which opens the calendar with that item selected.
 
 ## Rules that stay
 - A published item is shown read-only.
