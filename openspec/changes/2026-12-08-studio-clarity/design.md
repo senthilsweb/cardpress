@@ -17,9 +17,9 @@
  rail  secondary            page
 ```
 - **Rail (56 px).** From the top:
-  - the brand mark: a popup to switch brand, make one, or manage brands, which opens Settings, Brands;
+  - the CardPress mark and name (the owner chose this over a brand square on 2026-11-25);
   - Studio ✎, Library ▤, Calendar ▦, Settings ⚙.
-  - At the bottom: the theme toggle and the person (S). Their popup holds the name, Docs and Sign out.
+  - At the bottom: the theme toggle and the person (S), in the open brand's colour. Their popup holds the name, the brands (switch, New brand, Manage brands, which opens Settings, Brands), Docs and Sign out.
   - Every icon has a tooltip and a visible label on focus.
 - **Secondary (200–320 px, resizable, hidden with Ctrl/⌘ + \ as today).** Its heading names the area and its list shows that area's places. It remembers its width and whether it is hidden.
 - **Page.** Full height. A page's own actions sit at the top of the page itself, never in a bar across the window.
@@ -43,7 +43,7 @@
 | Account popup → Social accounts (drawer) | Settings, Social accounts |
 | Account popup → Manage brands / New brand (drawers) | Settings, Brands; New brand is a form on that page |
 | Account popup → theme, Docs, Sign out | rail bottom: theme toggle; the person's popup: Docs, Sign out |
-| Brand switcher in the sidebar header | the brand mark at the top of the rail |
+| Brand switcher in the sidebar header | the person's menu at the bottom of the rail |
 | Conversations drawer | Chat column: the conversation's name at the top opens the list in place, with search; choosing one returns to it |
 | Versions drawer | Details, Record, Versions: the list in place; restoring asks first |
 | Edit, Brand | Settings, Brands (the brand's look), and Design for this item |
@@ -55,8 +55,7 @@ Addresses: `/studio/`, `/library/`, `/calendar/`, `/settings/account/`, `/settin
 ## Popups that stay, and only these
 | Popup | Why it is a popup |
 |---|---|
-| Brand switcher | a quick choice that returns to where you were |
-| The person's menu | three entries |
+| The person's menu | who you are, the brands to switch to, Docs, Sign out |
 | Confirmations (delete, publish, cancel a post, restore a version) | must stop the person |
 | Schedule or move a post | a date, time and zone, then confirm; done in place from the calendar, grid or studio |
 | Expanded editor, full preview | as today |

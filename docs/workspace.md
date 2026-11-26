@@ -4,7 +4,7 @@ How the screens are arranged, and what is remembered.
 
 ## Navigation
 
-Every page has a narrow **rail** on the far left: the CardPress mark, the open brand, then **Studio**, **Library** and **Settings**. At the bottom are the button that hides the side column (in the studio), the light or dark mode button, and **you**: your initials open a short menu with your name, email and role, **Docs** and **Sign out**. Nothing is placed along the top of the window.
+Every page has a narrow **rail** on the far left: the CardPress mark and name, then **Studio**, **Library** and **Settings**. At the bottom are the button that hides the side column (in the studio), the light or dark mode button, and **you**: your initials, in the open brand's colour, open a short menu with your name, email and role, the **brands** (switch, New brand, Manage brands), **Docs** and **Sign out**. Nothing is placed along the top of the window.
 
 Beside the rail is the **side column** of the area you are in:
 
@@ -18,13 +18,13 @@ Each setting is its own page: `/settings/account/`, `/settings/brands/`, `/setti
 
 On a narrow screen the rail is a bar along the bottom. Settings opens on its list; choosing an entry opens its page, with **Settings** at the top to go back.
 
-Popups are kept for quick choices and confirmations: the brand menu, your menu, confirmations, the schedule form, the expanded editor and the full preview. In the studio, the conversation history and an item's versions still open on the right.
+Popups are kept for quick choices and confirmations: your menu (with the brands), confirmations, the schedule form, the expanded editor and the full preview. In the studio, the conversation history and an item's versions still open on the right.
 
 ## Brands
 
-A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The open brand is the coloured square near the top of the rail.
+A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The open brand's colour is the circle with your initials at the bottom of the rail; its menu lists the brands.
 
-- **Switch**: click the brand on the rail and pick another. The whole studio changes to that brand, and the last one you opened is remembered on the server.
+- **Switch**: click your initials at the bottom of the rail and pick another brand. The whole studio changes to that brand, and the last one you opened is remembered on the server.
 - **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).

@@ -1,7 +1,6 @@
 import { FileText, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Settings, Sun } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
-import { BrandSwitcher } from "@/components/studio/Brands";
 import { LogoMark } from "@/components/studio/Logo";
 import { libraryHref, settingsHref, studioHref, type Area } from "@/lib/nav";
 import type { Profile } from "@/lib/types";
@@ -33,15 +32,14 @@ const AREAS: { id: Area; label: string; href: () => string; icon: React.ReactNod
  * screens). The brand at the top, the areas, and the person at the bottom. Nothing is put along the top of the window.
  */
 export function Rail({ area, brands, activeId, colors, switching = false, onSwitchBrand, theme, onToggleTheme, panel, onLeave }: RailProps) {
-  const active = brands.find((b) => b.id === activeId) ?? brands[0];
   const icon = "flex flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[10.5px] font-medium [&_svg]:h-[18px] [&_svg]:w-[18px]";
   return (
     <TooltipProvider delayDuration={250}>
     <nav aria-label="Main" className="order-last flex shrink-0 items-center gap-1 border-t border-border bg-card px-2 py-1.5 lg:order-first lg:w-[60px] lg:flex-col lg:border-r lg:border-t-0 lg:px-1.5 lg:py-3">
-      <a href={studioHref()} aria-label="CardPress" className="mb-2 hidden lg:block" onClick={onLeave}><LogoMark size={28} /></a>
-      <BrandSwitcher variant="rail" brands={brands} activeId={activeId} colors={colors} busy={switching} onSwitch={onSwitchBrand}
-        onNew={() => { onLeave?.(); window.location.href = settingsHref("brands", "?new=1"); }}
-        onManage={() => { onLeave?.(); window.location.href = settingsHref("brands"); }} />
+      <a href={studioHref()} aria-label="CardPress" onClick={onLeave} className="mb-1 hidden flex-col items-center gap-1 lg:flex">
+        <LogoMark size={30} />
+        <span className="text-[10.5px] font-bold tracking-tight text-foreground">CardPress</span>
+      </a>
       <div className="hidden h-px w-8 bg-border lg:my-2 lg:block" />
       <ul className="flex flex-1 items-center justify-around gap-1 lg:w-full lg:flex-none lg:flex-col lg:justify-start">
         {AREAS.map((a) => {
@@ -78,7 +76,10 @@ export function Rail({ area, brands, activeId, colors, switching = false, onSwit
           </TooltipTrigger>
           <TooltipContent side="right">{theme === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
         </Tooltip>
-        <AccountMenu name={active?.name ?? ""} color={colors[active?.id] ?? "#888"} theme={theme} onToggleTheme={onToggleTheme} />
+        <AccountMenu brands={brands} activeId={activeId} colors={colors} switching={switching} onSwitchBrand={onSwitchBrand}
+          onNewBrand={() => { onLeave?.(); window.location.href = settingsHref("brands", "?new=1"); }}
+          onManageBrands={() => { onLeave?.(); window.location.href = settingsHref("brands"); }}
+          theme={theme} onToggleTheme={onToggleTheme} />
       </div>
     </nav>
     </TooltipProvider>
