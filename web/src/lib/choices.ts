@@ -12,11 +12,14 @@ export const AS_RADIOS = 4;
 
 const LABEL: Record<string, string> = {
   headline: "Card headline", eyebrow: "Eyebrow", subtitle: "Subtitle", tag: "Tag",
+  footer: "Footer, right", footerLeft: "Footer, left", quoteAuthor: "Quote author", statValue: "Number",
   title: "Title", altText: "Alt text", hashtags: "Hashtags", summary: "Summary",
 };
 export const choiceLabel = (field: string) => LABEL[field] ?? field;
 
-export const optionText = (v: string | string[]) => (Array.isArray(v) ? v.map((t) => `#${t}`).join(" ") : v);
+/** What an option says. An empty one takes the words off the card; an empty footer shows the brand's own. */
+export const optionText = (v: string | string[], field = "") =>
+  Array.isArray(v) ? v.map((t) => `#${t}`).join(" ") : v || (field.startsWith("footer") ? "Brand default" : "None");
 
 /** An offer that can still be picked from. */
 export const open = (c: Choice) => c.status === "pending" || c.status === "chosen";
@@ -36,7 +39,10 @@ export function ofReply(conv: Conversation, messageId: string): { changes: Chang
 export const picked = (choices: Choice[], picks: Picks) =>
   choices.filter((c) => picks[c.id] !== undefined).map((c) => ({ choiceId: c.id, option: picks[c.id] }));
 
-const CARD: Record<string, keyof Design> = { headline: "title", eyebrow: "eyebrow", subtitle: "subtitle", tag: "tag" };
+const CARD: Record<string, keyof Design> = {
+  headline: "title", eyebrow: "eyebrow", subtitle: "subtitle", tag: "tag",
+  footer: "footer", footerLeft: "footerLeft", quoteAuthor: "quoteAuthor", statValue: "statValue",
+};
 
 /**
  * A draft as it would look with the picked options, for the screen only: nothing of this is saved. `card` is the card
@@ -50,7 +56,7 @@ export function preview(d: Draft, card: Design, choices: Choice[], picks: Picks)
     const value = c.options[i].value;
     const key = CARD[c.field];
     if (key) {
-      if (design[key] === value) continue;
+      if ((design[key] ?? "") === value) continue;
       design = { ...design, [key]: value };
       draft = { ...draft, design };
     } else {

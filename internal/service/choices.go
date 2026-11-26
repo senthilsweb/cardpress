@@ -23,14 +23,26 @@ const (
 const (
 	minOptions    = 2
 	maxOptions    = 6
-	maxChoiceSets = 5
+	maxChoiceSets = 12 // every field there is
 	maxOptionNote = 80
 )
 
 // choiceFields are the fields an assistant may offer options for, and the kinds that have them.
 var choiceFields = map[string][]string{
 	"headline": {KindPost, KindArticle}, "eyebrow": {KindPost, KindArticle}, "subtitle": {KindPost, KindArticle}, "tag": {KindPost, KindArticle},
+	"footer": {KindPost, KindArticle}, "footerLeft": {KindPost, KindArticle}, "quoteAuthor": {KindPost, KindArticle}, "statValue": {KindPost, KindArticle},
 	"title": {KindPost, KindArticle}, "altText": {KindPost, KindArticle}, "hashtags": {KindPost}, "summary": {KindArticle},
+}
+
+// cardWord is where an offered field is drawn on a card, or nil for a field of the item itself.
+func cardWord(c *CardDesign, field string) *string {
+	return map[string]*string{"headline": &c.Title, "eyebrow": &c.Eyebrow, "subtitle": &c.Subtitle, "tag": &c.Tag,
+		"footer": &c.Footer, "footerLeft": &c.FooterLeft, "quoteAuthor": &c.QuoteAuthor, "statValue": &c.StatValue}[field]
+}
+
+// removable says whether an option may be empty, taking the words off the card. A card keeps a headline.
+func removable(field string) bool {
+	return field != "headline" && cardWord(&CardDesign{}, field) != nil
 }
 
 // Option is one value offered: text, or a list for hashtags. Note says in a few words how it differs.
@@ -86,7 +98,7 @@ func (s *Studio) withField(ctx context.Context, cur Draft, fc *fieldChange, fiel
 		return nil
 	}
 	text, ok := value.(string)
-	if text = strings.TrimSpace(text); !ok || text == "" {
+	if text = strings.TrimSpace(text); !ok || (text == "" && !removable(field)) {
 		return invalid("%s: each option is a piece of text", field)
 	}
 	if err := cleanText(text, 1000); err != nil {
@@ -110,8 +122,7 @@ func (s *Studio) withField(ctx context.Context, cur Draft, fc *fieldChange, fiel
 		if err != nil {
 			return err
 		}
-		to := map[string]*string{"headline": &card.Title, "eyebrow": &card.Eyebrow, "subtitle": &card.Subtitle, "tag": &card.Tag}[field]
-		*to = text
+		*cardWord(&card, field) = text
 		if err := card.validate(); err != nil {
 			return err
 		}

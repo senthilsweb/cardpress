@@ -224,13 +224,43 @@ func TestOptionsArePickedAndSaved(t *testing.T) {
 		got.Choices[0].Status != ChoiceChosen || got.Choices[0].Chosen != 1 || statuses(got) != "saved" {
 		t.Fatalf("%q %v %+v %s", card.Title, d.Hashtags, got.Choices, statuses(got))
 	}
+	// any card text can be offered, and an empty one takes it off; a headline stays
+	_, last := w.reply(func(*agent.Studio) {
+		if err := w.s.OfferChoices(w.ctx, w.conv, id, []ChoiceSet{{Field: "headline", Options: []Option{{Value: "Kept"}, {Value: ""}}}}); err == nil {
+			t.Fatal("a card keeps a headline")
+		}
+		var sets []ChoiceSet
+		for _, f := range []string{"eyebrow", "subtitle", "tag", "footer", "footerLeft", "quoteAuthor", "statValue"} {
+			sets = append(sets, ChoiceSet{Field: f, Options: []Option{{Value: "x " + f}, {Value: ""}}})
+		}
+		if err := w.s.OfferChoices(w.ctx, w.conv, id, sets); err != nil {
+			t.Fatal(err)
+		}
+		eyebrow := "Field notes"
+		if _, _, _, err := w.s.PatchCardText(w.ctx, id, CardText{Eyebrow: &eyebrow}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	got, _ = w.c.Get(w.ctx, w.conv)
+	var picks2 []Pick
+	for _, c := range got.Choices {
+		if c.MessageID == last {
+			picks2 = append(picks2, Pick{c.ID, map[bool]int{true: 1, false: 0}[c.Field == "eyebrow"]})
+		}
+	}
+	if _, err := w.c.SaveReply(w.ctx, w.conv, last, SaveRequest{Picks: picks2}); err != nil {
+		t.Fatal(err)
+	}
+	if card, _, _ = w.s.Card(w.ctx, id); card.Eyebrow != "" || card.Subtitle != "x subtitle" || card.Footer != "x footer" || card.StatValue != "x statValue" {
+		t.Fatalf("%+v", card)
+	}
 	// a newer offer for the same field replaces the old one
 	got, _ = w.reply(func(*agent.Studio) {
 		if err := w.s.OfferChoices(w.ctx, w.conv, id, offer[:1]); err != nil {
 			t.Fatal(err)
 		}
 	})
-	if len(got.Choices) != 3 || got.Choices[2].Status != ChoicePending || got.Choices[0].Status != ChoiceSuperseded {
+	if len(got.Choices) != 10 || got.Choices[9].Status != ChoicePending || got.Choices[0].Status != ChoiceSuperseded {
 		t.Fatalf("%+v", got.Choices)
 	}
 	if err := w.s.OfferChoices(w.ctx, w.conv, id, offer); err == nil {

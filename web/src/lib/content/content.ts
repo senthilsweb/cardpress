@@ -63,10 +63,10 @@ export const CardText = z.strictObject({
   eyebrow: word("eyebrow", "Eyebrow", 200, { choices: true }),
   subtitle: word("subtitle", "Subtitle", 600, { choices: true }),
   tag: word("tag", "Tag", 100, { choices: true }),
-  footer: word("footer", "Footer", 200),
-  footerLeft: word("footerLeft", "Footer, left", 200),
-  quoteAuthor: word("quoteAuthor", "Quote author", 200),
-  statValue: word("statValue", "Number", 60),
+  footer: word("footer", "Footer", 200, { choices: true }),
+  footerLeft: word("footerLeft", "Footer, left", 200, { choices: true }),
+  quoteAuthor: word("quoteAuthor", "Quote author", 200, { choices: true }),
+  statValue: word("statValue", "Number", 60, { choices: true }),
 });
 
 /* ------------------------------------------------------------------ the writing */
@@ -180,7 +180,7 @@ export const ReportReplyInput = z.strictObject({
 });
 
 /** The fields an assistant may offer options for: those marked `choices` above. */
-export const ChoiceField = z.enum(["headline", "eyebrow", "subtitle", "tag", "title", "altText", "summary", "hashtags"]);
+export const ChoiceField = z.enum(["headline", "eyebrow", "subtitle", "tag", "footer", "footerLeft", "quoteAuthor", "statValue", "title", "altText", "summary", "hashtags"]);
 
 /** `offer_choices`: options the person picks from in the chat, the recommended or saved one first. */
 export const OfferChoicesInput = z.strictObject({
@@ -189,7 +189,7 @@ export const OfferChoicesInput = z.strictObject({
   fields: z.array(z.strictObject({
     field: ChoiceField,
     options: z.array(z.strictObject({ value: z.union([z.string(), z.array(Hashtag)]), note: z.string().max(80).optional() })).min(2).max(6),
-  })).min(1).max(5),
+  })).min(1).max(12),
 });
 
 export const Tools = { update_draft: UpdateDraftInput, update_card_text: UpdateCardTextInput, report_reply: ReportReplyInput, offer_choices: OfferChoicesInput };

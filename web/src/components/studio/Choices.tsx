@@ -23,7 +23,7 @@ export function OptionPicker({ choice, label, place }: { choice: Choice; label: 
         <Select value={String(at)} onValueChange={(v) => store.pick(choice, Number(v))} disabled={store.busy}>
           <SelectTrigger aria-labelledby={`${name}-label`} className="h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {choice.options.map((o, i) => <SelectItem key={i} value={String(i)}>{optionText(o.value)}{note(i) && <span className="text-muted-foreground"> — {note(i)}</span>}</SelectItem>)}
+            {choice.options.map((o, i) => <SelectItem key={i} value={String(i)}>{optionText(o.value, choice.field)}{note(i) && <span className="text-muted-foreground"> — {note(i)}</span>}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -35,7 +35,7 @@ export function OptionPicker({ choice, label, place }: { choice: Choice; label: 
       {choice.options.map((o, i) => (
         <label key={i} className="flex cursor-pointer items-start gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input type="radio" name={name} className="mt-0.5 accent-[hsl(var(--brand))]" checked={at === i} onChange={() => store.pick(choice, i)} onClick={() => store.pick(choice, i)} />
-          <span className="min-w-0 break-words">{optionText(o.value)}{note(i) && <span className="block text-[11px] text-muted-foreground">{note(i)}</span>}</span>
+          <span className="min-w-0 break-words">{optionText(o.value, choice.field)}{note(i) && <span className="block text-[11px] text-muted-foreground">{note(i)}</span>}</span>
         </label>
       ))}
     </fieldset>

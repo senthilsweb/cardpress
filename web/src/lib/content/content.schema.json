@@ -380,6 +380,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -391,6 +392,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -402,6 +404,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 200
     },
@@ -413,6 +416,7 @@
         "post",
         "article"
       ],
+      "x-choices": true,
       "type": "string",
       "maxLength": 60
     }

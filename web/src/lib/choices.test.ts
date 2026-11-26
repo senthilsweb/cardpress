@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Choice, Conversation } from "./chat";
-import { ofReply, picked, preview, selected } from "./choices";
+import { ofReply, optionText, picked, preview, selected } from "./choices";
 import { EMPTY_DOC, type Draft } from "./draft";
 import { DEFAULT_DESIGN } from "./profiles";
 
@@ -21,6 +21,14 @@ describe("preview", () => {
     expect(preview(draft, card, choices, { h: 0 }).on).toBe(false);
     expect(preview(draft, card, [offer("t", "title", ["Old", "New"], { status: "superseded" })], { t: 1 }).on).toBe(false);
     expect(preview({ ...draft, id: "other" }, card, choices, { t: 1 }).on).toBe(false);
+  });
+});
+
+describe("taking words off the card", () => {
+  const c = offer("e", "eyebrow", ["Notes", ""]);
+  it("previews an empty option and names it", () => {
+    expect(preview(draft, { ...card, eyebrow: "Notes" }, [c], { e: 1 }).design.eyebrow).toBe("");
+    expect([optionText("", "eyebrow"), optionText("", "footerLeft")]).toEqual(["None", "Brand default"]);
   });
 });
 
