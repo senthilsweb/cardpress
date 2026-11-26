@@ -21,7 +21,7 @@ Above the canvas:
 - **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view.
 - **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, Text or Brand it shows the card instead, with the sizes and export buttons.
 - **Both** puts them side by side when the canvas is at least 900 pixels wide. Click a side to work on it.
-- The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **+** starts a new one. A dot marks a view that changed while you were looking at another.
+- The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **New** starts fresh: an empty post or article (the one on screen decides which), a card in the brand's look with nothing written on it, and an empty chat. Deleting the item or the conversation on screen does the same. A dot marks a view that changed while you were looking at another.
 
 On a narrow screen a bar at the bottom switches between **Chat**, **Preview** and **Edit**.
 

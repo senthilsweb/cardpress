@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -103,5 +104,28 @@ func TestTheAssistantWorksOnlyInTheAskersOwnBrands(t *testing.T) {
 		if !allowed && (err == nil || !strings.Contains(err.Error(), "your own brands") || len(got.Messages) != 0 || got.PostDraftID != "") {
 			t.Errorf("someone else's brand: %v %+v", err, got)
 		}
+	}
+}
+
+// A draft made for the assistant starts empty: it does not carry the words of the last card.
+func TestAnAssistantsNewDraftHasAnEmptyCard(t *testing.T) {
+	c, ctx := newChat(t, &spyAgent{}, &fakeFetcher{}), context.Background()
+	s := New(c.db)
+	if _, err := c.db.Exec(`INSERT INTO profiles (id, owner_id, data, position, updated_at) VALUES ('p', '', '{}', 0, '')`); err != nil {
+		t.Fatal(err)
+	}
+	old := defaultCard()
+	old.Title, old.Eyebrow, old.Footer, old.Photos = "Last week", "News", "@me", []string{}
+	raw, _ := json.Marshal(old)
+	if _, err := c.db.Exec(`INSERT INTO designs (profile_id, data, updated_at) VALUES ('p', ?, '')`, string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.NewAssistantDraft(ctx, "p", KindPost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, _, err := s.Card(ctx, d.ID)
+	if err != nil || card.Title != "" || card.Eyebrow != "" || card.Footer != "@me" || card.Layout != old.Layout {
+		t.Fatalf("%v %+v", err, card)
 	}
 }

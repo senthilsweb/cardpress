@@ -151,8 +151,8 @@ export function useChat(profileId: string) {
     setError(null);
     try {
       await api.deleteConversation(id);
-      const cs = await refreshList();
-      if (current?.id === id) setCurrent(cs.length ? await api.getConversation(cs[0].id) : null);
+      await refreshList();
+      if (current?.id === id) setCurrent(null); // an empty chat, not the one before it
     } catch (e) { setError(message(e)); }
   }, [current?.id, refreshList]);
 

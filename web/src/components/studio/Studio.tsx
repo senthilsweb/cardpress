@@ -161,12 +161,22 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     if (conv && conv.id !== chat.current?.id) await chat.open(conv.id);
     else if (!conv && chat.current) chat.newConversation();
   };
-  const newItem = async () => {
+  /** Whether a conversation is about an item, leaving out one that has just been deleted. */
+  const talkedAbout = (without?: string) => (id: string) => chat.list.some((c) => c.id !== without && linksDraft(c, id));
+  /** Start fresh: an empty card, empty text and an empty chat. */
+  const startFresh = async (deletedChat?: string) => {
     flushPendingEdits();
     try {
-      await store.create(store.current?.kind ?? "post");
-      if (!chat.busy && chat.current) chat.newConversation();
-    } catch (e) { toast.error("Could not create a draft", { description: (e as Error).message }); }
+      await store.fresh(store.current?.kind ?? "post", talkedAbout(deletedChat));
+      setUnseen([]);
+      if (!chat.busy) chat.newConversation();
+    } catch (e) { toast.error("Could not start a new draft", { description: (e as Error).message }); }
+  };
+  const deleteChat = async (id: string) => { await chat.remove(id); await startFresh(id); };
+  const deleteItem = async (id: string) => {
+    const wasOpen = store.current?.id === id;
+    await store.remove(id, talkedAbout());
+    if (wasOpen && !chat.busy) chat.newConversation();
   };
   /** Open a conversation from the list, with the item it is about. */
   const openConversation = async (id: string) => {
@@ -184,6 +194,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     matched.current = true;
     const conv = conversationFor(store.current.id, chat.list, chat.current?.id);
     if (conv && conv.id !== chat.current?.id) void chat.open(conv.id);
+    // a chat about some other item is not left beside this one (an outside agent's waiting proposal is)
+    else if (!conv && chat.current && chat.current.sourceKind !== "mcp") chat.newConversation();
   }, [chat.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
@@ -431,7 +443,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             </div>
             {/* the chat stays mounted, so an unsent message is not lost by switching */}
             <div className={cn("min-h-0 flex-1 overflow-y-auto", mode !== "chat" && "hidden")}>
-              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
+              <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} onNew={() => void startFresh()} onDelete={(id) => void deleteChat(id)} onHistory={() => setPanel(panel === "chats" ? null : "chats")}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
             {mode === "edit" && <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "post") setEditorExpanded(false); }} className="flex min-h-0 flex-1 flex-col">
@@ -446,7 +458,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <TabsContent value="design" className="mt-0"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></TabsContent>
                 <TabsContent value="content" className="mt-0"><ContentPanel design={design} set={set} /></TabsContent>
-                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={store} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
+                <TabsContent value="post" className="mt-0"><Composer media={media} onOpenHistory={() => setPanel("history")} openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => setSettingsOpen(true)} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} /></TabsContent>
                 <TabsContent value="profile" className="mt-0">
                   <ProfilePanel
                     profile={profile}
@@ -470,7 +482,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
 
           {/* canvas */}
           <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:hidden")}>
-            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void newItem()} item={store.current} onVersions={() => setPanel(panel === "history" ? null : "history")} />
+            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => setPanel(panel === "history" ? null : "history")} />
             {/* sizes and export belong to the card, so they show with it */}
             <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">
@@ -565,7 +577,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
         </div>
       </div>
       <ChatHistoryDrawer open={panel === "chats"} onClose={() => setPanel(null)} profileId={profile.id} recent={chat.list} currentId={chat.current?.id} drafts={store.drafts} busy={chat.busy}
-        onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); chat.newConversation(); }} />
+        onOpen={(id) => { setPanel(null); setMode("chat"); void openConversation(id); }} onNew={() => { setPanel(null); setMode("chat"); void startFresh(); }} />
       <AccountSettings open={panel === "account"} onClose={() => setPanel(null)} />
       <UsersDrawer open={panel === "users"} onClose={() => setPanel(null)} />
       <VersionsDrawer open={panel === "history"} onClose={() => setPanel(null)} draft={store.current} onRestore={async (seq) => { flushPendingEdits(); await store.restoreVersion(seq); }} statusKey={`${store.current?.id}:${store.current?.status}`} />

@@ -42,7 +42,7 @@ export function StageBar({ views, view, changed, onView, drafts, currentId, onPi
       <div className="w-[min(320px,60vw)]">
         <DraftPicker drafts={drafts} currentId={currentId} onPick={onPick} />
       </div>
-      <Button variant="ghost" size="icon-sm" title="New draft" aria-label="New draft" onClick={onNew}><Plus /></Button>
+      <Button variant="brand" size="sm" title="Start fresh: an empty card and a new chat" onClick={onNew}><Plus /> New</Button>
     </div>
   );
 }

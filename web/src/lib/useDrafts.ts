@@ -4,6 +4,7 @@ import { merge, note, union, untouched, type Touched } from "./merge";
 import { flushPendingEdits } from "./pendingEdits";
 import { lockReason } from "./lock";
 import { flattenForPost, EMPTY_DOC, type Draft, type DraftInput, type DraftKind } from "./draft";
+import { blankCard, isBlank } from "./fresh";
 import { toCardDesign } from "./cardDesign";
 import type { Design } from "./types";
 
@@ -141,13 +142,25 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
 
   const select = useCallback(async (id: string) => { await flush(); setCurrentId(id); }, [flush]);
 
+  /** A new, empty item: the brand's look with nothing written on the card. */
   const create = useCallback(async (kind: DraftKind = "post") => {
     await flush();
-    const design = designFor?.();
-    const d = await api.createDraft({ profileId, kind, doc: EMPTY_DOC, hashtags: [], altText: "", unicodeStyles: false, ...(design ? { design: toCardDesign(design) } : {}) });
+    const base = designFor?.();
+    const d = await api.createDraft({ profileId, kind, doc: EMPTY_DOC, hashtags: [], altText: "", unicodeStyles: false, ...(base ? { design: toCardDesign(blankCard(base)) } : {}) });
     commit([d, ...ref.current]);
+    idRef.current = d.id;
     setCurrentId(d.id);
   }, [flush, profileId]);
+
+  /** Show an empty item: an untouched one no conversation is using if there is one, else a new one. */
+  const fresh = useCallback(async (kind: DraftKind = "post", used: (id: string) => boolean = () => false) => {
+    await flush();
+    const open = ref.current.find((d) => d.id === idRef.current);
+    const spare = [open, ...ref.current].find((d) => d && d.kind === kind && isBlank(d) && !used(d.id));
+    if (!spare) return create(kind);
+    idRef.current = spare.id;
+    setCurrentId(spare.id);
+  }, [flush, create]);
 
   /**
    * Create a draft that already has content and, unless told not to, switch to it. The editing target is switched at once
@@ -165,14 +178,15 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
     return d.id;
   }, [flush, profileId]);
 
-  const remove = useCallback(async (id: string) => {
+  /** Delete an item. If it was the one on screen, what follows is an empty one, not whichever came before it. */
+  const remove = useCallback(async (id: string, used?: (id: string) => boolean) => {
     await flush();
+    const gone = ref.current.find((d) => d.id === id);
+    const wasOpen = idRef.current === id;
     await api.deleteDraft(id);
-    const rest = ref.current.filter((d) => d.id !== id);
-    commit(rest);
-    if (rest.length) { if (idRef.current === id) setCurrentId(rest[0].id); }
-    else await create("post");
-  }, [flush, create]);
+    commit(ref.current.filter((d) => d.id !== id));
+    if (wasOpen || !ref.current.length) await fresh(gone?.kind ?? "post", used);
+  }, [flush, fresh]);
 
   /** Post documents only allow paragraphs, lists, bold and italic, so switching to a post simplifies an article. */
   const setKind = useCallback((kind: DraftKind) => {
@@ -220,7 +234,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   }, [flush]);
 
   const current = drafts.find((d) => d.id === currentId) ?? drafts[0];
-  return { drafts, current, rev, restoreVersion, saveState, update, select, create, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
+  return { drafts, current, rev, restoreVersion, saveState, update, select, create, fresh, createFrom, remove, setKind, retry: flush, approve, unapprove, plan, publishPage, unpublishPage, refreshStatus, setAttachment, setAttachmentTitle, clearAttachment, setVideo, addImage, setImageAlt, orderImages, removeImage };
 }
 
 export type DraftStore = ReturnType<typeof useDrafts>;

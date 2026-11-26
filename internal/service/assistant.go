@@ -77,6 +77,13 @@ func (s *Studio) startingCard(ctx context.Context, profileID string) (CardDesign
 	return d, nil
 }
 
+// blankCard keeps a card's look (layout, colours, background, footer, logo) and drops its words and pictures.
+func blankCard(c CardDesign) CardDesign {
+	c.Eyebrow, c.Title, c.Subtitle, c.Tag, c.QuoteAuthor, c.StatValue = "", "", "", "", "", ""
+	c.Photos, c.Screenshot, c.BgImage, c.Caption = []string{}, "", "", nil
+	return c
+}
+
 // Card returns the card a draft is shown with.
 func (s *Studio) Card(ctx context.Context, draftID string) (CardDesign, Draft, error) {
 	d, err := s.GetDraft(ctx, draftID)
@@ -91,7 +98,7 @@ func (s *Studio) Card(ctx context.Context, draftID string) (CardDesign, Draft, e
 	return card, d, err
 }
 
-// NewAssistantDraft makes an empty post or article with the brand's starting card.
+// NewAssistantDraft makes an empty post or article with the brand's look and nothing written on its card.
 func (s *Studio) NewAssistantDraft(ctx context.Context, profileID, kind string) (Draft, error) {
 	if _, ok, err := s.BrandOwner(ctx, profileID); err != nil || !ok {
 		if err != nil {
@@ -103,6 +110,7 @@ func (s *Studio) NewAssistantDraft(ctx context.Context, profileID, kind string) 
 	if err != nil {
 		return Draft{}, err
 	}
+	card = blankCard(card)
 	raw, _ := json.Marshal(card)
 	return s.CreateDraft(ctx, DraftInput{ProfileID: profileID, Kind: kind, Doc: json.RawMessage(`{"type":"doc","content":[{"type":"paragraph"}]}`), Design: raw})
 }

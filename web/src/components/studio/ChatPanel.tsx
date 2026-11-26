@@ -103,7 +103,7 @@ function Thread({ conv, chat, onApply, onShow }: {
  * The chat that prepares content, turn by turn. It proposes; the person decides. Approving a proposal hands its content
  * to `onApply`, which copies it into a draft and returns the draft's id. The chat itself cannot publish or schedule anything.
  */
-export function ChatPanel({ chat, onApply, onShow, draftId, viewing, onHistory }: {
+export function ChatPanel({ chat, onApply, onShow, draftId, viewing, onHistory, onNew, onDelete }: {
   chat: ChatStore;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   /** Put an item an approved proposal went into on the canvas. */
@@ -111,6 +111,9 @@ export function ChatPanel({ chat, onApply, onShow, draftId, viewing, onHistory }
   /** The item on screen, and its kind. */
   draftId?: string;
   viewing?: DraftKind;
+  /** Start fresh: an empty item and an empty chat. */
+  onNew: () => void;
+  onDelete: (conversationId: string) => void;
   /** Open the list of earlier conversations and the notes. */
   onHistory: () => void;
 }) {
@@ -134,10 +137,10 @@ export function ChatPanel({ chat, onApply, onShow, draftId, viewing, onHistory }
           <AgentBadge chat={chat} conv={conv ?? undefined} />
           <span className="flex-1" />
           <Button variant="ghost" size="icon-sm" title="Conversations and notes" aria-label="Conversations and notes" onClick={onHistory}><History /></Button>
-          <Button variant="ghost" size="icon-sm" title="Start a new conversation about the item on screen" aria-label="New conversation" disabled={chat.busy || !conv} onClick={chat.newConversation}><Plus /></Button>
+          <Button variant="outline" size="sm" title="Start fresh: an empty card and a new chat" disabled={chat.busy} onClick={onNew}><Plus /> New</Button>
           {conv && (
             <Button variant={confirmDelete ? "destructive" : "ghost"} size={confirmDelete ? "sm" : "icon-sm"} title="Delete this conversation" aria-label="Delete this conversation" disabled={chat.busy}
-              onClick={() => { if (!confirmDelete) { setConfirmDelete(true); window.setTimeout(() => setConfirmDelete(false), 3000); } else { setConfirmDelete(false); void chat.remove(conv.id); } }}>
+              onClick={() => { if (!confirmDelete) { setConfirmDelete(true); window.setTimeout(() => setConfirmDelete(false), 3000); } else { setConfirmDelete(false); onDelete(conv.id); } }}>
               {confirmDelete ? "Confirm delete" : <Trash2 />}
             </Button>
           )}
