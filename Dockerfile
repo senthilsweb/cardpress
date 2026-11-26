@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
-# 1) build the Astro site
-FROM node:22-alpine AS web
+# 1) build the Astro site. Both build stages run on the builder's own platform: the site is the same for every target, Go
+# cross-compiles, and a Node build under emulation can hang.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
@@ -10,7 +11,7 @@ ENV BASE_PATH=${BASE_PATH}
 RUN npm run build
 
 # 2) embed it into one Go binary
-FROM golang:1.26-alpine AS bin
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS bin
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -18,7 +19,8 @@ COPY main.go ./
 COPY internal ./internal
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/cardpress .
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/cardpress .
 RUN mkdir /out/data
 
 # 3) tiny runtime image
