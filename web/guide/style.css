@@ -18,6 +18,8 @@ header .name { font-weight: 700; color: var(--text); text-decoration: none; whit
 .layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr) 14rem; max-width: 86rem; margin: 0 auto; }
 nav, aside { position: sticky; top: 3.5rem; align-self: start; max-height: calc(100vh - 3.5rem); overflow: auto; padding: 1.5rem 1rem; }
 nav { background: var(--side); border-right: 1px solid var(--line); min-height: calc(100vh - 3.5rem); }
+nav p { margin: 1rem 0 .25rem; padding: 0 .7rem; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--soft); }
+nav p:first-child { margin-top: 0; }
 nav a { display: block; padding: .35rem .7rem; border-radius: 7px; color: var(--text); text-decoration: none; font-size: .93rem; }
 nav a:hover { background: var(--mark); }
 nav a[aria-current] { background: var(--mark); color: var(--link); font-weight: 600; }
@@ -47,7 +49,6 @@ figcaption { margin-top: .4rem; font-size: .83rem; color: var(--soft); }
 .steps a:hover { border-color: var(--link); }
 .steps small { display: block; color: var(--soft); font-weight: 400; }
 .steps .next { text-align: right; }
-.quick { max-width: 46rem; }
 @media (max-width: 70rem) { .layout { grid-template-columns: 14rem minmax(0, 1fr); } aside { display: none; } }
 @media (max-width: 48rem) {
   .layout { display: block; }

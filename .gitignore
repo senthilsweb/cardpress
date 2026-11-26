@@ -16,4 +16,3 @@ site/
 
 # local agent worktrees
 .claude/worktrees/
-web/public/help/

@@ -4,7 +4,7 @@ CardPress is an open-source, self-hosted tool for writing and publishing social 
 
 ![Designing a card, drafting a post with the assistant, and previewing it in CardPress](media/cardpress-demo.gif)
 
-Using CardPress rather than running it? See the [user guide](https://www.senthilsweb.com/cardpress/guide/).
+Using CardPress rather than running it? See the **User guide** inside the app, also published as the [web guide](https://www.senthilsweb.com/cardpress/guide/).
 
 ## What it does
 

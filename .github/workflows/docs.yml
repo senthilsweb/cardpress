@@ -28,7 +28,7 @@ jobs:
           pip install --quiet "mkdocs-material==9.*" "mkdocs<2"
           mkdocs build --strict
       - name: Build the user guide into /guide
-        run: node web/guide/build.mjs full site/guide
+        run: node web/guide/build.mjs site/guide
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
 

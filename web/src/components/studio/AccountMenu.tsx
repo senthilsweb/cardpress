@@ -54,7 +54,7 @@ export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avat
           {theme === "dark" ? <Sun /> : <Moon />} {theme === "dark" ? "Light mode" : "Dark mode"}
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={helpHref()} target="_blank" rel="noopener noreferrer"><BookOpen /> Guide <ExternalLink className="ml-auto opacity-60" /></a>
+          <a href={helpHref()}><BookOpen /> User guide</a>
         </DropdownMenuItem>
         {user && <DropdownMenuItem onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>}
       </DropdownMenuContent>

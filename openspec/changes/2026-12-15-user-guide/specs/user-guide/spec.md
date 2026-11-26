@@ -2,10 +2,10 @@
 
 ## ADDED Requirements
 
-### Requirement: Help for users, inside and outside the app
-#### Scenario: Quick help
-- **WHEN** a signed-in person opens Help → Quick guide
-- **THEN** a one-page guide opens, with a link to the full guide
+### Requirement: The guide is part of the app
+#### Scenario: Open it
+- **WHEN** a signed-in person presses User guide
+- **THEN** the guide opens in the app, starting at Getting started
 
 ### Requirement: Honest about networks
 #### Scenario: A network without publishing

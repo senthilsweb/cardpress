@@ -1,34 +1,20 @@
 # User guide
 
-**Status:** built (asked for by the owner on 2026-11-26), not yet deployed. Source: `web/guide/`; `node web/guide/build.mjs full <folder>` builds the full guide.
+**Status:** built (asked for by the owner on 2026-11-26), not yet deployed. Source: `web/guide/`; `node web/guide/build.mjs <folder>` builds the web copy.
 
 ## Why
 The documentation mixes use of the product with installation and code. Someone writing posts needs only how to use it.
 
 ## What changes
-| | Quick guide | Full guide |
-|---|---|---|
-| Where | In the app, Help → Quick guide | Public website, Help → Full guide |
-| Length | One page | One page per task |
+One guide, **inside the app** (the owner's decision): **User guide** in the navigation and in the account menu opens the page `/help/`, with grouped contents, search and the sections of the page. The same pages are also built as plain static HTML for the web.
+
+Order: Getting started; Brands and multiple accounts; Connect social accounts; LinkedIn posts; LinkedIn articles; Posts and articles together; Seasonal greetings; then chat, the card, backgrounds, publishing, library, calendar, roles and problems. A box on the background pages says that new backgrounds can be plugged in, and that any custom picture can be used instead.
 
 - **One source folder** of text files; a small build script writes plain static HTML. Contents on the left, page contents on the right, previous and next, search. A little JavaScript, no documentation framework.
 - **Writing:** short numbered steps, exact button names, one task per page. No technical terms, no setup of the server, no marketing language.
 - **Screenshots** from a test copy with example brands only.
 - A change that a user can see updates its page in the same pull request.
 - The present documentation stays as the technical documentation.
-
-## Pages
-1. Start here
-2. Sign in and accounts: roles in plain words
-3. Brands: what a brand is
-4. Connect social accounts: LinkedIn, X, Instagram
-5. Create a card
-6. Write with chat
-7. Backgrounds and greetings
-8. Publish and schedule
-9. Library
-10. Calendar
-11. Common problems
 
 ### Brands
 - A brand is one identity: name, handle, logo, fonts and colours, with its own posts, chats, calendar entries and social accounts.
@@ -49,8 +35,8 @@ Facebook has card sizes only, with no account to connect.
 
 Steps on the networks' own sites change; each is checked against the network's current developer pages when written, and carries the date checked.
 
-## Publishing the full guide
-Suggested: GitHub Pages at `/cardpress/guide/`, beside the technical documentation.
+## Publishing on the web
+GitHub Pages at `/cardpress/guide/`, beside the technical documentation.
 
 ## Out of scope
 Server installation, the API, other languages.
