@@ -61,6 +61,7 @@ nav:
   - Deployment:
       - Deployment: deployment.md
       - Deploy to Fly.io: fly.md
+      - Release, back up and restore: release.md
   - Operations: operations.md
   - Reference: reference.md
   - AI-DLC record: ai-dlc/README.md

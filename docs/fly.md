@@ -51,6 +51,8 @@ Only these names are read from the file, and the file is parsed, not run. Values
 
 ## Day to day
 
+To release a new version of a running app, with a backup and a way back, follow [Release, back up and restore](release.md).
+
 ```bash
 scripts/deploy-fly.sh deploy  --app my-cardpress             # ship a new image (add --turso if you use it)
 scripts/deploy-fly.sh secrets --app my-cardpress             # sync changes in .env, then deploy to apply

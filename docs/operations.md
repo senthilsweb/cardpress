@@ -14,6 +14,8 @@ Two things matter: the database and, if you did not set `CARDPRESS_SECRET_KEY`, 
 
 ## Backups
 
+For an app on Fly.io see [Release, back up and restore](release.md).
+
 With a SQLite file, take a consistent copy while it runs:
 
 ```bash
