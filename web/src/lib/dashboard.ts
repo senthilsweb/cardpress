@@ -10,7 +10,8 @@ export interface BrandSummary { id: string; posts: Counts; articles: Counts; cos
 export interface Totals { brands: number; users?: number; disabledUsers?: number; costCents: number }
 export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage }
 
-export const PERIODS = [{ days: 7, label: "7 days" }, { days: 30, label: "30 days" }, { days: 90, label: "90 days" }, { days: 0, label: "All" }] as const;
+/** `short` is for a phone, where the periods share one line. */
+export const PERIODS = [{ days: 7, label: "7 days", short: "7d" }, { days: 30, label: "30 days", short: "30d" }, { days: 90, label: "90 days", short: "90d" }, { days: 0, label: "All", short: "All" }] as const;
 
 /** What the figures that follow time cover: the last so many days (0: all time), or chosen days, both included. */
 export type Period = { days: number } | { from: string; to: string };
@@ -41,6 +42,21 @@ export function readPeriod(saved: string | null): Period {
   return PERIODS.some((p) => String(p.days) === saved) ? { days: Number(saved) } : { days: 30 };
 }
 export const writePeriod = (p: Period) => ("from" in p ? `${p.from}..${p.to}` : String(p.days));
+
+/** A calendar's day as YYYY-MM-DD, as this browser's calendar has it. */
+export const toDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The calendar day a YYYY-MM-DD names; undefined when it names none. */
+export function dayOf(day: string): Date | undefined {
+  if (Number.isNaN(dayNumber(day))) return undefined;
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Chosen days in the space of a tab: "1 Oct – 15 Oct", with short years when either is not this year. */
+export function shortRange(from: string, to: string, thisYear = new Date().getFullYear()): string {
+  const one = (d: string) => (d.slice(0, 4) === String(thisYear) && from.slice(0, 4) === to.slice(0, 4) ? shortDay(d) : `${shortDay(d)} ’${d.slice(2, 4)}`);
+  return from === to ? one(from) : `${one(from)} – ${one(to)}`;
+}
 
 /** Chosen days as "1 Oct – 15 Oct 2026", with both years when they differ. */
 export function rangeLabel(from: string, to: string): string {

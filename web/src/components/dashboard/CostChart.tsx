@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { money, shortDay, type Spend } from "@/lib/dashboard";
 
 /** Cost for each day or week: one series of bars on one scale, the figure of the bar under the pointer above them, and a table. */
@@ -29,15 +33,19 @@ export function CostChart({ series, bucket }: { series: Spend[]; bucket: "day" |
           {series.length > 1 && <span>{shortDay(series[series.length - 1].start)}</span>}
         </div>
       )}
-      <details className="mt-2 text-xs">
-        <summary className="cursor-pointer text-muted-foreground">Show as a table</summary>
-        <div className="mt-2 max-h-56 overflow-auto">
-          <table className="w-full tabular-nums">
-            <thead><tr className="text-left text-muted-foreground"><th className="py-1 font-medium">{bucket === "week" ? "Week of" : "Day"}</th><th className="py-1 text-right font-medium">Replies</th><th className="py-1 text-right font-medium">Cost</th></tr></thead>
-            <tbody>{series.map((s) => <tr key={s.start} className="border-t border-border"><td className="py-1">{shortDay(s.start)}</td><td className="py-1 text-right">{s.replies}</td><td className="py-1 text-right">{money(s.costCents)}</td></tr>)}</tbody>
-          </table>
-        </div>
-      </details>
+      <Collapsible className="mt-2 text-xs">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="-ml-3 text-muted-foreground [&[data-state=open]>svg]:rotate-90"><ChevronRight className="transition-transform" /> Show as a table</Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 max-h-56 overflow-auto">
+            <Table className="text-xs tabular-nums">
+              <TableHeader><TableRow><TableHead>{bucket === "week" ? "Week of" : "Day"}</TableHead><TableHead className="text-right">Replies</TableHead><TableHead className="text-right">Cost</TableHead></TableRow></TableHeader>
+              <TableBody>{series.map((s) => <TableRow key={s.start}><TableCell className="py-1">{shortDay(s.start)}</TableCell><TableCell className="py-1 text-right">{s.replies}</TableCell><TableCell className="py-1 text-right">{money(s.costCents)}</TableCell></TableRow>)}</TableBody>
+            </Table>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </figure>
   );
 }

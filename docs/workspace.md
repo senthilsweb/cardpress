@@ -15,7 +15,7 @@ Every signed-in page has a **header** and a **side bar**, and shows the page on 
 `/dashboard/` is where signing in lands and where the logo leads (`components/dashboard/`).
 
 - **Totals:** brands the person may open (archived ones left out), LLM cost over them, and for an administrator the active and disabled accounts.
-- **Period:** 7, 30 (default) or 90 days, all time, or chosen days; remembered in the browser.
+- **Period:** 7, 30 (default) or 90 days, all time, or chosen days; remembered in the browser. **Custom** opens a calendar in a pop-up (`components/dashboard/DateRange.tsx`).
 - For the open brand, or **All brands**: posts and articles created in the period, by where they stand now, and the assistant's cost, sessions, replies, working time and largest sessions in it.
 - The next five scheduled items and the five last edited do not follow the period.
 - A count opens the Library on the same days (`?from=&to=`), which says so and can show all dates again.

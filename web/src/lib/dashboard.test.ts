@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duration, money, periodLabel, periodQuery, rangeProblem, readPeriod, shortDay, statusRows, writePeriod } from "./dashboard";
+import { dayOf, shortRange, toDay, duration, money, periodLabel, periodQuery, rangeProblem, readPeriod, shortDay, statusRows, writePeriod } from "./dashboard";
 
 const none = { total: 0, draft: 0, approved: 0, scheduled: 0, published: 0, attention: 0, pages: 0 };
 
@@ -56,5 +56,21 @@ describe("dashboard period", () => {
     expect(periodLabel(range)).toBe("1 Oct – 15 Oct 2026");
     expect(periodLabel({ from: "2025-12-30", to: "2026-01-02" })).toBe("30 Dec 2025 – 2 Jan 2026");
     expect(periodLabel({ from: "2026-10-01", to: "2026-10-01" })).toBe("1 Oct 2026");
+  });
+});
+
+describe("dashboard calendar days", () => {
+  it("goes between a calendar day and its name", () => {
+    expect(toDay(new Date(2026, 0, 5, 23, 59))).toBe("2026-01-05");
+    expect(toDay(dayOf("2026-12-31")!)).toBe("2026-12-31");
+    expect(dayOf("2026-02-30")).toBeUndefined();
+    expect(dayOf("")).toBeUndefined();
+  });
+
+  it("writes a range short enough for a tab", () => {
+    expect(shortRange("2026-10-01", "2026-10-15", 2026)).toBe("1 Oct – 15 Oct");
+    expect(shortRange("2026-10-01", "2026-10-01", 2026)).toBe("1 Oct");
+    expect(shortRange("2025-12-30", "2026-01-02", 2026)).toBe("30 Dec ’25 – 2 Jan ’26");
+    expect(shortRange("2025-03-01", "2025-03-02", 2026)).toBe("1 Mar ’25 – 2 Mar ’25");
   });
 });
