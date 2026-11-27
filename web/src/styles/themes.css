@@ -79,7 +79,10 @@
   --card-foreground: var(--head-fg); --border: var(--head-line); --input: var(--head-line); --accent: var(--head-hover); --accent-foreground: var(--head-fg);
   --primary: var(--head-fg); --primary-foreground: var(--head-bg); --brand: var(--head-accent); --on-brand: var(--head-on-accent); --muted: var(--head-hover);
   color: var(--head-fg);
+  --mark-fill: var(--head-bg); --mark-line: #fdf3dc;
 }
+/* on Cobalt's white header the mark is drawn in the text colour */
+[data-palette="cobalt"][data-theme="light"] .on-head { --mark-fill: var(--head-fg); --mark-line: var(--head-bg); }
 
 /* a popup opened from the header goes back to the page's colours */
 :root { --page-brand: var(--brand); --page-on-brand: var(--on-brand); }
