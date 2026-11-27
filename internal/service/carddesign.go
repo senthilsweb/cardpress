@@ -15,24 +15,28 @@ const CardDesignVersion = 1
 // never described twice. It is the strongly typed form of the editor's Design; the server refuses anything it could not
 // render. Images are data URLs, so a stored design is complete in itself.
 type CardDesign struct {
-	SizeID      string  `json:"sizeId"`
-	Layout      string  `json:"layout"`
-	Background  string  `json:"background"`
-	PaletteID   string  `json:"paletteId"`
-	Seed        int     `json:"seed"`
-	Eyebrow     string  `json:"eyebrow"`
-	Title       string  `json:"title"`
-	Subtitle    string  `json:"subtitle"`
-	Footer      string  `json:"footer"`
-	FooterLeft  string  `json:"footerLeft"`
-	Tag         string  `json:"tag"`
-	QuoteAuthor string  `json:"quoteAuthor"`
-	StatValue   string  `json:"statValue"`
-	TitleScale  float64 `json:"titleScale"`
-	Intensity   float64 `json:"intensity"`
-	BottomFade  float64 `json:"bottomFade"`
-	ShowLogo    bool    `json:"showLogo"`
-	ShowFooter  bool    `json:"showFooter"`
+	SizeID      string `json:"sizeId"`
+	Layout      string `json:"layout"`
+	Background  string `json:"background"`
+	PaletteID   string `json:"paletteId"`
+	Seed        int    `json:"seed"`
+	Eyebrow     string `json:"eyebrow"`
+	Title       string `json:"title"`
+	Subtitle    string `json:"subtitle"`
+	Footer      string `json:"footer"`
+	FooterLeft  string `json:"footerLeft"`
+	Tag         string `json:"tag"`
+	QuoteAuthor string `json:"quoteAuthor"`
+	StatValue   string `json:"statValue"`
+	// Signature is who a greeting is from, drawn by the greeting layout.
+	Signature string `json:"signature,omitempty"`
+	// NoOrnament leaves out the greeting layout\'s flourish.
+	NoOrnament bool    `json:"noOrnament,omitempty"`
+	TitleScale float64 `json:"titleScale"`
+	Intensity  float64 `json:"intensity"`
+	BottomFade float64 `json:"bottomFade"`
+	ShowLogo   bool    `json:"showLogo"`
+	ShowFooter bool    `json:"showFooter"`
 	// An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose.
 	NoFooter     bool              `json:"noFooter,omitempty"`
 	NoFooterLeft bool              `json:"noFooterLeft,omitempty"`
@@ -46,8 +50,8 @@ type CardDesign struct {
 }
 
 var (
-	cardLayouts = map[string]bool{"hero": true, "center": true, "quote": true, "stat": true, "split": true, "cover": true}
-	fontRoles   = map[string]bool{"title": true, "body": true, "label": true, "logo": true, "stat": true}
+	cardLayouts = map[string]bool{"hero": true, "center": true, "quote": true, "stat": true, "split": true, "cover": true, "greeting": true}
+	fontRoles   = map[string]bool{"title": true, "body": true, "label": true, "logo": true, "stat": true, "script": true}
 	idRe        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 )
 
@@ -83,7 +87,7 @@ func ParseCardDesign(raw []byte) (CardDesign, error) {
 
 func (d CardDesign) validate() error {
 	if !cardLayouts[d.Layout] {
-		return invalid("design: layout %q is not one of hero, center, quote, stat, split, cover", d.Layout)
+		return invalid("design: layout %q is not one of hero, center, quote, stat, split, cover, greeting", d.Layout)
 	}
 	for name, v := range map[string]string{"sizeId": d.SizeID, "background": d.Background, "paletteId": d.PaletteID} {
 		if !idRe.MatchString(v) {
@@ -96,6 +100,7 @@ func (d CardDesign) validate() error {
 	}{
 		"eyebrow": {d.Eyebrow, 200}, "title": {d.Title, 400}, "subtitle": {d.Subtitle, 600}, "footer": {d.Footer, 200},
 		"footerLeft": {d.FooterLeft, 200}, "tag": {d.Tag, 100}, "quoteAuthor": {d.QuoteAuthor, 200}, "statValue": {d.StatValue, 60},
+		"signature": {d.Signature, 200},
 	} {
 		if utf8.RuneCountInString(lim.v) > lim.n {
 			return invalid("design: %s is limited to %d characters", name, lim.n)

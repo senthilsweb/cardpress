@@ -31,13 +31,15 @@ const (
 var choiceFields = map[string][]string{
 	"headline": {KindPost, KindArticle}, "eyebrow": {KindPost, KindArticle}, "subtitle": {KindPost, KindArticle}, "tag": {KindPost, KindArticle},
 	"footer": {KindPost, KindArticle}, "footerLeft": {KindPost, KindArticle}, "quoteAuthor": {KindPost, KindArticle}, "statValue": {KindPost, KindArticle},
-	"title": {KindPost, KindArticle}, "altText": {KindPost, KindArticle}, "hashtags": {KindPost}, "summary": {KindArticle},
+	"signature": {KindPost, KindArticle},
+	"title":     {KindPost, KindArticle}, "altText": {KindPost, KindArticle}, "hashtags": {KindPost}, "summary": {KindArticle},
 }
 
 // cardWord is where an offered field is drawn on a card, or nil for a field of the item itself.
 func cardWord(c *CardDesign, field string) *string {
 	return map[string]*string{"headline": &c.Title, "eyebrow": &c.Eyebrow, "subtitle": &c.Subtitle, "tag": &c.Tag,
-		"footer": &c.Footer, "footerLeft": &c.FooterLeft, "quoteAuthor": &c.QuoteAuthor, "statValue": &c.StatValue}[field]
+		"footer": &c.Footer, "footerLeft": &c.FooterLeft, "quoteAuthor": &c.QuoteAuthor, "statValue": &c.StatValue,
+		"signature": &c.Signature}[field]
 }
 
 // removable says whether an option may be empty, taking the words off the card. A card keeps a headline.

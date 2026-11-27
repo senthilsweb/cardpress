@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schemaVersion": 3,
+  "x-schemaVersion": 4,
   "tools": {
     "update_draft": {
       "type": "object",
@@ -100,6 +100,10 @@
             "statValue": {
               "type": "string",
               "maxLength": 60
+            },
+            "signature": {
+              "type": "string",
+              "maxLength": 200
             }
           },
           "additionalProperties": false
@@ -181,6 +185,7 @@
                   "footerLeft",
                   "quoteAuthor",
                   "statValue",
+                  "signature",
                   "title",
                   "altText",
                   "summary",

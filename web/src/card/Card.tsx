@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useId, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useId, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { Design, LayoutId, Palette, Profile } from "@/lib/types";
 import type { Size } from "@/lib/sizes";
 import { mulberry32 } from "@/lib/rng";
@@ -18,6 +18,7 @@ export const LAYOUTS: LayoutDef[] = [
   { id: "quote", name: "Quote", hint: "Big quote + author" },
   { id: "stat", name: "Big number", hint: "One stat that matters" },
   { id: "split", name: "Headshot", hint: "Your photo + title" },
+  { id: "greeting", name: "Greeting", hint: "Centred wish with a sign-off" },
 ];
 
 interface Props {
@@ -40,6 +41,8 @@ function artFor(layout: LayoutId, W: number, H: number): { area: Area; mask: Mas
       return land ? { area: { x: W * 0.5, y: 0, w: W * 0.5, h: H }, mask: "right", soft: 1 } : { area: { x: 0, y: H * 0.11, w: W, h: H * 0.38 }, mask: "top", soft: 1 };
     case "split":
       return { area: { x: 0, y: 0, w: W, h: H }, mask: "none", soft: 0.35 };
+    case "greeting":
+      return { area: { x: 0, y: 0, w: W, h: H }, mask: "none", soft: 1 };
     default:
       return { area: { x: 0, y: 0, w: W, h: H }, mask: "none", soft: 0.4 };
   }
@@ -99,6 +102,47 @@ function SubLine({ text, palette, u, size, center }: { text: string; palette: Pa
   );
 }
 
+/** One line (or the lines as typed) made as large as asked, then smaller until it fits; very long text wraps. */
+function FitText({ text, size, width, style }: { text: string; size: number; width: number; style: CSSProperties }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const fit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.whiteSpace = "pre";
+    el.style.width = "max-content";
+    el.style.fontSize = `${size}px`;
+    const wide = el.offsetWidth;
+    if (wide <= width) return;
+    const k = width / wide;
+    // a little inside the width: a script's flourishes reach past its box
+    el.style.fontSize = `${size * Math.max(k * 0.97, 0.55)}px`;
+    if (k * 0.97 < 0.55) { el.style.whiteSpace = "pre-wrap"; el.style.width = `${width}px`; }
+  }, [size, width]);
+  useLayoutEffect(fit);
+  // a font that arrives after the first drawing changes the width
+  useEffect(() => {
+    document.fonts?.addEventListener("loadingdone", fit);
+    void document.fonts?.ready.then(fit);
+    return () => document.fonts?.removeEventListener("loadingdone", fit);
+  }, [fit]);
+  return (
+    <div style={{ width, display: "flex", justifyContent: "center", ...style }}>
+      <span ref={ref} style={{ display: "inline-block", flexShrink: 0, textAlign: "center", fontSize: size }}>{text}</span>
+    </div>
+  );
+}
+
+/** The flourish between a greeting's headline and its message: two strokes and a heart. */
+function Ornament({ colour, width }: { colour: string; width: number }) {
+  return (
+    <svg width={width} height={width / 9} viewBox="0 0 270 30" style={{ display: "block" }} aria-hidden>
+      <path d="M8 22 C45 6 82 6 116 15" fill="none" stroke={colour} strokeWidth={3.2} strokeLinecap="round" />
+      <path d="M262 22 C225 6 188 6 154 15" fill="none" stroke={colour} strokeWidth={3.2} strokeLinecap="round" />
+      <path d="M135 27 C120 17 119 6 127 4 C131 3 134 6 135 10 C136 6 139 3 143 4 C151 6 150 17 135 27 Z" fill="none" stroke={colour} strokeWidth={2.6} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const lines = (t: string) => t.split("\n").map((l, i, a) => (
   <span key={i}>
     {l}
@@ -124,7 +168,8 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
   const LOGO = cssFamily(fonts.logo);
   const STAT = cssFamily(fonts.stat);
   const fontKey = Object.values(fonts).join("|");
-  useEffect(() => { Object.values(fonts).forEach((f) => { void ensureFont(f); }); }, [fontKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the script font is fetched only for the layout that draws with it
+  useEffect(() => { Object.entries(fonts).forEach(([role, f]) => { if (role !== "script" || design.layout === "greeting") void ensureFont(f); }); }, [fontKey, design.layout]); // eslint-disable-line react-hooks/exhaustive-deps
   const ts = design.titleScale;
   const intensity = design.intensity * art.soft;
 
@@ -153,8 +198,9 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
       </div>
     ) : null;
 
+  const greeting = L === "greeting";
   const logo = design.showLogo ? (
-    <div style={{ position: "absolute", left: pad, top: pad * (land ? 0.95 : 0.8), display: "flex", alignItems: "center", gap: 1.4 * u }}>
+    <div style={{ position: "absolute", ...(greeting ? { left: 0, right: 0, top: 3.2 * u, justifyContent: "center" } : { left: pad, top: pad * (land ? 0.95 : 0.8) }), display: "flex", alignItems: "center", gap: 1.4 * u }}>
       <Mark profile={profile} palette={pal} u={u} />
       {(profile.logoText || profile.logoSub) && !(profile.mark === "image" && profile.logoImage && !profile.logoText) && (
         <div style={{ lineHeight: 1.15 }}>
@@ -226,6 +272,32 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
         )}
       </div>
     );
+  } else if (L === "greeting") {
+    const width = Math.min(W - 2 * pad, 150 * u);
+    const script = cssFamily(fonts.script);
+    const message = design.subtitle.length > 200 ? 2.7 : design.subtitle.length > 110 ? 3.1 : 3.6;
+    const rule = <span style={{ width: 9 * u, height: 0.35 * u, background: pal.accent, flexShrink: 0 }} />;
+    content = (
+      <div style={{ position: "absolute", left: pad, right: pad, top: 10 * u, bottom: 9 * u, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+        {design.eyebrow && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2.6 * u, fontFamily: body, fontSize: 4.2 * u, fontWeight: 600, letterSpacing: "0.34em", textTransform: "uppercase", color: pal.text }}>
+            {rule}<span style={{ marginRight: "-0.34em" }}>{design.eyebrow}</span>{rule}
+          </div>
+        )}
+        {design.title && <FitText text={design.title} size={(land ? 17 : 18) * u * ts} width={width} style={{ fontFamily: script, fontWeight: 700, lineHeight: 1.2, color: pal.sub }} />}
+        {design.title && !design.noOrnament && <Ornament colour={pal.sub} width={(land ? 50 : 56) * u} />}
+        {design.subtitle && (
+          <div style={{ marginTop: 3 * u, maxWidth: Math.min(width * 0.86, 100 * u), fontSize: message * u, fontWeight: 500, lineHeight: 1.45, color: pal.text, whiteSpace: "pre-line" }}>{design.subtitle}</div>
+        )}
+        {design.signature && (
+          // to the right of centre, clear of art that sits in the lower left
+          <div style={{ alignSelf: "flex-end", width: land ? "42%" : "60%", marginTop: 3.4 * u }}>
+            <div style={{ fontFamily: script, fontSize: 5.4 * u, fontWeight: 600, lineHeight: 1.25, color: pal.sub, whiteSpace: "pre-line" }}>{design.signature}</div>
+            <div style={{ width: 18 * u, height: 0.35 * u, background: pal.sub, margin: `${1.2 * u}px auto 0` }} />
+          </div>
+        )}
+      </div>
+    );
   } else if (L === "split") {
     const photo = profile.headshot || design.photos[0];
     const d = land ? H * 0.56 : W * 0.46;
@@ -272,9 +344,13 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
       {!fullBleedImage && (L === "center" || L === "quote") && design.background !== "plain" && (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
+      {!fullBleedImage && greeting && !bg.frames && design.background !== "plain" && (
+        // a greeting's words fill more of the card, so the wash behind them is wider and stronger
+        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 72% 62% at 50% 50%, ${rgba(pal.base, 0.95)} 0%, ${rgba(pal.base, 0.86)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
+      )}
       {bf > 0 && <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(pal.fade, 0)} 45%, ${rgba(pal.fade, bf)} 100%)` }} />}
-      {bg.dense && footer && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 12 * u, background: `linear-gradient(0deg, ${rgba(pal.base, 0.96)} 45%, ${rgba(pal.base, 0)} 100%)` }} />}
-      {bg.dense && logo && art.area.x < pad && <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: pad + 14 * u, background: `linear-gradient(180deg, ${rgba(pal.base, 0.96)} 35%, ${rgba(pal.base, 0)} 100%)` }} />}
+      {bg.dense && !bg.frames && footer && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 12 * u, background: `linear-gradient(0deg, ${rgba(pal.base, 0.96)} 45%, ${rgba(pal.base, 0)} 100%)` }} />}
+      {bg.dense && !bg.frames && logo && art.area.x < pad && <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: pad + 14 * u, background: `linear-gradient(180deg, ${rgba(pal.base, 0.96)} 35%, ${rgba(pal.base, 0)} 100%)` }} />}
       {logo}
       {content}
       {footer}

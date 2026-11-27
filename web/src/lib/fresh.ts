@@ -2,7 +2,7 @@ import type { Draft } from "./draft";
 import { serializeDraft } from "./linkedin";
 import type { Design } from "./types";
 
-const WORDS = ["eyebrow", "title", "subtitle", "tag", "quoteAuthor", "statValue"] as const;
+const WORDS = ["eyebrow", "title", "subtitle", "tag", "quoteAuthor", "statValue", "signature"] as const;
 
 /** A card with the brand's look (layout, colours, background, footer, logo) and nothing written or placed on it. */
 export function blankCard(base: Design): Design {

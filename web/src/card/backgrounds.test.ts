@@ -38,3 +38,10 @@ describe("backgrounds", () => {
           }
   });
 });
+
+describe("framing art", () => {
+  it("is offered for greetings and draws at every size", () => {
+    expect(bgById("harvest-frame").frames).toBe(true);
+    for (const [W, H] of [[1200, 1200], [1080, 1920], [1200, 627]]) expect(draw("harvest-frame", W, H, 3)).not.toMatch(/NaN|undefined|Infinity/);
+  });
+});

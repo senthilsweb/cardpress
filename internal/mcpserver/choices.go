@@ -11,7 +11,7 @@ import (
 type offerIn struct {
 	ConversationID string              `json:"conversationId" jsonschema:"the conversationId from the studio block"`
 	DraftID        string              `json:"draftId" jsonschema:"the item the options are for"`
-	Fields         []service.ChoiceSet `json:"fields" jsonschema:"for each field (headline, eyebrow, subtitle, tag, footer, footerLeft, quoteAuthor, statValue, title, altText, summary, hashtags): 2 to 6 options, the recommended one first; a value is text, or for hashtags a list of words. An empty text takes a card field other than the headline off the card"`
+	Fields         []service.ChoiceSet `json:"fields" jsonschema:"for each field (headline, eyebrow, subtitle, tag, footer, footerLeft, quoteAuthor, statValue, signature, title, altText, summary, hashtags): 2 to 6 options, the recommended one first; a value is text, or for hashtags a list of words. An empty text takes a card field other than the headline off the card"`
 }
 
 type offerOut struct {

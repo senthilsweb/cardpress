@@ -8,7 +8,7 @@ export type GroupId = "writing" | "card" | "sharing" | "planning";
 
 export const GROUPS: readonly { id: GroupId; title: string; fields: readonly FieldName[] }[] = [
   { id: "writing", title: "Writing", fields: ["kind", "title", "body", "summary"] },
-  { id: "card", title: "Card words", fields: ["tag", "eyebrow", "statValue", "headline", "subtitle", "quoteAuthor", "footerLeft", "footer"] },
+  { id: "card", title: "Card words", fields: ["tag", "eyebrow", "statValue", "headline", "subtitle", "quoteAuthor", "signature", "footerLeft", "footer"] },
   { id: "sharing", title: "Sharing", fields: ["hashtags", "attachment", "altText", "unicodeStyles", "slug"] },
   { id: "planning", title: "Planning", fields: ["audience", "topic", "campaign", "reviewNotes"] },
 ];
@@ -74,7 +74,7 @@ export function blockerLine({ missing, over }: { missing: FieldName[]; over: Fie
   return parts.join(" · ");
 }
 
-const CARD: Partial<Record<FieldName, string>> = { headline: "title", eyebrow: "eyebrow", subtitle: "subtitle", tag: "tag", footer: "footer", footerLeft: "footerLeft", quoteAuthor: "quoteAuthor", statValue: "statValue" };
+const CARD: Partial<Record<FieldName, string>> = { headline: "title", eyebrow: "eyebrow", subtitle: "subtitle", tag: "tag", footer: "footer", footerLeft: "footerLeft", quoteAuthor: "quoteAuthor", statValue: "statValue", signature: "signature" };
 const OWN: Partial<Record<FieldName, (keyof Draft)[]>> = {
   kind: ["kind"], title: ["title"], body: ["doc"], summary: ["summary"], slug: ["slug"], hashtags: ["hashtags"], altText: ["altText"],
   unicodeStyles: ["unicodeStyles"], attachment: ["attachment", "attachmentTitle", "videoUrl", "images"],

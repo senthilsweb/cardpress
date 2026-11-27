@@ -145,7 +145,7 @@ func (s *Studio) written(ctx context.Context, d Draft) bool {
 		return true
 	}
 	card, _, err := s.Card(ctx, d.ID)
-	return err != nil || card.Eyebrow+card.Title+card.Subtitle+card.Tag+card.QuoteAuthor+card.StatValue != ""
+	return err != nil || card.Eyebrow+card.Title+card.Subtitle+card.Tag+card.QuoteAuthor+card.StatValue+card.Signature != ""
 }
 
 // openChanges notes how the conversation's items stand as a reply begins.

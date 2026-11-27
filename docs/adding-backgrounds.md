@@ -28,6 +28,8 @@ const def: BackgroundDef = { id: "waves", name: "Waves", hint: "Soft, flowing lo
 export default def;
 ```
 
+Set `frames: true` when the art keeps to the edges and leaves the middle clear: no wash is laid behind centred words.
+
 Set `dense: true` when the art is busy: the card then clears a strip behind the footer, and behind the logo where the art runs under it.
 
 Optional `needs: "photos" | "screenshot" | "image"` shows an "add" badge until the user supplies that media.

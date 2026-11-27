@@ -7,7 +7,7 @@
 import { z } from "zod";
 
 /** Moves when a field, a limit or a tool input changes. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export type Writer = "agent" | "person" | "system";
 export type Kind = "post" | "article";
@@ -67,6 +67,7 @@ export const CardText = z.strictObject({
   footerLeft: word("footerLeft", "Footer, left", 200, { choices: true }),
   quoteAuthor: word("quoteAuthor", "Quote author", 200, { choices: true }),
   statValue: word("statValue", "Number", 60, { choices: true }),
+  signature: word("signature", "Sign-off", 200, { choices: true }),
 });
 
 /* ------------------------------------------------------------------ the writing */
@@ -180,7 +181,7 @@ export const ReportReplyInput = z.strictObject({
 });
 
 /** The fields an assistant may offer options for: those marked `choices` above. */
-export const ChoiceField = z.enum(["headline", "eyebrow", "subtitle", "tag", "footer", "footerLeft", "quoteAuthor", "statValue", "title", "altText", "summary", "hashtags"]);
+export const ChoiceField = z.enum(["headline", "eyebrow", "subtitle", "tag", "footer", "footerLeft", "quoteAuthor", "statValue", "signature", "title", "altText", "summary", "hashtags"]);
 
 /** `offer_choices`: options the person picks from in the chat, the recommended or saved one first. */
 export const OfferChoicesInput = z.strictObject({

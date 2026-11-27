@@ -40,6 +40,8 @@ export interface BackgroundDef {
   needs?: "photos" | "screenshot" | "image";
   /** Dense art: the card clears a strip behind the footer, and behind the logo where the art runs under it. */
   dense?: boolean;
+  /** The art frames the card and leaves its middle clear, so no wash is laid behind centred words. */
+  frames?: boolean;
   render: (c: BgCtx) => ReactNode;
 }
 

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import {
-  AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
+  AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Gift, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
 } from "lucide-react";
 import type { Design, LayoutId, MarkKind, Palette, Profile } from "@/lib/types";
 import { bgById, categoryOf } from "@/card/backgrounds";
@@ -22,7 +22,7 @@ import { flushPendingEdits } from "@/lib/pendingEdits";
 type SetDesign = (patch: Partial<Design>) => void;
 
 const LAYOUT_ICONS: Record<LayoutId, typeof LayoutPanelLeft> = {
-  hero: LayoutPanelLeft, center: AlignCenter, cover: BookOpen, quote: Quote, stat: Hash, split: UserRound,
+  hero: LayoutPanelLeft, center: AlignCenter, cover: BookOpen, quote: Quote, stat: Hash, split: UserRound, greeting: Gift,
 };
 
 /* ======================================================= Design */
@@ -45,7 +45,8 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
                 key={l.id}
                 type="button"
                 title={l.hint}
-                onClick={() => set({ layout: l.id })}
+                // a greeting is square unless another size was chosen
+                onClick={() => set({ layout: l.id, ...(l.id === "greeting" && design.sizeId === "li-post" ? { sizeId: "li-square" } : {}) })}
                 className={cn(
                   "flex cursor-pointer flex-col items-center gap-1.5 rounded-md border px-2 py-2.5 text-[11.5px] transition-colors",
                   on ? "border-brand bg-accent text-foreground" : "border-border bg-card text-muted-foreground hover:border-brand/50 hover:text-foreground"
@@ -150,6 +151,7 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <SliderField label="Title size" value={design.titleScale} min={0.6} max={1.5} step={0.05} onChange={(v) => set({ titleScale: v })} format={(v) => `${Math.round(v * 100)}%`} />
         <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
         <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
+        {design.layout === "greeting" && <SwitchField id="ornament" label="Show ornament" checked={!design.noOrnament} onChange={(v) => set({ noOrnament: !v })} />}
         <SwitchField id="logo" label="Show logo" checked={design.showLogo} onChange={(v) => set({ showLogo: v })} />
         <SwitchField id="foot" label="Show footer" checked={design.showFooter} onChange={(v) => set({ showFooter: v })} />
       </Section>
@@ -159,7 +161,7 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
 
 /* ======================================================= Fonts */
 const DEFAULT_VALUE = "__default";
-const CATEGORY_LABEL = { sans: "Sans", serif: "Serif", display: "Display", mono: "Mono" } as const;
+const CATEGORY_LABEL = { sans: "Sans", serif: "Serif", display: "Display", mono: "Mono", script: "Script" } as const;
 
 /** Font picker. With `inherit`, an empty value means "use the profile / built-in default". */
 function FontSelect({ value, onChange, inherit }: { value?: string; onChange: (v: string | undefined) => void; inherit?: string }) {
@@ -173,7 +175,7 @@ function FontSelect({ value, onChange, inherit }: { value?: string; onChange: (v
       <SelectTrigger><SelectValue /></SelectTrigger>
       <SelectContent>
         {inherit !== undefined && <SelectItem value={DEFAULT_VALUE}>Default ({label(inherit)})</SelectItem>}
-        {(["sans", "serif", "display", "mono"] as const).map((cat) => {
+        {(["sans", "serif", "display", "script", "mono"] as const).map((cat) => {
           const list = fonts.filter((f) => f.category === cat);
           return list.length ? (
             <SelectGroup key={cat}>
@@ -297,6 +299,7 @@ export function ProfilePanel(props: {
           <Field label="Labels"><FontSelect inherit={resolveFonts(pr).label} value={pr.labelFont} onChange={(v) => up({ labelFont: v })} /></Field>
           <Field label="Logo text"><FontSelect inherit={resolveFonts(pr).logo} value={pr.logoFont} onChange={(v) => up({ logoFont: v })} /></Field>
           <Field label="Big number"><FontSelect inherit={resolveFonts(pr).stat} value={pr.statFont} onChange={(v) => up({ statFont: v })} /></Field>
+          <Field label="Script (greetings)"><FontSelect inherit={resolveFonts(pr).script} value={pr.scriptFont} onChange={(v) => up({ scriptFont: v })} /></Field>
         </div>
         <AddGoogleFont />
       </Section>

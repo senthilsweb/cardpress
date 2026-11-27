@@ -71,7 +71,7 @@ func (t tools) getDesign(ctx context.Context, _ *mcp.CallToolRequest, in draftRe
 type cardTextIn struct {
 	DraftID string `json:"draftId" jsonschema:"the draft id"`
 	// a map, so that a field this tool must not touch is seen and refused with a reason
-	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue"`
+	Changes map[string]any `json:"changes" jsonschema:"only the words to change: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue, signature"`
 }
 
 func cardText(changes map[string]any) (service.CardText, error) {

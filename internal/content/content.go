@@ -51,6 +51,7 @@ var Server = map[string]Field{
 	"footerLeft":    {Column: "drafts.design.footerLeft", MaxLength: 200, Assistant: true},
 	"quoteAuthor":   {Column: "drafts.design.quoteAuthor", MaxLength: 200, Assistant: true},
 	"statValue":     {Column: "drafts.design.statValue", MaxLength: 60, Assistant: true},
+	"signature":     {Column: "drafts.design.signature", MaxLength: 200, Assistant: true},
 	"audience":      {Column: "drafts.audience", MaxLength: 200, Assistant: true},
 	"topic":         {Column: "drafts.topic", MaxLength: 100, Assistant: true},
 	"campaign":      {Column: "drafts.campaign", MaxLength: 100},

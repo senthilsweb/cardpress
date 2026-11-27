@@ -1,0 +1,11 @@
+# Tasks
+- [x] Agree the open questions
+- [x] `signature` field: models (agent repository), server, Details, choices
+- [x] Script font role
+- [x] Greeting · Centred, with fitting at every size
+- [x] Thanksgiving art set with clear areas and ornaments
+- [ ] Side art, Framed, Headline only
+- [ ] Art sets for Diwali, New Year, Lunar New Year
+- [ ] Templates in the picker
+- [x] User guide: Seasonal greetings
+- [ ] Tests, browser check at every size, deploy
