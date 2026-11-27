@@ -7,7 +7,7 @@ cd web && npm install && npm run build && cd ..
 go build -o bin/cardpress .      # from the repository root
 cd scripts/record-demo && npm install
 
-./run.sh                         # the animation, out/demo.gif (about 2 MB, 1200 px wide)
+./run.sh                         # out/demo.gif (about 2 MB) and, with ffmpeg, out/demo.mp4 (1920 px)
 cp out/demo.gif ../../docs/media/cardpress-demo.gif
 cp out/demo.gif ../../web/public/demo/cardpress-demo.gif
 

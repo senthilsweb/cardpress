@@ -6,6 +6,9 @@ import pngjs from "pngjs";
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 const { PNG } = pngjs;
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { BASE, setup } from "./setup.mjs";
 
@@ -61,8 +64,8 @@ function resize(png) {
 async function snap(delay) {
   // wait until fonts are loaded and two frames have been painted, so the capture does not depend on timing
   await page.evaluate(async () => { await document.fonts.ready; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); });
-  const png = PNG.sync.read(await page.screenshot({ type: "png" }));
-  frames.push({ rgba: resize(png), delay });
+  const shot = await page.screenshot({ type: "png" });
+  frames.push({ rgba: resize(PNG.sync.read(shot)), shot, delay });
 }
 // hold: stay on the current view for ms. animated: sample frames while something moves.
 async function hold(ms, animated = false) {
@@ -201,4 +204,16 @@ function writeGif() {
   }
   console.log("delays", createHash("sha1").update(JSON.stringify(seq.map((f) => f.delay))).digest("hex").slice(0, 8), "pixels", createHash("sha1").update(Buffer.concat(seq.map((f) => Buffer.from(f.rgba)))).digest("hex").slice(0, 8));
   console.log("wrote out/demo.gif", seq.length, "frames", (enc.bytes().length / 1e6).toFixed(1) + " MB");
+  writeVideo(seq);
+}
+
+// The same walkthrough as a video, sharper than the GIF can be. Needs ffmpeg; skipped without it.
+function writeVideo(seq) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cardpress-video-"));
+  const list = seq.map((f, i) => { fs.writeFileSync(`${dir}/${i}.png`, f.shot); return `file '${i}.png'\nduration ${f.delay / 1000}`; });
+  list.push(`file '${seq.length - 1}.png'`); // the last frame is named again, or its duration is ignored
+  fs.writeFileSync(`${dir}/list.txt`, list.join("\n"));
+  const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", `${dir}/list.txt`, "-vf", "scale=1920:-2:flags=lanczos,fps=30", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", `${OUT}demo.mp4`], { stdio: "inherit" });
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log(r.status === 0 ? "wrote out/demo.mp4" : "no video: ffmpeg is missing or failed");
 }
