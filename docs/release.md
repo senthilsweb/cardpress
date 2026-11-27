@@ -110,9 +110,9 @@ fly secrets set -a $APP "CARDPRESS_AGENT_MANIFEST=$(jq -c . previous-manifest.js
 
 ## Restore the data
 
-!!! warning "Not yet rehearsed"
-    These steps follow Fly's volume commands and have not been run on a real installation. Rehearse them on a copy of the
-    app before relying on them.
+!!! warning "Rehearsed in part"
+    Restoring a snapshot into a new volume and starting CardPress on it was rehearsed on 2026-11-27, in a separate app
+    (below). Replacing the machine of the **live** app, as these steps do, has not been run. Rehearse first.
 
 A snapshot is restored into a **new volume with a new name**, so the present volume is left untouched.
 
@@ -130,6 +130,46 @@ the old volume only when you are sure.
 
 **The encryption key** (`CARDPRESS_SECRET_KEY`) must be the same as when the data was saved, or stored social
 credentials cannot be read. Keep a copy somewhere safe; a snapshot does not contain Fly secrets.
+
+## Rehearse a restore
+
+Restores into a **separate, private app**, so the live one is never touched. The copy holds real data: keep it private,
+give it new keys, and delete it afterwards. It costs one small machine and volume while it exists.
+
+```bash
+DRILL=my-cardpress-drill
+fly volumes snapshots list VOL                      # a new snapshot takes a while to appear: wait for "created"
+fly apps create $DRILL
+fly volumes create cardpress_restore --snapshot-id SNAPSHOT -a $DRILL --region iad --size 1 -y
+```
+
+In the copy of `fly.toml`, set `[mounts] source = "cardpress_restore"`, remove the whole `[http_service]` section so
+nothing is public, and add a health check:
+
+```toml
+[checks.http]
+  type = "http"
+  port = 8080
+  path = "/healthz"
+  interval = "15s"
+  timeout = "5s"
+```
+
+```bash
+# new random keys: the copy cannot read stored social credentials, so it cannot publish. No assistant settings.
+printf 'CARDPRESS_SECRET_KEY=%s\nCARDPRESS_API_TOKEN=%s\nCARDPRESS_SIGNUP=closed\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" | fly secrets import --stage -a $DRILL
+(cd "$OUT" && fly deploy -a $DRILL -c fly.toml --ha=false --no-public-ips --remote-only)
+fly ips list -a $DRILL                              # must be empty
+fly proxy 18190:8080 -a $DRILL                      # then open http://localhost:18190
+```
+
+Check that `/api/v1/info` says `"needsSetup": false`, sign in, and compare the Library with the live app. Then delete
+the copy, which removes its volume:
+
+```bash
+fly apps destroy $DRILL
+```
 
 ## A copy off Fly
 
