@@ -2,29 +2,23 @@
 
 How the screens are arranged, and what is remembered.
 
-## Navigation
+## The frame
 
-Every page has a narrow dark **navigation bar** on the left:
+Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
-- **The CardPress mark** at the top opens the brand menu: switch brand, **New brand**, **Manage brands**.
-- **Studio**, **Calendar** and **User guide** go to their pages. The guide (`/help/`) is built from `web/guide/pages`; the same pages are published on the web.
-- **Library** and **Settings** each open a panel beside the bar listing their pages:
-  - Library: All, Posts, Articles.
-  - Settings: Account, API keys; Brands and Social accounts; for admins, Users and Assistant.
-- Choosing a page closes the panel, as do **Esc** and a click outside it.
-- At the bottom are **hide the work column** (studio only, also **Ctrl/⌘ + \\**) and **you**. Your menu has the light or dark mode, **User guide** and **Sign out**.
+- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **Sign out**).
+- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
+- On a narrow screen the header is shorter and the side bar runs along the bottom.
 
-Nothing is placed along the top of the window. Each setting is its own page: `/settings/account/`, `/settings/brands/`, `/settings/social/`, `/settings/api-keys/`, `/settings/users/`, `/settings/assistant/`. Old addresses such as `/studio/?open=accounts` go to the matching page.
+## Themes
 
-On a narrow screen the bar runs along the bottom, with the mark (brands) at its left and you at its right. Settings opens on its list.
-
-Popups are kept for quick choices and confirmations: the brand menu, your menu, confirmations, the schedule form, the expanded editor and the full preview. In the studio, conversations and versions are listed inside the left column.
+**Settings → Appearance** chooses **Parchment** (default), **Aubergine**, **Cobalt** or **Graphite**, and Light, Dark or System. It is saved per person (`palette` and `theme` preferences). A theme is a list of named colours in `web/src/styles/themes.css`; a test checks that each can be read. Cards keep their brand's colours.
 
 ## Brands
 
-A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The CardPress mark at the top of the navigation opens the list of brands; the open one is ticked.
+A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The brand menu in the header lists the brands; the open one is ticked.
 
-- **Switch**: click the CardPress mark at the top of the navigation and pick another brand. The whole studio changes to that brand, and the last one you opened is remembered on the server.
+- **Switch**: open the brand menu in the header and pick another brand. The whole studio changes to that brand, and the last one you opened is remembered on the server.
 - **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
@@ -78,7 +72,7 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview**, *
 ## Sidebar
 - **Make the left column wider or narrower** by dragging the grip on its right edge (320 to 720 pixels; double-click to reset, or focus it and use the arrow keys). The width is remembered.
 
-- **Hide or show** the whole sidebar with the button near the bottom of the navigation bar, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
+- **Hide or show** the whole sidebar with the button near the bottom of the side bar, or **Ctrl/⌘ + \\**. The canvas grows to use the space, and the editor's expanded view gets the full width. On a narrow screen the sidebar sits above the canvas and hiding it removes it.
 - **Fold sections.** Click a section's title (Writing, Sharing, Colours…) to fold or unfold it. Folded fields cannot be reached with Tab, so they do not get in the way of the keyboard.
 - The editor in Details can be **dragged taller or shorter** from its bottom-right corner.
 
@@ -101,7 +95,7 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/lib/layout.tsx` | The `Layout` type, safe parsing of the saved value, and the context sections read |
 | `web/src/components/studio/fields.tsx` | `Section`, the foldable group |
 | `web/src/components/studio/Studio.tsx` | Sidebar hide/show and the shortcut |
-| `web/src/components/shell/Rail.tsx` | The navigation bar, its panels, and the bar on narrow screens |
+| `web/src/components/shell/Rail.tsx` | The frame: header, side bar, its panels, and the bar on narrow screens |
 | `web/src/components/studio/Details.tsx` | The Details column |
 | `web/src/lib/details.ts` | Its groups, counters and what is missing, from the content schema (`lib/content/`) |
 | `web/src/components/settings/Settings.tsx` | The settings pages |

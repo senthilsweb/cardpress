@@ -8,8 +8,10 @@ import { cn } from "@/lib/utils";
 export type StageView = "post" | "article" | "both";
 const NAMES: Record<StageView, string> = { post: "Post", article: "Article", both: "Both" };
 
-/** Above the canvas: which of the post and the article is shown, and which item is being worked on. */
-export function StageBar({ views, view, changed, onView, drafts, currentId, onPick, onNew, item, onVersions }: {
+/** Which of the post and the article is shown, and which item is being worked on. */
+export function StageBar({ inHeader = false, views, view, changed, onView, drafts, currentId, onPick, onNew, item, onVersions }: {
+  /** In the page header on a wide screen; otherwise a row above the canvas. */
+  inHeader?: boolean;
   /** The views that exist for what is open. */
   views: StageView[];
   view: StageView;
@@ -22,7 +24,7 @@ export function StageBar({ views, view, changed, onView, drafts, currentId, onPi
 }) {
   const locked = lockReason(item);
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2">
+    <div className={cn("flex items-center gap-2", inHeader ? "min-w-0 flex-1 pl-2" : "flex-wrap border-b border-border bg-background px-4 py-2")}>
       <div className="flex rounded-md border border-border bg-card p-0.5" role="group" aria-label="View">
         {views.map((v) => (
           <button key={v} type="button" aria-pressed={v === view} onClick={() => onView(v)}
@@ -39,7 +41,7 @@ export function StageBar({ views, view, changed, onView, drafts, currentId, onPi
           <History /> v{item.version}{item.versionIsCurrent ? "" : " · edited"}
         </Button>
       )}
-      <div className="w-[min(320px,60vw)]">
+      <div className={cn(inHeader ? "w-[min(320px,28vw)] min-w-0" : "w-[min(320px,60vw)]")}>
         <DraftPicker drafts={drafts} currentId={currentId} onPick={onPick} />
       </div>
       <Button variant="brand" size="sm" title="Start fresh: an empty card and a new chat" onClick={onNew}><Plus /> New</Button>

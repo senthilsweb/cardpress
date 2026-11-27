@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Search } from "lucide-react";
-import { Rail } from "@/components/shell/Rail";
+import { Shell } from "@/components/shell/Rail";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ export default function Help() {
 }
 
 function Page({ data }: { data: LibraryBoot }) {
-  const [theme, toggleTheme] = useTheme(data.theme);
+  const [theme, toggleTheme] = useTheme();
   const [brand, setBrand] = useState(data.activeId);
   const [place, setPlace] = useState<Place>(() => helpPlace(window.location.search, window.location.hash));
   const [query, setQuery] = useState("");
@@ -69,9 +69,9 @@ function Page({ data }: { data: LibraryBoot }) {
   );
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <>
       <Toaster theme={theme} />
-      <Rail area="help" brands={data.profiles} activeId={brand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <Shell area="help" brands={data.profiles} activeId={brand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme}>
       <aside className="flex shrink-0 flex-col gap-2 border-b border-border bg-background p-3 lg:w-64 lg:border-b-0 lg:border-r">
         <h2 className="hidden px-1 text-sm font-semibold lg:block">User guide</h2>
         <div className="relative">
@@ -135,6 +135,7 @@ function Page({ data }: { data: LibraryBoot }) {
           )}
         </div>
       </div>
-    </div>
+      </Shell>
+    </>
   );
 }

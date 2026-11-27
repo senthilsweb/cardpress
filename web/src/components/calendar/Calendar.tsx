@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { Rail } from "@/components/shell/Rail";
+import { Shell } from "@/components/shell/Rail";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { ScheduleFields, resolveSchedule } from "@/components/studio/ScheduleFields";
@@ -37,7 +37,7 @@ const STATE_STYLE: Record<ReturnType<typeof entryState>, string> = {
 const STATE_LABEL: Record<ReturnType<typeof entryState>, string> = { sent: "Sent", waiting: "Waiting", problem: "Needs a look", planned: "Planned article" };
 
 function Page({ data }: { data: LibraryBoot }) {
-  const [theme, toggleTheme] = useTheme(data.theme);
+  const [theme, toggleTheme] = useTheme();
   const { can } = useSession();
   const wide = window.matchMedia("(min-width: 1024px)").matches;
   // the address keeps the view and the day, so a reload or a shared link shows the same thing: /calendar/?view=week&day=2026-11-26
@@ -99,9 +99,9 @@ function Page({ data }: { data: LibraryBoot }) {
   );
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <>
       <Toaster theme={theme} />
-      <Rail area="calendar" brands={data.profiles} activeId={brand === "all" ? data.activeId : brand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <Shell area="calendar" brands={data.profiles} activeId={brand === "all" ? data.activeId : brand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme}>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 sm:px-6">
           <h1 className="mr-2 text-xl font-semibold tracking-tight">{viewTitle(view, anchor)}</h1>
@@ -193,7 +193,8 @@ function Page({ data }: { data: LibraryBoot }) {
       </main>
 
       <ScheduleDialog at={scheduling} ready={ready} names={brand === "all" ? names : undefined} onClose={() => setScheduling(null)} onDone={() => { setScheduling(null); void load(); }} />
-    </div>
+      </Shell>
+    </>
   );
 }
 

@@ -31,13 +31,14 @@ const (
 	maxPrefBytes       = 1 << 20
 	maxDocBytes        = 16 << 20
 	timeLayout         = time.RFC3339
-	PrefTheme          = "theme"
+	PrefTheme          = "theme"   // light, dark or system
+	PrefPalette        = "palette" // the colour theme of the application
 	PrefFonts          = "customFonts"
 	PrefLayout         = "layout"        // sidebar and section fold state, editor height
 	PrefActive         = "activeProfile" // the brand that was open last
 )
 
-var allowedPrefs = map[string]bool{PrefTheme: true, PrefFonts: true, PrefLayout: true, PrefActive: true}
+var allowedPrefs = map[string]bool{PrefTheme: true, PrefPalette: true, PrefFonts: true, PrefLayout: true, PrefActive: true}
 
 // State is everything the studio loads at start.
 type State struct {

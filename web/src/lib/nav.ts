@@ -12,7 +12,7 @@ export const settingsHref = (section?: SettingsSection, query = "") => `${base()
 
 export type Area = "studio" | "library" | "calendar" | "settings" | "help";
 
-export type SettingsSection = "account" | "brands" | "social" | "api-keys" | "users" | "assistant";
+export type SettingsSection = "account" | "appearance" | "brands" | "social" | "api-keys" | "users" | "assistant";
 
 interface SectionDef {
   id: SettingsSection;
@@ -26,6 +26,7 @@ interface SectionDef {
 /** The settings pages, in the order they are listed. */
 export const SETTINGS_SECTIONS: readonly SectionDef[] = [
   { id: "account", label: "Account", person: true },
+  { id: "appearance", label: "Appearance" },
   { id: "brands", label: "Brands" },
   { id: "social", label: "Social accounts", perm: "social" },
   { id: "api-keys", label: "API keys", person: true },

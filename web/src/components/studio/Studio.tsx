@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Rail } from "@/components/shell/Rail";
+import { Shell } from "@/components/shell/Rail";
 import { LEGACY_OPEN, settingsHref } from "@/lib/nav";
 import { DesignPanel } from "./panels";
 import { Details } from "./Details";
@@ -74,7 +74,7 @@ export default function Studio() {
 }
 
 function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: string) => Promise<void> }) {
-  const [theme, toggleTheme] = useTheme(initial.theme);
+  const [theme, toggleTheme] = useTheme();
   useState(() => { hydrateCustomFonts(initial.customFonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); }); });
   const [profiles, setProfiles] = useSyncedState<Profile[]>(initial.profiles, (v) => api.putProfiles(v));
   const archived = initial.archived;
@@ -392,8 +392,12 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     <button type="button" aria-pressed={mode === m} onClick={() => setMode(m)}
       className={cn("flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[13px] font-semibold [&_svg]:h-4 [&_svg]:w-4", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
       {icon} {text}
-      {m === "chat" && chat.pendingCount > 0 && <span className="min-w-4 rounded-full bg-brand px-1 text-[10px] leading-4 text-white" title={`${chat.pendingCount} proposals waiting for your decision`}>{chat.pendingCount}</span>}
+      {m === "chat" && chat.pendingCount > 0 && <span className="min-w-4 rounded-full bg-brand px-1 text-[10px] leading-4 text-on-brand" title={`${chat.pendingCount} proposals waiting for your decision`}>{chat.pendingCount}</span>}
     </button>
+  );
+
+  const stageBar = (inHeader: boolean) => (
+    <StageBar inHeader={inHeader} views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => { setVersion(undefined); showDetails(); setVersionsAsked((n) => n + 1); }} />
   );
 
   return (
@@ -401,10 +405,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
      <LayoutContext.Provider value={layoutCtx}>
      <ChoiceContext.Provider value={choices}>
       <Toaster theme={theme} />
-      <div className="flex h-dvh flex-col lg:flex-row">
-        <Rail area="studio" brands={profiles} activeId={profile.id} colors={brandColors} switching={switching} onSwitchBrand={(id) => void switchBrand(id)}
-          theme={theme} onToggleTheme={toggleTheme} panel={{ hidden: sidebarHidden, toggle: toggleSidebar }} onLeave={flushPendingEdits} />
-
+      <Shell area="studio" brands={profiles} activeId={profile.id} colors={brandColors} switching={switching} onSwitchBrand={(id) => void switchBrand(id)}
+        theme={theme} onToggleTheme={toggleTheme} panel={{ hidden: sidebarHidden, toggle: toggleSidebar }} onLeave={flushPendingEdits}
+        header={largeScreen ? stageBar(true) : undefined}>
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {/* sidebar */}
           <aside
@@ -446,7 +449,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
 
           {/* canvas */}
           <main className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", !phonePreview && "max-lg:order-first max-lg:flex-none max-lg:[&>*:not(:first-child)]:hidden")}>
-            <StageBar views={views} view={view} changed={changed} onView={showView} drafts={store.drafts} currentId={store.current?.id ?? ""} onPick={(id) => void openItem(id)} onNew={() => void startFresh()} item={store.current} onVersions={() => { setVersion(undefined); showDetails(); setVersionsAsked((n) => n + 1); }} />
+            {/* on a wide screen these are in the header */}
+            {!largeScreen && stageBar(false)}
             {/* sizes and export belong to the card, so they show with it */}
             <div className={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5", (reading || (showBoth && kind === "article")) && "hidden")}>
               <div className="flex rounded-md border border-border bg-card p-0.5">
@@ -542,7 +546,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             })}
           </nav>
         </div>
-      </div>
+      </Shell>
      </ChoiceContext.Provider>
      </LayoutContext.Provider>
 

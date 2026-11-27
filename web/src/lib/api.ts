@@ -205,7 +205,7 @@ export const api = {
   restoreProfile: (id: string) => call<void>("POST", `/profiles/${encodeURIComponent(id)}/restore`),
   deleteProfile: (id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(id)}`),
   putDesigns: (designs: Record<string, unknown>) => call<void>("PUT", "/designs", { designs }),
-  putPreference: (key: "theme" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
+  putPreference: (key: "theme" | "palette" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
   listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),

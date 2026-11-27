@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Bot, CircleUser, KeyRound, Loader2, Palette, Plug, Users } from "lucide-react";
+import { ArrowLeft, Bot, CircleUser, KeyRound, Loader2, Palette, Plug, SwatchBook, Users } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { Drawer, InlineDrawers } from "@/components/ui/drawer";
-import { Rail, SecondaryHeader, SecondaryLink } from "@/components/shell/Rail";
+import { Shell, SecondaryHeader, SecondaryLink } from "@/components/shell/Rail";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { AccountSettings } from "@/components/studio/AccountSettings";
 import { ManageBrandsDrawer, NewBrandDrawer } from "@/components/studio/Brands";
 import { BrandLook } from "./BrandLook";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { SocialSettings } from "@/components/studio/SocialSettings";
 import { UsersDrawer } from "@/components/studio/UsersDrawer";
 import { api, type ApiInfo } from "@/lib/api";
@@ -22,7 +23,7 @@ import { useTheme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<SettingsSection, React.ReactNode> = {
-  account: <CircleUser />, brands: <Palette />, social: <Plug />, "api-keys": <KeyRound />, users: <Users />, assistant: <Bot />,
+  account: <CircleUser />, appearance: <SwatchBook />, brands: <Palette />, social: <Plug />, "api-keys": <KeyRound />, users: <Users />, assistant: <Bot />,
 };
 const noop = () => undefined;
 
@@ -33,7 +34,7 @@ export default function Settings() {
 }
 
 function Page({ data }: { data: LibraryBoot }) {
-  const [theme, toggleTheme] = useTheme(data.theme);
+  const [theme, toggleTheme] = useTheme();
   const { user, can } = useSession();
   const sections = visibleSections(!!user, can);
   const asked = sectionFromPath(window.location.pathname);
@@ -67,9 +68,9 @@ function Page({ data }: { data: LibraryBoot }) {
   const active = brands.profiles.find((p) => p.id === brands.activeId) ?? brands.profiles[0];
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <>
       <Toaster theme={theme} />
-      <Rail area="settings" sub={shown} brands={brands.profiles} activeId={brands.activeId} colors={colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <Shell area="settings" sub={shown} brands={brands.profiles} activeId={brands.activeId} colors={colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme}>
       <aside className={cn("flex min-h-0 flex-1 flex-col bg-card lg:hidden", shown && "hidden")}>
         <SecondaryHeader title="Settings" />
         <nav aria-label="Settings" className="flex flex-col gap-0.5 p-2">
@@ -82,6 +83,7 @@ function Page({ data }: { data: LibraryBoot }) {
         <a href={settingsHref()} className="flex items-center gap-1.5 border-b border-border px-4 py-2 text-sm text-muted-foreground lg:hidden"><ArrowLeft className="h-4 w-4" /> Settings</a>
         <InlineDrawers>
           {shown === "account" && <AccountSettings open onClose={noop} parts={["profile", "password"]} title="Account" />}
+          {shown === "appearance" && <AppearanceSettings />}
           {shown === "api-keys" && <AccountSettings open onClose={noop} parts={["keys"]} title="API keys" />}
           {shown === "brands" && <BrandsPage brands={brands} colors={colors} sync={sync} setActive={setActive} />}
           {shown === "social" && active && <SocialSettings open onOpenChange={noop} profileId={active.id} brandName={active.name} />}
@@ -89,7 +91,8 @@ function Page({ data }: { data: LibraryBoot }) {
           {shown === "assistant" && <AssistantPage />}
         </InlineDrawers>
       </main>
-    </div>
+      </Shell>
+    </>
   );
 }
 
