@@ -2,7 +2,7 @@
 
 CardPress is an open-source, self-hosted tool for writing and publishing social media posts. You design a branded card, draft the post text with an assistant, preview exactly what will be sent, and publish or schedule it yourself. It ships as one Go binary with the web app inside.
 
-![Designing a card, drafting a post with the assistant, and previewing it in CardPress](media/cardpress-demo.gif)
+![Asking for a greeting in the chat, designing the card and previewing it, then the library, calendar and themes in CardPress](media/cardpress-demo.gif)
 
 Using CardPress rather than running it? See the **User guide** inside the app, also published as the [web guide](https://www.senthilsweb.com/cardpress/guide/).
 

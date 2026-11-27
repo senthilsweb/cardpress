@@ -1,31 +1,24 @@
-// Records the marketing demo GIF from a running CardPress, the same way every time:
-// a fixed script, a fixed design seed (the app's default), a seeded Math.random, explicit frame delays and no real-time
-// dependence in the output. Run it through ./run.sh, which starts CardPress on an empty database.
-// Env: BASE (default http://127.0.0.1:18300), SOURCE_FILE (the article text pasted into the assistant), DUMP=n (also
-// write every nth frame to out/frames for review)
-import { chromium } from "playwright-core";
+// Records the home-page animation, the same way every time: a fixed script, example data, a scripted assistant (no AI),
+// a seeded Math.random, explicit frame delays and no real-time dependence in the output. Run it through ./run.sh.
+// DUMP=n also writes every nth frame to out/frames for review.
 import gifenc from "gifenc";
 import pngjs from "pngjs";
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 const { PNG } = pngjs;
 import fs from "node:fs";
-import { createHash } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { BASE, setup } from "./setup.mjs";
 
-const BASE = (process.env.BASE || "http://127.0.0.1:18300").replace(/\/$/, "");
-const SOURCE = fs.readFileSync(process.env.SOURCE_FILE || new URL("./source.txt", import.meta.url), "utf8").trim();
 const OUT = new URL("./out/", import.meta.url).pathname;
 fs.mkdirSync(OUT, { recursive: true });
 const W = 1440, H = 860, GW = 1200, GH = Math.round((H * GW) / W);
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
-const ctx = await browser.newContext({
-  viewport: { width: W, height: H },
-  deviceScaleFactor: 2, // capture at 2x and scale down, so text and card edges stay sharp
-  colorScheme: "light",
-  reducedMotion: "no-preference",
-});
-await ctx.addInitScript(() => {
+const frames = [];
+// frames are captured at 2x and scaled down, so text and card edges stay sharp
+const demo = await setup({ width: W, height: H, addInitScript: () => {
   // seeded random numbers: ids and anything else that draws on Math.random come out the same each run
   let a = 20261123;
   Math.random = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -52,11 +45,12 @@ await ctx.addInitScript(() => {
     };
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
-});
+} });
+const { ctx } = demo;
+try {
 const page = await ctx.newPage();
 
 // ---- frame capture (gif mode) ----
-const frames = [];
 function resize(png) {
   const out = new Uint8Array(GW * GH * 4), sx = png.width / GW, sy = png.height / GH;
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
@@ -70,8 +64,8 @@ function resize(png) {
 async function snap(delay) {
   // wait until fonts are loaded and two frames have been painted, so the capture does not depend on timing
   await page.evaluate(async () => { await document.fonts.ready; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); });
-  const png = PNG.sync.read(await page.screenshot({ type: "png" }));
-  frames.push({ rgba: resize(png), delay });
+  const shot = await page.screenshot({ type: "png" });
+  frames.push({ rgba: resize(PNG.sync.read(shot)), shot, delay });
 }
 // hold: stay on the current view for ms. animated: sample frames while something moves.
 async function hold(ms, animated = false) {
@@ -111,81 +105,68 @@ async function type(loc, text, { clear = false } = {}) {
   for (let i = 0; i < text.length; i += 4) { await page.keyboard.type(text.slice(i, i + 4)); await snap(90); }
   await hold(500);
 }
-// open or fold a sidebar section, whatever state it is in
-async function section(name, open) {
-  const h = page.getByRole("button", { name, exact: true }).first();
-  if ((await h.getAttribute("aria-expanded")) !== String(open)) await click(h, { after: 450 });
+// a button by its exact name, within a part of the page when given
+const btn = (name, within = page) => within.getByRole("button", { name, exact: true }).first();
+const settle = async () => { await page.waitForLoadState("networkidle").catch(() => {}); await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(900); };
+async function visit(url, ms) {
+  await page.goto(BASE + url);
+  await settle();
+  await page.evaluate(([x, y]) => window.__cur(x, y), cur);
+  await hold(ms);
 }
-const btn = (name, opts = {}) => page.getByRole("button", { name, exact: opts.exact ?? false }).first();
 
-// ---- the story ----
-await page.goto(BASE + "/studio/");
-await page.waitForLoadState("networkidle");
-await page.getByRole("tab", { name: "Design" }).waitFor();
-await moveTo(W * 0.62, H * 0.5);
-await hold(1600);
+// ---- the story: a Thanksgiving greeting, from a sentence to a card, then around the app ----
+await visit("/studio/", 400);
+await click(btn("New"), { after: 900 });
 
-// Colours: the brand palette used for every card
-for (const n of ["Layout", "Background"]) await section(n, false);
-await section("Colours", true);
-await click(btn("Blue pink gloss", { exact: true }), { after: 1400 });
-await section("Colours", false);
+// Chat: ask for the greeting
+const message = page.getByLabel("Message", { exact: true });
+await type(message, "Write a short Thanksgiving post to our readers.");
+await click(btn("Send"), { after: 0 });
+await page.getByText("The greeting post and the words on its card are saved.").waitFor({ timeout: 30000 });
+await settle();
+await hold(2200);
 
-// Text: the card says what the post is about
-await click(page.getByRole("tab", { name: "Text" }), { after: 500 });
-await type(page.locator("#eyebrow"), "Data pipeline · Bank statements", { clear: true });
-await type(page.locator("#title"), "Bank statements to cash flow", { clear: true });
-await type(page.locator("#subtitle"), "Ingest. Parse. Categorise. Summarise.", { clear: true });
-await type(page.locator("#footerl"), "senthilsweb.com", { clear: true });
-await type(page.locator("#footer"), "github.com/senthilsweb/cardpress", { clear: true });
-await hold(1000);
+// Design: the greeting layout and a seasonal background
+await click(btn("Design"), { after: 700 });
+await click(btn("Greeting"), { after: 1200 });
+await click(btn("Browse backgrounds"), { after: 900 });
+const picker = page.getByRole("dialog");
+await type(picker.getByLabel("Search backgrounds"), "thanks");
+await hold(1200);
+await click(btn("Harvest frame", picker), { after: 900 });
+await click(btn("Use", picker), { after: 900 });
+await hold(2400);
 
-// Design: two looks for the same card
-await click(page.getByRole("tab", { name: "Design" }), { after: 500 });
-await section("Background", true);
-await click(btn("Geometric"), { after: 2200 });
-await click(btn("Contours"), { after: 2400 });
+// Chat: pick another headline, keep it
+await click(btn("Chat"), { after: 700 });
+// the whole card, not the feed preview that Chat opens with
+await click(page.getByRole("switch", { name: /Feed preview/ }), { after: 900 });
+await click(page.getByRole("radio", { name: /Giving Thanks/ }), { after: 1600 });
+await click(page.getByRole("radio", { name: /Thanksgiving!/ }), { after: 900 });
+await click(btn("Save as version"), { after: 1400 });
 
-// Assistant: paste an article, get a draft, approve it into a post
-await click(page.getByRole("button", { name: "Assistant", exact: true }), { after: 900 });
-const src = page.locator("#chat-text");
-await src.evaluate((el) => el.scrollIntoView({ block: "center" }));
-const sb = await src.boundingBox();
-await moveTo(sb.x + 80, sb.y + 40);
-await src.click();
-await src.fill(SOURCE);
-await hold(1400);
-await click(btn("Draft from this"), { after: 0 });
-await page.getByRole("button", { name: "Approve and use" }).waitFor({ timeout: 20000 });
-await hold(1600);
-await click(page.getByText("Also use the title as the card's title"), { after: 500 }); // keep our own card title
-await click(btn("Approve and use"), { after: 1200 });
-await click(page.getByRole("button", { name: /Open the Post tab/ }), { after: 1000 });
-
-// Post: hashtags and the full preview
-const tag = page.getByLabel("Add a hashtag");
-await tag.evaluate((el) => el.scrollIntoView({ block: "center" }));
-// the demo agent suggests a few tags; clear them and add our own
-for (let n = await page.getByRole("button", { name: /^Remove #/ }).count(); n > 0; n--) await click(page.getByRole("button", { name: /^Remove #/ }).first(), { after: 250 });
-for (const t of ["DataEngineering", "CashFlow", "Fintech"]) {
-  await type(tag, t);
-  await page.keyboard.press("Enter");
-  await hold(500, true);
-}
-await click(page.getByRole("button", { name: /Full preview/ }).first(), { after: 2800 });
+// Details and the full preview
+await click(btn("Details"), { after: 1600 });
+await click(btn("Full preview"), { after: 3000 });
 await page.keyboard.press("Escape");
-await hold(800);
+await hold(600);
 
-// Sizes for every network
-await click(page.getByRole("button", { name: "Square", exact: true }).nth(2), { after: 1500 });
-await click(page.getByRole("button", { name: "Story", exact: true }), { after: 1500 });
-await click(page.getByRole("button", { name: "All sizes", exact: true }), { after: 2400 });
-await click(page.getByRole("button", { name: "One", exact: true }), { after: 400 });
-await click(page.getByRole("button", { name: "Post image", exact: true }).first(), { after: 1600 });
+// around the app
+await visit("/library/", 2400);
+await visit("/calendar/", 2400);
+await visit("/settings/appearance/", 1200);
+await click(page.getByRole("button", { name: /^Aubergine/ }), { after: 1500 });
+await click(page.getByRole("button", { name: /^Cobalt/ }), { after: 1500 });
+await click(btn("Dark"), { after: 1600 });
+await click(btn("Light"), { after: 500 });
+await click(page.getByRole("button", { name: /^Parchment/ }), { after: 600 });
+await visit("/studio/", 3000);
 
-await ctx.close();
 writeGif();
-await browser.close();
+} finally {
+  await demo.close();
+}
 
 function writeGif() {
   // merge frames that did not change into the previous one's delay
@@ -223,4 +204,16 @@ function writeGif() {
   }
   console.log("delays", createHash("sha1").update(JSON.stringify(seq.map((f) => f.delay))).digest("hex").slice(0, 8), "pixels", createHash("sha1").update(Buffer.concat(seq.map((f) => Buffer.from(f.rgba)))).digest("hex").slice(0, 8));
   console.log("wrote out/demo.gif", seq.length, "frames", (enc.bytes().length / 1e6).toFixed(1) + " MB");
+  writeVideo(seq);
+}
+
+// The same walkthrough as a video, sharper than the GIF can be. Needs ffmpeg; skipped without it.
+function writeVideo(seq) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cardpress-video-"));
+  const list = seq.map((f, i) => { fs.writeFileSync(`${dir}/${i}.png`, f.shot); return `file '${i}.png'\nduration ${f.delay / 1000}`; });
+  list.push(`file '${seq.length - 1}.png'`); // the last frame is named again, or its duration is ignored
+  fs.writeFileSync(`${dir}/list.txt`, list.join("\n"));
+  const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", `${dir}/list.txt`, "-vf", "scale=1920:-2:flags=lanczos,fps=30", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", `${OUT}demo.mp4`], { stdio: "inherit" });
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log(r.status === 0 ? "wrote out/demo.mp4" : "no video: ffmpeg is missing or failed");
 }
