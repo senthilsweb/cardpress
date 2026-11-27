@@ -76,6 +76,7 @@ type Library interface {
 	List(ctx context.Context, q service.LibraryQuery) (service.LibraryPage, error)
 	Calendar(ctx context.Context, q service.CalendarQuery) ([]service.CalendarEntry, error)
 	Ready(ctx context.Context, profileID string, all bool) ([]service.ReadyItem, error)
+	Dashboard(ctx context.Context, q service.DashboardQuery, now time.Time) (service.Dashboard, error)
 }
 
 // Publishing is the part of the publishing service the HTTP API needs.
@@ -267,6 +268,7 @@ func (s *server) table() []routeDef {
 		{"GET", "/publish/jobs", write(scopeBrandQuery), s.listJobs},
 		{"GET", "/library", write(scopeBrandQuery), s.library},
 		{"GET", "/calendar", write(scopeBrandQuery), s.calendar},
+		{"GET", "/dashboard", write(scopeBrandQuery), s.dashboard},
 		{"GET", "/calendar/ready", write(scopeBrandQuery), s.calendarReady},
 		{"GET", "/publish/jobs/{id}", write(scopeJob), s.getJob},
 		{"GET", "/publish/jobs/{id}/attempts", write(scopeJob), s.jobAttempts},
@@ -1435,6 +1437,27 @@ func (s *server) calendar(w http.ResponseWriter, r *http.Request) {
 		entries = []service.CalendarEntry{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
+}
+
+// dashboard is the figures of one brand (?profileId=) or of all of the caller's (?scope=all). days is 7, 30 (when left
+// out), 90, or 0 for all time; tz the person's time zone.
+func (s *server) dashboard(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	days := 30
+	if v := q.Get("days"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, r, http.StatusBadRequest, "invalid", "days must be a number")
+			return
+		}
+		days = n
+	}
+	d, err := s.Library.Dashboard(r.Context(), service.DashboardQuery{ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Days: days, Zone: q.Get("tz")}, time.Now())
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
 }
 
 func (s *server) calendarReady(w http.ResponseWriter, r *http.Request) {

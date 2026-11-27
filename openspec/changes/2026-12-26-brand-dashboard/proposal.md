@@ -1,6 +1,6 @@
 # A dashboard for each brand
 
-**Status:** proposed (asked for by the owner on 2026-11-27). Not built.
+**Status:** built (agreed by the owner on 2026-11-27, with a Sign in button on the home page), not deployed.
 
 ## Why
 Nothing shows how much has been written, what is waiting, or what the assistant has cost.
@@ -34,8 +34,11 @@ migration 0020). No migration.
 - **Tokens** are not stored, so they are not shown.
 
 ## Server
-`GET /api/v1/dashboard?brand=<id>|all&days=7|30|90|0`, with the same access rules as the Library. Days are counted in the
-person's time zone.
+`GET /api/v1/dashboard?profileId=<id>` or `?scope=all`, with `days=7|30|90|0` and `tz`, under the same access rules as the
+Library. Days are counted in the person's time zone. Archived brands are not in All brands.
+
+## Home page
+On a server with accounts the public home page offers **Sign in** to someone who is not signed in.
 
 ## Out of scope
 Likes, views or other figures from the networks; budgets and alerts; export.

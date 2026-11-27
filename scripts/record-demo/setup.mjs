@@ -88,7 +88,7 @@ export async function setup({ width, height, scale = 2, addInitScript } = {}) {
       await api("POST", `/drafts/${d.id}/approve`);
       await api("PUT", `/drafts/${d.id}/plan`, { scheduledAt: inDays(days), timezone: "America/New_York" });
     }
-    return { browser, ctx, api, card, paragraphs, close: () => close(browser) };
+    return { browser, ctx, api, card, paragraphs, dir, close: () => close(browser) };
   } catch (e) {
     await close(browser);
     throw e;

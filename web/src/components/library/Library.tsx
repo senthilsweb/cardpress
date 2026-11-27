@@ -77,8 +77,9 @@ function Page({ data }: { data: LibraryBoot }) {
   const { can } = useSession();
   // the navigation's Posts and Articles open the library with ?kind=
   const [filter, setFilter] = useState<LibraryFilter>(() => {
-    const k = new URLSearchParams(window.location.search).get("kind");
-    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: "", q: "" };
+    const q = new URLSearchParams(window.location.search);
+    const k = q.get("kind"), s = q.get("status");
+    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: STATUS_FILTERS.some((x) => x.value === s) ? s! : "", q: "" };
   });
   const [typed, setTyped] = useState("");
   const [page, setPage] = useState(1);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, LayoutDashboard, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
@@ -7,7 +7,7 @@ import { openSettings, SettingsHost } from "@/components/settings/SettingsDialog
 import { About } from "./About";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { calendarHref, helpHref, libraryHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, dashboardHref, helpHref, libraryHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
 
   const settings = visibleSections(!!user, can);
   const items: Item[] = [
+    { id: "dashboard", label: "Dashboard", href: dashboardHref(), icon: <LayoutDashboard /> },
     { id: "studio", label: "Studio", href: studioHref(), icon: <PenLine /> },
     { id: "library", label: "Library", icon: <FileText />, groups: [{ entries: [
       { id: "", label: "All", href: libraryHref() },
@@ -152,7 +153,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col bg-side">
         <header className="on-head relative z-40 flex h-12 shrink-0 items-center gap-2 border-b border-head-line bg-head px-2 lg:h-[52px] lg:px-3">
-          <a href={studioHref()} onClick={onLeave} className="flex shrink-0 items-center gap-2 rounded-md pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="CardPress, the studio">
+          <a href={dashboardHref()} onClick={onLeave} className="flex shrink-0 items-center gap-2 rounded-md pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="CardPress, the dashboard">
             <LogoMark size={28} />
             <span className="text-[15px] font-bold tracking-tight max-sm:hidden">CardPress</span>
           </a>

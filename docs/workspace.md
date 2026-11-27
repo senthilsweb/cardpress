@@ -7,8 +7,14 @@ How the screens are arranged, and what is remembered.
 Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
 - **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **About CardPress** with the version, build, database and the assistant's versions, **Sign out**).
-- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
+- **Side bar:** Dashboard, Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
 - On a narrow screen the header is shorter and the side bar runs along the bottom.
+
+## Dashboard
+
+`/dashboard/` is where signing in lands and where the logo leads (`components/dashboard/`). For the open brand, or **All brands**: posts and articles by status (counted as the Library lists them), the next five scheduled items, the five last edited, and the assistant's cost, sessions, replies, working time and largest sessions for 7, 30 or 90 days or all time.
+
+Figures come from items, publishing jobs and `chat_usage` (`GET /api/v1/dashboard`). Cost is the list price the agent service reports for chat replies; sessions started outside CardPress and deleted conversations are not counted. Days and weeks are the person's own.
 
 ## Themes
 

@@ -160,6 +160,8 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (editorExpanded) setPhonePreview(true); }, [editorExpanded]); // the large editor is drawn over the canvas
+  // /studio/?conversation=<id> (the dashboard's largest sessions) opens that conversation once the lists are here
+  const [askedFor] = useState(() => new URLSearchParams(window.location.search).get("conversation"));
   const [editorHost, setEditorHost] = useState<HTMLDivElement | null>(null);
   /* ---------- what the canvas shows, and the conversation about it ---------- */
   const pair = useMemo(() => pairFor(store.current, store.drafts, chat.list, chat.current?.id), [store.current, store.drafts, chat.list, chat.current?.id]);
@@ -216,6 +218,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   useEffect(() => {
     if (!chat.loaded || matched.current || !store.current) return;
     matched.current = true;
+    if (askedFor) { window.history.replaceState(null, "", window.location.pathname); setMode("chat"); void openConversation(askedFor); return; }
     const conv = conversationFor(store.current.id, chat.list, chat.current?.id);
     if (conv && conv.id !== chat.current?.id) void chat.open(conv.id);
     // a chat about some other item is not left beside this one (an outside agent's waiting proposal is)

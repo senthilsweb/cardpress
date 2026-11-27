@@ -7,10 +7,12 @@ export const DOCS_URL = "https://www.senthilsweb.com/cardpress/";
 export const helpHref = () => `${base()}help/`;
 export const studioHref = (query = "") => `${base()}studio/${query}`;
 export const libraryHref = (kind?: "post" | "article") => `${base()}library/${kind ? `?kind=${kind}` : ""}`;
+/** The page a person lands on. */
+export const dashboardHref = (query = "") => `${base()}dashboard/${query}`;
 export const calendarHref = (query = "") => `${base()}calendar/${query}`;
 export const settingsHref = (section?: SettingsSection, query = "") => `${base()}settings/${section ? `${section}/` : ""}${query}`;
 
-export type Area = "studio" | "library" | "calendar" | "settings" | "help";
+export type Area = "dashboard" | "studio" | "library" | "calendar" | "settings" | "help";
 
 export type SettingsSection = "account" | "appearance" | "api-keys" | "brands" | "look" | "social" | "users" | "assistant";
 
