@@ -1,0 +1,94 @@
+/*
+ * The application's colour themes. Components use the names only (through Tailwind: bg-card, text-muted-foreground…),
+ * so a theme is this list. Cards use their brand's palette and are not affected. Colours are written as #rrggbb: a test
+ * reads this file and checks that every theme can be read.
+ *
+ *   paper card-bg ink muted-ink line brand on-brand thumb   the page
+ *   head-*                                                  the header
+ *   side-*                                                  the side bar and the bar on a phone
+ */
+
+/* Parchment (the default): warm cream, deep teal and a gold accent */
+:root, .theme-preview {
+  --paper: #fdf3dc; --card-bg: #fffaf0; --ink: #0a3b33; --ink-2: #2f5a52; --muted-ink: #66654f;
+  --line: #ecdcb4; --brand: #0e6b57; --on-brand: #ffffff; --brand-soft: #0e6b5717; --thumb: #f3e3bd;
+  --gold: #f5b301; --header-from: #fff0c8; --header-to: #eef2f4;
+  --canvas-bg: #ffffff; --canvas-grid-minor: rgba(0, 0, 0, 0.055); --canvas-grid-major: rgba(0, 0, 0, 0.11);
+  --head-bg: #0b2a24; --head-fg: #ffffff; --head-muted: #8fd3c2; --head-line: rgba(255, 255, 255, 0.14); --head-hover: rgba(255, 255, 255, 0.09); --head-accent: #f5b301; --head-on-accent: #0b2a24;
+  --side-bg: #0b2a24; --side-panel: #06201b; --side-fg: #ffffff; --side-muted: #8fd3c2; --side-hover: rgba(255, 255, 255, 0.07); --side-on: rgba(255, 255, 255, 0.13);
+  --frame-pad: 6px;
+}
+[data-theme="dark"], .theme-preview[data-theme="dark"] {
+  --paper: #0c1f1c; --card-bg: #112a26; --ink: #f4ead0; --ink-2: #cfd8c8; --muted-ink: #8fa89f;
+  --line: #1f3b35; --brand: #3cc4a0; --on-brand: #06201b; --brand-soft: #3cc4a01f; --thumb: #173530;
+  --header-from: #14302b; --header-to: #0f2431;
+  --canvas-bg: #1e1e1e; --canvas-grid-minor: rgba(255, 255, 255, 0.05); --canvas-grid-major: rgba(255, 255, 255, 0.1);
+  --head-bg: #061713; --side-bg: #061713; --side-panel: #030f0c;
+}
+
+/* Aubergine: a deep purple frame around a light page */
+[data-palette="aubergine"] {
+  --paper: #f8f6f8; --card-bg: #ffffff; --ink: #1d1c1d; --ink-2: #4a4549; --muted-ink: #645d64;
+  --line: #e5dfe5; --brand: #611f69; --on-brand: #ffffff; --brand-soft: #611f6914; --thumb: #f1ebf1;
+  --gold: #ecb22e; --header-from: #f1e3f2; --header-to: #f6f4f8;
+  --head-bg: #3f0f40; --head-muted: #d9c2da; --head-accent: #ecb22e; --head-on-accent: #2b0a2c;
+  --side-bg: #3f0f40; --side-panel: #350d36; --side-muted: #d9c2da;
+}
+[data-palette="aubergine"][data-theme="dark"] {
+  --paper: #1a1d21; --card-bg: #222529; --ink: #e8e6e8; --ink-2: #cfcbcf; --muted-ink: #aaa5aa;
+  --line: #3a3d41; --brand: #d49bda; --on-brand: #2b0a2c; --brand-soft: #d49bda1f; --thumb: #2b2e33;
+  --header-from: #2a1a2c; --header-to: #1c1f23;
+  --head-bg: #19171d; --side-bg: #19171d; --side-panel: #120f16;
+}
+
+/* Cobalt: a blue side bar, a white header, a cool light page; thin borders and small corners */
+[data-palette="cobalt"] {
+  --paper: #f7f8f9; --card-bg: #ffffff; --ink: #172b4d; --ink-2: #344563; --muted-ink: #5e6c84;
+  --line: #dfe1e6; --brand: #0c66e4; --on-brand: #ffffff; --brand-soft: #0c66e414; --thumb: #f1f2f4;
+  --gold: #e2b203; --header-from: #e9f2ff; --header-to: #f7f8f9;
+  --head-bg: #ffffff; --head-fg: #172b4d; --head-muted: #5e6c84; --head-line: #dfe1e6; --head-hover: #091e420a; --head-accent: #0c66e4; --head-on-accent: #ffffff;
+  --side-bg: #0747a6; --side-panel: #063b8a; --side-muted: #d6e4ff; --side-hover: rgba(255, 255, 255, 0.1); --side-on: rgba(255, 255, 255, 0.18);
+  --frame-pad: 0px; --radius: 0.375rem;
+}
+[data-palette="cobalt"][data-theme="dark"] {
+  --paper: #161a1d; --card-bg: #1d2125; --ink: #c7d1db; --ink-2: #adbac7; --muted-ink: #8c9bab;
+  --line: #2c333a; --brand: #579dff; --on-brand: #0b1a30; --brand-soft: #579dff1f; --thumb: #22272b;
+  --header-from: #12263f; --header-to: #161a1d;
+  --head-bg: #1d2125; --head-fg: #c7d1db; --head-muted: #8c9bab; --head-line: #2c333a; --head-hover: rgba(255, 255, 255, 0.07); --head-accent: #579dff; --head-on-accent: #0b1a30;
+  --side-bg: #09326c; --side-panel: #072750; --side-muted: #cce0ff;
+}
+
+/* Graphite: neutral grey */
+[data-palette="graphite"] {
+  --paper: #f6f7f8; --card-bg: #ffffff; --ink: #1f2328; --ink-2: #3d444d; --muted-ink: #5b636d;
+  --line: #dde1e6; --brand: #3b5266; --on-brand: #ffffff; --brand-soft: #3b526617; --thumb: #eef0f2;
+  --gold: #d99a00; --header-from: #e9ecef; --header-to: #f6f7f8;
+  --head-bg: #1f2328; --head-muted: #b4bcc6; --head-accent: #e8eaed; --head-on-accent: #1f2328;
+  --side-bg: #1f2328; --side-panel: #181b1f; --side-muted: #b4bcc6;
+}
+[data-palette="graphite"][data-theme="dark"] {
+  --paper: #131619; --card-bg: #1b1f23; --ink: #e3e6ea; --ink-2: #c4cad1; --muted-ink: #99a2ad;
+  --line: #2d333a; --brand: #a9c1d6; --on-brand: #10151a; --brand-soft: #a9c1d61f; --thumb: #232830;
+  --header-from: #1d2329; --header-to: #131619;
+  --head-bg: #0d0f12; --side-bg: #0d0f12; --side-panel: #08090b;
+}
+
+/* controls placed in the header take the header's colours */
+.on-head {
+  --foreground: var(--head-fg); --muted-foreground: var(--head-muted); --background: transparent; --card: var(--head-hover);
+  --card-foreground: var(--head-fg); --border: var(--head-line); --input: var(--head-line); --accent: var(--head-hover); --accent-foreground: var(--head-fg);
+  --primary: var(--head-fg); --primary-foreground: var(--head-bg); --brand: var(--head-accent); --on-brand: var(--head-on-accent); --muted: var(--head-hover);
+  color: var(--head-fg);
+  --mark-fill: var(--head-bg); --mark-line: #fdf3dc;
+}
+/* on Cobalt's white header the mark is drawn in the text colour */
+[data-palette="cobalt"][data-theme="light"] .on-head { --mark-fill: var(--head-fg); --mark-line: var(--head-bg); }
+
+/* a popup opened from the header goes back to the page's colours */
+:root { --page-brand: var(--brand); --page-on-brand: var(--on-brand); }
+.off-head {
+  --foreground: var(--ink); --muted-foreground: var(--muted-ink); --background: var(--paper); --card: var(--card-bg);
+  --card-foreground: var(--ink); --border: var(--line); --input: var(--line); --accent: var(--brand-soft); --accent-foreground: var(--ink);
+  --primary: var(--ink); --primary-foreground: var(--paper); --brand: var(--page-brand); --on-brand: var(--page-on-brand); --muted: var(--thumb);
+  color: var(--ink);
+}

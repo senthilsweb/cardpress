@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { studioHref } from "@/lib/nav";
-import { Rail } from "@/components/shell/Rail";
+import { Shell } from "@/components/shell/Rail";
 import { Attempts, Thumb } from "@/components/studio/JobQueue";
 import { BootScreen } from "@/components/studio/BootScreen";
 import { DocView } from "@/components/studio/DocView";
@@ -73,7 +73,7 @@ const savedColumns = (): ColumnId[] => {
 const remember = (key: string, value: unknown) => { try { localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value)); } catch { /* not remembered */ } };
 
 function Page({ data }: { data: LibraryBoot }) {
-  const [theme, toggleTheme] = useTheme(data.theme);
+  const [theme, toggleTheme] = useTheme();
   const { can } = useSession();
   // the navigation's Posts and Articles open the library with ?kind=
   const [filter, setFilter] = useState<LibraryFilter>(() => {
@@ -187,9 +187,9 @@ function Page({ data }: { data: LibraryBoot }) {
   const grid = view === "grid";
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <>
       <Toaster theme={theme} />
-      <Rail area="library" sub={filter.kind} onSub={(k) => setFilter((f) => ({ ...f, kind: k === "post" || k === "article" ? k : "" }))} brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme} />
+      <Shell area="library" sub={filter.kind} onSub={(k) => setFilter((f) => ({ ...f, kind: k === "post" || k === "article" ? k : "" }))} brands={data.profiles} activeId={railBrand} colors={data.colors} onSwitchBrand={switchBrand} theme={theme} onToggleTheme={toggleTheme}>
 
       <div className="flex min-h-0 min-w-0 flex-1">
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
@@ -310,7 +310,8 @@ function Page({ data }: { data: LibraryBoot }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </Shell>
+    </>
   );
 }
 

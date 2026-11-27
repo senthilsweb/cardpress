@@ -46,7 +46,7 @@ No assistant is set up by default. To add one, see [Claude Managed Agent](cma-ag
 
 ## Publish
 
-Publishing to LinkedIn needs a token. Add it under **Settings, Social accounts** (in the navigation on the left); see [Social accounts](social-settings.md) and [Publishing](publishing.md). Until then you can copy the post text and image into LinkedIn yourself.
+Publishing to LinkedIn needs a token. Add it under **Settings, Social accounts** (in the side bar); see [Social accounts](social-settings.md) and [Publishing](publishing.md). Until then you can copy the post text and image into LinkedIn yourself.
 
 ## Next
 

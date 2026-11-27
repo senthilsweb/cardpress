@@ -15,9 +15,11 @@ const base = import.meta.env.BASE_URL;
     <title>{title}</title>
     <script is:inline>
       try {
-        // first paint follows the system; the saved choice is applied once it loads from the server
-        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        // first paint follows the choice kept in this browser (or the system); the server's is applied once it loads
+        const saved = JSON.parse(localStorage.getItem("cardpress.appearance") || "{}");
+        const dark = saved.mode === "dark" || (saved.mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.documentElement.dataset.palette = saved.theme || "parchment";
       } catch (e) {}
     </script>
   </head>

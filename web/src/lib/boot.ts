@@ -1,3 +1,4 @@
+import { hydrateAppearance } from "./appearance";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, completeProfiles, upgradePlaceholderText, withStandardPalettes } from "./profiles";
@@ -18,7 +19,6 @@ export interface Loaded {
   /** The brand that is open. */
   activeId: string;
   designs: Record<string, Design>;
-  theme?: "light" | "dark";
   customFonts: FontDef[];
   drafts: Draft[];
   layout: Layout;
@@ -85,10 +85,10 @@ async function loadDrafts(profileId: string, design: Design | undefined): Promis
 function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[], activeId: string, session: Session): Loaded {
   const profiles = (s.profiles as Profile[]).length ? withStandardPalettes(s.profiles as Profile[]) : DEFAULT_PROFILES;
   const archived = Array.isArray(s.archived) ? completeProfiles(s.archived as Profile[]) : [];
-  const theme = s.preferences.theme === "dark" || s.preferences.theme === "light" ? s.preferences.theme : undefined;
+  hydrateAppearance(s.preferences);
   const fonts = Array.isArray(s.preferences.customFonts) ? (s.preferences.customFonts as FontDef[]) : [];
   const designs = Object.fromEntries(Object.entries(s.designs as Record<string, Design>).map(([k, d]) => [k, upgradePlaceholderText(d)]));
-  return { profiles, archived, activeId, designs, theme, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout), session };
+  return { profiles, archived, activeId, designs, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout), session };
 }
 
 export function useBoot() {

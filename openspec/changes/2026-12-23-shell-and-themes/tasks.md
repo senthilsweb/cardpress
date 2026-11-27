@@ -1,8 +1,9 @@
 # Tasks
-- [ ] Colour names for frame and surface; move components onto them
-- [ ] Themes, Light / Dark / System, saved per person
-- [ ] Header and labelled side bar, rounded surface, all pages
-- [ ] Studio controls into the header
-- [ ] Phone layout
-- [ ] Contrast and keyboard checks in every theme
-- [ ] User guide text and pictures, deploy
+- [x] Colour names for frame and surface; move components onto them
+- [x] Themes, Light / Dark / System, saved per person
+- [x] Header and labelled side bar, rounded surface, all pages
+- [x] Studio controls into the header
+- [x] Phone layout
+- [x] Contrast and keyboard checks in every theme
+- [x] User guide text
+- [ ] New guide pictures, deploy

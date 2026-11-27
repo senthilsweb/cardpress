@@ -1,7 +1,7 @@
-import { BookOpen, ChevronsUpDown, ExternalLink, LogOut, Moon, Sun } from "lucide-react";
+import { BookOpen, ChevronsUpDown, ExternalLink, LogOut, Moon, Palette, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/brands";
-import { helpHref } from "@/lib/nav";
+import { helpHref, settingsHref } from "@/lib/nav";
 import { initialsOf, roleLabel, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +15,12 @@ interface Props {
   onToggleTheme: () => void;
   /** "row" is the full-width entry of the open navigation; "avatar" is the circle of the folded one and the bottom bar. */
   variant?: "row" | "avatar";
+  /** Where the menu opens. */
+  side?: "right" | "bottom";
 }
 
-/** The person at the bottom of the navigation, and their short menu: who they are, the theme, the guide and Sign out. */
-export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avatar" }: Props) {
+/** The person at the right of the header, and their short menu: who they are, the theme, the guide and Sign out. */
+export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avatar", side = "right" }: Props) {
   const { user, signOut } = useSession();
   const shown = user?.fullName ?? name;
   const badge = (
@@ -44,7 +46,7 @@ export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avat
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="end" sideOffset={10} className="min-w-[230px] max-lg:mb-2">
+      <DropdownMenuContent side={side} align="end" sideOffset={8} className="min-w-[230px]">
         <DropdownMenuLabel className="truncate">
           {shown}
           {user && <span className="block text-xs font-normal text-muted-foreground">{user.email}</span>}
@@ -52,6 +54,9 @@ export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avat
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onToggleTheme}>
           {theme === "dark" ? <Sun /> : <Moon />} {theme === "dark" ? "Light mode" : "Dark mode"}
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={settingsHref("appearance")}><Palette /> Appearance</a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href={helpHref()}><BookOpen /> User guide</a>

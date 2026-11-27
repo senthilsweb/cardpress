@@ -53,7 +53,7 @@ export function DraftPicker({ drafts, currentId, onPick }: { drafts: Draft[]; cu
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
       {open && (
-        <div role="dialog" aria-label="Find a draft" className="absolute right-0 top-full z-30 mt-1 w-[min(420px,90vw)] overflow-hidden rounded-lg border border-border bg-card shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
+        <div role="dialog" aria-label="Find a draft" className="off-head absolute right-0 top-full z-50 mt-1 w-[min(420px,90vw)] overflow-hidden rounded-lg border border-border bg-card shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
           <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKey} placeholder="Search posts and articles" role="combobox" aria-expanded="true"
