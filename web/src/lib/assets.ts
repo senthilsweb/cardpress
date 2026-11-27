@@ -2,7 +2,18 @@
 
 export type AssetKind = "image" | "pdf" | "video";
 export interface Asset { id: string; profileId: string; kind: AssetKind; name: string; tags: string[]; mime?: string; size?: number; width?: number; height?: number; link?: string; hasThumb: boolean; createdBy?: string; createdAt: string }
-export interface Assets { items: Asset[]; usedBytes: number; limitBytes: number }
+/** One page of a library, with what is true of the whole: how many entries, every tag, how full. */
+export interface Assets { items: Asset[]; total: number; page: number; pages: number; pageSize: number; count: number; tags: string[]; usedBytes: number; limitBytes: number }
+export interface AssetQuery { text: string; kind: "" | AssetKind; tag: string; page: number; pageSize: number }
+export const ASSET_PAGE_SIZES = [12, 24, 48] as const;
+
+export function assetParams(q: AssetQuery): URLSearchParams {
+  const p = new URLSearchParams({ page: String(q.page), pageSize: String(q.pageSize) });
+  if (q.text.trim()) p.set("q", q.text.trim());
+  if (q.kind) p.set("kind", q.kind);
+  if (q.tag) p.set("tag", q.tag);
+  return p;
+}
 
 // the server's limits, so a file is refused before it is sent
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -43,16 +54,6 @@ export const nameFromFile = (file: string) => (file.replace(/\.[A-Za-z0-9]{1,5}$
 export function splitTags(text: string): string[] {
   const seen = new Set<string>();
   return text.split(",").map((t) => t.replace(/\s+/g, " ").trim()).filter((t) => t && !seen.has(t.toLowerCase()) && !!seen.add(t.toLowerCase()));
-}
-
-/** Every tag in use, in alphabetical order. */
-export const allTags = (items: Asset[]) => [...new Map(items.flatMap((a) => a.tags).map((t) => [t.toLowerCase(), t])).values()].sort((a, b) => a.localeCompare(b));
-
-/** The entries of a kind (all when empty) with a tag (any when empty) whose name or tags hold every word typed. */
-export function findAssets(items: Asset[], q: { text: string; kind: "" | AssetKind; tag: string }): Asset[] {
-  const words = q.text.toLowerCase().split(/\s+/).filter(Boolean);
-  const tag = q.tag.toLowerCase();
-  return items.filter((a) => (!q.kind || a.kind === q.kind) && (!tag || a.tags.some((t) => t.toLowerCase() === tag)) && words.every((w) => `${a.name} ${a.tags.join(" ")}`.toLowerCase().includes(w)));
 }
 
 const open = (file: Blob) => new Promise<HTMLImageElement>((ok, fail) => {

@@ -24,7 +24,7 @@ Figures come from items, publishing jobs, `chat_usage` and `users` (`GET /api/v1
 
 ## Media
 
-**Library → Media** (`/media/`, `components/media/`) holds a brand's pictures, PDF documents and video links, with search, type and tag filters, grid or list, and the space used. Files are chosen or dropped. The browser reduces a picture to 2,400 px and draws its thumbnail before sending (`lib/assets.ts`); the server checks type (from the bytes), size and the brand's allowance (`internal/service/media.go`). Cards and posts do not use the library yet.
+**Library → Media** (`/media/`, `components/media/`) holds a brand's pictures, PDF documents and video links, with search, type and tag filters, grid or list, pages of 12, 24 or 48 from the server, and the space used. Files are chosen or dropped. The browser reduces a picture to 2,400 px and draws its thumbnail before sending (`lib/assets.ts`); the server checks type (from the bytes), size and the brand's allowance (`internal/service/media.go`). Cards and posts do not use the library yet.
 
 ## Themes
 

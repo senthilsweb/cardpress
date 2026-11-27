@@ -17,7 +17,7 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST /profiles/{id}/archive`, `POST /profiles/{id}/restore` | Hide a brand and bring it back; archiving keeps everything and says how many posts are still scheduled |
 | `DELETE /profiles/{id}` | Delete an archived brand and everything it owns; refused (`409`) while it has scheduled or unfinished posts |
 | `GET`/`PUT /profiles/{id}/details` | Who the brand is (type, name, address, mobile, email): its owner and administrators only. All empty removes it |
-| `GET`/`POST /profiles/{id}/assets` | The brand's media library and how full it is; add a file (multipart: `name`, `tags`, `file`, `thumb`) or a video (`name`, `tags`, `link`) |
+| `GET`/`POST /profiles/{id}/assets` | The brand's media library, a page at a time (`?q=&kind=&tag=&page=&pageSize=12\|24\|48`), and how full it is; add a file (multipart: `name`, `tags`, `file`, `thumb`) or a video (`name`, `tags`, `link`) |
 | `PUT`/`DELETE /profiles/{id}/assets/{asset}` | Rename and tag an entry; delete it |
 | `GET /profiles/{id}/assets/{asset}/file` and `/thumb` | A stored file, sent as a download, and its thumbnail |
 | `GET /dashboard?profileId=` or `?scope=all`, `&days=7\|30\|90\|0&tz=`, or `&from=&to=` (days) | The dashboard's figures: totals (users for an administrator only), items created in the period by status, assistant cost and sessions in it |

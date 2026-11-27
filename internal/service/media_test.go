@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/png"
 	"path/filepath"
@@ -68,7 +69,7 @@ func TestMediaLibrary(t *testing.T) {
 		t.Errorf("video: %+v %v", v, err)
 	}
 
-	list, err := m.List(ctx, "a")
+	list, err := m.List(ctx, "a", AssetQuery{})
 	if err != nil || len(list.Items) != 3 || list.Items[0].ID != v.ID || list.UsedBytes != int64(len(pic)+14) || list.LimitBytes != 1<<20 {
 		t.Errorf("list: %d items, %d bytes, %v", len(list.Items), list.UsedBytes, err)
 	}
@@ -96,7 +97,7 @@ func TestMediaLibrary(t *testing.T) {
 	// another person's brand answers as missing, and an entry is only reached through its own brand
 	other := WithPrincipal(ctx, Principal{User: &User{ID: "owner-b", Roles: []string{"editor"}}})
 	for _, err := range []error{
-		func() error { _, err := m.List(other, "a"); return err }(),
+		func() error { _, err := m.List(other, "a", AssetQuery{}); return err }(),
 		func() error { _, err := m.File(other, "a", a.ID); return err }(),
 		func() error { _, err := m.File(other, "b", a.ID); return err }(),
 		func() error { _, err := m.Thumb(other, "b", a.ID); return err }(),
@@ -143,6 +144,59 @@ func TestWebPSize(t *testing.T) {
 	} {
 		if w, h, ok := imageSize(c.b, sniff(c.b)); !ok || w != c.w || h != c.h {
 			t.Errorf("%s: %d x %d %v", name, w, h, ok)
+		}
+	}
+}
+
+func TestMediaPages(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, "file:"+filepath.Join(t.TempDir(), "p.db"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO profiles (id, position, data, updated_at) VALUES ('a', 0, '{}', '')`); err != nil {
+		t.Fatal(err)
+	}
+	m := NewMedia(db.DB, 0)
+	for i := range 30 {
+		tags := []string{"All"}
+		if i%10 == 0 {
+			tags = append(tags, "Ünique")
+		}
+		if _, err := m.Add(ctx, "a", NewAsset{Name: fmt.Sprintf("Talk %02d", i), Tags: tags, Link: fmt.Sprintf("https://video.example/%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := func(q AssetQuery) Assets {
+		t.Helper()
+		got, err := m.List(ctx, "a", q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := list(AssetQuery{}); len(got.Items) != 24 || got.Total != 30 || got.Count != 30 || got.Pages != 2 || got.Items[0].Name != "Talk 29" || strings.Join(got.Tags, ",") != "All,Ünique" {
+		t.Errorf("first page: %d %+v", len(got.Items), got)
+	}
+	if got := list(AssetQuery{Page: 3, PageSize: 12}); got.Page != 3 || got.Pages != 3 || len(got.Items) != 6 || got.Items[5].Name != "Talk 00" {
+		t.Errorf("last page: %d %+v", len(got.Items), got)
+	}
+	if got := list(AssetQuery{Page: 9}); got.Page != 2 || len(got.Items) != 6 {
+		t.Errorf("past the end: %+v", got)
+	}
+	if got := list(AssetQuery{Tag: "ünique", Q: "talk 1"}); got.Total != 1 || got.Items[0].Name != "Talk 10" || got.Count != 30 {
+		t.Errorf("tag and words: %+v", got)
+	}
+	if got := list(AssetQuery{Kind: "pdf"}); got.Total != 0 || got.Pages != 1 || got.Page != 1 || len(got.Items) != 0 {
+		t.Errorf("none of a kind: %+v", got)
+	}
+	for _, bad := range []AssetQuery{{Kind: "doc"}, {PageSize: 1000}, {Page: -1}} {
+		if _, err := m.List(ctx, "a", bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%+v was accepted", bad)
 		}
 	}
 }

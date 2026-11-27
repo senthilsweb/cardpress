@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatInZone, relative, timezones, zonedToUtc } from "@/lib/jobs";
+import { Combobox } from "@/components/ui/combobox";
+import { formatInZone, relative, timezones, zonedToUtc, zoneOtherName } from "@/lib/jobs";
 
 /** The earliest and latest times the server accepts (it checks again). */
 const MIN_LEAD_MS = 60_000;
@@ -29,12 +30,8 @@ export function ScheduleFields({ idPrefix, local, tz, onLocal, onTz, verb = "Pos
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${idPrefix}-tz`}>Time zone</Label>
-          <select
-            id={`${idPrefix}-tz`} value={tz} onChange={(e) => onTz(e.target.value)}
-            className="flex h-9 w-full cursor-pointer rounded-md border border-input bg-card px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {(zones.includes(tz) ? zones : [tz, ...zones]).map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
-          </select>
+          <Combobox id={`${idPrefix}-tz`} searchLabel="Search time zones" value={tz} onChange={onTz}
+            options={(zones.includes(tz) ? zones : [tz, ...zones]).map((z) => ({ value: z, label: z.replace(/_/g, " "), words: zoneOtherName(z) }))} />
         </div>
       </div>
       <p className={problem ? "text-xs text-destructive" : "text-xs text-muted-foreground"} aria-live="polite">

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Palette, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, ChevronRight, Copy, Loader2, Palette, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Pane } from "@/components/ui/pane";
 import { useUnsaved } from "@/components/settings/guard";
 import { DetailsFields } from "@/components/settings/BrandDetails";
@@ -73,25 +75,29 @@ export function NewBrand({ onClose, brands, current, source, onCreate }: {
           <Label htmlFor="nb-handle">Handle</Label>
           <Input id="nb-handle" value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@yourbrand" autoComplete="off" />
         </div>
-        <fieldset className="space-y-2">
-          <legend className="mb-1.5 text-sm font-medium">Start from</legend>
+        <div className="space-y-2">
+          <p id="nb-from" className="text-sm font-medium">Start from</p>
+          <RadioGroup aria-labelledby="nb-from" value={String(copy)} onValueChange={(v) => setCopy(v === "true")}>
           {([[false, "Blank"], [true, `A copy of “${from.name}”`]] as const).map(([val, label]) => (
             <label key={String(val)} className={cn("flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm", copy === val ? "border-brand bg-accent" : "border-border hover:border-brand/50")}>
-              <input type="radio" name="nb-from" className="mt-1 accent-[var(--brand)]" checked={copy === val} onChange={() => setCopy(val)} />
+              <RadioGroupItem value={String(val)} className="mt-0.5" />
               <span>
                 {label}
                 {val && <span className="block text-xs text-muted-foreground">Logo, colours and fonts. Not accounts or posts.</span>}
               </span>
             </label>
           ))}
-        </fieldset>
-        <details className="rounded-md border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium">Contact details (optional)</summary>
+          </RadioGroup>
+        </div>
+        <Collapsible className="rounded-md border border-border px-3 py-2">
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-1 text-sm font-medium [&[data-state=open]>svg]:rotate-90"><ChevronRight aria-hidden className="h-4 w-4" /> Contact details (optional)</CollapsibleTrigger>
+          <CollapsibleContent>
           <div className="mt-3 space-y-3 pb-1">
             <p className="text-xs text-muted-foreground">Private: never on a card or a public page, and not sent to the assistant. A website can show in a card's footer.</p>
             <DetailsFields value={details} onChange={setDetails} website={{ value: website, onChange: setWebsite }} />
           </div>
-        </details>
+          </CollapsibleContent>
+        </Collapsible>
         {(wrong || error) && <p role="alert" className="text-xs text-destructive">{wrong ?? error}</p>}
       </form>
     </Pane>

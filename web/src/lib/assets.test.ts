@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allTags, fileProblem, fileSize, findAssets, fit, nameFromFile, splitTags, type Asset } from "./assets";
-
-const asset = (name: string, kind: Asset["kind"], tags: string[] = []): Asset => ({ id: name, profileId: "b", kind, name, tags, hasThumb: false, createdAt: "" });
+import { assetParams, fileProblem, fileSize, fit, nameFromFile, splitTags } from "./assets";
 
 describe("media library", () => {
   it("writes sizes", () => {
@@ -31,12 +29,8 @@ describe("media library", () => {
     expect(splitTags(" team, Team ,, year  end ")).toEqual(["team", "year end"]);
   });
 
-  it("finds by words, kind and tag", () => {
-    const items = [asset("Logo dark", "image", ["Brand"]), asset("Price list", "pdf", ["sales"]), asset("Launch talk", "video", ["brand", "events"])];
-    expect(allTags(items).map((t) => t.toLowerCase())).toEqual(["brand", "events", "sales"]);
-    expect(findAssets(items, { text: "", kind: "", tag: "" })).toHaveLength(3);
-    expect(findAssets(items, { text: "brand lau", kind: "", tag: "" }).map((a) => a.name)).toEqual(["Launch talk"]);
-    expect(findAssets(items, { text: "", kind: "image", tag: "BRAND" }).map((a) => a.name)).toEqual(["Logo dark"]);
-    expect(findAssets(items, { text: "price", kind: "video", tag: "" })).toEqual([]);
+  it("asks the server for one page", () => {
+    expect(assetParams({ text: "  ", kind: "", tag: "", page: 1, pageSize: 24 }).toString()).toBe("page=1&pageSize=24");
+    expect(assetParams({ text: " logo ", kind: "image", tag: "Brand", page: 2, pageSize: 12 }).toString()).toBe("page=2&pageSize=12&q=logo&kind=image&tag=Brand");
   });
 });

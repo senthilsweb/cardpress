@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/senthilsweb/cardpress/internal/service"
@@ -13,7 +14,7 @@ import (
 
 // Media is the part of the media library the HTTP API needs.
 type Media interface {
-	List(ctx context.Context, profileID string) (service.Assets, error)
+	List(ctx context.Context, profileID string, q service.AssetQuery) (service.Assets, error)
 	Add(ctx context.Context, profileID string, in service.NewAsset) (service.Asset, error)
 	Update(ctx context.Context, profileID, id, name string, tags []string) (service.Asset, error)
 	Delete(ctx context.Context, profileID, id string) error
@@ -36,11 +37,15 @@ func (s *server) media(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// listAssets answers ?q= &kind= &tag= &page= &pageSize= with one page of the library.
 func (s *server) listAssets(w http.ResponseWriter, r *http.Request) {
 	if !s.media(w, r) {
 		return
 	}
-	list, err := s.Media.List(r.Context(), r.PathValue("id"))
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	size, _ := strconv.Atoi(q.Get("pageSize"))
+	list, err := s.Media.List(r.Context(), r.PathValue("id"), service.AssetQuery{Q: q.Get("q"), Kind: q.Get("kind"), Tag: q.Get("tag"), Page: page, PageSize: size})
 	if err != nil {
 		fail(w, r, err)
 		return

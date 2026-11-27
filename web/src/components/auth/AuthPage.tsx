@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, type ApiInfo } from "@/lib/api";
 import { BuiltWith, Logo } from "@/components/studio/Logo";
 import { base, daysIn, joinDate, loginUrl, MONTHS, signupUrl } from "@/lib/session";
-
-const select = "flex h-9 w-full cursor-pointer rounded-md border border-input bg-card px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /** Where to go after signing in: a page of this app only. */
 function nextPage(): string {
@@ -57,17 +57,21 @@ export function DatePicker({ y, m, d, onChange, idPrefix }: { y: string; m: stri
     if (next.d && Number(next.d) > daysIn(next.y, next.m)) next.d = ""; // 31 February is not offered
     onChange(next);
   };
+  /** One of the three; its name stands for "not set", since a drop-down line cannot be empty. */
+  const part = (id: string | undefined, name: string, value: string, pick: (v: string) => void, options: string[][]) => (
+    <Select value={value || "none"} onValueChange={(v) => pick(v === "none" ? "" : v)}>
+      <SelectTrigger id={id} aria-label={name}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">{name}</SelectItem>
+        {options.map(([v, label]) => <SelectItem key={v} value={v}>{label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
   return (
-    <div className="grid grid-cols-[4.5rem_1fr_5.5rem] gap-2">
-      <select id={`${idPrefix}-day`} aria-label="Day" className={select} value={d} onChange={(e) => set({ d: e.target.value })}>
-        <option value="">Day</option>{days.map((x) => <option key={x} value={x}>{x}</option>)}
-      </select>
-      <select aria-label="Month" className={select} value={m} onChange={(e) => set({ m: e.target.value })}>
-        <option value="">Month</option>{MONTHS.map((x, i) => <option key={x} value={String(i + 1)}>{x}</option>)}
-      </select>
-      <select aria-label="Year" className={select} value={y} onChange={(e) => set({ y: e.target.value })}>
-        <option value="">Year</option>{years.map((x) => <option key={x} value={x}>{x}</option>)}
-      </select>
+    <div className="grid grid-cols-[5rem_1fr_6rem] gap-2">
+      {part(`${idPrefix}-day`, "Day", d, (v) => set({ d: v }), days.map((x) => [x, x]))}
+      {part(undefined, "Month", m, (v) => set({ m: v }), MONTHS.map((x, i) => [String(i + 1), x]))}
+      {part(undefined, "Year", y, (v) => set({ y: v }), years.map((x) => [x, x]))}
     </div>
   );
 }
@@ -147,13 +151,15 @@ function Signup({ info }: { info: ApiInfo }) {
         </div>
         <div className="space-y-1.5"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={f.email} onChange={set("email")} autoComplete="email" required /></div>
         <Password id="password" label="Password" value={f.password} onChange={(v) => setF((x) => ({ ...x, password: v }))} hint="At least 10 characters. A few words work well." autoComplete="new-password" />
-        <details className="group rounded-md border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm text-muted-foreground group-open:mb-3">Optional details</summary>
+        <Collapsible className="rounded-md border border-border px-3 py-2">
+          <CollapsibleTrigger type="button" className="flex w-full cursor-pointer items-center gap-1 text-sm text-muted-foreground data-[state=open]:mb-3 [&[data-state=open]>svg]:rotate-90"><ChevronRight aria-hidden className="h-4 w-4" /> Optional details</CollapsibleTrigger>
+          <CollapsibleContent>
           <div className="space-y-3 pb-1">
             <div className="space-y-1.5"><Label htmlFor="phone">Phone</Label><Input id="phone" type="tel" value={f.phone} onChange={set("phone")} autoComplete="tel" /></div>
             <div className="space-y-1.5"><Label htmlFor="dob-day">Date of birth</Label><DatePicker idPrefix="dob" {...dob} onChange={setDob} /></div>
           </div>
-        </details>
+          </CollapsibleContent>
+        </Collapsible>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <Button type="submit" variant="brand" className="w-full" disabled={busy || !ready}>{busy && <Loader2 className="animate-spin" />} {first ? "Create the admin account" : "Create account"}</Button>
       </form>

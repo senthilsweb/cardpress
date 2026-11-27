@@ -13,7 +13,9 @@ import (
 	"image"
 	_ "image/jpeg" // read a picture's size
 	_ "image/png"  // read a picture's size
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -70,12 +72,30 @@ type Asset struct {
 	CreatedAt string   `json:"createdAt"`
 }
 
-// Assets is a brand's library and how full it is. A file listed twice is counted once.
+// Assets is one page of a brand's library, with what is true of the whole of it: how many entries, every tag, and how
+// full it is. A file listed twice is counted once.
 type Assets struct {
-	Items      []Asset `json:"items"`
-	UsedBytes  int64   `json:"usedBytes"`
-	LimitBytes int64   `json:"limitBytes"`
+	Items      []Asset  `json:"items"`
+	Total      int      `json:"total"` // entries that match
+	Page       int      `json:"page"`  // the page returned (1-based, kept within range)
+	PageSize   int      `json:"pageSize"`
+	Pages      int      `json:"pages"` // at least 1
+	Count      int      `json:"count"` // entries in the library
+	Tags       []string `json:"tags"`
+	UsedBytes  int64    `json:"usedBytes"`
+	LimitBytes int64    `json:"limitBytes"`
 }
+
+// AssetQuery says which entries to list: those of a kind ("" for all), with a tag, whose name or tags hold every word.
+type AssetQuery struct {
+	Q, Kind, Tag   string
+	Page, PageSize int // 0: the first page, 24 entries
+}
+
+// AssetPageSizes are the page sizes a caller may ask for.
+var AssetPageSizes = []int{12, 24, 48}
+
+const assetDefaultPageSize = 24
 
 // NewAsset is what is added: a file with its thumbnail, or a video's address.
 type NewAsset struct {
@@ -204,27 +224,72 @@ func (m *Media) open(ctx context.Context, profileID string) error {
 	return brandVisible(ctx, m.db, profileID)
 }
 
-// List is a brand's library, newest first.
-func (m *Media) List(ctx context.Context, profileID string) (Assets, error) {
-	out := Assets{Items: []Asset{}, LimitBytes: m.BrandLimit}
+// matches says whether an entry is one the query asks for. Words and tags are compared without case.
+func (q AssetQuery) matches(a Asset) bool {
+	if q.Kind != "" && a.Kind != q.Kind {
+		return false
+	}
+	if q.Tag != "" && !slices.ContainsFunc(a.Tags, func(t string) bool { return strings.EqualFold(t, q.Tag) }) {
+		return false
+	}
+	text := strings.ToLower(a.Name + " " + strings.Join(a.Tags, " "))
+	for _, w := range strings.Fields(strings.ToLower(q.Q)) {
+		if !strings.Contains(text, w) {
+			return false
+		}
+	}
+	return true
+}
+
+// List is a page of a brand's library, newest first. The entries are read without their files or thumbnails.
+func (m *Media) List(ctx context.Context, profileID string, q AssetQuery) (Assets, error) {
+	out := Assets{Items: []Asset{}, Tags: []string{}, LimitBytes: m.BrandLimit}
 	if err := m.open(ctx, profileID); err != nil {
 		return out, err
+	}
+	if q.Kind != "" && q.Kind != "image" && q.Kind != "pdf" && q.Kind != "video" {
+		return out, invalid("kind must be image, pdf or video")
+	}
+	size := q.PageSize
+	if size == 0 {
+		size = assetDefaultPageSize
+	}
+	if !slices.Contains(AssetPageSizes, size) {
+		return out, invalid("pageSize must be 12, 24 or 48")
+	}
+	if q.Page < 0 {
+		return out, invalid("page must be 1 or more")
 	}
 	rs, err := m.db.QueryContext(ctx, `SELECT `+assetColumns+` FROM assets a WHERE a.profile_id = ? ORDER BY a.created_at DESC, a.rowid DESC`, profileID)
 	if err != nil {
 		return out, err
 	}
+	var found []Asset
+	tags := map[string]string{}
 	for rs.Next() {
 		a, err := scanAsset(rs)
 		if err != nil {
 			rs.Close()
 			return out, err
 		}
-		out.Items = append(out.Items, a)
+		out.Count++
+		for _, t := range a.Tags {
+			tags[strings.ToLower(t)] = t
+		}
+		if q.matches(a) {
+			found = append(found, a)
+		}
 	}
 	if err := closeRows(rs); err != nil {
 		return out, err
 	}
+	for _, k := range slices.Sorted(maps.Keys(tags)) {
+		out.Tags = append(out.Tags, tags[k])
+	}
+	out.Total, out.PageSize = len(found), size
+	out.Pages = max(1, (len(found)+size-1)/size)
+	out.Page = min(max(1, q.Page), out.Pages) // a page past the end (after a delete, say) shows the last one
+	out.Items = append(out.Items, found[(out.Page-1)*size:min(len(found), out.Page*size)]...)
 	out.UsedBytes, err = m.used(ctx, m.db, profileID)
 	return out, err
 }

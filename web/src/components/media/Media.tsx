@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Pager } from "@/components/ui/pager";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +22,7 @@ import { SessionProvider } from "@/components/studio/SessionProvider";
 import { Thumb } from "./Thumb";
 import { api } from "@/lib/api";
 import { formatInZone } from "@/lib/jobs";
-import { ACCEPT, allTags, fileProblem, fileSize, findAssets, KIND_LABEL, nameFromFile, prepareUpload, splitTags, type Asset, type AssetKind, type Assets } from "@/lib/assets";
+import { ACCEPT, ASSET_PAGE_SIZES, fileProblem, fileSize, KIND_LABEL, nameFromFile, prepareUpload, splitTags, type Asset, type AssetKind, type Assets } from "@/lib/assets";
 import { libraryHref, studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
@@ -30,6 +31,8 @@ import { cn } from "@/lib/utils";
 const noop = () => undefined;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 const VIEW_KEY = "cardpress.media.view";
+const SIZE_KEY = "cardpress.media.pageSize";
+const savedSize = () => { try { const n = Number(localStorage.getItem(SIZE_KEY)); return (ASSET_PAGE_SIZES as readonly number[]).includes(n) ? n : 24; } catch { return 24; } };
 
 export default function Media() {
   const { boot, retry, submitToken } = useLibraryBoot();
@@ -44,9 +47,10 @@ function Page({ data }: { data: LibraryBoot }) {
   const [brand, setBrand] = useState(data.activeId);
   const [library, setLibrary] = useState<Assets | null>(null);
   const [error, setError] = useState("");
-  const [text, setText] = useState("");
-  const [kind, setKind] = useState<"" | AssetKind>("");
-  const [tag, setTag] = useState("");
+  const [typed, setTyped] = useState("");
+  // what the server is asked for; a new filter starts at the first page
+  const [query, setQuery] = useState(() => ({ text: "", kind: "" as "" | AssetKind, tag: "", page: 1, pageSize: savedSize() }));
+  const ask = useCallback((change: Partial<typeof query>) => setQuery((q) => ({ ...q, page: 1, ...change })), []);
   const [view, setView] = useState<"grid" | "list">(() => { try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid"; } catch { return "grid"; } });
   const [sending, setSending] = useState<{ name: string; at: number; of: number } | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -59,12 +63,23 @@ function Page({ data }: { data: LibraryBoot }) {
     if (data.noBrand) return;
     const mine = ++run.current;
     setError("");
-    api.assets(brand).then((l) => { if (mine === run.current) setLibrary(l); }, (e) => { if (mine === run.current) { setLibrary(null); setError(message(e)); } });
-  }, [brand, data.noBrand]);
+    api.assets(brand, query).then((l) => {
+      if (mine !== run.current) return;
+      setLibrary(l);
+      if (l.page !== query.page) setQuery((q) => ({ ...q, page: l.page })); // the page asked for was past the end
+    }, (e) => { if (mine === run.current) { setLibrary(null); setError(message(e)); } });
+  }, [brand, query, data.noBrand]);
   useEffect(load, [load]);
+  // search waits for a pause in typing
+  useEffect(() => {
+    const t = window.setTimeout(() => setQuery((q) => (q.text === typed ? q : { ...q, text: typed, page: 1 })), 300);
+    return () => window.clearTimeout(t);
+  }, [typed]);
+  /** After adding: the newest are first, so show the first page. */
+  const showNewest = () => { if (query.page === 1) load(); else ask({}); };
 
   const changeView = (v: "grid" | "list") => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not remembered */ } };
-  const switchBrand = (id: string) => { void api.putPreference("activeProfile", id).then(() => { setLibrary(null); setTag(""); setBrand(id); }, (e) => toast.error("Could not switch", { description: message(e) })); };
+  const switchBrand = (id: string) => { void api.putPreference("activeProfile", id).then(() => { setLibrary(null); ask({ tag: "" }); setBrand(id); }, (e) => toast.error("Could not switch", { description: message(e) })); };
 
   /** Files go one at a time, which a small server can hold. */
   const upload = async (files: File[]) => {
@@ -90,7 +105,7 @@ function Page({ data }: { data: LibraryBoot }) {
     setSending(null);
     if (added) toast.success(added === 1 ? "Added" : `Added ${added}`);
     if (failed.length) toast.error(failed.length === 1 ? "Not added" : `${failed.length} were not added`, { description: failed.join("\n"), duration: 8000 });
-    load();
+    showNewest();
   };
 
   const save = async (a: Asset, name: string, tags: string[]) => { await api.updateAsset(a.profileId, a.id, { name, tags }); load(); };
@@ -109,9 +124,8 @@ function Page({ data }: { data: LibraryBoot }) {
     } catch (e) { toast.error("Could not download", { description: message(e) }); }
   };
 
-  const items = library?.items ?? [];
-  const tags = allTags(items);
-  const shown = findAssets(items, { text, kind, tag: tags.includes(tag) ? tag : "" });
+  const shown = library?.items ?? [];
+  const tags = library?.tags ?? [];
   const name = data.profiles.find((p) => p.id === brand)?.name ?? "";
   const full = library ? Math.min(100, (library.usedBytes / library.limitBytes) * 100) : 0;
 
@@ -149,7 +163,7 @@ function Page({ data }: { data: LibraryBoot }) {
               <Button asChild variant="ghost" size="sm" className="lg:hidden"><a href={libraryHref()}>Posts and articles</a></Button>
               {!data.noBrand && (
                 <>
-                  <AddVideo brand={brand} onAdded={load} />
+                  <AddVideo brand={brand} onAdded={showNewest} />
                   <Button variant="brand" size="sm" disabled={!!sending} onClick={() => input.current?.click()}><Upload /> Upload</Button>
                   <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" aria-label="Choose files to upload" onChange={(e) => { void upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
                 </>
@@ -170,20 +184,21 @@ function Page({ data }: { data: LibraryBoot }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative min-w-[180px] flex-1">
                     <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search" aria-label="Search the media library" className="pl-8" />
+                    <Input type="search" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Search" aria-label="Search the media library" className="pl-8" />
                   </div>
-                  <ToggleGroup type="single" aria-label="Type" className={group} value={kind || "all"} onValueChange={(v) => { if (v) setKind(v === "all" ? "" : (v as AssetKind)); }}>
+                  <ToggleGroup type="single" aria-label="Type" className={group} value={query.kind || "all"} onValueChange={(v) => { if (v) ask({ kind: v === "all" ? "" : (v as AssetKind) }); }}>
                     <ToggleGroupItem value="all">All</ToggleGroupItem>
                     <ToggleGroupItem value="image">Images</ToggleGroupItem>
                     <ToggleGroupItem value="pdf">PDFs</ToggleGroupItem>
                     <ToggleGroupItem value="video">Videos</ToggleGroupItem>
                   </ToggleGroup>
-                  {tags.length > 0 && (
-                    <Select value={tags.includes(tag) ? tag : "*"} onValueChange={(v) => setTag(v === "*" ? "" : v)}>
+                  {(tags.length > 0 || query.tag) && (
+                    <Select value={query.tag || "*"} onValueChange={(v) => ask({ tag: v === "*" ? "" : v })}>
                       <SelectTrigger className="w-[150px]" aria-label="Tag"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="*">Any tag</SelectItem>
-                        {tags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        {/* the chosen tag stays listed when its last entry goes */}
+                        {[...new Set([...tags, ...(query.tag ? [query.tag] : [])])].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
@@ -193,7 +208,7 @@ function Page({ data }: { data: LibraryBoot }) {
                   </ToggleGroup>
                 </div>
 
-                {items.length === 0 ? (
+                {library.count === 0 ? (
                   <Card className="grid place-items-center gap-3 border-dashed p-10 text-center">
                     <p className="text-sm text-muted-foreground">Nothing here yet. Drop pictures or PDFs on this page.</p>
                     <Button variant="outline" size="sm" disabled={!!sending} onClick={() => input.current?.click()}><Upload /> Choose files</Button>
@@ -237,6 +252,10 @@ function Page({ data }: { data: LibraryBoot }) {
                     </Table>
                   </Card>
                 )}
+
+                <Pager label="Pages of the media library" page={library.page} pages={library.pages} pageSize={library.pageSize} total={library.total} sizes={ASSET_PAGE_SIZES}
+                  onPage={(page) => { setQuery((q) => ({ ...q, page })); document.querySelector("main")?.scrollTo(0, 0); }}
+                  onSize={(pageSize) => { try { localStorage.setItem(SIZE_KEY, String(pageSize)); } catch { /* not remembered */ } ask({ pageSize }); }} />
 
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <div role="meter" aria-label="Library space used" aria-valuemin={0} aria-valuemax={library.limitBytes} aria-valuenow={library.usedBytes} className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">

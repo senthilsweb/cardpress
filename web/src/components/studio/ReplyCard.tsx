@@ -1,5 +1,6 @@
-import { CheckCircle2, CircleAlert, CircleSlash, History, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleAlert, CircleSlash, History, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { ChatMessage, ReplyReport } from "@/lib/chat";
 import { checkLine, hasOutcome, savedLine } from "@/lib/reply";
 
@@ -54,10 +55,10 @@ export function ReplyCard({ message, onVersion }: { message: ChatMessage; onVers
         </div>
       ))}
       {d?.steps && d.steps.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it did</summary>
-          <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-muted-foreground">{d.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-        </details>
+        <Collapsible>
+          <CollapsibleTrigger className="flex cursor-pointer items-center gap-0.5 text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-90"><ChevronRight aria-hidden className="h-3.5 w-3.5" /> What it did</CollapsibleTrigger>
+          <CollapsibleContent><ol className="mt-1 list-decimal space-y-0.5 pl-5 text-muted-foreground">{d.steps.map((s, i) => <li key={i}>{s}</li>)}</ol></CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );

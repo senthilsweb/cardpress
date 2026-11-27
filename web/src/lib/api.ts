@@ -53,7 +53,7 @@ import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
 import type { BrandDetails } from "./brandDetails";
-import type { Asset, Assets } from "./assets";
+import { assetParams, type Asset, type AssetQuery, type Assets } from "./assets";
 import { defaultTimezone } from "./jobs";
 import { periodQuery, type Dashboard, type Period } from "./dashboard";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
@@ -209,7 +209,7 @@ export const api = {
   brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
   saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
   /** A brand's media library. */
-  assets: (brand: string) => call<Assets>("GET", `/profiles/${encodeURIComponent(brand)}/assets`),
+  assets: (brand: string, q: AssetQuery) => call<Assets>("GET", `/profiles/${encodeURIComponent(brand)}/assets?${assetParams(q)}`),
   addAsset: (brand: string, form: FormData) => call<Asset>("POST", `/profiles/${encodeURIComponent(brand)}/assets`, form),
   updateAsset: (brand: string, id: string, change: { name: string; tags: string[] }) => call<Asset>("PUT", `/profiles/${encodeURIComponent(brand)}/assets/${encodeURIComponent(id)}`, change),
   deleteAsset: (brand: string, id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(brand)}/assets/${encodeURIComponent(id)}`),

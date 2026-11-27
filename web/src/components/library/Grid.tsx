@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarClock, Eye, ExternalLink, Globe, MoreHorizontal, PenLine, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatInZone } from "@/lib/jobs";
 import { COLUMNS, pagePath, rowActions, rowKey, type ColumnId, type LibraryItem, type LibrarySort, type SortKey } from "@/lib/library";
@@ -86,8 +87,8 @@ export function Grid({ items, columns, sort, onSort, selected, onSelected, loadi
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
           <tr>
             <th scope="col" className="w-10 px-3 py-2.5">
-              <input type="checkbox" aria-label="Select every row on this page that can be deleted" className="h-4 w-4 cursor-pointer accent-[var(--brand)]"
-                checked={allOnPage} disabled={deletable.length === 0} onChange={toggleAll} />
+              <Checkbox aria-label="Select every row on this page that can be deleted" className="align-middle"
+                checked={allOnPage} disabled={deletable.length === 0} onCheckedChange={toggleAll} />
             </th>
             <th scope="col" className="w-24 px-1 py-2.5"><span className="sr-only">Card</span></th>
             {heading("Title", "title", "min-w-[220px]")}
@@ -102,8 +103,8 @@ export function Grid({ items, columns, sort, onSort, selected, onSelected, loadi
             return (
               <tr key={key} onClick={(e) => { if (!(e.target as HTMLElement).closest("button, a, input, [role=menuitem]")) act.onView(it); }} className={cn("cursor-pointer border-b border-border last:border-b-0 hover:bg-muted/30", selected.has(key) && "bg-brand/5")}>
                 <td className="px-3 py-2 align-middle">
-                  <input type="checkbox" aria-label={`Select ${it.title || "Untitled"}`} className="h-4 w-4 cursor-pointer accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
-                    checked={selected.has(key)} disabled={!a.delete} title={a.deleteWhy ?? undefined} onChange={() => toggle(it)} />
+                  <Checkbox aria-label={`Select ${it.title || "Untitled"}`} className="align-middle"
+                    checked={selected.has(key)} disabled={!a.delete} title={a.deleteWhy ?? undefined} onCheckedChange={() => toggle(it)} />
                 </td>
                 <td className="px-1 py-2 align-middle">{thumb(it)}</td>
                 <td className="max-w-[420px] px-3 py-2 align-middle">

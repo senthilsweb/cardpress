@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatInZone, relative, toLocalInput, zonedToUtc } from "./jobs";
+import { formatInZone, relative, toLocalInput, zonedToUtc, zoneOtherName } from "./jobs";
 
 const iso = (s: string, tz: string) => zonedToUtc(s, tz)?.toISOString();
 
@@ -50,5 +50,13 @@ describe("relative", () => {
     expect(relative("2026-12-01T12:00:00Z", now)).toBe("in 3 h");
     expect(relative("2026-12-04T09:00:00Z", now)).toBe("in 3 days");
     expect(relative("2026-12-01T08:55:00Z", now)).toBe("5 min ago");
+  });
+});
+
+describe("zone names", () => {
+  it("answers to the city's other name", () => {
+    expect(zoneOtherName("Asia/Calcutta")).toBe("Kolkata");
+    expect(zoneOtherName("Asia/Kolkata")).toBe("Calcutta");
+    expect(zoneOtherName("Europe/Paris")).toBe("");
   });
 });

@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { countries, detailsProblem, EMPTY_DETAILS, KIND_LABEL, sameDetails, type BrandDetails } from "@/lib/brandDetails";
 import { useUnsaved } from "./guard";
-
-const select = "h-9 w-full cursor-pointer rounded-md border border-input bg-card px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /** The fields of who a brand is. `website` is the brand's own field, shown among them where it can be set here. */
 export function DetailsFields({ value, onChange, website }: { value: BrandDetails; onChange: (v: BrandDetails) => void; website?: { value: string; onChange: (v: string) => void } }) {
@@ -24,10 +24,14 @@ export function DetailsFields({ value, onChange, website }: { value: BrandDetail
     <div className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor={`${id}-kind`}>Type</Label>
-        <select id={`${id}-kind`} className={select} value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value as BrandDetails["kind"] })}>
-          <option value="">Not set</option>
-          {Object.entries(KIND_LABEL).map(([k, name]) => <option key={k} value={k}>{name}</option>)}
-        </select>
+        {/* a drop-down line cannot be empty, so "not set" has a name of its own */}
+        <Select value={value.kind || "none"} onValueChange={(v) => onChange({ ...value, kind: (v === "none" ? "" : v) as BrandDetails["kind"] })}>
+          <SelectTrigger id={`${id}-kind`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Not set</SelectItem>
+            {Object.entries(KIND_LABEL).map(([k, name]) => <SelectItem key={k} value={k}>{name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       {field("legalName", value.kind === "individual" ? "Full name" : value.kind === "company" ? "Company name" : "Name (company or person)", { maxLength: 160 })}
       {field("line1", "Address line 1", { maxLength: 160 })}
@@ -38,10 +42,8 @@ export function DetailsFields({ value, onChange, website }: { value: BrandDetail
         {field("postalCode", "Postal code", { maxLength: 20 })}
         <div className="space-y-1.5">
           <Label htmlFor={`${id}-country`}>Country</Label>
-          <select id={`${id}-country`} className={select} value={value.country} onChange={(e) => onChange({ ...value, country: e.target.value })}>
-            <option value="">Not set</option>
-            {all.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-          </select>
+          <Combobox id={`${id}-country`} searchLabel="Search countries" value={value.country} onChange={(country) => onChange({ ...value, country })}
+            options={[{ value: "", label: "Not set" }, ...all.map((c) => ({ value: c.code, label: c.name }))]} />
         </div>
       </div>
       {website && (
