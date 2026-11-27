@@ -52,7 +52,7 @@ const savePref = (key: string, value: string) => { try { window.localStorage.set
  * Everything about the item on screen, each field once, in the groups of the content schema. Its status, what is
  * missing and the next step stay at the bottom.
  */
-export function Details({ media, changed, onSeen, setCard, onCardFocus, versionsAsked, version, openPreview, onPreviewOpened, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
+export function Details({ media, changed, onSeen, setCard, onCardFocus, versionsAsked, version, openPreview, onPreviewOpened, onPreviewClosed, store, jobs, brandNames, renderPng, onOpenSettings, design, profile, palette, size, expanded, setExpanded, host }: {
   /** What the open post carries. */
   media: PostMediaView;
   /** Fields someone else changed that have not been looked at. */
@@ -70,6 +70,8 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   openPreview?: boolean;
   /** Called once it has opened, so it does not open again the next time this shows. */
   onPreviewOpened?: () => void;
+  /** The Full preview was closed. */
+  onPreviewClosed?: () => void;
   store: DraftStore; design: Design; profile: Profile; palette: Palette; size: Size;
   /** Scheduled and published posts. */
   jobs: JobsStore;
@@ -118,6 +120,8 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   const openFull = () => { flushPendingEdits(); setPreview(true); };
   const collapse = () => { flushPendingEdits(); setExpanded(false); };
   useEffect(() => { if (openPreview) { flushPendingEdits(); setPreview(true); onPreviewOpened?.(); } }, [openPreview]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wasPreview = useRef(false);
+  useEffect(() => { if (wasPreview.current && !preview) onPreviewClosed?.(); wasPreview.current = preview; }, [preview]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tag, setTag] = useState("");
   const own = draft?.kind === "post" && media.media.kind !== "card" ? media.media.kind : undefined;
   const pics = own === "images" ? draft?.images ?? [] : [];

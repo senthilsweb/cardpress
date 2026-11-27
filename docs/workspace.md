@@ -6,8 +6,8 @@ How the screens are arranged, and what is remembered.
 
 Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
-- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **Sign out**).
-- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
+- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **About CardPress**, **Sign out**).
+- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser), and last **About** (version, build, database and the assistant's versions).
 - On a narrow screen the header is shorter and the side bar runs along the bottom.
 
 ## Themes
@@ -56,7 +56,8 @@ A footer field that has never been written shows the brand's handle (right) or w
 
 Above the canvas:
 
-- **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view.
+- **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view. A feed preview opens and closes its text (**see more**, **see less**).
+- **Full preview** on the canvas toolbar (**Ctrl/⌘ + Enter** away from a text field) opens the item as it is now, from any column. The window belongs to Details, which is there out of sight while it is open.
 - **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, or typing in Card words, it shows the card instead, with the sizes and export buttons.
 - **Both** puts them side by side when the canvas is at least 900 pixels wide. Click a side to work on it.
 - The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **New** starts fresh: an empty post or article (the one on screen decides which), a card in the brand's look with nothing written on it, and an empty chat. It is the only **New**, and stays above the screen on a phone. Deleting the item or the conversation on screen does the same. A dot marks a view that changed while you were looking at another.

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Info, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
 import { openSettings, SettingsHost } from "@/components/settings/SettingsDialog";
+import { About } from "./About";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
 import { calendarHref, helpHref, libraryHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
@@ -58,6 +59,7 @@ const COMPACT = "cardpress.sidebar.compact";
 export function Shell({ area, sub, brands, activeId, colors, switching = false, onSwitchBrand, theme, onToggleTheme, panel, onLeave, onSub, header, children }: ShellProps) {
   const { user, can } = useSession();
   const [open, setOpen] = useState<Item["id"] | null>(null);
+  const [about, setAbout] = useState(false);
   const [compact, setCompact] = useState(() => { try { return localStorage.getItem(COMPACT) === "1"; } catch { return false; } });
   const toggleCompact = () => setCompact((v) => { try { localStorage.setItem(COMPACT, v ? "0" : "1"); } catch { /* not remembered */ } return !v; });
   const root = useRef<HTMLDivElement>(null);
@@ -146,6 +148,12 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
     </Tooltip>
   );
 
+  const aboutEntry = (
+    <button type="button" onClick={() => { setOpen(null); setAbout(true); }} aria-haspopup="dialog" className={entry(false)}>
+      <Info /><span className={cn(compact && "sr-only")}>About</span>
+    </button>
+  );
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col bg-side">
@@ -160,7 +168,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
             {theme === "dark" ? <Sun /> : <Moon />}
           </button>
           <a href={helpHref()} onClick={onLeave} className={cn(headButton, "max-sm:hidden")} aria-label="User guide" title="User guide"><CircleHelp /></a>
-          <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} side="bottom" />
+          <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} side="bottom" onAbout={() => setAbout(true)} />
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -183,6 +191,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
                 <button type="button" onClick={toggleCompact} aria-pressed={compact} aria-label={compact ? "Show the names in the side bar" : "Show icons only"} className={small}>
                   {compact ? <ChevronsRight /> : <ChevronsLeft />}
                 </button>)}
+              <div className="w-full">{compact ? tip("About", aboutEntry) : aboutEntry}</div>
             </nav>
 
             {shown?.groups && (
@@ -232,6 +241,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
         </div>
       </div>
       <SettingsHost onLeave={onLeave} />
+      <About open={about} onOpenChange={setAbout} />
     </TooltipProvider>
   );
 }

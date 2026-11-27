@@ -57,6 +57,8 @@ import type { Attachment } from "./compose";
 
 export interface ApiInfo {
   name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo;
+  /** The source the server was made from; told to a signed-in person. */
+  build?: { commit?: string; date?: string };
   /** Accounts are on: the app needs a first (admin) account, then people sign in. */
   accounts?: boolean; needsSetup?: boolean; signupOpen?: boolean; signedIn?: boolean; user?: User; perms?: Perm[];
 }

@@ -54,7 +54,9 @@ export interface ChatMessage {
   status?: "done" | "failed" | "stopped";
   detail?: ReplyDetail;
 }
-export interface AgentInfo { name: string; ai: boolean; /** False on a server with no assistant set up. */ ready: boolean }
+export interface AgentInfo { name: string; ai: boolean; /** False on a server with no assistant set up. */ ready: boolean;
+  /** The agents' and the content schema's versions, told to a signed-in person. */
+  version?: string; schemaVersion?: number }
 /** What goes with a message besides its words. */
 export interface ChatRequest { write: DraftKind[]; viewing?: DraftKind }
 

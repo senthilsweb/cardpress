@@ -50,6 +50,11 @@ type Source struct {
 	New bool
 }
 
+// Versioned is an assistant that can say which version of its agents and of their content schema it is using.
+type Versioned interface {
+	Versions() (agent string, schema int)
+}
+
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
 var ErrSessionGone = errors.New("the session cannot be continued")
 

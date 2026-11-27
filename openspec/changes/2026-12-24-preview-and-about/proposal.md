@@ -1,6 +1,6 @@
 # Preview from the canvas, "see less", and About
 
-**Status:** in progress (asked for by the owner on 2026-11-27).
+**Status:** built (asked for by the owner on 2026-11-27), not deployed.
 
 ## Why
 - Seeing the whole post as it will be sent takes three steps: open Details, then Full preview.

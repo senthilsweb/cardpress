@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -39,6 +40,25 @@ import (
 var dist embed.FS
 
 var version = "dev" // set with -ldflags "-X main.version=v0.1.0"
+
+// commit and built say which source the program was made from. The image build sets them; a build in a checkout reads
+// them from what Go records.
+var commit, built string
+
+func buildInfo() api.Build {
+	b := api.Build{Commit: commit, Date: built}
+	if info, ok := debug.ReadBuildInfo(); ok && b.Commit == "" {
+		for _, s := range info.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				b.Commit = s.Value
+			case "vcs.time":
+				b.Date = s.Value
+			}
+		}
+	}
+	return b
+}
 
 func main() {
 	// `cardpress mcp` speaks the Model Context Protocol on stdin/stdout, for an agent running on this machine
@@ -133,6 +153,7 @@ func main() {
 	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
 	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
 	opts := api.Options{
+		Build:              buildInfo(),
 		Events:             events,
 		Notes:              studio,
 		AssistantAdminOnly: cfg.Agent == "cma", // its tools act as one account, so only the admin may use it

@@ -1,4 +1,4 @@
-import { BookOpen, ChevronsUpDown, ExternalLink, LogOut, Moon, Palette, Sun } from "lucide-react";
+import { BookOpen, ChevronsUpDown, ExternalLink, Info, LogOut, Moon, Palette, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/brands";
 import { helpHref, settingsHref } from "@/lib/nav";
@@ -17,10 +17,11 @@ interface Props {
   variant?: "row" | "avatar";
   /** Where the menu opens. */
   side?: "right" | "bottom";
+  onAbout: () => void;
 }
 
 /** The person at the right of the header, and their short menu: who they are, the theme, the guide and Sign out. */
-export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avatar", side = "right" }: Props) {
+export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avatar", side = "right", onAbout }: Props) {
   const { user, signOut } = useSession();
   const shown = user?.fullName ?? name;
   const badge = (
@@ -61,6 +62,7 @@ export function AccountMenu({ name, color, theme, onToggleTheme, variant = "avat
         <DropdownMenuItem asChild>
           <a href={helpHref()}><BookOpen /> User guide</a>
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onAbout}><Info /> About CardPress</DropdownMenuItem>
         {user && <DropdownMenuItem onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>

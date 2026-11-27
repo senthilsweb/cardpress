@@ -4,6 +4,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -95,6 +96,7 @@ type Publishing interface {
 type Chatting interface {
 	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
+	AgentDetails() service.AgentInfo
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
@@ -145,6 +147,14 @@ type Options struct {
 	} // MCP call log; nil if MCP is off
 	Version  string
 	DBDriver string
+	// Build says which source the server was made from. Told only to someone who is signed in.
+	Build Build
+}
+
+// Build is the source a server was made from.
+type Build struct {
+	Commit string `json:"commit,omitempty"`
+	Date   string `json:"date,omitempty"`
 }
 
 type server struct {
@@ -346,10 +356,32 @@ func (s *server) info(w http.ResponseWriter, r *http.Request) {
 			out["signedIn"] = false
 		}
 	}
+	trusted := s.trusted(r)
 	if s.Chat != nil {
-		out["agent"] = s.Chat.Agent()
+		agent := s.Chat.Agent()
+		if trusted {
+			agent = s.Chat.AgentDetails()
+		}
+		out["agent"] = agent
+	}
+	if trusted && s.Build != (Build{}) {
+		out["build"] = s.Build
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// trusted says whether the caller may be told more than anyone: a signed-in person, the holder of the token, or, on a
+// server with neither, whoever can reach it.
+func (s *server) trusted(r *http.Request) bool {
+	if s.Accounts != nil {
+		_, ok := principalOf(r)
+		return ok
+	}
+	if s.Token == "" {
+		return true
+	}
+	got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return ok && subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1
 }
 
 func (s *server) state(w http.ResponseWriter, r *http.Request) {

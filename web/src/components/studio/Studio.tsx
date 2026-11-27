@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import JSZip from "jszip";
-import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, SlidersHorizontal, MessageSquareText } from "lucide-react";
+import { Check, Copy, Download, Eye, LayoutGrid, Loader2, Maximize2, Palette as PaletteIcon, PackageOpen, Shuffle, Square, SlidersHorizontal, MessageSquareText } from "lucide-react";
 import { Card } from "@/card/Card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -123,6 +123,19 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
   const go = (href: string) => { flushPendingEdits(); window.location.href = href; };
   // the library can send someone straight to a draft's Full preview (to schedule it)
   const [previewRequested, setPreviewRequested] = useState(false);
+  // the Full preview belongs to Details: asked for from another column, Details is there out of sight while it is open
+  const [previewing, setPreviewing] = useState(false);
+  const openFullPreview = useCallback(() => { flushPendingEdits(); setPreviewing(true); setPreviewRequested(true); }, []);
+  // Ctrl/Cmd + Enter, away from anything being typed in
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.defaultPrevented) return;
+      if ((e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      e.preventDefault(); openFullPreview();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openFullPreview]);
   const [editorExpanded, setEditorExpanded] = useState(false);
   // below the large breakpoint one thing is on screen at a time: the left column or the canvas
   const largeScreen = useMedia("(min-width: 1024px)");
@@ -376,7 +389,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return (
       <ArticleView draft={seenDraft} design={own} profile={profile} palette={profile.palettes.find((p) => p.id === own.paletteId) ?? profile.palettes[0]} width={width}
         onEdit={() => { void openItem(d.id).then(() => { showDetails(); setEditorExpanded(true); }); }}
-        onPreview={() => { void openItem(d.id).then(() => { setPreviewRequested(true); showDetails(); }); }} />
+        onPreview={() => { void openItem(d.id).then(openFullPreview); }} />
     );
   };
   const postPane = (d: Draft, width: number) => {
@@ -385,7 +398,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     return (
       <div className="flex min-h-full items-start justify-center p-6">
         {why ? <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {paneSize.net} preview: {why}.</p>
-          : <FeedFrame design={own} profile={profile} palette={pal} {...postMedia.frame} size={paneSize} caption={serializeDraft(seenDraft).text} width={Math.max(240, Math.min(width - 48, 520))} />}
+          : <FeedFrame key={d.id} expandable design={own} profile={profile} palette={pal} {...postMedia.frame} size={paneSize} caption={serializeDraft(seenDraft).text} width={Math.max(240, Math.min(width - 48, 520))} />}
       </div>
     );
   };
@@ -434,9 +447,9 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <ChatPanel chat={chat} onApply={applyProposal} draftId={store.current?.id} viewing={store.current?.kind} profileId={profile.id} drafts={store.drafts} onOpen={(id) => void openConversation(id)} onDelete={(id) => void deleteChat(id)} onVersion={(id, seq) => void openVersion(id, seq)}
                 onShow={(id) => { if (id && store.drafts.some((d) => d.id === id)) { void openItem(id); setPhonePreview(true); } else toast("That draft no longer exists"); }} />
             </div>
-            {mode === "details" && (
-              <div className="min-h-0 flex-1">
-                <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={seen} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked} version={version}
+            {(mode === "details" || previewing) && (
+              <div className={cn("min-h-0 flex-1", mode !== "details" && "hidden")}>
+                <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={mode === "details" ? seen : () => undefined} onPreviewClosed={() => setPreviewing(false)} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked} version={version}
                   openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => openSettings(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} />
               </div>
             )}
@@ -488,6 +501,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                 <Switch id="feed" checked={feed} onCheckedChange={setFeed} />
                 <Label htmlFor="feed" className="flex items-center gap-1 text-foreground"><Eye className="h-3.5 w-3.5" /> Feed preview</Label>
               </div>
+              <Button variant="outline" size="sm" onClick={openFullPreview} disabled={!store.current} title="Full preview (Ctrl/⌘ + Enter)" aria-keyshortcuts="Control+Enter Meta+Enter"><Maximize2 /> Full preview</Button>
               <span className="eyebrow ml-2 hidden md:inline">{one ? `${size.net} · ${size.name} · ${size.w}×${size.h}` : `${SIZES.filter((s) => !cannot(s.net)).length} sizes`}</span>
               <div className="flex-1" />
               {note && <span className="flex items-center gap-1 text-xs text-brand"><Check className="h-3.5 w-3.5" />{note}</span>}
@@ -517,7 +531,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
                   {cannot(size.net) ? (
                     <p role="status" className="max-w-sm rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No {size.net} preview: {cannot(size.net)}.</p>
                   ) : feed ? (
-                    <FeedFrame {...cardProps} {...media.frame} size={size} caption={caption} width={Math.min(maxW, size.w / size.h < 1 ? 470 : 560)} />
+                    <FeedFrame key={onScreen?.draft.id} {...cardProps} {...media.frame} size={size} caption={caption} expandable width={Math.min(maxW, size.w / size.h < 1 ? 470 : 560)} />
                   ) : (
                     <ScaledCard {...cardProps} size={size} maxW={maxW} maxH={maxH} />
                   )}
