@@ -27,6 +27,7 @@ Settings come from environment variables, with a few command-line flags. With Do
 | Variable | What it does |
 |---|---|
 | `CARDPRESS_DEFAULT_ROLE` | The role of a person who signs up: `editor` (default) or `writer` |
+| `CARDPRESS_MEDIA_BRAND_MB` | How many MB of files each brand's media library may hold. Default `200` |
 | `CARDPRESS_SIGNUP` | `closed` stops self sign-up once the first account exists (admins add people). Default `open` |
 | `CARDPRESS_ADMIN_EMAIL` | If set, only this email can create the first (admin) account. Set it on a server reachable from the internet |
 

@@ -139,6 +139,7 @@ type Options struct {
 	Settings     Settings
 	Publishing   Publishing
 	Library      Library
+	Media        Media // nil: no media library
 	Chat         Chatting
 	Accounts     Accounts // nil: no accounts (the token alone, or nothing on localhost)
 	Token        string   // empty: no bearer token required
@@ -223,6 +224,12 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
 		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
 		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
+		{"GET", "/profiles/{id}/assets", write(scopeBrandPath), s.listAssets},
+		{"POST", "/profiles/{id}/assets", write(scopeBrandPath), s.addAsset},
+		{"PUT", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.updateAsset},
+		{"DELETE", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.deleteAsset},
+		{"GET", "/profiles/{id}/assets/{asset}/file", write(scopeBrandPath), s.assetFile},
+		{"GET", "/profiles/{id}/assets/{asset}/thumb", write(scopeBrandPath), s.assetThumb},
 		{"GET", "/profiles/{id}/settings", rule{scopeBrandPath, service.PermSocial}, s.getSettings},
 		{"GET", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.getNetwork},
 		{"PUT", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.putNetwork},

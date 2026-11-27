@@ -22,6 +22,10 @@ Every signed-in page has a **header** and a **side bar**, and shows the page on 
 
 Figures come from items, publishing jobs, `chat_usage` and `users` (`GET /api/v1/dashboard`). A post that was scheduled or sent counts by the day its draft was created. Cost is the list price the agent service reports for chat replies; sessions started outside CardPress and deleted conversations are not counted. Days and weeks are the person's own.
 
+## Media
+
+**Library → Media** (`/media/`, `components/media/`) holds a brand's pictures, PDF documents and video links, with search, type and tag filters, grid or list, and the space used. Files are chosen or dropped. The browser reduces a picture to 2,400 px and draws its thumbnail before sending (`lib/assets.ts`); the server checks type (from the bytes), size and the brand's allowance (`internal/service/media.go`). Cards and posts do not use the library yet.
+
 ## Themes
 
 **Settings → Appearance** chooses **Parchment** (default), **Aubergine**, **Cobalt** or **Graphite**, and Light, Dark or System. It is saved per person (`palette` and `theme` preferences). A theme is a list of named colours in `web/src/styles/themes.css`; a test checks that each can be read. Cards keep their brand's colours.

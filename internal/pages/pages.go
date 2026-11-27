@@ -385,5 +385,5 @@ func (s *site) sitemap(w http.ResponseWriter, r *http.Request) {
 func (s *site) robots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	_, _ = fmt.Fprintf(w, "User-agent: *\nAllow: /articles\nAllow: /posts\nDisallow: /api/\nDisallow: /mcp\nDisallow: /studio/\nDisallow: /library/\nDisallow: /dashboard/\n\nSitemap: %s\n", s.abs(r, "/sitemap.xml"))
+	_, _ = fmt.Fprintf(w, "User-agent: *\nAllow: /articles\nAllow: /posts\nDisallow: /api/\nDisallow: /mcp\nDisallow: /studio/\nDisallow: /library/\nDisallow: /dashboard/\nDisallow: /media/\n\nSitemap: %s\n", s.abs(r, "/sitemap.xml"))
 }

@@ -157,7 +157,7 @@ func main() {
 		Events:             events,
 		Notes:              studio,
 		AssistantAdminOnly: cfg.Agent == "cma", // its tools act as one account, so only the admin may use it
-		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Media: service.NewMedia(db.DB, cfg.MediaBrandMB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
