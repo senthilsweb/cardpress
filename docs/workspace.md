@@ -12,9 +12,15 @@ Every signed-in page has a **header** and a **side bar**, and shows the page on 
 
 ## Dashboard
 
-`/dashboard/` is where signing in lands and where the logo leads (`components/dashboard/`). For the open brand, or **All brands**: posts and articles by status (counted as the Library lists them), the next five scheduled items, the five last edited, and the assistant's cost, sessions, replies, working time and largest sessions for 7, 30 or 90 days or all time.
+`/dashboard/` is where signing in lands and where the logo leads (`components/dashboard/`).
 
-Figures come from items, publishing jobs and `chat_usage` (`GET /api/v1/dashboard`). Cost is the list price the agent service reports for chat replies; sessions started outside CardPress and deleted conversations are not counted. Days and weeks are the person's own.
+- **Totals:** brands the person may open (archived ones left out), LLM cost over them, and for an administrator the active and disabled accounts.
+- **Period:** 7, 30 (default) or 90 days, all time, or chosen days; remembered in the browser.
+- For the open brand, or **All brands**: posts and articles created in the period, by where they stand now, and the assistant's cost, sessions, replies, working time and largest sessions in it.
+- The next five scheduled items and the five last edited do not follow the period.
+- A count opens the Library on the same days (`?from=&to=`), which says so and can show all dates again.
+
+Figures come from items, publishing jobs, `chat_usage` and `users` (`GET /api/v1/dashboard`). A post that was scheduled or sent counts by the day its draft was created. Cost is the list price the agent service reports for chat replies; sessions started outside CardPress and deleted conversations are not counted. Days and weeks are the person's own.
 
 ## Themes
 

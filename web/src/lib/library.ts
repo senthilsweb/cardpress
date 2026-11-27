@@ -51,6 +51,8 @@ export interface LibraryFilter {
   kind: "" | "post" | "article";
   status: string;
   q: string;
+  /** Items created from the first to the last of these days (YYYY-MM-DD), in the person's time zone. */
+  created?: { from: string; to: string };
 }
 
 export const LIBRARY_STATUS_LABEL: Record<LibraryItem["status"], string> = {

@@ -17,13 +17,13 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST /profiles/{id}/archive`, `POST /profiles/{id}/restore` | Hide a brand and bring it back; archiving keeps everything and says how many posts are still scheduled |
 | `DELETE /profiles/{id}` | Delete an archived brand and everything it owns; refused (`409`) while it has scheduled or unfinished posts |
 | `GET`/`PUT /profiles/{id}/details` | Who the brand is (type, name, address, mobile, email): its owner and administrators only. All empty removes it |
-| `GET /dashboard?profileId=` or `?scope=all`, `&days=7\|30\|90\|0&tz=` | The dashboard's figures: counts as of now, assistant cost and sessions for the period |
+| `GET /dashboard?profileId=` or `?scope=all`, `&days=7\|30\|90\|0&tz=`, or `&from=&to=` (days) | The dashboard's figures: totals (users for an administrator only), items created in the period by status, assistant cost and sessions in it |
 | `POST /import/legacy` | Import data from the older browser-only version |
 | `GET/POST /drafts`, `GET/PUT/DELETE /drafts/{id}` | Drafts. Only a draft can be deleted |
 | `POST /drafts/{id}/approve`, `POST .../unapprove`, `PUT .../plan` | Approve (needs `approve`), take approval back, set an article's planned date |
 | `POST/DELETE /drafts/{id}/page` | Put an approved item's public page online or take it down (needs `publish`); see [Public pages](public-pages.md) |
 | `GET/POST /drafts/{id}/versions`, `GET .../{seq}`, `POST .../{seq}/restore` | An item's history: list, save one with a note, read one, restore one |
-| `GET /library` | The library list, with server-side paging, sorting (`sort`, `order`), search and filters |
+| `GET /library` | The library list, with server-side paging, sorting (`sort`, `order`), search and filters; `from`, `to` and `tz` keep the items created on those days |
 | `GET /calendar` | Posts and planned articles between `from` and `to` (RFC 3339, at most 45 days). See [Calendar](calendar.md) |
 | `GET /calendar/ready` | Approved posts and articles with no date |
 | `GET /profiles/{id}/settings`, `GET/PUT /profiles/{id}/settings/{network}`, `POST .../test` | One brand's social credentials (secrets are write-only). The older `/settings...` routes act on the first brand |

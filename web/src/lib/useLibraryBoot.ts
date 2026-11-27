@@ -13,6 +13,8 @@ export interface LibraryBoot {
   activeId: string;
   colors: Record<string, string>;
   session: Session;
+  /** The person has no brand saved yet: `profiles` holds the starting ones the studio will write on its first visit. */
+  noBrand: boolean;
   /** Each brand's own design: the card shown for an item that was never given one. */
   designs: Record<string, Design>;
 }
@@ -35,14 +37,15 @@ export function useLibraryBoot() {
       if (!session) return; // being sent to sign in
       if (!info.accounts && info.authRequired && !getToken()) return setBoot({ status: "auth" });
       const state = await api.state();
-      const profiles = (state.profiles as Profile[]).length ? withStandardPalettes(state.profiles as Profile[]) : DEFAULT_PROFILES;
+      const noBrand = !(state.profiles as Profile[]).length;
+      const profiles = !noBrand ? withStandardPalettes(state.profiles as Profile[]) : DEFAULT_PROFILES;
       const activeId = pickActive(state.preferences.activeProfile, profiles) ?? profiles[0].id;
       const designs = state.designs as Record<string, Design>;
       const colors = Object.fromEntries(profiles.map((p) => [p.id, brandColor(p, designs[p.id])]));
       hydrateAppearance(state.preferences);
       const fonts = Array.isArray(state.preferences.customFonts) ? (state.preferences.customFonts as FontDef[]) : [];
       hydrateCustomFonts(fonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); });
-      setBoot({ status: "ready", data: { profiles, activeId, colors, designs, session } });
+      setBoot({ status: "ready", data: { profiles, activeId, colors, designs, session, noBrand } });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { clearToken(); return setBoot({ status: "auth", error: "That token was not accepted." }); }
       setBoot({ status: "error", message: e instanceof Error ? e.message : "Something went wrong" });

@@ -25,6 +25,7 @@ import type { Draft } from "@/lib/draft";
 import { downloadBlob } from "@/lib/export";
 import { defaultTimezone, formatInZone, toLocalInput, type Job } from "@/lib/jobs";
 import { COLUMNS, DEFAULT_SORT, defaultColumns, deleteSummary, draftLink, LIBRARY_STATUS_LABEL, nextSort, PAGE_SIZES, pageNumbers, pagePath, rowKey, STATUS_FILTERS, type ColumnId, type LibraryFilter, type LibraryItem, type LibraryPage, type LibrarySort } from "@/lib/library";
+import { rangeLabel, rangeProblem } from "@/lib/dashboard";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { DEFAULT_DESIGN } from "@/lib/profiles";
 import { fullDesign } from "@/lib/cardDesign";
@@ -79,7 +80,9 @@ function Page({ data }: { data: LibraryBoot }) {
   const [filter, setFilter] = useState<LibraryFilter>(() => {
     const q = new URLSearchParams(window.location.search);
     const k = q.get("kind"), s = q.get("status");
-    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: STATUS_FILTERS.some((x) => x.value === s) ? s! : "", q: "" };
+    // the dashboard's counts open the library with the days they cover
+    const from = q.get("from") ?? "", to = q.get("to") ?? "";
+    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: STATUS_FILTERS.some((x) => x.value === s) ? s! : "", q: "", created: rangeProblem(from, to) ? undefined : { from, to } };
   });
   const [typed, setTyped] = useState("");
   const [page, setPage] = useState(1);
@@ -123,7 +126,7 @@ function Page({ data }: { data: LibraryBoot }) {
     const t = window.setTimeout(() => setFilter((f) => (f.q === typed ? f : { ...f, q: typed })), 300);
     return () => window.clearTimeout(t);
   }, [typed]);
-  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, pageSize, sort]);
+  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, filter.created, pageSize, sort]);
 
   const load = useCallback(async (quiet = false) => {
     const id = ++run.current;
@@ -184,7 +187,7 @@ function Page({ data }: { data: LibraryBoot }) {
     setFilter((f) => ({ ...f, brand: id }));
     api.putPreference("activeProfile", id).catch(() => undefined); // only means the choice is not remembered
   };
-  const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "";
+  const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "" || !!filter.created;
   const grid = view === "grid";
 
   return (
@@ -257,6 +260,13 @@ function Page({ data }: { data: LibraryBoot }) {
               </SelectContent>
             </Select>
           </div>
+
+          {filter.created && (
+            <p role="status" className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>Created {rangeLabel(filter.created.from, filter.created.to)}</span>
+              <Button size="sm" variant="ghost" onClick={() => { window.history.replaceState(window.history.state, "", window.location.pathname); setFilter((f) => ({ ...f, created: undefined })); }}>Show all dates</Button>
+            </p>
+          )}
 
           {grid && chosen.length > 0 && (
             <div role="status" className="mt-3 flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">

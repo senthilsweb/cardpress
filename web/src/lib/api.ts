@@ -53,7 +53,8 @@ import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
 import type { BrandDetails } from "./brandDetails";
-import type { Dashboard } from "./dashboard";
+import { defaultTimezone } from "./jobs";
+import { periodQuery, type Dashboard, type Period } from "./dashboard";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
@@ -203,7 +204,7 @@ export const api = {
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
-  dashboard: (q: { profileId: string; all: boolean; days: number; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), days: String(q.days), tz: q.tz })}`),
+  dashboard: (q: { profileId: string; all: boolean; period: Period; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), ...periodQuery(q.period), tz: q.tz })}`),
   brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
   saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
   orderProfiles: (ids: string[]) => call<void>("PUT", "/profiles/order", { ids }),
@@ -279,6 +280,7 @@ export const api = {
     if (f.kind) q.set("kind", f.kind);
     if (f.status) q.set("status", f.status);
     if (f.q.trim()) q.set("q", f.q.trim());
+    if (f.created) { q.set("from", f.created.from); q.set("to", f.created.to); q.set("tz", defaultTimezone()); }
     return call<LibraryPage>("GET", `/library?${q}`);
   },
   calendar: (brand: string, from: string, to: string) => {

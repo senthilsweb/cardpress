@@ -74,8 +74,25 @@ type BrandSummary struct {
 	Sessions  int    `json:"sessions"`
 }
 
+// Totals are the person's figures over everything they may open, whichever brand is in view.
+type Totals struct {
+	Brands int `json:"brands"` // without archived ones
+	// Users are the active accounts and DisabledUsers the rest; told to an admin only.
+	Users         *int `json:"users,omitempty"`
+	DisabledUsers int  `json:"disabledUsers,omitempty"`
+	CostCents     int  `json:"costCents"` // in the period
+}
+
+// Period is what the figures that follow time cover: days of the person's zone, or empty for all time.
+type Period struct {
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+}
+
 // Dashboard is the page's figures.
 type Dashboard struct {
+	Totals   Totals          `json:"totals"`
+	Period   Period          `json:"period"`
 	Brands   []BrandSummary  `json:"brands"`
 	Posts    Counts          `json:"posts"`
 	Articles Counts          `json:"articles"`
@@ -84,11 +101,13 @@ type Dashboard struct {
 	Usage    Usage           `json:"usage"`
 }
 
-// DashboardQuery says whose figures and for how long. Counts are as of now; usage is of the last Days days (0: all).
+// DashboardQuery says whose figures and for how long: the last Days days (0: all), or From to To. Items are counted by
+// the day they were created, with their status as it is now; Next and Recent do not follow the period.
 type DashboardQuery struct {
 	ProfileID string
 	All       bool
 	Days      int
+	From, To  string // YYYY-MM-DD, together, instead of Days
 	Zone      string // an IANA time zone, in which days and weeks are counted; empty is UTC
 }
 
@@ -103,33 +122,31 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 	if q.Days != 0 && q.Days != 7 && q.Days != 30 && q.Days != 90 {
 		return out, invalid("days must be 7, 30, 90 or 0 for all")
 	}
-	zone := time.UTC
-	if q.Zone != "" {
-		z, err := time.LoadLocation(q.Zone)
-		if err != nil || q.Zone == "Local" {
-			return out, invalid("that is not a time zone")
-		}
-		zone = z
+	zone, err := timeZone(q.Zone)
+	if err != nil {
+		return out, err
 	}
-	var ids []string
-	if q.All {
-		where, args := l.scope(ctx, "", true, "id")
-		rs, err := l.db.QueryContext(ctx, `SELECT id FROM profiles WHERE archived_at IS NULL`+where+` ORDER BY position, id`, args...)
-		if err != nil {
-			return out, err
+	period, err := dayRange(q.From, q.To, zone)
+	if err != nil {
+		return out, err
+	}
+	today := day(now, zone)
+	switch {
+	case q.From != "":
+		if q.Days != 0 {
+			return out, invalid("give days or a first and last day, not both")
 		}
-		for rs.Next() {
-			var id string
-			if err := rs.Scan(&id); err != nil {
-				rs.Close()
-				return out, err
-			}
-			ids = append(ids, id)
-		}
-		if err := closeRows(rs); err != nil {
-			return out, err
-		}
-	} else {
+		out.Period = Period{From: q.From, To: q.To}
+	case q.Days > 0:
+		period = Days{From: today.AddDate(0, 0, -(q.Days - 1)), Until: today.AddDate(0, 0, 1)}
+		out.Period = Period{From: period.From.Format(time.DateOnly), To: today.Format(time.DateOnly)}
+	}
+	every, err := l.openBrands(ctx)
+	if err != nil {
+		return out, err
+	}
+	ids := every
+	if !q.All {
 		if err := brandNotHidden(ctx, l.db, q.ProfileID); err != nil {
 			return out, err
 		}
@@ -152,6 +169,18 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 			if it.Status == JobCancelled {
 				continue
 			}
+			item := DashboardItem{Type: it.Type, ID: it.ID, DraftID: it.DraftID, ProfileID: id, Kind: it.Kind, Status: it.Status, Title: it.Title, At: it.At}
+			if due, ok := comingUp(it, now); ok {
+				next := item
+				next.At = due
+				out.Next = append(out.Next, next)
+			}
+			if it.Type == "draft" {
+				out.Recent = append(out.Recent, item)
+			}
+			if !period.Holds(r.created) {
+				continue
+			}
 			c := &sum.Posts
 			if it.Kind == KindArticle {
 				c = &sum.Articles
@@ -172,15 +201,6 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 			if it.PageAt != "" {
 				c.Pages++
 			}
-			item := DashboardItem{Type: it.Type, ID: it.ID, DraftID: it.DraftID, ProfileID: id, Kind: it.Kind, Status: it.Status, Title: it.Title, At: it.At}
-			if due, ok := comingUp(it, now); ok {
-				next := item
-				next.At = due
-				out.Next = append(out.Next, next)
-			}
-			if it.Type == "draft" {
-				out.Recent = append(out.Recent, item)
-			}
 		}
 		add(&out.Posts, sum.Posts)
 		add(&out.Articles, sum.Articles)
@@ -190,7 +210,54 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 	sort.SliceStable(out.Recent, func(i, j int) bool { return out.Recent[i].At > out.Recent[j].At })
 	out.Next = out.Next[:min(len(out.Next), dashboardList)]
 	out.Recent = out.Recent[:min(len(out.Recent), dashboardList)]
-	return out, l.usage(ctx, &out, ids, q.Days, zone, now)
+	if err := l.usage(ctx, &out, ids, period, zone, now); err != nil {
+		return out, err
+	}
+	return out, l.totals(ctx, &out, every, q.All, period, zone, now)
+}
+
+// openBrands are the brands the caller may open that are not archived, in their order.
+func (l *Library) openBrands(ctx context.Context) ([]string, error) {
+	where, args := l.scope(ctx, "", true, "id")
+	rs, err := l.db.QueryContext(ctx, `SELECT id FROM profiles WHERE archived_at IS NULL`+where+` ORDER BY position, id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rs.Next() {
+		var id string
+		if err := rs.Scan(&id); err != nil {
+			rs.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, closeRows(rs)
+}
+
+// totals counts what the person may open, and for an admin the accounts. A server without accounts has none to count.
+func (l *Library) totals(ctx context.Context, out *Dashboard, every []string, all bool, period Days, zone *time.Location, now time.Time) error {
+	out.Totals.Brands = len(every)
+	if all {
+		out.Totals.CostCents = out.Usage.CostCents
+	} else {
+		var sum Dashboard
+		if err := l.usage(ctx, &sum, every, period, zone, now); err != nil {
+			return err
+		}
+		out.Totals.CostCents = sum.Usage.CostCents
+	}
+	if p, ok := PrincipalFrom(ctx); ok && !p.Admin() {
+		return nil
+	}
+	var active, disabled int
+	if err := l.db.QueryRowContext(ctx, `SELECT COUNT(CASE WHEN status = 'active' THEN 1 END), COUNT(CASE WHEN status <> 'active' THEN 1 END) FROM users`).Scan(&active, &disabled); err != nil {
+		return err
+	}
+	if active+disabled > 0 {
+		out.Totals.Users, out.Totals.DisabledUsers = &active, disabled
+	}
+	return nil
 }
 
 // comingUp is when an item is due, for a post waiting to be sent or an approved article with a planned date ahead.
@@ -232,20 +299,22 @@ func week(t time.Time, zone *time.Location) time.Time {
 
 // usage fills in cost and sessions from chat_usage: one row for each reply, holding what that reply added to its
 // session's cost, and the session's working time so far.
-func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, days int, zone *time.Location, now time.Time) error {
+func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, period Days, zone *time.Location, now time.Time) error {
 	u := &out.Usage
 	u.Bucket, u.Series, u.Largest = "day", []Spend{}, []SessionSpend{}
-	if days == 0 || days > 31 {
+	// the last day shown: the period's, but never one still to come
+	last := day(now, zone)
+	if !period.Until.IsZero() && period.Until.AddDate(0, 0, -1).Before(last) {
+		last = period.Until.AddDate(0, 0, -1)
+	}
+	if period.From.IsZero() || period.From.AddDate(0, 0, 31).Before(period.Until) {
 		u.Bucket = "week"
 	}
 	start := day
 	if u.Bucket == "week" {
 		start = week
 	}
-	var since time.Time // zero: everything
-	if days > 0 {
-		since = day(now, zone).AddDate(0, 0, -(days - 1))
-	}
+	since := period.From // zero: everything
 	if len(ids) == 0 {
 		return nil
 	}
@@ -283,6 +352,9 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, days 
 		key := conv + " " + sid
 		if at.Before(since) {
 			before[key] = max(before[key], seconds)
+			continue
+		}
+		if !period.Until.IsZero() && !at.Before(period.Until) {
 			continue
 		}
 		s := sessions[key]
@@ -334,7 +406,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, days 
 		out.Brands[i].CostCents, out.Brands[i].Sessions = brandCost[id], len(brandSessions[id])
 	}
 	// every day or week of the period, empty ones too, so the chart shows time as it passed
-	if days == 0 {
+	if since.IsZero() {
 		if first.IsZero() {
 			return nil
 		}
@@ -344,7 +416,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, days 
 	if u.Bucket == "week" {
 		step = 7
 	}
-	for d, last := start(since, zone), start(now, zone); !d.After(last); d = d.AddDate(0, 0, step) {
+	for d, end := start(since, zone), start(last, zone); !d.After(end); d = d.AddDate(0, 0, step) {
 		k := d.Format(time.DateOnly)
 		if spend[k] == nil {
 			u.Series = append(u.Series, Spend{Start: k})
