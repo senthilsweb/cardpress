@@ -2,7 +2,7 @@
 
 > Open-source, self-hosted agentic AI for social media authoring and management: design branded cards, draft posts with an assistant, preview them, then publish or schedule. One Go binary with the web app embedded.
 
-![CardPress: design a card, draft a post with the assistant, preview it](docs/media/cardpress-demo.gif)
+![CardPress: ask for a greeting in the chat, design the card, preview it, then the library, calendar and themes](docs/media/cardpress-demo.gif)
 
 **Docs: [senthilsweb.com/cardpress](https://www.senthilsweb.com/cardpress/)**
 

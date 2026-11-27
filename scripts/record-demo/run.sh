@@ -1,12 +1,11 @@
 #!/bin/sh
-# Starts a clean CardPress on a temporary database, records, and stops it.
-#   ./run.sh               (needs a built ../../cardpress binary: go build -o cardpress ../..)
+# Takes pictures of a throwaway CardPress with example data (needs a built binary: go build -o bin/cardpress . at the root).
+#   ./run.sh          the home-page animation, out/demo.gif
+#   ./run.sh shots    the user guide's screenshots of brands, accounts, calendar and backgrounds
 set -e
 cd "$(dirname "$0")"
-BIN=${CARDPRESS_BIN:-../../bin/cardpress}
-D=$(mktemp -d)
-$BIN -addr 127.0.0.1:18300 -db "file:$D/cardpress.db" >"$D/server.log" 2>&1 &
-PID=$!
-trap 'kill $PID 2>/dev/null; rm -rf "$D"' EXIT
-sleep 2
-node record.mjs
+case "${1:-demo}" in
+  demo) exec node record.mjs ;;
+  shots) exec node shots.mjs ;;
+  *) echo "usage: ./run.sh [shots]" >&2; exit 2 ;;
+esac

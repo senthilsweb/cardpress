@@ -1,26 +1,29 @@
-# Recording the demo
+# Recording the demo and the guide's screenshots
 
-Makes the animated demo used on the landing page and in the README. It drives a clean CardPress in Chrome, with a visible cursor, and writes `out/demo.gif` (about 2 MB, 1200 px wide).
+Drives a throwaway CardPress in Chrome and writes pictures of it: a new database, one test account, example brands (TemplrPress and others) and a **scripted stand-in** for the assistant. Nobody's real work is read, no AI is used and nothing costs anything.
 
 ```bash
+cd web && npm install && npm run build && cd ..
 go build -o bin/cardpress .      # from the repository root
 cd scripts/record-demo && npm install
-./run.sh                         # starts CardPress on a temporary database, records, stops it
-cp out/demo.gif ../../web/public/demo/cardpress-demo.gif
+
+./run.sh                         # the animation, out/demo.gif (about 2 MB, 1200 px wide)
 cp out/demo.gif ../../docs/media/cardpress-demo.gif
+cp out/demo.gif ../../web/public/demo/cardpress-demo.gif
+
+./run.sh shots                   # writes brands, social, calendar and picker into web/guide/img
 ```
 
-## What it shows
-The Blue pink gloss colours, the card text (bank statements to cash flow), two looks for the same card (Geometric, then Contours), an article pasted into the assistant and approved into a post, hashtags, the full preview, and the other sizes. The story is in `record.mjs`, the article in `source.txt`.
+It uses ports 18300 and 18301 on this machine. Needs Chrome and Node 22+. Nothing here is part of the app build.
+
+## What the animation shows
+A new post, a Thanksgiving greeting asked for in the chat, the greeting layout and a seasonal background, headline options, the details and the full preview, the library, the calendar and the themes. The story is in `record.mjs`; what the stand-in writes is in `stand-in.mjs`; the example data is in `setup.mjs`.
+
+## The guide's other screenshots
+`post-chat.jpg`, `post-details.jpg`, `post-preview.jpg` and `library.jpg` show real work, so they are taken by hand on a real installation. Look through them before committing: the repository is public.
 
 ## Repeatable
-The same inputs give the same file, byte for byte (checked by recording twice): a fixed script, the app's default design seed, a seeded `Math.random`, CSS transitions, spinners and the caret frozen, fonts and paint awaited before each frame, and explicit frame delays. `record.mjs` prints a hash of the frame delays and pixels so a change shows up. The same machine, Chrome and fonts are assumed; a different browser version may change anti-aliasing.
+The script is fixed, `Math.random` is seeded, transitions, spinners and the caret are frozen, fonts and paint are awaited before each frame, and frame delays are explicit. Dates shown in the library and calendar are the day of recording, so two recordings differ there.
 
-## Quality
-Frames are captured at 2x and scaled down to 1200 px, and every frame after the first gets its own colour palette built from the pixels that changed, so gradients and text stay clean inside the GIF format's 256-colour limit.
-
-## Options
-- **Your own article**: `SOURCE_FILE=/path/to/article.txt ./run.sh`. `source.txt` is only a stand-in.
-- **Review frames**: `DUMP=1 ./run.sh` also writes each frame to `out/frames/`.
-- **Assistant**: the chat scene was written for the removed demo assistant and its proposal cards. It needs rewriting before the script runs to the end.
-- Needs Chrome installed and Node 20+. Nothing here is part of the app build.
+## Quality and review
+Frames are captured at 2x and scaled down, and every frame after the first gets its own colour palette built from the pixels that changed. `DUMP=1 ./run.sh` also writes each frame to `out/frames/`.
