@@ -1,6 +1,6 @@
 # Media library, per brand
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built.
+**Status:** proposed (asked for by the owner on 2026-11-26). Not built. Waits for `2026-12-24` to `2026-12-27` (the owner's order of 2026-11-27).
 
 ## Why
 Pictures are uploaded again for every card and stored inside each card's design. A brand needs one place for its logos,
