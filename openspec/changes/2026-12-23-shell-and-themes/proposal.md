@@ -1,6 +1,6 @@
 # A header, a labelled side bar, and colour themes
 
-**Status:** proposed (asked for by the owner on 2026-11-26, with a reference picture). Not built.
+**Status:** agreed by the owner on 2026-11-27 (header contents as drawn; Parchment stays the default). Not built.
 
 ## Why
 The navigation is icons without names, the logo and brand sit in the same square, and the colours cannot be chosen.
@@ -37,8 +37,23 @@ The navigation is icons without names, the logo and brand sit in the same square
 |---|---|---|
 | Parchment (default) | today's dark green and cream | green |
 | Aubergine | deep purple header and side bar, light surface | plum, with a warm highlight |
-| Ocean | deep blue | blue |
+| Cobalt | dark blue side bar, white header, cool light grey surface, white cards | clear blue |
 | Graphite | neutral grey | slate |
+
+### Cobalt
+A quiet, minimal theme (the owner's reference of 2026-11-27): thin borders, small radius (6 px), compact text and
+colour kept for state and the open item.
+
+| Colour name | Value |
+|---|---|
+| Side bar | `#0747a6`, text white, open item a lighter blue |
+| Header | white, bottom border |
+| Surface | `oklch(0.975 0.004 260)` |
+| Panel | `oklch(0.955 0.006 260)` |
+| Card | white |
+| Text / muted | `oklch(0.22 0.02 260)` / `oklch(0.47 0.02 260)` |
+| Border | `oklch(0.9 0.008 260)` |
+| Accent | `#0c66e4` |
 
 - **Settings → Appearance:** theme swatches with a small preview, and Light, Dark or System. Saved for each person on
   the server.
