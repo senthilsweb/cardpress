@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Shell } from "@/components/shell/Rail";
 import { LEGACY_OPEN, settingsHref } from "@/lib/nav";
+import { openSettings } from "@/components/settings/SettingsDialog";
 import { DesignPanel } from "./panels";
 import { Details } from "./Details";
 import { ChatPanel } from "./ChatPanel";
@@ -436,7 +437,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
             {mode === "details" && (
               <div className="min-h-0 flex-1">
                 <Details media={media} changed={marks[store.current?.id ?? ""] ?? []} onSeen={seen} setCard={set} onCardFocus={setCardFocus} versionsAsked={versionsAsked} version={version}
-                  openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => go(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} />
+                  openPreview={previewRequested} onPreviewOpened={() => setPreviewRequested(false)} store={{ ...store, remove: deleteItem }} jobs={jobs} brandNames={brandNames} renderPng={async (s) => (await render([s]))[0].blob} onOpenSettings={() => openSettings(settingsHref("social"))} design={design} profile={profile} palette={palette} size={size} expanded={editorExpanded} setExpanded={setEditorExpanded} host={editorHost} />
               </div>
             )}
             {mode === "design" && <div className="min-h-0 flex-1 overflow-y-auto"><DesignPanel design={design} set={set} profile={profile} palette={palette} /></div>}
