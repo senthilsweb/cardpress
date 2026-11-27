@@ -6,9 +6,69 @@ export interface Spend { start: string; costCents: number; replies: number }
 export interface SessionSpend { conversationId: string; profileId: string; title: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
 export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
 export interface BrandSummary { id: string; posts: Counts; articles: Counts; costCents: number; sessions: number }
-export interface Dashboard { brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage }
+/** The person's figures over everything they may open. `users` is told to an admin only. */
+export interface Totals { brands: number; users?: number; disabledUsers?: number; costCents: number }
+export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage }
 
-export const PERIODS = [{ days: 7, label: "7 days" }, { days: 30, label: "30 days" }, { days: 90, label: "90 days" }, { days: 0, label: "All" }] as const;
+/** `short` is for a phone, where the periods share one line. */
+export const PERIODS = [{ days: 7, label: "7 days", short: "7d" }, { days: 30, label: "30 days", short: "30d" }, { days: 90, label: "90 days", short: "90d" }, { days: 0, label: "All", short: "All" }] as const;
+
+/** What the figures that follow time cover: the last so many days (0: all time), or chosen days, both included. */
+export type Period = { days: number } | { from: string; to: string };
+
+export const periodQuery = (p: Period): Record<string, string> => ("from" in p ? { from: p.from, to: p.to } : { days: String(p.days) });
+
+/** The most days a chosen range may span, as the server allows. */
+const MAX_DAYS = 5 * 366 + 1;
+const dayNumber = (day: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m || Number(m[1]) < 2000) return NaN;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return new Date(t).toISOString().slice(0, 10) === day ? t / 86_400_000 : NaN;
+};
+
+/** What is wrong with a chosen range, in words; empty when it can be used. */
+export function rangeProblem(from: string, to: string): string {
+  const a = dayNumber(from), b = dayNumber(to);
+  if (Number.isNaN(a) || Number.isNaN(b)) return "Choose both days.";
+  if (b < a) return "The first day is after the last.";
+  return b - a >= MAX_DAYS ? "Choose at most five years." : "";
+}
+
+/** The period as the browser remembers it ("30", or "2026-10-01..2026-10-15"); anything else is the last 30 days. */
+export function readPeriod(saved: string | null): Period {
+  const [from, to] = (saved ?? "").split("..");
+  if (to !== undefined) return rangeProblem(from, to) ? { days: 30 } : { from, to };
+  return PERIODS.some((p) => String(p.days) === saved) ? { days: Number(saved) } : { days: 30 };
+}
+export const writePeriod = (p: Period) => ("from" in p ? `${p.from}..${p.to}` : String(p.days));
+
+/** A calendar's day as YYYY-MM-DD, as this browser's calendar has it. */
+export const toDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The calendar day a YYYY-MM-DD names; undefined when it names none. */
+export function dayOf(day: string): Date | undefined {
+  if (Number.isNaN(dayNumber(day))) return undefined;
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Chosen days in the space of a tab: "1 Oct – 15 Oct", with short years when either is not this year. */
+export function shortRange(from: string, to: string, thisYear = new Date().getFullYear()): string {
+  const one = (d: string) => (d.slice(0, 4) === String(thisYear) && from.slice(0, 4) === to.slice(0, 4) ? shortDay(d) : `${shortDay(d)} ’${d.slice(2, 4)}`);
+  return from === to ? one(from) : `${one(from)} – ${one(to)}`;
+}
+
+/** Chosen days as "1 Oct – 15 Oct 2026", with both years when they differ. */
+export function rangeLabel(from: string, to: string): string {
+  const year = (d: string) => d.slice(0, 4);
+  if (from === to) return `${shortDay(from)} ${year(from)}`;
+  return `${shortDay(from)}${year(from) === year(to) ? "" : ` ${year(from)}`} – ${shortDay(to)} ${year(to)}`;
+}
+
+export function periodLabel(p: Period): string {
+  if ("from" in p) return rangeLabel(p.from, p.to);
+  return p.days ? `last ${p.days} days` : "all time";
+}
 
 export const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

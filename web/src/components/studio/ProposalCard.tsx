@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, ChevronDown, ChevronRight, Loader2, Pencil, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,10 +86,10 @@ export function ProposalCard({ p, onApprove, onReject, onOpenPost }: {
               {p.hashtags.length > 0 && <p className="text-xs text-brand">{p.hashtags.map((h) => `#${h}`).join(" ")}</p>}
               {p.altText && <p className="text-[11px] text-muted-foreground">Alt text: {p.altText}</p>}
               {p.rationale && (
-                <details className="text-[11px] text-muted-foreground">
-                  <summary className="cursor-pointer">Why this draft</summary>
-                  <p className="mt-1 leading-snug">{p.rationale}</p>
-                </details>
+                <Collapsible className="text-[11px] text-muted-foreground">
+                  <CollapsibleTrigger className="flex cursor-pointer items-center gap-0.5 [&[data-state=open]>svg]:rotate-90"><ChevronRight aria-hidden className="h-3 w-3" /> Why this draft</CollapsibleTrigger>
+                  <CollapsibleContent><p className="mt-1 leading-snug">{p.rationale}</p></CollapsibleContent>
+                </Collapsible>
               )}
             </div>
           )}
@@ -98,7 +100,7 @@ export function ProposalCard({ p, onApprove, onReject, onOpenPost }: {
             <div className="space-y-2">
               {(editing ? title.trim() : p.title) && (
                 <label className="flex cursor-pointer items-center gap-2 text-xs">
-                  <input type="checkbox" checked={useTitle} onChange={(e) => setUseTitle(e.target.checked)} className="accent-[var(--brand)]" />
+                  <Checkbox checked={useTitle} onCheckedChange={(v) => setUseTitle(v === true)} />
                   Also use the title as the card's title
                 </label>
               )}

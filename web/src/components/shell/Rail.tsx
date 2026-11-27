@@ -7,7 +7,7 @@ import { openSettings, SettingsHost } from "@/components/settings/SettingsDialog
 import { About } from "./About";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { calendarHref, dashboardHref, helpHref, libraryHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, dashboardHref, helpHref, libraryHref, mediaHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -74,6 +74,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
       { id: "", label: "All", href: libraryHref() },
       { id: "post", label: "Posts", href: libraryHref("post") },
       { id: "article", label: "Articles", href: libraryHref("article") },
+      { id: "media", label: "Media", href: mediaHref() },
     ] }] },
     { id: "calendar", label: "Calendar", href: calendarHref(), icon: <CalendarDays /> },
     { id: "help", label: "Guide", href: helpHref(), icon: <CircleHelp /> },
@@ -96,7 +97,8 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
   const follow = (e: React.MouseEvent, it: Item, entry: Entry) => {
     setOpen(null);
     if (entry.external) return;
-    if (it.id === area && onSub) { e.preventDefault(); onSub(entry.id); window.history.replaceState(null, "", entry.href); return; }
+    // Media is a page of its own; the other library entries are filters of one page
+    if (it.id === area && onSub && entry.id !== "media") { e.preventDefault(); onSub(entry.id); window.history.replaceState(null, "", entry.href); return; }
     onLeave?.();
   };
 

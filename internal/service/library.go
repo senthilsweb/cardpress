@@ -60,6 +60,8 @@ type LibraryQuery struct {
 	PageSize  int    // 10, 20 or 50; 0 means the default
 	Sort      string // "" or "at" (when), "title", "status", "kind", "brand"
 	Order     string // "" or "desc" (newest, Z to A first), "asc"
+	// CreatedFrom and CreatedTo (YYYY-MM-DD, together) keep the items created on those days of the Zone.
+	CreatedFrom, CreatedTo, Zone string
 }
 
 // LibrarySorts are the columns the list can be sorted by.
@@ -86,6 +88,8 @@ var LibraryPageSizes = []int{10, 20, 50}
 type row struct {
 	item LibraryItem
 	text string // everything searchable, lower case
+	// created is when the item was first written: a post that became a job counts from its draft.
+	created string
 }
 
 // List returns one page.
@@ -118,6 +122,15 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 		return LibraryPage{}, invalid("order must be asc or desc")
 	}
 
+	zone, err := timeZone(q.Zone)
+	if err != nil {
+		return LibraryPage{}, err
+	}
+	created, err := dayRange(q.CreatedFrom, q.CreatedTo, zone)
+	if err != nil {
+		return LibraryPage{}, err
+	}
+
 	var rows []row
 	if q.Kind != "article" { // an article is never sent from here, so it has no job
 		jobs, err := l.jobRows(ctx, q)
@@ -136,6 +149,9 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 	kept := rows[:0]
 	for _, r := range rows {
 		if q.Status != "" && r.item.Status != q.Status {
+			continue
+		}
+		if !created.Holds(r.created) {
 			continue
 		}
 		if needle != "" && !strings.Contains(r.text, needle) {
@@ -191,7 +207,7 @@ func (l *Library) List(ctx context.Context, q LibraryQuery) (LibraryPage, error)
 
 func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	query := `SELECT j.id, j.profile_id, j.draft_id, j.status, j.body, j.hashtags, j.scheduled_at, j.post_url, j.created_at, j.published_at,
-	                 COALESCE(d.slug, ''), COALESCE(d.page_at, ''), ` + namesAndVersion("j.created_by", "d.approved_by", "j.draft_id") + `
+	                 COALESCE(d.slug, ''), COALESCE(d.page_at, ''), COALESCE(d.created_at, j.created_at), ` + namesAndVersion("j.created_by", "d.approved_by", "j.draft_id") + `
 	          FROM publish_jobs j LEFT JOIN drafts d ON d.id = j.draft_id`
 	var args []any
 	if !q.All {
@@ -208,10 +224,10 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, draft, status, body, tags, postURL, created, published, slug, pageAt, by, approver string
+		var id, pid, draft, status, body, tags, postURL, created, published, slug, pageAt, first, by, approver string
 		var sched sql.NullString
 		var version int
-		if err := rs.Scan(&id, &pid, &draft, &status, &body, &tags, &sched, &postURL, &created, &published, &slug, &pageAt, &by, &approver, &version); err != nil {
+		if err := rs.Scan(&id, &pid, &draft, &status, &body, &tags, &sched, &postURL, &created, &published, &slug, &pageAt, &first, &by, &approver, &version); err != nil {
 			return nil, err
 		}
 		at := created
@@ -227,7 +243,8 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 		out = append(out, row{
 			item: LibraryItem{Type: "job", ID: id, ProfileID: pid, Kind: "post", Status: status, Title: title, Excerpt: excerpt, At: at, PostURL: postURL, DraftID: draft, Slug: slug, PageAt: pageAt,
 				CreatedBy: by, ApprovedBy: approver, Version: version},
-			text: strings.ToLower(body + " " + strings.Join(hs, " ")),
+			text:    strings.ToLower(body + " " + strings.Join(hs, " ")),
+			created: first,
 		})
 	}
 	return out, rs.Err()
@@ -235,7 +252,7 @@ func (l *Library) jobRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 
 func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) {
 	// a draft that became a post is listed once, as the post
-	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone, design, design_version, slug, page_at,
+	query := `SELECT id, profile_id, kind, status, title, doc, hashtags, updated_at, scheduled_at, timezone, design, design_version, slug, page_at, created_at,
 	          ` + namesAndVersion("d.created_by", "d.approved_by", "d.id") + ` FROM drafts d
 	          WHERE NOT EXISTS (SELECT 1 FROM publish_jobs j WHERE j.draft_id = d.id)`
 	var args []any
@@ -257,9 +274,9 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 	defer rs.Close()
 	var out []row
 	for rs.Next() {
-		var id, pid, kind, status, own, doc, tags, updated, planned, zone, design, slug, pageAt, by, approver string
+		var id, pid, kind, status, own, doc, tags, updated, planned, zone, design, slug, pageAt, first, by, approver string
 		var designVersion, version int
-		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone, &design, &designVersion, &slug, &pageAt, &by, &approver, &version); err != nil {
+		if err := rs.Scan(&id, &pid, &kind, &status, &own, &doc, &tags, &updated, &planned, &zone, &design, &designVersion, &slug, &pageAt, &first, &by, &approver, &version); err != nil {
 			return nil, err
 		}
 		blocks := docBlocks(doc)
@@ -281,7 +298,8 @@ func (l *Library) draftRows(ctx context.Context, q LibraryQuery) ([]row, error) 
 		out = append(out, row{
 			item: LibraryItem{Type: "draft", ID: id, ProfileID: pid, Kind: kind, Status: status, Title: title, Excerpt: excerpt, At: updated, DraftID: id, PlannedAt: planned, Timezone: zone, Design: listedDesign(design, designVersion), Slug: slug, PageAt: pageAt,
 				CreatedBy: by, ApprovedBy: approver, Version: version},
-			text: strings.ToLower(searchable + " " + strings.Join(hs, " ")),
+			text:    strings.ToLower(searchable + " " + strings.Join(hs, " ")),
+			created: first,
 		})
 	}
 	return out, rs.Err()

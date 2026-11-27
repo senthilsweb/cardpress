@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, Check, Columns3, Globe, List, Share2, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Search, Table2, Trash2, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, Columns3, Globe, List, Share2, ChevronLeft, Download, ExternalLink, FileText, Loader2, PenLine, Search, Table2, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,12 +19,14 @@ import { LinkedInArticleDialog } from "@/components/studio/LinkedInArticleDialog
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { useSession } from "@/lib/session";
 import { ScaledCard } from "@/components/studio/preview";
+import { Pager } from "@/components/ui/pager";
 import { ScheduleFields, resolveSchedule } from "@/components/studio/ScheduleFields";
 import { api } from "@/lib/api";
 import type { Draft } from "@/lib/draft";
 import { downloadBlob } from "@/lib/export";
 import { defaultTimezone, formatInZone, toLocalInput, type Job } from "@/lib/jobs";
-import { COLUMNS, DEFAULT_SORT, defaultColumns, deleteSummary, draftLink, LIBRARY_STATUS_LABEL, nextSort, PAGE_SIZES, pageNumbers, pagePath, rowKey, STATUS_FILTERS, type ColumnId, type LibraryFilter, type LibraryItem, type LibraryPage, type LibrarySort } from "@/lib/library";
+import { COLUMNS, DEFAULT_SORT, defaultColumns, deleteSummary, draftLink, LIBRARY_STATUS_LABEL, nextSort, PAGE_SIZES, pagePath, rowKey, STATUS_FILTERS, type ColumnId, type LibraryFilter, type LibraryItem, type LibraryPage, type LibrarySort } from "@/lib/library";
+import { rangeLabel, rangeProblem } from "@/lib/dashboard";
 import { articleHtmlPage, docToMarkdown } from "@/lib/markdown";
 import { DEFAULT_DESIGN } from "@/lib/profiles";
 import { fullDesign } from "@/lib/cardDesign";
@@ -79,7 +81,9 @@ function Page({ data }: { data: LibraryBoot }) {
   const [filter, setFilter] = useState<LibraryFilter>(() => {
     const q = new URLSearchParams(window.location.search);
     const k = q.get("kind"), s = q.get("status");
-    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: STATUS_FILTERS.some((x) => x.value === s) ? s! : "", q: "" };
+    // the dashboard's counts open the library with the days they cover
+    const from = q.get("from") ?? "", to = q.get("to") ?? "";
+    return { brand: data.activeId, kind: k === "post" || k === "article" ? k : "", status: STATUS_FILTERS.some((x) => x.value === s) ? s! : "", q: "", created: rangeProblem(from, to) ? undefined : { from, to } };
   });
   const [typed, setTyped] = useState("");
   const [page, setPage] = useState(1);
@@ -123,7 +127,7 @@ function Page({ data }: { data: LibraryBoot }) {
     const t = window.setTimeout(() => setFilter((f) => (f.q === typed ? f : { ...f, q: typed })), 300);
     return () => window.clearTimeout(t);
   }, [typed]);
-  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, pageSize, sort]);
+  useEffect(() => { setPage(1); }, [filter.brand, filter.kind, filter.status, filter.q, filter.created, pageSize, sort]);
 
   const load = useCallback(async (quiet = false) => {
     const id = ++run.current;
@@ -184,7 +188,7 @@ function Page({ data }: { data: LibraryBoot }) {
     setFilter((f) => ({ ...f, brand: id }));
     api.putPreference("activeProfile", id).catch(() => undefined); // only means the choice is not remembered
   };
-  const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "";
+  const filtered = filter.kind !== "" || filter.status !== "" || filter.q !== "" || !!filter.created;
   const grid = view === "grid";
 
   return (
@@ -258,6 +262,13 @@ function Page({ data }: { data: LibraryBoot }) {
             </Select>
           </div>
 
+          {filter.created && (
+            <p role="status" className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>Created {rangeLabel(filter.created.from, filter.created.to)}</span>
+              <Button size="sm" variant="ghost" onClick={() => { window.history.replaceState(window.history.state, "", window.location.pathname); setFilter((f) => ({ ...f, created: undefined })); }}>Show all dates</Button>
+            </p>
+          )}
+
           {grid && chosen.length > 0 && (
             <div role="status" className="mt-3 flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
               <span>{chosen.length} selected</span>
@@ -292,7 +303,7 @@ function Page({ data }: { data: LibraryBoot }) {
               ))}
             </ul>
           )}
-          {result && result.total > 0 && <Pager r={result} onPage={setPage} onSize={changeSize} />}
+          {result && result.total > 0 && <div className="mt-5"><Pager label="Pages of the list" sizeLabel="Rows per page" page={result.page} pages={result.pages} pageSize={result.pageSize} total={result.total} sizes={PAGE_SIZES} onPage={setPage} onSize={changeSize} /></div>}
         </div>
         )}
       </main>
@@ -364,27 +375,6 @@ function ItemPage({ at, data, onBack, onGone, onPatch }: { at: ItemRef; data: Li
         </>
       )}
     </div>
-  );
-}
-
-/** Numbered pages with the total, and a choice of how many to show. The server does the paging. */
-function Pager({ r, onPage, onSize }: { r: LibraryPage; onPage: (n: number) => void; onSize: (n: number) => void }) {
-  const from = (r.page - 1) * r.pageSize + 1, to = Math.min(r.total, r.page * r.pageSize);
-  return (
-    <nav className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Pages of the list">
-      <span className="text-muted-foreground">{from}–{to} of {r.total}</span>
-      <div className="flex items-center gap-1">
-        <Button size="icon-sm" variant="ghost" aria-label="Previous page" disabled={r.page <= 1} onClick={() => onPage(r.page - 1)}><ChevronLeft /></Button>
-        {pageNumbers(r.page, r.pages).map((n, i) => n === "…"
-          ? <span key={`gap${i}`} className="px-1 text-muted-foreground" aria-hidden>…</span>
-          : <Button key={n} size="sm" variant={n === r.page ? "brand" : "ghost"} className="min-w-8 px-2" aria-current={n === r.page ? "page" : undefined} aria-label={`Page ${n}`} onClick={() => onPage(n)}>{n}</Button>)}
-        <Button size="icon-sm" variant="ghost" aria-label="Next page" disabled={r.page >= r.pages} onClick={() => onPage(r.page + 1)}><ChevronRight /></Button>
-      </div>
-      <Select value={String(r.pageSize)} onValueChange={(v) => onSize(Number(v))}>
-        <SelectTrigger className="w-[130px]" aria-label="Rows per page"><SelectValue /></SelectTrigger>
-        <SelectContent>{PAGE_SIZES.map((n) => <SelectItem key={n} value={String(n)}>{n} per page</SelectItem>)}</SelectContent>
-      </Select>
-    </nav>
   );
 }
 

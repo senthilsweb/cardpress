@@ -1,5 +1,6 @@
 import { History, Save, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AS_RADIOS, choiceLabel, ofReply, open, optionText, picked, selected } from "@/lib/choices";
 import type { Choice, Conversation } from "@/lib/chat";
@@ -30,15 +31,18 @@ export function OptionPicker({ choice, label, place }: { choice: Choice; label: 
     );
   }
   return (
-    <fieldset className="space-y-1" disabled={store.busy}>
-      <legend className="mb-1 font-medium">{label}</legend>
-      {choice.options.map((o, i) => (
-        <label key={i} className="flex cursor-pointer items-start gap-2 rounded px-1 py-0.5 hover:bg-accent">
-          <input type="radio" name={name} className="mt-0.5 accent-[hsl(var(--brand))]" checked={at === i} onChange={() => store.pick(choice, i)} onClick={() => store.pick(choice, i)} />
-          <span className="min-w-0 break-words">{optionText(o.value)}{note(i) && <span className="block text-[11px] text-muted-foreground">{note(i)}</span>}</span>
-        </label>
-      ))}
-    </fieldset>
+    <div className="space-y-1">
+      <p className="mb-1 font-medium" id={`${name}-label`}>{label}</p>
+      <RadioGroup aria-labelledby={`${name}-label`} className="gap-1" value={String(at)} onValueChange={(v) => store.pick(choice, Number(v))} disabled={store.busy}>
+        {choice.options.map((o, i) => (
+          <label key={i} className="flex cursor-pointer items-start gap-2 rounded px-1 py-0.5 hover:bg-accent">
+            {/* pressing the marked one again counts as a pick too */}
+            <RadioGroupItem value={String(i)} className="mt-px" onClick={() => store.pick(choice, i)} />
+            <span className="min-w-0 break-words">{optionText(o.value)}{note(i) && <span className="block text-[11px] text-muted-foreground">{note(i)}</span>}</span>
+          </label>
+        ))}
+      </RadioGroup>
+    </div>
   );
 }
 

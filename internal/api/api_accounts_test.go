@@ -48,7 +48,7 @@ func newRig(t *testing.T, o rigOpts) *rig {
 	pub := service.NewPublisher(db.DB, okCreds{"accessToken": "TOK", "authorUrn": "urn:li:person:Me"}, &apiPoster{}, 0)
 	t.Cleanup(pub.Wait)
 	opts := Options{
-		Studio: studio, Settings: service.NewSettings(db.DB, box, func(string) string { return "" }), Publishing: pub, Library: service.NewLibrary(db.DB),
+		Studio: studio, Settings: service.NewSettings(db.DB, box, func(string) string { return "" }), Publishing: pub, Library: service.NewLibrary(db.DB), Media: service.NewMedia(db.DB, 0),
 		Chat:     service.NewChat(db.DB, &agenttest.Mock{}, stubFetcher{src: source.Source{Title: "T", Text: article}}),
 		Accounts: service.NewAccounts(db.DB, service.AccountsOptions{SignupClosed: o.signupClosed}),
 		Token:    o.token, AssistantAdminOnly: o.adminOnly, Version: "t", DBDriver: db.Driver,
@@ -701,5 +701,68 @@ func TestBrandDetails(t *testing.T) {
 	var n int
 	if err := r.db.QueryRow(`SELECT COUNT(*) FROM brand_details`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("details left behind: %d %v", n, err)
+	}
+}
+
+func TestMediaLibraryAccess(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, other := r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	other.mustSignup("other@example.com", "Other")
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatalf("a brand: %d", code)
+	}
+	upload := func(c *client, file []byte) *httptest.ResponseRecorder {
+		var body bytes.Buffer
+		f := multipart.NewWriter(&body)
+		_ = f.WriteField("name", `Price "list"`)
+		_ = f.WriteField("tags", "sales, 2026")
+		part, _ := f.CreateFormFile("file", "list.pdf")
+		_, _ = part.Write(file)
+		_ = f.Close()
+		req := httptest.NewRequest("POST", "/api/v1/profiles/acme/assets", &body)
+		req.Header.Set("Content-Type", f.FormDataContentType())
+		return c.send(req)
+	}
+	rec := upload(ed, []byte("%PDF-1.7 prices"))
+	var a service.Asset
+	if err := json.Unmarshal(rec.Body.Bytes(), &a); rec.Code != 201 || err != nil || a.Kind != "pdf" || len(a.Tags) != 2 || a.CreatedBy != "Ed Tester" {
+		t.Fatalf("upload: %d %s", rec.Code, rec.Body)
+	}
+	if code := upload(ed, []byte("<html><script>alert(1)</script>")).Code; code != 400 {
+		t.Errorf("a page was taken as a file: %d", code)
+	}
+	if code := upload(ed, make([]byte, 22<<20)).Code; code != 413 {
+		t.Errorf("too large: %d", code)
+	}
+	file := ed.do("GET", "/api/v1/profiles/acme/assets/"+a.ID+"/file", "")
+	if file.Code != 200 || file.Header().Get("Content-Type") != "application/pdf" || file.Header().Get("X-Content-Type-Options") != "nosniff" ||
+		!strings.HasPrefix(file.Header().Get("Content-Disposition"), "attachment") || !strings.Contains(file.Header().Get("Content-Security-Policy"), "sandbox") {
+		t.Errorf("file: %d %v", file.Code, file.Header())
+	}
+	base := "/api/v1/profiles/acme/assets"
+	for _, call := range [][3]string{{"GET", base, ""}, {"GET", base + "/" + a.ID + "/file", ""}, {"PUT", base + "/" + a.ID, `{"name":"Mine"}`}, {"DELETE", base + "/" + a.ID, ""}} {
+		if code := other.do(call[0], call[1], call[2]).Code; code != 404 {
+			t.Errorf("another person, %s %s: %d", call[0], call[1], code)
+		}
+		if code := r.browser(t).do(call[0], call[1], call[2]).Code; code != 401 {
+			t.Errorf("nobody signed in, %s %s: %d", call[0], call[1], code)
+		}
+	}
+	if code := admin.do("GET", base, "").Code; code != 200 {
+		t.Errorf("an administrator: %d", code)
+	}
+	// gone with the brand, file and all
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"keep","name":"Keep"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	ed.do("POST", "/api/v1/profiles/acme/archive", "")
+	if code := ed.do("DELETE", "/api/v1/profiles/acme", "").Code; code >= 300 {
+		t.Fatalf("delete: %d", code)
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT (SELECT COUNT(*) FROM assets) + (SELECT COUNT(*) FROM asset_blobs)`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("files left behind: %d %v", n, err)
 	}
 }

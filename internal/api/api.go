@@ -139,6 +139,7 @@ type Options struct {
 	Settings     Settings
 	Publishing   Publishing
 	Library      Library
+	Media        Media // nil: no media library
 	Chat         Chatting
 	Accounts     Accounts // nil: no accounts (the token alone, or nothing on localhost)
 	Token        string   // empty: no bearer token required
@@ -223,6 +224,12 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
 		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
 		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
+		{"GET", "/profiles/{id}/assets", write(scopeBrandPath), s.listAssets},
+		{"POST", "/profiles/{id}/assets", write(scopeBrandPath), s.addAsset},
+		{"PUT", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.updateAsset},
+		{"DELETE", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.deleteAsset},
+		{"GET", "/profiles/{id}/assets/{asset}/file", write(scopeBrandPath), s.assetFile},
+		{"GET", "/profiles/{id}/assets/{asset}/thumb", write(scopeBrandPath), s.assetThumb},
 		{"GET", "/profiles/{id}/settings", rule{scopeBrandPath, service.PermSocial}, s.getSettings},
 		{"GET", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.getNetwork},
 		{"PUT", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.putNetwork},
@@ -1411,6 +1418,7 @@ func (s *server) library(w http.ResponseWriter, r *http.Request) {
 	page, err := s.Library.List(r.Context(), service.LibraryQuery{
 		ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Kind: q.Get("kind"), Status: q.Get("status"),
 		Q: q.Get("q"), Page: pageNo, PageSize: size, Sort: q.Get("sort"), Order: q.Get("order"),
+		CreatedFrom: q.Get("from"), CreatedTo: q.Get("to"), Zone: q.Get("tz"),
 	})
 	if err != nil {
 		fail(w, r, err)
@@ -1440,10 +1448,13 @@ func (s *server) calendar(w http.ResponseWriter, r *http.Request) {
 }
 
 // dashboard is the figures of one brand (?profileId=) or of all of the caller's (?scope=all). days is 7, 30 (when left
-// out), 90, or 0 for all time; tz the person's time zone.
+// out), 90, or 0 for all time, or from and to name the days; tz the person's time zone.
 func (s *server) dashboard(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	days := 30
+	if q.Get("from") != "" || q.Get("to") != "" {
+		days = 0
+	}
 	if v := q.Get("days"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
@@ -1452,7 +1463,7 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		days = n
 	}
-	d, err := s.Library.Dashboard(r.Context(), service.DashboardQuery{ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Days: days, Zone: q.Get("tz")}, time.Now())
+	d, err := s.Library.Dashboard(r.Context(), service.DashboardQuery{ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Days: days, From: q.Get("from"), To: q.Get("to"), Zone: q.Get("tz")}, time.Now())
 	if err != nil {
 		fail(w, r, err)
 		return

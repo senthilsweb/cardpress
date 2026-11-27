@@ -70,6 +70,11 @@ export function timezones(): string[] {
   return ["UTC", defaultTimezone()];
 }
 
+/** Cities that browsers still list, or have started to list, under their other name. */
+const OTHER_NAMES: [string, string][] = [["Calcutta", "Kolkata"], ["Saigon", "Ho_Chi_Minh"], ["Katmandu", "Kathmandu"], ["Rangoon", "Yangon"], ["Kiev", "Kyiv"], ["Godthab", "Nuuk"]];
+/** The other name of a zone's city, so that either one finds it. */
+export const zoneOtherName = (tz: string) => OTHER_NAMES.flatMap(([a, b]) => (tz.endsWith(`/${a}`) ? [b] : tz.endsWith(`/${b}`) ? [a] : [])).join(" ");
+
 /** The offset of `tz` from UTC at instant `t`, in milliseconds (zone time minus UTC). */
 function offsetMs(t: number, tz: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {

@@ -1,6 +1,7 @@
 # Media library, per brand
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built. Waits for `2026-12-24` to `2026-12-26` (the owner's order of 2026-11-27).
+**Status:** part 1 built (storage, API, the Media page), not deployed. Part 2 (choosing from the library, `asset:`
+references) is not built. Asked for by the owner on 2026-11-26.
 
 ## Why
 Pictures are uploaded again for every card and stored inside each card's design. A brand needs one place for its logos,
@@ -38,6 +39,16 @@ The server has 256 MB of memory and a 1 GB disk, and a file is read whole from t
 | Total | A warning at 70% of the disk |
 
 SVG files are refused for now: they can carry scripts. Lists load thumbnails only.
+
+## Decided while building
+- **The browser reduces a picture and draws its thumbnail.** The server only reads the size from the file's header and
+  refuses anything over the limits, so a small machine never unpacks a large picture. One upload is taken in at a time.
+- A **JPEG is always drawn again**, which drops the photo's own data, such as where it was taken. A PNG or WebP that
+  already fits is stored as it is.
+- A thumbnail belongs to the **entry**, not to the shared file, so one brand's upload never decides what another sees.
+- A brand holds a file once; adding it again names the entry that has it.
+- A file's type is read from its bytes. Files are sent as downloads, with nothing in them allowed to run.
+- The page is **Library → Media**. The allowance is `CARDPRESS_MEDIA_BRAND_MB`, 200 by default.
 
 ## Consequences
 The database file and its backups grow with the files. If a brand library outgrows the disk, the disk is enlarged;

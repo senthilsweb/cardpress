@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CalendarClock, Check, ChevronDown, ExternalLink, Loader2, Send, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { defaultTimezone, formatInZone, relative, STATUS_LABEL, toLocalInput, type Attempt, type Job } from "@/lib/jobs";
@@ -186,7 +187,7 @@ export function JobQueue({ store, brands }: { store: JobsStore; /** Brand names 
       {store.error && <p role="alert" className="text-xs text-destructive">{store.error}</p>}
       {Object.keys(brands).length > 1 && (
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" className="accent-[var(--brand)]" checked={store.scope === "all"} onChange={(e) => store.setScope(e.target.checked ? "all" : "brand")} />
+          <Checkbox checked={store.scope === "all"} onCheckedChange={(v) => store.setScope(v === true ? "all" : "brand")} />
           All brands
         </label>
       )}

@@ -53,7 +53,9 @@ import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
 import type { BrandDetails } from "./brandDetails";
-import type { Dashboard } from "./dashboard";
+import { assetParams, type Asset, type AssetQuery, type Assets } from "./assets";
+import { defaultTimezone } from "./jobs";
+import { periodQuery, type Dashboard, type Period } from "./dashboard";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
@@ -203,9 +205,21 @@ export const api = {
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
-  dashboard: (q: { profileId: string; all: boolean; days: number; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), days: String(q.days), tz: q.tz })}`),
+  dashboard: (q: { profileId: string; all: boolean; period: Period; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), ...periodQuery(q.period), tz: q.tz })}`),
   brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
   saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
+  /** A brand's media library. */
+  assets: (brand: string, q: AssetQuery) => call<Assets>("GET", `/profiles/${encodeURIComponent(brand)}/assets?${assetParams(q)}`),
+  addAsset: (brand: string, form: FormData) => call<Asset>("POST", `/profiles/${encodeURIComponent(brand)}/assets`, form),
+  updateAsset: (brand: string, id: string, change: { name: string; tags: string[] }) => call<Asset>("PUT", `/profiles/${encodeURIComponent(brand)}/assets/${encodeURIComponent(id)}`, change),
+  deleteAsset: (brand: string, id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(brand)}/assets/${encodeURIComponent(id)}`),
+  /** An entry's file or thumbnail, fetched with the sign-in so it can be shown or saved. */
+  assetBlob: async (brand: string, id: string, part: "file" | "thumb"): Promise<Blob> => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/profiles/${encodeURIComponent(brand)}/assets/${encodeURIComponent(id)}/${part}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, "http", `Could not load the file (${res.status})`);
+    return res.blob();
+  },
   orderProfiles: (ids: string[]) => call<void>("PUT", "/profiles/order", { ids }),
   /** How many of the brand's posts are still scheduled: archiving does not cancel them. */
   archiveProfile: (id: string) => call<{ scheduled: number }>("POST", `/profiles/${encodeURIComponent(id)}/archive`),
@@ -279,6 +293,7 @@ export const api = {
     if (f.kind) q.set("kind", f.kind);
     if (f.status) q.set("status", f.status);
     if (f.q.trim()) q.set("q", f.q.trim());
+    if (f.created) { q.set("from", f.created.from); q.set("to", f.created.to); q.set("tz", defaultTimezone()); }
     return call<LibraryPage>("GET", `/library?${q}`);
   },
   calendar: (brand: string, from: string, to: string) => {

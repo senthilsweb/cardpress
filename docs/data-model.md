@@ -17,6 +17,8 @@ CardPress keeps everything in one database: SQLite in a file by default, or Turs
 erDiagram
     profiles ||--o| designs : "card design"
     profiles ||--o| brand_details : "who it is"
+    profiles ||--o{ assets : "media library"
+    asset_blobs ||--o{ assets : "file"
     profiles ||--o{ drafts : writes
     profiles ||--o{ credentials : "has accounts"
     profiles ||--o{ publish_jobs : posts
@@ -49,6 +51,8 @@ Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown
 |---|---|---|
 | `profiles` | 0001, 0007, 0011 | `id` (PK), `position`, `data` (JSON: name, handle, website, logo, fonts, colour sets), `updated_at`, `archived_at` (set when a brand is archived, empty otherwise), `owner_id` (who made it; empty for brands that predate accounts, which the first account adopts) |
 | `brand_details` | 0026 | `profile_id` (PK), `kind`, `legal_name`, `line1`, `line2`, `city`, `region`, `postal_code`, `country`, `mobile`, `email`, `updated_by`, `updated_at`. Personal data, read only by the brand's owner and administrators |
+| `assets` | 0027 | `id` (PK), `profile_id`, `kind` (image, pdf, video), `name`, `tags` (JSON), `hash`, `link`, `mime`, `size`, `width`, `height`, `thumb`, `thumb_mime`, `created_by`, `created_at`, `updated_at`. A brand's media library |
+| `asset_blobs` | 0027 | `hash` (PK), `data`. Each distinct file once; removed with its last entry |
 | `designs` | 0001 | `profile_id` (PK), `data` (JSON: the brand's current card design), `updated_at` |
 | `preferences` | 0001 | `key` (PK), `value` (JSON), `updated_at`. Keys: `theme`, `layout`, `customFonts`, `activeProfile`, `envProfile` |
 
@@ -124,6 +128,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0024 | `chat_messages`: `status`, `detail` |
 | 0025 | `chat_changes` (what a reply changed, for save and undo) and `choices` (options offered) |
 | 0026 | `brand_details` |
+| 0027 | `assets`, `asset_blobs` |
 
 ## A post's own file
 
