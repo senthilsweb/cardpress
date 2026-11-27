@@ -1,6 +1,6 @@
 # One dialog design, and settings in a dialog
 
-**Status:** in progress (asked for by the owner on 2026-11-26, with a reference picture; started 2026-11-27). The shared dialog and the background picker are built, not deployed. Settings are not moved yet.
+**Status:** in progress (asked for by the owner on 2026-11-26, with a reference picture; started 2026-11-27). Built, not deployed. Media waits for the media library.
 
 ## Why
 Popups differ from one another, and settings are separate pages that leave the work behind.

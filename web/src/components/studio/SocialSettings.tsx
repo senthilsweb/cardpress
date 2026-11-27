@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, Eye, EyeOff, Loader2, Lock, PlugZap, Trash2, X } from "lucide-react";
-import { Drawer } from "@/components/ui/drawer";
+import { Pane } from "@/components/ui/pane";
+import { useUnsaved } from "@/components/settings/guard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +49,7 @@ function ResultView({ r }: { r: TestResult }) {
   );
 }
 
-/** One network's fields. The Save and Test actions live in the drawer's frozen footer. */
+/** One network's fields. The Save and Test actions live in the page's footer. */
 function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
   net: NetworkSettings; edits: Edits; setEdit: (key: string, value: string) => void; canStore: boolean; busy: boolean;
   onRemove: (f: SettingsField) => Promise<void>;
@@ -65,7 +66,7 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
   };
 
   return (
-    <div className="space-y-4 px-4 py-4">
+    <div className="space-y-4 pt-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={net.complete ? "brand" : "outline"}>{status}</Badge>
         {!net.testable && <Badge variant="outline">Publishing not yet supported</Badge>}
@@ -118,10 +119,10 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
 }
 
 /**
- * Credentials for each network, kept encrypted on the server. Opened from the gear in the header as a right-hand
- * drawer: the networks are tabs, and Save and Test connection are frozen at the bottom for the selected one.
+ * Credentials for each network of one brand, kept encrypted on the server. The networks are tabs, and Save and Test
+ * connection stay at the bottom for the selected one.
  */
-export function SocialSettings({ open, onOpenChange, profileId, brandName }: { open: boolean; onOpenChange: (o: boolean) => void; profileId: string; brandName: string }) {
+export function SocialSettings({ profileId, brandName, onChanged }: { profileId: string; brandName: string; onChanged: () => void }) {
   const [view, setView] = useState<SettingsView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [active, setActive] = useState("linkedin");
@@ -130,7 +131,6 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [results, setResults] = useState<Record<string, TestResult | null>>({});
   const [savedNet, setSavedNet] = useState<string | null>(null);
-  const [confirmClose, setConfirmClose] = useState(false);
   const top = useRef<HTMLSpanElement>(null);
 
   const load = useCallback(async () => {
@@ -138,25 +138,19 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
     try { setView(await api.getSettings(profileId)); } catch (e) { setLoadError(errMsg(e)); }
   }, [profileId]);
 
-  useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => { void load(); }, [load]);
 
   const net = view?.networks.find((n) => n.id === active) ?? view?.networks[0];
   const dirtyOf = (n: NetworkSettings) => changedFields(n, edits[n.id] ?? {}).length > 0;
   const anyDirty = !!view?.networks.some(dirtyOf);
   const dirty = net ? dirtyOf(net) : false;
+  useUnsaved(anyDirty);
   const storingNeedsKey = !!net && !!view && !view.canStore && changedFields(net, edits[net.id] ?? {}).some((f) => (edits[net.id] ?? {})[f.key].trim() !== "");
 
   const replace = (n: NetworkSettings) => setView((v) => (v ? { ...v, networks: v.networks.map((x) => (x.id === n.id ? n : x)) } : v));
   const setErr = (id: string, e: string | null) => setErrors((x) => ({ ...x, [id]: e }));
   // results and errors appear at the top of the scrolling body, while the buttons are frozen below: bring them into view
   const toTop = () => top.current?.scrollIntoView({ block: "nearest" });
-
-  // closing throws away anything typed, so ask first when there is something to lose
-  const close = () => {
-    if (anyDirty && !confirmClose) { setConfirmClose(true); return; }
-    setConfirmClose(false); setEdits({}); setResults({}); setErrors({}); setSavedNet(null); setView(null);
-    onOpenChange(false);
-  };
 
   const save = async () => {
     if (!net) return;
@@ -165,6 +159,7 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
       const out: Record<string, string | null> = {};
       for (const f of changedFields(net, edits[net.id] ?? {})) out[f.key] = (edits[net.id] ?? {})[f.key];
       replace(await api.putNetwork(profileId, net.id, out));
+      onChanged();
       setEdits((e) => ({ ...e, [net.id]: {} }));
       setSavedNet(net.id);
       window.setTimeout(() => setSavedNet((s) => (s === net.id ? null : s)), 2500);
@@ -182,19 +177,13 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
     setBusy("remove"); setErr(n.id, null); setResults((r) => ({ ...r, [n.id]: null }));
     try {
       replace(await api.putNetwork(profileId, n.id, { [f.key]: "" }));
+      onChanged();
       setEdits((e) => { const { [f.key]: _gone, ...rest } = e[n.id] ?? {}; return { ...e, [n.id]: rest }; });
     } catch (e) { setErr(n.id, errMsg(e)); } finally { setBusy(null); }
   };
 
   const footer = net && (
     <div className="space-y-2.5">
-      {confirmClose && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-          <span className="flex-1">You have unsaved changes. Discard them?</span>
-          <Button size="sm" variant="outline" onClick={() => setConfirmClose(false)}>Keep editing</Button>
-          <Button size="sm" variant="destructive" onClick={close}>Discard</Button>
-        </div>
-      )}
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" aria-live="polite">
           {savedNet === net.id ? <span className="flex items-center gap-1 text-brand"><Check className="h-3.5 w-3.5" /> Saved</span> : dirty ? "Unsaved changes" : ""}
@@ -212,14 +201,11 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
   );
 
   return (
-    <Drawer
-      open={open}
-      onClose={close}
-      title="Social accounts"
+    <Pane
       footer={footer}
-      subheader={view && (
-        <Tabs value={net?.id} onValueChange={(v) => { setActive(v); setConfirmClose(false); }}>
-          <TabsList className="grid w-full grid-cols-3">
+      tabs={view && (
+        <Tabs value={net?.id} onValueChange={setActive}>
+          <TabsList className="grid w-full max-w-sm grid-cols-3">
             {view.networks.map((n) => (
               <TabsTrigger key={n.id} value={n.id}>
                 {n.name}
@@ -232,26 +218,26 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
     >
       <div>
         <span ref={top} />
-        <p className="px-4 pt-4 text-xs leading-snug text-muted-foreground">
+        <p className="text-xs leading-snug text-muted-foreground">
           Accounts for <b className="text-foreground">{brandName}</b>. Stored encrypted; only the last four characters are shown.
         </p>
         {loadError && (
-          <div role="alert" className="space-y-2 px-4 pt-4 text-sm">
+          <div role="alert" className="space-y-2 pt-4 text-sm">
             <p className="text-destructive">{loadError}</p>
             <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
           </div>
         )}
-        {!view && !loadError && <p className="flex items-center gap-2 px-4 pt-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
+        {!view && !loadError && <p className="flex items-center gap-2 pt-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
         {view && !view.canStore && (
-          <div className="mx-4 mt-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          <div className="mt-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
             <p>
               No encryption key. Set <code className="font-mono">CARDPRESS_SECRET_KEY</code> and restart.
             </p>
           </div>
         )}
-        {net && errors[net.id] && <p role="alert" className="mx-4 mt-4 text-xs text-destructive">{errors[net.id]}</p>}
-        {net && results[net.id] && <div className="mx-4 mt-4"><ResultView r={results[net.id]!} /></div>}
+        {net && errors[net.id] && <p role="alert" className="mt-4 text-xs text-destructive">{errors[net.id]}</p>}
+        {net && results[net.id] && <div className="mt-4"><ResultView r={results[net.id]!} /></div>}
         {net && view && (
           <NetworkFields
             key={net.id}
@@ -264,6 +250,6 @@ export function SocialSettings({ open, onOpenChange, profileId, brandName }: { o
           />
         )}
       </div>
-    </Drawer>
+    </Pane>
   );
 }

@@ -7,7 +7,7 @@ How the screens are arranged, and what is remembered.
 Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
 - **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **Sign out**).
-- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
+- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
 - On a narrow screen the header is shorter and the side bar runs along the bottom.
 
 ## Themes
@@ -78,9 +78,15 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview**, *
 
 All of this is remembered: it is saved on the server as the `layout` preference, so it is the same in any browser that uses the same server.
 
-## Drawers
+## Settings
 
-Settings pages are built from the drawer component (`components/ui/drawer.tsx`) drawn as a page (`InlineDrawers`). The studio opens none.
+Settings open in a dialog over the page in use (`components/settings/SettingsDialog.tsx`). It takes the page's settings address (`/settings/social/` and the like) while open, so links, bookmarks and the browser's Back button work; closing gives the earlier address back. An address visited directly opens the dialog over an empty frame, and closing goes to the studio.
+
+- The left column groups the pages and searches their names and words; **Ctrl/⌘ + K** goes to the search. On a phone it is a drop-down and the dialog fills the screen.
+- A page with something unsaved asks before it is left or closed. **Brand look** saves as you type, and once more on leaving.
+- After a change to a brand or its accounts, closing loads the page behind again.
+
+The dialog is `components/ui/panel-dialog.tsx` (the background picker uses it too); a settings page is a `Pane` (`components/ui/pane.tsx`) and says what would be lost with `useUnsaved` (`components/settings/guard.tsx`).
 
 ## Canvas
 
@@ -98,7 +104,7 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/components/shell/Rail.tsx` | The frame: header, side bar, its panels, and the bar on narrow screens |
 | `web/src/components/studio/Details.tsx` | The Details column |
 | `web/src/lib/details.ts` | Its groups, counters and what is missing, from the content schema (`lib/content/`) |
-| `web/src/components/settings/Settings.tsx` | The settings pages |
+| `web/src/components/settings/SettingsDialog.tsx` | The settings dialog and which page it shows |
 | `web/src/lib/nav.ts` | Addresses, the settings list and who sees each entry |
 
 ## The article editor

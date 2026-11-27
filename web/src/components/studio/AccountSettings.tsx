@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Check, Copy, KeyRound, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
+import { Pane } from "@/components/ui/pane";
+import { useUnsaved } from "@/components/settings/guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,23 +17,27 @@ type Part = "profile" | "password" | "keys";
 const PART_LABEL: Record<Part, string> = { profile: "Profile", password: "Password", keys: "API keys" };
 
 /** `parts` picks the tabs: the Account settings page shows profile and password, API keys has its own page. */
-export function AccountSettings({ open, onClose, parts = ["profile", "password", "keys"], title = "Account settings" }: { open: boolean; onClose: () => void; parts?: Part[]; title?: string }) {
+export function AccountSettings({ parts }: { parts: Part[] }) {
   const { user, setUser } = useSession();
   const [tab, setTab] = useState<string>(parts[0]);
-  const [f, setF] = useState({ firstName: "", lastName: "", phone: "" });
-  const [dob, setDob] = useState({ y: "", m: "", d: "" });
+  const [f, setF] = useState({ firstName: user?.firstName ?? "", lastName: user?.lastName ?? "", phone: user?.phone ?? "" });
+  const [dob, setDob] = useState(() => splitDate(user?.birthDate));
   const [pw, setPw] = useState({ current: "", next: "", again: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // start from what is saved each time the drawer opens
+  // start from what is saved
   useEffect(() => {
-    if (!open || !user) return;
+    if (!user) return;
     setF({ firstName: user.firstName, lastName: user.lastName, phone: user.phone ?? "" });
     setDob(splitDate(user.birthDate));
     setPw({ current: "", next: "", again: "" });
     setError(null);
-  }, [open, user]);
+  }, [user]);
+  // a date is compared part by part, as the fields hold it
+  const savedDob = splitDate(user?.birthDate);
+  const profileChanged = !!user && (f.firstName !== user.firstName || f.lastName !== user.lastName || f.phone !== (user.phone ?? "") || dob.y !== savedDob.y || dob.m !== savedDob.m || dob.d !== savedDob.d);
+  useUnsaved(profileChanged || !!(pw.current || pw.next || pw.again));
   if (!user) return null;
 
   const saveProfile = async () => {
@@ -56,11 +61,10 @@ export function AccountSettings({ open, onClose, parts = ["profile", "password",
   const pwReady = pw.current !== "" && pw.next.length >= 10 && pw.again !== "";
 
   return (
-    <Drawer
-      open={open} onClose={onClose} title={title} resizeKey="account"
-      subheader={parts.length > 1 && (
-        <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }} className="px-3 py-2">
-          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${parts.length}, minmax(0, 1fr))` }}>
+    <Pane
+      tabs={parts.length > 1 && (
+        <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }}>
+          <TabsList className="grid w-full max-w-sm" style={{ gridTemplateColumns: `repeat(${parts.length}, minmax(0, 1fr))` }}>
             {parts.map((p) => <TabsTrigger key={p} value={p}>{PART_LABEL[p]}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -73,10 +77,10 @@ export function AccountSettings({ open, onClose, parts = ["profile", "password",
         </div>
       )}
     >
-      <Tabs value={tab} className="space-y-4 p-4">
+      <Tabs value={tab} className="space-y-4">
         <TabsContent value="profile" className="mt-0 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label htmlFor="as-first">First name</Label><Input id="as-first" data-autofocus value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="as-first">First name</Label><Input id="as-first" value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} /></div>
             <div className="space-y-1.5"><Label htmlFor="as-last">Last name</Label><Input id="as-last" value={f.lastName} onChange={(e) => setF({ ...f, lastName: e.target.value })} /></div>
           </div>
           <div className="space-y-1.5"><Label htmlFor="as-email">Email</Label><Input id="as-email" value={user.email} readOnly disabled /></div>
@@ -89,9 +93,9 @@ export function AccountSettings({ open, onClose, parts = ["profile", "password",
           <div className="space-y-1.5"><Label htmlFor="as-new">New password</Label><Input id="as-new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /><p className="text-xs text-muted-foreground">At least 10 characters.</p></div>
           <div className="space-y-1.5"><Label htmlFor="as-again">New password again</Label><Input id="as-again" type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></div>
         </TabsContent>
-        <TabsContent value="keys" className="mt-0"><KeysPanel open={open && tab === "keys"} /></TabsContent>
+        <TabsContent value="keys" className="mt-0"><KeysPanel open={tab === "keys"} /></TabsContent>
       </Tabs>
-    </Drawer>
+    </Pane>
   );
 }
 
@@ -106,6 +110,7 @@ function KeysPanel({ open }: { open: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const load = async () => { try { setKeys((await api.apiKeys()).keys); } catch (e) { setError(e instanceof Error ? e.message : "Could not load the keys"); } };
   useEffect(() => { if (open) { setFresh(null); setError(null); void load(); } }, [open]);
+  useUnsaved(!!fresh && !copied, "The new key is not shown again. Leave without copying it?");
   useEffect(() => { if (!confirm) return; const t = window.setTimeout(() => setConfirm(null), 4000); return () => window.clearTimeout(t); }, [confirm]);
 
   const create = async () => {

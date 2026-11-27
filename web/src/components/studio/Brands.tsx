@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Palette, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
+import { Pane } from "@/components/ui/pane";
+import { useUnsaved } from "@/components/settings/guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { brandProblem, buildBrand } from "@/lib/brands";
@@ -15,8 +16,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** Create a brand: blank, or a copy of another brand's look (never its accounts, drafts or posts). */
-export function NewBrandDrawer({ open, onClose, brands, current, source, onCreate }: {
-  open: boolean;
+export function NewBrand({ onClose, brands, current, source, onCreate }: {
   onClose: () => void;
   brands: Profile[];
   /** The open brand, offered as the thing to copy. */
@@ -32,10 +32,12 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
   const [error, setError] = useState<string | null>(null);
   const from = source ?? current;
 
+  const first = { name: source ? `${source.name} copy` : "", handle: source?.handle ?? "" };
   useEffect(() => {
-    if (!open) return;
-    setName(source ? `${source.name} copy` : ""); setHandle(source?.handle ?? ""); setCopy(!!source); setError(null); setBusy(false);
-  }, [open, source]);
+    setName(first.name); setHandle(first.handle); setCopy(!!source); setError(null); setBusy(false);
+  }, [source]); // eslint-disable-line react-hooks/exhaustive-deps
+  // once it is being made there is nothing left to lose
+  useUnsaved(!busy && (name !== first.name || handle !== first.handle));
 
   const problem = brandProblem(name, brands);
   const submit = async () => {
@@ -46,8 +48,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
   };
 
   return (
-    <Drawer
-      open={open} onClose={onClose} title="New brand"
+    <Pane
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
@@ -55,7 +56,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
         </div>
       }
     >
-      <form className="space-y-4 px-4 py-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <div className="space-y-1.5">
           <Label htmlFor="nb-name">Brand name</Label>
           <Input id="nb-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="off" />
@@ -79,7 +80,7 @@ export function NewBrandDrawer({ open, onClose, brands, current, source, onCreat
         </fieldset>
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       </form>
-    </Drawer>
+    </Pane>
   );
 }
 
@@ -89,6 +90,7 @@ function RenameBrand({ brand, others, onSave, onClose }: { brand: Profile; other
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const problem = brandProblem(name, others);
+  useUnsaved(!busy && name !== brand.name);
   const save = async () => {
     if (problem || busy) return;
     if (name.trim() === brand.name) return onClose();
@@ -96,7 +98,7 @@ function RenameBrand({ brand, others, onSave, onClose }: { brand: Profile; other
     try { await onSave(name.trim()); onClose(); } catch (e) { setError(errMsg(e)); setBusy(false); }
   };
   return (
-    <form className="min-w-0 flex-1 space-y-1.5" onSubmit={(e) => { e.preventDefault(); void save(); }} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
+    <form data-escape="local" className="min-w-0 flex-1 space-y-1.5" onSubmit={(e) => { e.preventDefault(); void save(); }} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
       <div className="flex items-center gap-1.5">
         <Input autoFocus aria-label="Brand name" value={name} onChange={(e) => setName(e.target.value)} onFocus={(e) => e.target.select()} maxLength={80} autoComplete="off" className="h-8 min-w-0 flex-1" />
         <Button type="button" size="sm" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
@@ -110,9 +112,7 @@ function RenameBrand({ brand, others, onSave, onClose }: { brand: Profile; other
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, colors, onOpen, onRename, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
-  open: boolean;
-  onClose: () => void;
+export function ManageBrands({ active, archived, activeId, colors, onOpen, onRename, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
   active: Profile[];
   archived: Profile[];
   activeId: string;
@@ -127,14 +127,12 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   onArchive: (id: string) => Promise<{ scheduled: number }>;
   onRestore: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  /** On the Brands page: a New brand button in place of Done. */
-  onNew?: () => void;
+  onNew: () => void;
 }) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  useEffect(() => { if (!open) { setConfirm(null); setError(null); setNotice(null); } }, [open]);
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key); setError(null); setNotice(null);
@@ -190,10 +188,8 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Brands" footer={<div className="flex justify-end">{onNew
-      ? <Button variant="brand" size="sm" onClick={onNew}><Plus /> New brand</Button>
-      : <Button variant="outline" size="sm" onClick={onClose}>Done</Button>}</div>}>
-      <div className="space-y-4 px-4 py-4">
+    <Pane footer={<div className="flex justify-end"><Button variant="brand" size="sm" onClick={onNew}><Plus /> New brand</Button></div>}>
+      <div className="space-y-4">
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         <ul className="space-y-2">{active.map(row)}</ul>
@@ -228,6 +224,6 @@ export function ManageBrandsDrawer({ open, onClose, active, archived, activeId, 
           </section>
         )}
       </div>
-    </Drawer>
+    </Pane>
   );
 }
