@@ -51,7 +51,7 @@ function Avatar({ profile, palette }: { profile: Profile; palette: Palette }) {
   );
 }
 
-function Caption({ text, limit, expandable, more = "…more" }: { text: string; limit: number; expandable?: boolean; more?: string }) {
+function Caption({ text, limit, expandable, more = "…more", less = "see less" }: { text: string; limit: number; expandable?: boolean; more?: string; less?: string }) {
   const [open, setOpen] = useState(false);
   const { shown, truncated } = foldAt(text, limit);
   const full = open || !truncated;
@@ -61,6 +61,7 @@ function Caption({ text, limit, expandable, more = "…more" }: { text: string; 
       {truncated && !full && (expandable
         ? <button type="button" className="ml-1 cursor-pointer text-neutral-500 hover:underline" onClick={() => setOpen(true)}>{more}</button>
         : <span className="text-neutral-500"> {more}</span>)}
+      {truncated && open && <button type="button" className="ml-1 cursor-pointer text-neutral-500 hover:underline" onClick={() => setOpen(false)}>{less}</button>}
     </p>
   );
 }
@@ -130,7 +131,7 @@ export function FeedFrame({ width, caption = "", expandable, mediaSrc, documentT
         </div>
         <Ellipsis className="h-5 w-5 text-neutral-500" />
       </div>
-      {net !== "Instagram" && caption && <div className="px-3.5 pb-3"><Caption text={caption} limit={net === "X" ? 280 : 210} expandable={expandable} more={net === "LinkedIn" ? "…see more" : "…more"} /></div>}
+      {net !== "Instagram" && caption && <div className="px-3.5 pb-3"><Caption text={caption} limit={net === "X" ? 280 : 210} expandable={expandable} more={net === "LinkedIn" ? "…see more" : "…more"} less={net === "LinkedIn" ? "see less" : "less"} /></div>}
       <div className={net === "X" ? "mx-3.5 overflow-hidden rounded-2xl border border-neutral-200" : ""}>
         {net === "X" && !own ? <ScaledCard {...p} maxW={width - 30} maxH={99999} rounded={false} /> : media}
       </div>

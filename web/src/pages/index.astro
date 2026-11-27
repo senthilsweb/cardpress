@@ -16,6 +16,7 @@ const features = [
       <span class="text-[22px] font-bold leading-none tracking-tight">CardPress</span>
       <span class="flex-1"></span>
       <a href="https://github.com/senthilsweb/cardpress" class="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">GitHub</a>
+      <a id="sign-in" href={`${base}login/`} hidden class="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent">Sign in</a>
       <a href={editor} class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Open editor</a>
     </header>
 
@@ -49,4 +50,12 @@ const features = [
       Open source under the MIT license. Built with <span aria-label="love" style="color:#ef4444">♥</span> by <a href="https://www.senthilsweb.com" class="hover:text-foreground hover:underline">www.senthilsweb.com</a>.
     </footer>
   </div>
+  <script>
+    // Sign in is offered to someone who is not signed in, on a server that has accounts
+    const link = document.getElementById("sign-in") as HTMLAnchorElement | null;
+    if (link) fetch(link.href.replace(/login\/$/, "api/v1/info"), { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((info) => { if (info?.accounts && !info.signedIn) link.hidden = false; })
+      .catch(() => { /* the page works without it */ });
+  </script>
 </Base>

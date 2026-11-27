@@ -647,3 +647,59 @@ func TestASharedAssistantIsTheAdminsOnly(t *testing.T) {
 		}
 	}
 }
+
+// Who a brand is belongs to its owner and the administrators. It is kept apart from the brand's look, so nothing that
+// reads the brand (the app's state, and through it exports, public pages and the assistant) can carry it.
+func TestBrandDetails(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, other := r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	other.mustSignup("other@example.com", "Other")
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatalf("a brand: %d", code)
+	}
+	const path = "/api/v1/profiles/acme/details"
+	var got service.BrandDetails
+	if code := ed.json("GET", path, "", &got); code != 200 || got != (service.BrandDetails{}) {
+		t.Fatalf("a new brand has none: %d %+v", code, got)
+	}
+	in := `{"kind":"company","legalName":" Acme Ltd ","line1":"1 Secret Lane","city":"Springfield","country":"US","mobile":"+1 555 010 0000","email":"owner@acme.example"}`
+	if code := ed.json("PUT", path, in, &got); code != 200 || got.LegalName != "Acme Ltd" || got.Country != "US" {
+		t.Fatalf("saved: %d %+v", code, got)
+	}
+	for _, p := range []string{"/api/v1/state", "/api/v1/library?profileId=acme"} {
+		if body := ed.do("GET", p, "").Body.String(); strings.Contains(body, "Secret Lane") || strings.Contains(body, "owner@acme.example") {
+			t.Errorf("%s carries the details", p)
+		}
+	}
+	if code := other.do("GET", path, "").Code; code != 404 {
+		t.Errorf("another person reads: %d", code)
+	}
+	if code := other.do("PUT", path, `{}`).Code; code != 404 {
+		t.Errorf("another person writes: %d", code)
+	}
+	if code := admin.do("GET", path, "").Code; code != 200 {
+		t.Errorf("an administrator reads: %d", code)
+	}
+	if code := r.browser(t).do("GET", path, "").Code; code != 401 {
+		t.Errorf("nobody signed in reads: %d", code)
+	}
+	for _, bad := range []string{`{"kind":"charity"}`, `{"country":"usa"}`, `{"email":"not-an-address"}`, `{"email":"a@b"}`, `{"mobile":"call me"}`, `{"line1":"a\nb"}`, `{"city":"` + strings.Repeat("x", 81) + `"}`} {
+		if code := ed.do("PUT", path, bad).Code; code != 400 {
+			t.Errorf("%s: %d", bad, code)
+		}
+	}
+	// gone with the brand
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"keep","name":"Keep"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	ed.do("POST", "/api/v1/profiles/acme/archive", "")
+	if code := ed.do("DELETE", "/api/v1/profiles/acme", "").Code; code >= 300 {
+		t.Fatalf("delete: %d", code)
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM brand_details`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("details left behind: %d %v", n, err)
+	}
+}

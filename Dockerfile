@@ -19,8 +19,10 @@ COPY main.go ./
 COPY internal ./internal
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
+ARG COMMIT=
+ARG BUILT=
 ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/cardpress .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.built=${BUILT}" -o /out/cardpress .
 RUN mkdir /out/data
 
 # 3) tiny runtime image

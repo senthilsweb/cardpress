@@ -4,6 +4,7 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -32,6 +33,8 @@ type Studio interface {
 	ReplaceProfiles(ctx context.Context, list []json.RawMessage) error
 	CreateProfile(ctx context.Context, raw json.RawMessage) error
 	SaveProfile(ctx context.Context, id string, raw json.RawMessage) error
+	BrandDetails(ctx context.Context, profileID string) (service.BrandDetails, error)
+	SaveBrandDetails(ctx context.Context, profileID string, d service.BrandDetails) (service.BrandDetails, error)
 	ReorderProfiles(ctx context.Context, ids []string) error
 	ArchiveProfile(ctx context.Context, id string) (service.ArchiveResult, error)
 	RestoreProfile(ctx context.Context, id string) error
@@ -73,6 +76,7 @@ type Library interface {
 	List(ctx context.Context, q service.LibraryQuery) (service.LibraryPage, error)
 	Calendar(ctx context.Context, q service.CalendarQuery) ([]service.CalendarEntry, error)
 	Ready(ctx context.Context, profileID string, all bool) ([]service.ReadyItem, error)
+	Dashboard(ctx context.Context, q service.DashboardQuery, now time.Time) (service.Dashboard, error)
 }
 
 // Publishing is the part of the publishing service the HTTP API needs.
@@ -95,6 +99,7 @@ type Publishing interface {
 type Chatting interface {
 	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
+	AgentDetails() service.AgentInfo
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
@@ -145,6 +150,14 @@ type Options struct {
 	} // MCP call log; nil if MCP is off
 	Version  string
 	DBDriver string
+	// Build says which source the server was made from. Told only to someone who is signed in.
+	Build Build
+}
+
+// Build is the source a server was made from.
+type Build struct {
+	Commit string `json:"commit,omitempty"`
+	Date   string `json:"date,omitempty"`
 }
 
 type server struct {
@@ -208,6 +221,8 @@ func (s *server) table() []routeDef {
 		{"POST", "/profiles/{id}/archive", write(scopeBrandPath), s.archiveProfile},
 		{"POST", "/profiles/{id}/restore", write(scopeBrandPath), s.restoreProfile},
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
+		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
+		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
 		{"GET", "/profiles/{id}/settings", rule{scopeBrandPath, service.PermSocial}, s.getSettings},
 		{"GET", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.getNetwork},
 		{"PUT", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.putNetwork},
@@ -253,6 +268,7 @@ func (s *server) table() []routeDef {
 		{"GET", "/publish/jobs", write(scopeBrandQuery), s.listJobs},
 		{"GET", "/library", write(scopeBrandQuery), s.library},
 		{"GET", "/calendar", write(scopeBrandQuery), s.calendar},
+		{"GET", "/dashboard", write(scopeBrandQuery), s.dashboard},
 		{"GET", "/calendar/ready", write(scopeBrandQuery), s.calendarReady},
 		{"GET", "/publish/jobs/{id}", write(scopeJob), s.getJob},
 		{"GET", "/publish/jobs/{id}/attempts", write(scopeJob), s.jobAttempts},
@@ -346,10 +362,32 @@ func (s *server) info(w http.ResponseWriter, r *http.Request) {
 			out["signedIn"] = false
 		}
 	}
+	trusted := s.trusted(r)
 	if s.Chat != nil {
-		out["agent"] = s.Chat.Agent()
+		agent := s.Chat.Agent()
+		if trusted {
+			agent = s.Chat.AgentDetails()
+		}
+		out["agent"] = agent
+	}
+	if trusted && s.Build != (Build{}) {
+		out["build"] = s.Build
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// trusted says whether the caller may be told more than anyone: a signed-in person, the holder of the token, or, on a
+// server with neither, whoever can reach it.
+func (s *server) trusted(r *http.Request) bool {
+	if s.Accounts != nil {
+		_, ok := principalOf(r)
+		return ok
+	}
+	if s.Token == "" {
+		return true
+	}
+	got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return ok && subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) == 1
 }
 
 func (s *server) state(w http.ResponseWriter, r *http.Request) {
@@ -885,6 +923,30 @@ func (s *server) saveProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *server) getBrandDetails(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.BrandDetails(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	// personal data: no cache keeps it
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) putBrandDetails(w http.ResponseWriter, r *http.Request) {
+	var in service.BrandDetails
+	if !decode(w, r, &in) {
+		return
+	}
+	d, err := s.Studio.SaveBrandDetails(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
 func (s *server) orderProfiles(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		IDs []string `json:"ids"`
@@ -1375,6 +1437,27 @@ func (s *server) calendar(w http.ResponseWriter, r *http.Request) {
 		entries = []service.CalendarEntry{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
+}
+
+// dashboard is the figures of one brand (?profileId=) or of all of the caller's (?scope=all). days is 7, 30 (when left
+// out), 90, or 0 for all time; tz the person's time zone.
+func (s *server) dashboard(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	days := 30
+	if v := q.Get("days"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, r, http.StatusBadRequest, "invalid", "days must be a number")
+			return
+		}
+		days = n
+	}
+	d, err := s.Library.Dashboard(r.Context(), service.DashboardQuery{ProfileID: q.Get("profileId"), All: q.Get("scope") == "all", Days: days, Zone: q.Get("tz")}, time.Now())
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
 }
 
 func (s *server) calendarReady(w http.ResponseWriter, r *http.Request) {

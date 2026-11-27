@@ -77,6 +77,6 @@ A person can make **API keys** (Settings, API keys) for programs such as an MCP 
 | Who may call each route (the policy table) | `internal/api/auth.go`, `table()` in `internal/api/api.go` |
 | Ownership of brands and what each list shows | `internal/service/studio.go`, `brands.go`, `library.go` |
 | Sign-in and sign-up pages | `web/src/components/auth/AuthPage.tsx` |
-| Settings pages | `web/src/components/settings/Settings.tsx`, with `studio/AccountSettings.tsx` and `UsersDrawer.tsx` |
+| Settings pages | `web/src/components/settings/SettingsDialog.tsx`, with `studio/AccountSettings.tsx` and `settings/UsersSettings.tsx` |
 
 Every route of the API is listed once in the table with the scope it names (a brand, a draft, a post, a conversation) and the permission a role must hold. A test walks the whole table as a second person against the first person's ids and expects the same answer a missing thing would get (`404`).

@@ -11,10 +11,18 @@ try {
   const open = async (url) => { await page.goto(BASE + url); await page.waitForLoadState("networkidle").catch(() => {}); await page.evaluate(() => document.fonts.ready); await sleep(1200); };
   const shot = async (name, height = 839) => { await page.screenshot({ path: `${OUT}/${name}.jpg`, type: "jpeg", quality: 85, clip: { x: 0, y: 0, width: 1456, height } }); console.log("wrote", name); };
 
-  await open("/settings/brands/");
-  await shot("brands", 540);
-  await open("/settings/social/");
-  await shot("social", 710);
+  // settings are a dialog over the page in use: opened from the studio, and pictured on its own
+  const settings = async (name, entry, height) => {
+    await open("/studio/");
+    await page.getByRole("navigation", { name: "Main" }).first().getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("region", { name: "Settings" }).getByRole("link", { name: entry, exact: true }).click();
+    await sleep(1500);
+    const box = await page.getByRole("dialog", { name: "Settings" }).boundingBox();
+    await page.screenshot({ path: `${OUT}/${name}.jpg`, type: "jpeg", quality: 85, clip: { ...box, height: Math.min(height, box.height) } });
+    console.log("wrote", name);
+  };
+  await settings("brands", "Brands", 560);
+  await settings("social", "Social accounts", 720);
   await open("/calendar/");
   await shot("calendar");
 

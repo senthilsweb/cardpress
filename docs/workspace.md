@@ -6,9 +6,15 @@ How the screens are arranged, and what is remembered.
 
 Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
-- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **Sign out**).
-- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
+- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **About CardPress** with the version, build, database and the assistant's versions, **Sign out**).
+- **Side bar:** Dashboard, Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
 - On a narrow screen the header is shorter and the side bar runs along the bottom.
+
+## Dashboard
+
+`/dashboard/` is where signing in lands and where the logo leads (`components/dashboard/`). For the open brand, or **All brands**: posts and articles by status (counted as the Library lists them), the next five scheduled items, the five last edited, and the assistant's cost, sessions, replies, working time and largest sessions for 7, 30 or 90 days or all time.
+
+Figures come from items, publishing jobs and `chat_usage` (`GET /api/v1/dashboard`). Cost is the list price the agent service reports for chat replies; sessions started outside CardPress and deleted conversations are not counted. Days and weeks are the person's own.
 
 ## Themes
 
@@ -21,6 +27,7 @@ A brand is an identity (name, handle, logo, fonts, colour sets) with its own car
 - **Switch**: open the brand menu in the header and pick another brand. The whole studio changes to that brand, and the last one you opened is remembered on the server.
 - **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
+- **Details** (New brand, and Brand look): type (company or individual), name, address, mobile and email, all optional. They are personal data kept in their own table (`brand_details`): only the brand's owner and administrators read them, and they are never on a card or a public page, in a profile export, or sent to the assistant.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
 - **Queue**: the Publishing queue shows the open brand's posts. Tick **All brands** to see every brand's, each labelled.
 - The **pencil** beside a brand's name (Settings, Brands) renames it. Its cards and posts, and the name printed on them (**Logo text**), stay as they are.
@@ -56,7 +63,8 @@ A footer field that has never been written shows the brand's handle (right) or w
 
 Above the canvas:
 
-- **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view.
+- **Post** shows the card or the feed preview. With Chat open the feed preview starts on, so the text is in view. A feed preview opens and closes its text (**see more**, **see less**).
+- **Full preview** on the canvas toolbar (**Ctrl/⌘ + Enter** away from a text field) opens the item as it is now, from any column. The window belongs to Details, which is there out of sight while it is open.
 - **Article** shows the article as it reads: cover card, title, summary and text, with **Edit** and **Preview and copy**. While you are on Design, or typing in Card words, it shows the card instead, with the sizes and export buttons.
 - **Both** puts them side by side when the canvas is at least 900 pixels wide. Click a side to work on it.
 - The **item picker** finds a draft by name, text or hashtag: type a few words, filter to posts or articles, and use the arrow keys and Enter. **New** starts fresh: an empty post or article (the one on screen decides which), a card in the brand's look with nothing written on it, and an empty chat. It is the only **New**, and stays above the screen on a phone. Deleting the item or the conversation on screen does the same. A dot marks a view that changed while you were looking at another.
@@ -78,9 +86,15 @@ On a narrow screen a bar at the bottom switches between **Chat**, **Preview**, *
 
 All of this is remembered: it is saved on the server as the `layout` preference, so it is the same in any browser that uses the same server.
 
-## Drawers
+## Settings
 
-Settings pages are built from the drawer component (`components/ui/drawer.tsx`) drawn as a page (`InlineDrawers`). The studio opens none.
+Settings open in a dialog over the page in use (`components/settings/SettingsDialog.tsx`). It takes the page's settings address (`/settings/social/` and the like) while open, so links, bookmarks and the browser's Back button work; closing gives the earlier address back. An address visited directly opens the dialog over an empty frame, and closing goes to the studio.
+
+- The left column groups the pages and searches their names and words; **Ctrl/⌘ + K** goes to the search. On a phone it is a drop-down and the dialog fills the screen.
+- A page with something unsaved asks before it is left or closed. **Brand look** saves as you type, and once more on leaving.
+- After a change to a brand or its accounts, closing loads the page behind again.
+
+The dialog is `components/ui/panel-dialog.tsx` (the background picker uses it too); a settings page is a `Pane` (`components/ui/pane.tsx`) and says what would be lost with `useUnsaved` (`components/settings/guard.tsx`).
 
 ## Canvas
 
@@ -98,7 +112,7 @@ The expanded post editor has a plain background, without the grid.
 | `web/src/components/shell/Rail.tsx` | The frame: header, side bar, its panels, and the bar on narrow screens |
 | `web/src/components/studio/Details.tsx` | The Details column |
 | `web/src/lib/details.ts` | Its groups, counters and what is missing, from the content schema (`lib/content/`) |
-| `web/src/components/settings/Settings.tsx` | The settings pages |
+| `web/src/components/settings/SettingsDialog.tsx` | The settings dialog and which page it shows |
 | `web/src/lib/nav.ts` | Addresses, the settings list and who sees each entry |
 
 ## The article editor

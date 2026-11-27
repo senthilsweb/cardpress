@@ -21,7 +21,7 @@ web/
   src/pages/             index.astro (landing page), studio.astro (the editor)
   src/card/              the card renderer: Card.tsx (layouts), backgrounds.tsx, bg/ (drop-ins)
   src/components/studio/ the editor UI
-  src/components/ui/     shadcn components, including the drawer
+  src/components/ui/     shadcn components, and the large panel dialog
   src/lib/               API client, profiles, palettes, sizes, export, LinkedIn text rules
   src/styles/global.css  theme tokens
 scripts/record-demo/     records the demo GIF
@@ -45,8 +45,8 @@ openspec/                one change proposal per piece of work
 | `internal/mcpserver/server.go` | The tools an outside agent gets, and nothing more |
 | `internal/source/guard.go` | The checks on every address the server fetches |
 | `web/src/card/Card.tsx` | The six layouts |
-| `web/src/components/studio/Studio.tsx` | The studio: rail, side column tabs, canvas, drawers |
-| `web/src/components/shell/Rail.tsx`, `settings/Settings.tsx` | The rail on every page; the settings pages |
+| `web/src/components/studio/Studio.tsx` | The studio: rail, side column tabs, canvas |
+| `web/src/components/shell/Rail.tsx`, `settings/SettingsDialog.tsx` | The frame on every page; the settings dialog |
 
 ## Patterns
 

@@ -52,11 +52,15 @@ import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
+import type { BrandDetails } from "./brandDetails";
+import type { Dashboard } from "./dashboard";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
 export interface ApiInfo {
   name: string; version: string; db: string; authRequired: boolean; agent?: AgentInfo;
+  /** The source the server was made from; told to a signed-in person. */
+  build?: { commit?: string; date?: string };
   /** Accounts are on: the app needs a first (admin) account, then people sign in. */
   accounts?: boolean; needsSetup?: boolean; signupOpen?: boolean; signedIn?: boolean; user?: User; perms?: Perm[];
 }
@@ -199,6 +203,9 @@ export const api = {
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
+  dashboard: (q: { profileId: string; all: boolean; days: number; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), days: String(q.days), tz: q.tz })}`),
+  brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
+  saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
   orderProfiles: (ids: string[]) => call<void>("PUT", "/profiles/order", { ids }),
   /** How many of the brand's posts are still scheduled: archiving does not cancel them. */
   archiveProfile: (id: string) => call<{ scheduled: number }>("POST", `/profiles/${encodeURIComponent(id)}/archive`),

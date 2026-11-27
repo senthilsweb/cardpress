@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, LayoutDashboard, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
+import { openSettings, SettingsHost } from "@/components/settings/SettingsDialog";
+import { About } from "./About";
 import { LogoMark } from "@/components/studio/Logo";
 import { initials } from "@/lib/brands";
-import { calendarHref, helpHref, libraryHref, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
+import { calendarHref, dashboardHref, helpHref, libraryHref, SETTINGS_GROUPS, settingsHref, studioHref, visibleSections, type Area } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -57,16 +59,16 @@ const COMPACT = "cardpress.sidebar.compact";
 export function Shell({ area, sub, brands, activeId, colors, switching = false, onSwitchBrand, theme, onToggleTheme, panel, onLeave, onSub, header, children }: ShellProps) {
   const { user, can } = useSession();
   const [open, setOpen] = useState<Item["id"] | null>(null);
+  const [about, setAbout] = useState(false);
   const [compact, setCompact] = useState(() => { try { return localStorage.getItem(COMPACT) === "1"; } catch { return false; } });
   const toggleCompact = () => setCompact((v) => { try { localStorage.setItem(COMPACT, v ? "0" : "1"); } catch { /* not remembered */ } return !v; });
   const root = useRef<HTMLDivElement>(null);
   const active = brands.find((b) => b.id === activeId) ?? brands[0];
   const color = colors[active?.id] ?? "#888";
-  const go = (href: string) => { onLeave?.(); window.location.href = href; };
 
   const settings = visibleSections(!!user, can);
-  const pick = (ids: string[]) => settings.filter((s) => ids.includes(s.id)).map((s) => ({ id: s.id, label: s.label, href: settingsHref(s.id) }));
   const items: Item[] = [
+    { id: "dashboard", label: "Dashboard", href: dashboardHref(), icon: <LayoutDashboard /> },
     { id: "studio", label: "Studio", href: studioHref(), icon: <PenLine /> },
     { id: "library", label: "Library", icon: <FileText />, groups: [{ entries: [
       { id: "", label: "All", href: libraryHref() },
@@ -75,11 +77,9 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
     ] }] },
     { id: "calendar", label: "Calendar", href: calendarHref(), icon: <CalendarDays /> },
     { id: "help", label: "Guide", href: helpHref(), icon: <CircleHelp /> },
-    { id: "settings", label: "Settings", icon: <Settings />, groups: [
-      { entries: pick(["account", "appearance", "api-keys"]) },
-      { title: "Brands", entries: pick(["brands", "social"]) },
-      { title: "Administration", entries: pick(["users", "assistant"]) },
-    ].filter((g) => g.entries.length) },
+    { id: "settings", label: "Settings", icon: <Settings />, groups: SETTINGS_GROUPS.map((title) => ({
+      title, entries: settings.filter((s) => s.group === title).map((s) => ({ id: s.id, label: s.label, href: settingsHref(s.id) })),
+    })).filter((g) => g.entries.length) },
   ];
   const shown = items.find((i) => i.id === open);
 
@@ -123,8 +123,8 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => go(settingsHref("brands", "?new=1"))}><Plus /> New brand…</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => go(settingsHref("brands"))}><SlidersHorizontal /> Manage brands…</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openSettings(settingsHref("brands", "?new=1"))}><Plus /> New brand…</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openSettings(settingsHref("brands"))}><SlidersHorizontal /> Manage brands…</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -153,7 +153,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col bg-side">
         <header className="on-head relative z-40 flex h-12 shrink-0 items-center gap-2 border-b border-head-line bg-head px-2 lg:h-[52px] lg:px-3">
-          <a href={studioHref()} onClick={onLeave} className="flex shrink-0 items-center gap-2 rounded-md pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="CardPress, the studio">
+          <a href={dashboardHref()} onClick={onLeave} className="flex shrink-0 items-center gap-2 rounded-md pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="CardPress, the dashboard">
             <LogoMark size={28} />
             <span className="text-[15px] font-bold tracking-tight max-sm:hidden">CardPress</span>
           </a>
@@ -163,7 +163,7 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
             {theme === "dark" ? <Sun /> : <Moon />}
           </button>
           <a href={helpHref()} onClick={onLeave} className={cn(headButton, "max-sm:hidden")} aria-label="User guide" title="User guide"><CircleHelp /></a>
-          <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} side="bottom" />
+          <AccountMenu name={active?.name ?? ""} color={color} theme={theme} onToggleTheme={onToggleTheme} side="bottom" onAbout={() => setAbout(true)} />
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -234,25 +234,8 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
           </nav>
         </div>
       </div>
+      <SettingsHost onLeave={onLeave} />
+      <About open={about} onOpenChange={setAbout} />
     </TooltipProvider>
   );
-}
-
-/** The heading of a page's own list (Settings on a narrow screen). */
-export function SecondaryHeader({ title, children }: { title: string; children?: React.ReactNode }) {
-  return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-      <h2 className="flex-1 truncate font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]">{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-/** One entry of a page's own list. */
-export function SecondaryLink({ href, onClick, current, children }: { href?: string; onClick?: () => void; current: boolean; children: React.ReactNode }) {
-  const cls = cn("flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm [&_svg]:h-4 [&_svg]:w-4",
-    current ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground");
-  return href
-    ? <a href={href} aria-current={current ? "page" : undefined} className={cls}>{children}</a>
-    : <button type="button" aria-pressed={current} onClick={onClick} className={cls}>{children}</button>;
 }

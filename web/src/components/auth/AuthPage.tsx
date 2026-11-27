@@ -12,7 +12,7 @@ const select = "flex h-9 w-full cursor-pointer rounded-md border border-input bg
 /** Where to go after signing in: a page of this app only. */
 function nextPage(): string {
   const n = new URLSearchParams(window.location.search).get("next");
-  return n && n.startsWith(base()) && !n.startsWith("//") && !/\/(login|signup)\/?$/.test(n) ? n : `${base()}studio/`;
+  return n && n.startsWith(base()) && !n.startsWith("//") && !/\/(login|signup)\/?$/.test(n) ? n : `${base()}dashboard/`;
 }
 
 function Card({ title, lead, children }: { title: string; lead?: string; children: React.ReactNode }) {

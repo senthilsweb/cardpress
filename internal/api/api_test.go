@@ -36,6 +36,11 @@ func handler(t *testing.T, token string, origins ...string) http.Handler {
 	return New(Options{Studio: service.New(db.DB), Token: token, CORSOrigins: origins, Version: "test", DBDriver: db.Driver})
 }
 
+func handlerWithBuild(t *testing.T, token string) http.Handler {
+	t.Helper()
+	return New(Options{Token: token, Version: "test", Build: Build{Commit: "abc123"}})
+}
+
 func do(h http.Handler, method, path, body string, hdr map[string]string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	for k, v := range hdr {
@@ -1201,5 +1206,20 @@ func TestSearchAndNotesRoutes(t *testing.T) {
 	}
 	if r := do(h, "GET", "/api/v1/chat/memories", ``, nil); r.Code != 400 {
 		t.Errorf("notes without a brand: %d", r.Code)
+	}
+}
+
+// Anyone may ask a server its name and version; which source it was built from is for those who may use it.
+func TestInfoBuildIsForTheTrusted(t *testing.T) {
+	h := handlerWithBuild(t, "secret-token")
+	anyone := do(h, "GET", "/api/v1/info", "", nil).Body.String()
+	if !strings.Contains(anyone, `"version":"test"`) || strings.Contains(anyone, "abc123") {
+		t.Fatalf("without the token: %s", anyone)
+	}
+	if wrong := do(h, "GET", "/api/v1/info", "", map[string]string{"Authorization": "Bearer nope"}).Body.String(); strings.Contains(wrong, "abc123") {
+		t.Fatalf("with a wrong token: %s", wrong)
+	}
+	if got := do(h, "GET", "/api/v1/info", "", map[string]string{"Authorization": "Bearer secret-token"}).Body.String(); !strings.Contains(got, `"commit":"abc123"`) {
+		t.Fatalf("with the token: %s", got)
 	}
 }

@@ -1,12 +1,11 @@
 import { Check, Monitor, Moon, Sun } from "lucide-react";
-import { Drawer } from "@/components/ui/drawer";
+import { Pane } from "@/components/ui/pane";
 import { setMode, setTheme, THEMES, useAppearance, type Mode } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const MODES: { id: Mode; name: string; icon: React.ReactNode }[] = [
   { id: "light", name: "Light", icon: <Sun /> }, { id: "dark", name: "Dark", icon: <Moon /> }, { id: "system", name: "System", icon: <Monitor /> },
 ];
-const noop = () => undefined;
 
 /** A small picture of the application in a theme's own colours. */
 function Preview({ theme, mode }: { theme: string; mode: "light" | "dark" }) {
@@ -35,8 +34,8 @@ function Preview({ theme, mode }: { theme: string; mode: "light" | "dark" }) {
 export function AppearanceSettings() {
   const { theme, mode, shown } = useAppearance();
   return (
-    <Drawer open onClose={noop} title="Appearance">
-      <div className="space-y-6 px-4 py-4">
+    <Pane>
+      <div className="space-y-6">
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Theme</legend>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -63,6 +62,6 @@ export function AppearanceSettings() {
         </fieldset>
         <p className="text-xs text-muted-foreground">Card colours come from the brand, not from the theme.</p>
       </div>
-    </Drawer>
+    </Pane>
   );
 }

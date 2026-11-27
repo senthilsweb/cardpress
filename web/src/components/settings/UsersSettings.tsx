@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Loader2, Plus, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
+import { Pane } from "@/components/ui/pane";
+import { useUnsaved } from "@/components/settings/guard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
@@ -12,7 +13,7 @@ const select = "h-8 cursor-pointer rounded-md border border-input bg-card px-2 t
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
 /** People and roles. Administrators only; the server refuses anyone else. */
-export function UsersDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function UsersSettings() {
   const { user: me } = useSession();
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,8 @@ export function UsersDrawer({ open, onClose }: { open: boolean; onClose: () => v
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", role: "editor" });
 
   const load = useCallback(() => api.users().then(setUsers).catch((e) => setError(message(e))), []);
-  useEffect(() => { if (open) { setError(null); void load(); } }, [open, load]);
+  useEffect(() => { void load(); }, [load]);
+  useUnsaved((adding && !!(form.firstName || form.lastName || form.email || form.password)) || !!pw);
 
   const act = async (key: string, fn: () => Promise<unknown>, done?: string) => {
     setBusy(key); setError(null);
@@ -31,14 +33,14 @@ export function UsersDrawer({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Users" resizeKey="users"
+    <Pane
       footer={
         <div className="flex items-center justify-between gap-2">
           {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : <span className="text-xs text-muted-foreground">{users ? `${users.length} ${users.length === 1 ? "person" : "people"}` : ""}</span>}
           <Button size="sm" variant="brand" onClick={() => setAdding((v) => !v)}><Plus /> Add a user</Button>
         </div>
       }>
-      <div className="space-y-4 p-4">
+      <div className="space-y-4">
         {adding && (
           <form className="space-y-3 rounded-md border border-border bg-card p-3" onSubmit={(e) => { e.preventDefault(); void act("add", async () => { await api.addUser(form); setForm({ firstName: "", lastName: "", email: "", password: "", role: "editor" }); setAdding(false); }, "User added"); }}>
             <div className="grid grid-cols-2 gap-2">
@@ -88,6 +90,6 @@ export function UsersDrawer({ open, onClose }: { open: boolean; onClose: () => v
         )}
         <p className="text-xs text-muted-foreground">Setting a password signs that person out everywhere.</p>
       </div>
-    </Drawer>
+    </Pane>
   );
 }

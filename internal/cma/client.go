@@ -40,6 +40,9 @@ func (c *Client) Name() string { return "Claude agent" }
 func (c *Client) IsAI() bool   { return true }
 func (c *Client) Ready() bool  { return true }
 
+// Versions are the coordinator's version and the content schema's, as the manifest gives them.
+func (c *Client) Versions() (string, int) { return c.m.AgentVersion, c.m.SchemaVersion }
+
 // CreateSession starts a managed session for one conversation.
 func (c *Client) CreateSession(ctx context.Context) (string, error) {
 	return c.api.newSession(ctx, "CardPress conversation")

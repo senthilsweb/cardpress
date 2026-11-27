@@ -47,6 +47,9 @@ type AgentInfo struct {
 	AI   bool   `json:"ai"`
 	// Ready is false on a server with no assistant set up.
 	Ready bool `json:"ready"`
+	// Version and SchemaVersion are the agents' own, where the assistant says them (see AgentDetails).
+	Version       string `json:"version,omitempty"`
+	SchemaVersion int    `json:"schemaVersion,omitempty"`
 }
 
 // ChatMessage is one turn.
@@ -160,6 +163,15 @@ func NewChat(db *sql.DB, a agent.Client, f SourceFetcher) *Chat {
 // Agent describes what answers.
 func (c *Chat) Agent() AgentInfo {
 	return AgentInfo{Name: c.agent.Name(), AI: c.agent.IsAI(), Ready: c.agent.Ready()}
+}
+
+// AgentDetails is Agent with the versions of what answers, when it has them.
+func (c *Chat) AgentDetails() AgentInfo {
+	info := c.Agent()
+	if v, ok := c.agent.(agent.Versioned); ok {
+		info.Version, info.SchemaVersion = v.Versions()
+	}
+	return info
 }
 
 func (c *Chat) stamp() string { return c.now().UTC().Format(draftTimeLayout) }
