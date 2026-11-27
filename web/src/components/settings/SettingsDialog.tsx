@@ -14,6 +14,7 @@ import { Guard } from "./guard";
 import { api, type ApiInfo } from "@/lib/api";
 import { blankDesign, brandColor, move, pickActive } from "@/lib/brands";
 import { Holds } from "@/lib/holds";
+import type { BrandDetails } from "@/lib/brandDetails";
 import { findSections, SETTINGS_GROUPS, settingsHref, settingsPlace, studioHref, visibleSections, type SettingsSection } from "@/lib/nav";
 import { completeProfiles, DEFAULT_DESIGN, DEFAULT_PROFILES, withStandardPalettes } from "@/lib/profiles";
 import { fullDesign } from "@/lib/cardDesign";
@@ -190,6 +191,16 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
   const [adding, setAdding] = useState(!!at.adding);
   const [copyOf, setCopyOf] = useState<Profile | undefined>(undefined);
   const sync = useCallback(async () => { setBrands(await readBrands()); }, []);
+  const [kinds, setKinds] = useState<Record<string, BrandDetails["kind"]>>({});
+  // the list shows each brand's type; one that cannot be read simply has none
+  const ids = section === "brands" ? brands?.profiles.map((p) => p.id).join(" ") : undefined;
+  useEffect(() => {
+    if (!ids) return;
+    let gone = false;
+    void Promise.all(ids.split(" ").map((id) => api.brandDetails(id).then((d) => [id, d.kind] as const, () => [id, ""] as const)))
+      .then((all) => { if (!gone) setKinds(Object.fromEntries(all)); });
+    return () => { gone = true; };
+  }, [ids]);
   const load = useCallback(() => { setError(null); sync().catch((e) => setError(e instanceof Error ? e.message : "Could not load")); }, [sync]);
   useEffect(load, [load]);
 
@@ -213,8 +224,10 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
   const changing = async (work: () => Promise<unknown>) => { await work(); onChanged(); await sync(); };
   const setActive = (id: string) => changing(() => api.putPreference("activeProfile", id));
   const done = () => { setAdding(false); setCopyOf(undefined); window.history.replaceState(window.history.state, "", settingsHref("brands")); };
-  const create = async (p: Profile, from?: Profile) => {
+  const create = async (p: Profile, from?: Profile, details?: BrandDetails) => {
     await api.createProfile(p);
+    // the brand exists by now: details that cannot be saved are said, and can be typed again under Brand look
+    if (details) await api.saveBrandDetails(p.id, details).catch((e) => toast.error("The brand is made; its details were not saved", { description: e instanceof Error ? e.message : undefined }));
     // a copy starts from the other brand's card, a blank one from the default card without footer text
     const copied = from && brands.designs[from.id];
     const base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
@@ -226,7 +239,7 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
   if (adding) return <NewBrand onClose={done} brands={brands.profiles} current={current} source={copyOf} onCreate={create} />;
   const colors = Object.fromEntries([...brands.profiles, ...brands.archived].map((p) => [p.id, brandColor(p, brands.designs[p.id])]));
   return (
-    <ManageBrands active={brands.profiles} archived={brands.archived} activeId={current.id} colors={colors}
+    <ManageBrands kinds={kinds} active={brands.profiles} archived={brands.archived} activeId={current.id} colors={colors}
       onOpen={setActive}
       onRename={(id, name) => changing(async () => {
         // the saved brand as the server has it, so that only its name changes

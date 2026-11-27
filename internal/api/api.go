@@ -33,6 +33,8 @@ type Studio interface {
 	ReplaceProfiles(ctx context.Context, list []json.RawMessage) error
 	CreateProfile(ctx context.Context, raw json.RawMessage) error
 	SaveProfile(ctx context.Context, id string, raw json.RawMessage) error
+	BrandDetails(ctx context.Context, profileID string) (service.BrandDetails, error)
+	SaveBrandDetails(ctx context.Context, profileID string, d service.BrandDetails) (service.BrandDetails, error)
 	ReorderProfiles(ctx context.Context, ids []string) error
 	ArchiveProfile(ctx context.Context, id string) (service.ArchiveResult, error)
 	RestoreProfile(ctx context.Context, id string) error
@@ -218,6 +220,8 @@ func (s *server) table() []routeDef {
 		{"POST", "/profiles/{id}/archive", write(scopeBrandPath), s.archiveProfile},
 		{"POST", "/profiles/{id}/restore", write(scopeBrandPath), s.restoreProfile},
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
+		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
+		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
 		{"GET", "/profiles/{id}/settings", rule{scopeBrandPath, service.PermSocial}, s.getSettings},
 		{"GET", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.getNetwork},
 		{"PUT", "/profiles/{id}/settings/{network}", rule{scopeBrandPath, service.PermSocial}, s.putNetwork},
@@ -915,6 +919,30 @@ func (s *server) saveProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) getBrandDetails(w http.ResponseWriter, r *http.Request) {
+	d, err := s.Studio.BrandDetails(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	// personal data: no cache keeps it
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, d)
+}
+
+func (s *server) putBrandDetails(w http.ResponseWriter, r *http.Request) {
+	var in service.BrandDetails
+	if !decode(w, r, &in) {
+		return
+	}
+	d, err := s.Studio.SaveBrandDetails(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
 }
 
 func (s *server) orderProfiles(w http.ResponseWriter, r *http.Request) {

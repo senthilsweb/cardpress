@@ -241,6 +241,7 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 		`DELETE FROM designs WHERE profile_id = ?`,
 		`DELETE FROM agent_memories WHERE profile_id = ?`,
 		`DELETE FROM credentials WHERE profile_id = ?`,
+		`DELETE FROM brand_details WHERE profile_id = ?`,
 		`DELETE FROM profiles WHERE id = ?`,
 	} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {

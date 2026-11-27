@@ -3,6 +3,8 @@ import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Copy, Loader2, Palette, Pe
 import { Button } from "@/components/ui/button";
 import { Pane } from "@/components/ui/pane";
 import { useUnsaved } from "@/components/settings/guard";
+import { DetailsFields } from "@/components/settings/BrandDetails";
+import { detailsProblem, EMPTY_DETAILS, KIND_LABEL, sameDetails, type BrandDetails } from "@/lib/brandDetails";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { brandProblem, buildBrand } from "@/lib/brands";
@@ -23,8 +25,10 @@ export function NewBrand({ onClose, brands, current, source, onCreate }: {
   current: Profile;
   /** A brand chosen to copy from elsewhere (Duplicate); when set the copy option starts selected. */
   source?: Profile;
-  onCreate: (profile: Profile, from?: Profile) => Promise<void>;
+  onCreate: (profile: Profile, from?: Profile, details?: BrandDetails) => Promise<void>;
 }) {
+  const [details, setDetails] = useState<BrandDetails>(EMPTY_DETAILS);
+  const [website, setWebsite] = useState("");
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [copy, setCopy] = useState(false);
@@ -37,13 +41,16 @@ export function NewBrand({ onClose, brands, current, source, onCreate }: {
     setName(first.name); setHandle(first.handle); setCopy(!!source); setError(null); setBusy(false);
   }, [source]); // eslint-disable-line react-hooks/exhaustive-deps
   // once it is being made there is nothing left to lose
-  useUnsaved(!busy && (name !== first.name || handle !== first.handle));
+  const filled = !sameDetails(details, EMPTY_DETAILS);
+  useUnsaved(!busy && (name !== first.name || handle !== first.handle || filled || website !== ""));
 
   const problem = brandProblem(name, brands);
+  const wrong = detailsProblem(details);
   const submit = async () => {
-    if (problem || busy) return;
+    if (problem || wrong || busy) return;
     setBusy(true); setError(null);
-    try { await onCreate(buildBrand({ name, handle, from: copy ? from : undefined }, brands.map((b) => b.id)), copy ? from : undefined); }
+    const built = buildBrand({ name, handle, from: copy ? from : undefined }, brands.map((b) => b.id));
+    try { await onCreate(website.trim() ? { ...built, website: website.trim() } : built, copy ? from : undefined, filled ? details : undefined); }
     catch (e) { setError(errMsg(e)); setBusy(false); }
   };
 
@@ -52,7 +59,7 @@ export function NewBrand({ onClose, brands, current, source, onCreate }: {
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button variant="brand" size="sm" onClick={() => void submit()} disabled={!!problem || busy}>{busy ? <Loader2 className="animate-spin" /> : <Plus />} Create brand</Button>
+          <Button variant="brand" size="sm" onClick={() => void submit()} disabled={!!problem || !!wrong || busy}>{busy ? <Loader2 className="animate-spin" /> : <Plus />} Create brand</Button>
         </div>
       }
     >
@@ -78,7 +85,14 @@ export function NewBrand({ onClose, brands, current, source, onCreate }: {
             </label>
           ))}
         </fieldset>
-        {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+        <details className="rounded-md border border-border px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium">Contact details (optional)</summary>
+          <div className="mt-3 space-y-3 pb-1">
+            <p className="text-xs text-muted-foreground">Private: never on a card or a public page, and not sent to the assistant. A website can show in a card's footer.</p>
+            <DetailsFields value={details} onChange={setDetails} website={{ value: website, onChange: setWebsite }} />
+          </div>
+        </details>
+        {(wrong || error) && <p role="alert" className="text-xs text-destructive">{wrong ?? error}</p>}
       </form>
     </Pane>
   );
@@ -112,7 +126,9 @@ function RenameBrand({ brand, others, onSave, onClose }: { brand: Profile; other
 type Confirm = { kind: "archive" | "delete"; id: string } | null;
 
 /** Open, reorder, duplicate and archive brands; restore or delete archived ones. */
-export function ManageBrands({ active, archived, activeId, colors, onOpen, onRename, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
+export function ManageBrands({ kinds = {}, active, archived, activeId, colors, onOpen, onRename, onLook, onMove, onDuplicate, onArchive, onRestore, onDelete, onNew }: {
+  /** Each brand's type, where one is set. */
+  kinds?: Record<string, BrandDetails["kind"]>;
   active: Profile[];
   archived: Profile[];
   activeId: string;
@@ -156,6 +172,7 @@ export function ManageBrands({ active, archived, activeId, colors, onOpen, onRen
               <div className="flex items-center gap-1">
                 <p className="truncate text-sm font-medium">{p.name}</p>
                 {onRename && <Button variant="ghost" size="icon-sm" className="h-6 w-6 shrink-0" title="Rename" aria-label={`Rename ${p.name}`} disabled={!!busy} onClick={() => setRenaming(p.id)}><Pencil /></Button>}
+                {kinds[p.id] ? <span className="ml-1 rounded border border-border px-1.5 text-[10.5px] text-muted-foreground">{KIND_LABEL[kinds[p.id] as "company" | "individual"]}</span> : null}
                 {isOpen && <span className="ml-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-brand">Open</span>}
               </div>
               {p.handle && <p className="truncate text-xs text-muted-foreground">{p.handle}</p>}

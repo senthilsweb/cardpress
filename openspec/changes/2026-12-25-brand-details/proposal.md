@@ -1,6 +1,6 @@
 # Brand details: who the brand is
 
-**Status:** proposed (asked for by the owner on 2026-11-27). Not built.
+**Status:** built (agreed by the owner on 2026-11-27), not deployed.
 
 ## Why
 A brand holds what a card shows. It does not say who the client is. A light customer record (contacts, invoices) is

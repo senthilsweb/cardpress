@@ -52,6 +52,7 @@ import type { Perm, User } from "./session";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
+import type { BrandDetails } from "./brandDetails";
 import type { AgentInfo, ChatMessage, ChatRequest, ChatSource, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
 
@@ -201,6 +202,8 @@ export const api = {
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
+  brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
+  saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
   orderProfiles: (ids: string[]) => call<void>("PUT", "/profiles/order", { ids }),
   /** How many of the brand's posts are still scheduled: archiving does not cancel them. */
   archiveProfile: (id: string) => call<{ scheduled: number }>("POST", `/profiles/${encodeURIComponent(id)}/archive`),

@@ -8,6 +8,7 @@ import { fullDesign } from "@/lib/cardDesign";
 import { sizeById } from "@/lib/sizes";
 import { useSyncedState } from "@/lib/store";
 import { useFlush } from "./guard";
+import { BrandDetailsSection } from "./BrandDetails";
 import type { Design, Profile } from "@/lib/types";
 
 /** A brand's logo, fonts and colour sets, with its card beside them. Saved as it is changed. */
@@ -37,6 +38,7 @@ export function BrandLook({ profiles, id, design: saved, onBack, onChanged }: { 
           <ProfilePanel profile={profile} profiles={[profile]} paletteId={palette.id} updateProfile={update} setPaletteId={setPaletteId}
             resetProfiles={() => update({ ...DEFAULT_PROFILES[0], id: profile.id, name: profile.name, displayName: profile.displayName, handle: profile.handle, website: profile.website, logoText: profile.logoText })}
             importProfiles={(list) => update({ ...list[0], id: profile.id, name: profile.name })} />
+          <BrandDetailsSection profileId={profile.id} />
         </div>
         <div className="canvas-grid hidden min-w-0 flex-1 items-center justify-center overflow-auto p-8 lg:flex">
           <ScaledCard design={{ ...design, paletteId: palette.id }} profile={profile} palette={palette} size={sizeById(design.sizeId)} maxW={400} maxH={440} />

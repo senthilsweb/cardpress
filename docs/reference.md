@@ -16,6 +16,7 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `POST /profiles`, `PUT /profiles/{id}`, `PUT /profiles/order` | Create, save and reorder brands |
 | `POST /profiles/{id}/archive`, `POST /profiles/{id}/restore` | Hide a brand and bring it back; archiving keeps everything and says how many posts are still scheduled |
 | `DELETE /profiles/{id}` | Delete an archived brand and everything it owns; refused (`409`) while it has scheduled or unfinished posts |
+| `GET`/`PUT /profiles/{id}/details` | Who the brand is (type, name, address, mobile, email): its owner and administrators only. All empty removes it |
 | `POST /import/legacy` | Import data from the older browser-only version |
 | `GET/POST /drafts`, `GET/PUT/DELETE /drafts/{id}` | Drafts. Only a draft can be deleted |
 | `POST /drafts/{id}/approve`, `POST .../unapprove`, `PUT .../plan` | Approve (needs `approve`), take approval back, set an article's planned date |
