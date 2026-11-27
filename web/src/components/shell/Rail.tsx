@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Info, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountMenu } from "@/components/studio/AccountMenu";
@@ -148,12 +148,6 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
     </Tooltip>
   );
 
-  const aboutEntry = (
-    <button type="button" onClick={() => { setOpen(null); setAbout(true); }} aria-haspopup="dialog" className={entry(false)}>
-      <Info /><span className={cn(compact && "sr-only")}>About</span>
-    </button>
-  );
-
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col bg-side">
@@ -191,7 +185,6 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
                 <button type="button" onClick={toggleCompact} aria-pressed={compact} aria-label={compact ? "Show the names in the side bar" : "Show icons only"} className={small}>
                   {compact ? <ChevronsRight /> : <ChevronsLeft />}
                 </button>)}
-              <div className="w-full">{compact ? tip("About", aboutEntry) : aboutEntry}</div>
             </nav>
 
             {shown?.groups && (

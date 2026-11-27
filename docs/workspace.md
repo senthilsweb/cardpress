@@ -6,8 +6,8 @@ How the screens are arranged, and what is remembered.
 
 Every signed-in page has a **header** and a **side bar**, and shows the page on its own surface (`components/shell/Rail.tsx`).
 
-- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **About CardPress**, **Sign out**).
-- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser), and last **About** (version, build, database and the assistant's versions).
+- **Header:** the logo, the **brand menu** (switch brand, **New brand**, **Manage brands**), the open page's controls (in the studio: Post or Article, the version, the item picker and **New**), light or dark, the user guide and the person's menu (**Appearance**, **User guide**, **About CardPress** with the version, build, database and the assistant's versions, **Sign out**).
+- **Side bar:** Studio, Calendar and Guide go to their pages; **Library** and **Settings** open a panel listing theirs (Library: All, Posts, Articles. Settings: Account, Appearance, API keys; Brands, Brand look, Social accounts; for admins Users, Assistant). Esc or a press outside closes it. At the bottom: hide the studio's work column (**Ctrl/⌘ + \\**), and show icons only (remembered in the browser).
 - On a narrow screen the header is shorter and the side bar runs along the bottom.
 
 ## Themes

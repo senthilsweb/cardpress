@@ -17,6 +17,22 @@ APP=my-cardpress
 3. Nothing important is due in the next few minutes: the app restarts, and the scheduler with it. A post up to 15
    minutes late is still sent (`CARDPRESS_MISSED_GRACE`).
 
+## Versions
+
+Every merge to `main` is a release with a semantic version, `vMAJOR.MINOR.PATCH`. After the tests pass and the image is
+published, the build tags the commit and writes a GitHub release listing the changes. The version is in the image
+(`ghcr.io/senthilsweb/cardpress:0.2.0`), in `/healthz` and in **About CardPress**.
+
+| Label on the pull request | Version goes from 0.2.3 to |
+|---|---|
+| none | 0.2.4 |
+| `release:minor` (something new) | 0.3.0 |
+| `release:major` (something that breaks) | 1.0.0 |
+
+Set the label **before** merging. A merge made while an earlier release is still building waits for it; if a third
+arrives, the waiting one is skipped and its changes are in the next version. Pushing a tag by hand still builds an image
+for that tag.
+
 ## 1. Wait for the image
 
 A merge to `main` builds the image and publishes it to GitHub's registry (about 7 minutes).

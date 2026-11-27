@@ -14,8 +14,8 @@
    when the focus is not in a text field.
 2. **See more and see less.** In any feed preview (canvas and Full preview) the text opens with the network's own wording
    and closes again with **see less**. Switching items closes it.
-3. **About.** **About CardPress** in the person's menu, just above Sign out, and as the last entry of the side bar, opens a
-   small card:
+3. **About.** **About CardPress** in the person's menu, just above Sign out, opens a small card (the owner removed a
+   second entry in the side bar on 2026-11-27):
 
 | Part | Shows |
 |---|---|
@@ -23,7 +23,7 @@
 | Assistant | name, connected or not, agent version, content schema version |
 | Links | user guide, documentation, source code, licence (MIT) |
 
-   A **Copy** button copies these lines for a problem report. On a phone it is reached from the person's menu.
+   A **Copy** button copies these lines for a problem report. 
 
 ## Server
 `GET /api/v1/info` keeps what it says to anyone (name, version) and adds, **only to a signed-in person** (or with the

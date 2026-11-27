@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# merges to main are released one after another, so two cannot take the same version
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && 'release' || format('ci-{0}', github.run_id) }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -28,9 +32,39 @@ jobs:
         run: cd web && npm ci && npm run check && npm test && npm run build
       - name: Go vet and tests
         run: go vet ./... && go test -race ./...
+      - name: Release script
+        run: scripts/next-version.test.sh
+
+  # the version this build is: on a merge to main the next one, on a pushed tag that tag, on a pull request its number
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # every tag and the history they sit on
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="$GITHUB_REF_NAME"
+          elif [ "$GITHUB_REF" = refs/heads/main ]; then
+            labels="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[].labels[].name' | tr '\n' ' ')"
+            version="$(scripts/next-version.sh $labels)"
+          else version="pr-$PR"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version" >> "$GITHUB_STEP_SUMMARY"
 
   image:
-    needs: test
+    needs: [test, version]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -56,6 +90,7 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
+            type=semver,pattern={{version}},value=${{ needs.version.outputs.version }},enable={{is_default_branch}}
             type=sha
       # Pull requests build the image (to catch Dockerfile breakage) but do not push it.
       - uses: docker/build-push-action@v6
@@ -66,8 +101,24 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ needs.version.outputs.version }}
             COMMIT=${{ github.sha }}
             BUILT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # after the image is published, the merge gets its tag and a release with the list of changes
+  release:
+    needs: [version, image]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "$VERSION is released already"; exit 0; fi
+          gh release create "$VERSION" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "CardPress $VERSION" --generate-notes
