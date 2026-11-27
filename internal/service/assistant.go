@@ -44,10 +44,11 @@ type CardText struct {
 	Tag         *string `json:"tag,omitempty"`
 	QuoteAuthor *string `json:"quoteAuthor,omitempty"`
 	StatValue   *string `json:"statValue,omitempty"`
+	Signature   *string `json:"signature,omitempty"`
 }
 
 // CardTextFields are the names CardText accepts.
-var CardTextFields = []string{"eyebrow", "headline", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue"}
+var CardTextFields = []string{"eyebrow", "headline", "subtitle", "footer", "footerLeft", "tag", "quoteAuthor", "statValue", "signature"}
 
 // Headline is the card headline's name to an assistant, and StoredHeadline its name in a saved design.
 const (
@@ -88,7 +89,7 @@ func (s *Studio) startingCard(ctx context.Context, profileID string) (CardDesign
 
 // blankCard keeps a card's look (layout, colours, background, footer, logo) and drops its words and pictures.
 func blankCard(c CardDesign) CardDesign {
-	c.Eyebrow, c.Title, c.Subtitle, c.Tag, c.QuoteAuthor, c.StatValue = "", "", "", "", "", ""
+	c.Eyebrow, c.Title, c.Subtitle, c.Tag, c.QuoteAuthor, c.StatValue, c.Signature = "", "", "", "", "", "", ""
 	c.Photos, c.Screenshot, c.BgImage, c.Caption = []string{}, "", "", nil
 	return c
 }
@@ -207,7 +208,7 @@ func (s *Studio) PatchCardText(ctx context.Context, id string, t CardText) (Card
 		to   *string
 		from *string
 	}{{&card.Eyebrow, t.Eyebrow}, {&card.Title, t.Headline}, {&card.Subtitle, t.Subtitle}, {&card.Footer, t.Footer},
-		{&card.FooterLeft, t.FooterLeft}, {&card.Tag, t.Tag}, {&card.QuoteAuthor, t.QuoteAuthor}, {&card.StatValue, t.StatValue}} {
+		{&card.FooterLeft, t.FooterLeft}, {&card.Tag, t.Tag}, {&card.QuoteAuthor, t.QuoteAuthor}, {&card.StatValue, t.StatValue}, {&card.Signature, t.Signature}} {
 		if f.from == nil {
 			continue
 		}

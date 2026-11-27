@@ -1,6 +1,6 @@
 import type { Design } from "./types";
 
-const NO_WORDS = { eyebrow: "", title: "", subtitle: "", footer: "", footerLeft: "", tag: "", quoteAuthor: "", statValue: "" };
+const NO_WORDS = { eyebrow: "", title: "", subtitle: "", footer: "", footerLeft: "", tag: "", quoteAuthor: "", statValue: "", signature: "" };
 
 /** A saved design made whole. Settings it lacks come from `base`; words it lacks stay empty, never `base`'s. */
 export const fullDesign = (base: Design, saved: Partial<Design>): Design => ({ ...base, ...NO_WORDS, noFooter: false, noFooterLeft: false, ...saved });
@@ -25,6 +25,8 @@ export function toCardDesign(d: Design): Design {
     titleScale: d.titleScale, intensity: d.intensity, bottomFade: d.bottomFade,
     showLogo: d.showLogo, showFooter: d.showFooter, photos: d.photos ?? [],
   };
+  if (d.signature) out.signature = d.signature;
+  if (d.noOrnament) out.noOrnament = true;
   if (d.noFooter) out.noFooter = true;
   if (d.noFooterLeft) out.noFooterLeft = true;
   if (d.screenshot) out.screenshot = d.screenshot;

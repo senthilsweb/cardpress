@@ -107,8 +107,93 @@ function falling(c: BgCtx) {
   );
 }
 
+/** A pumpkin about 100 units wide, standing on 0,0. */
+function Pumpkin({ x, y, s, skin, rib, stem }: { x: number; y: number; s: number; skin: string; rib: string; stem: string }) {
+  return (
+    <g transform={`translate(${f(x)} ${f(y)}) scale(${s.toFixed(3)})`}>
+      <ellipse cx={0} cy={2} rx={52} ry={6} fill="#000" opacity={0.14} />
+      <path d="M-4,-70 C-6,-82 -2,-90 8,-96 L15,-90 C8,-84 7,-78 8,-70 Z" fill={stem} />
+      {[[-30, 22, 34], [30, 22, 34], [-14, 24, 37], [14, 24, 37], [0, 18, 38]].map(([cx, rx, ry]) => (
+        <ellipse key={cx} cx={cx} cy={-36} rx={rx} ry={ry} fill={skin} stroke={rib} strokeWidth={1.8} />
+      ))}
+    </g>
+  );
+}
+
+/** A pine cone about 40 units wide: rows of scales. */
+function Cone({ x, y, s, dark, light }: { x: number; y: number; s: number; dark: string; light: string }) {
+  return (
+    <g transform={`translate(${f(x)} ${f(y)}) rotate(24) scale(${s.toFixed(3)})`}>
+      {[0, 1, 2, 3, 4, 5].flatMap((row) => {
+        const w = [10, 17, 20, 19, 15, 8][row];
+        return [-1, 0, 1].map((k) => (
+          <path key={`${row}-${k}`} d={`M${k * w * 0.7 - 9},${-48 + row * 9} Q${k * w * 0.7},${-34 + row * 9} ${k * w * 0.7 + 9},${-48 + row * 9} Z`} fill={(row + k) % 2 ? dark : light} />
+        ));
+      })}
+    </g>
+  );
+}
+
+/** Leaves in the top corners and a harvest still life at the bottom, leaving the middle for the words. */
+function harvest(c: BgCtx) {
+  const { area, u, pal, rng, uid } = c;
+  const col = tones(pal, AUTUMN);
+  const [orange, rib, cream, creamRib, wood, stem, berry] = tones(pal, ["#e8731c", "#b9520d", "#f4e3c1", "#d09a52", "#8a5a33", "#6b4a22", "#c0261c"]);
+  const right = area.x + area.w, floor = area.y + area.h * 0.93;
+  const short = Math.min(area.w, area.h) / 100;
+  const k = Math.min(u, short);
+  const leaf = (x: number, y: number, size: number, turn: number, key: string, opacity = 1) => {
+    const s = (size * k) / 100, fill = pick(rng, col);
+    return (
+      <g key={key} transform={`translate(${f(x)} ${f(y)}) rotate(${f(turn)}) scale(${s.toFixed(3)})`} opacity={opacity}>
+        <path d={LEAF} fill={fill} stroke={pal.base} strokeWidth={(0.35 * k) / s} strokeLinejoin="round" />
+        <path d={VEINS} fill="none" stroke={pal.base} strokeOpacity={0.45} strokeWidth={(0.18 * k) / s} strokeLinecap="round" />
+      </g>
+    );
+  };
+  // [from the corner across, from the top down, size]
+  const spray = [[2, 2, 24], [13, 0, 19], [24, 3, 14], [4, 14, 17], [15, 11, 12], [32, -1, 11], [0, 25, 12], [9, 22, 9]];
+  const corner = (side: 1 | -1) => spray.map(([dx, dy, size], i) => {
+    const x = (side === 1 ? area.x + dx * k : right - dx * k) + between(rng, -1, 1) * k;
+    return leaf(x, area.y + dy * k + between(rng, -1, 1) * k, size, side * between(rng, 100, 190), `c${side}${i}`);
+  }).reverse();
+  const bx = area.x + 15 * k;
+  return (
+    <g>
+      <defs>
+        <radialGradient id={`bokeh-${uid}`}>
+          <stop offset="0" stopColor={col[3]} stopOpacity="0.34" />
+          <stop offset="1" stopColor={col[3]} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {Array.from({ length: 22 }, (_, i) => {
+        // soft lights down both sides, away from the words
+        const x = i % 2 ? area.x + between(rng, 0, 0.18) * area.w : right - between(rng, 0, 0.18) * area.w;
+        return <circle key={`b${i}`} cx={x} cy={area.y + rng() * area.h * 0.86} r={between(rng, 3, 10) * k} fill={`url(#bokeh-${uid})`} />;
+      })}
+      <path d={`M${f(area.x)},${f(area.y + 6 * k)} Q${f(area.x + 18 * k)},${f(area.y + 4 * k)} ${f(area.x + 38 * k)},${f(area.y - 2 * k)}`} fill="none" stroke={stem} strokeWidth={0.8 * k} strokeLinecap="round" />
+      <path d={`M${f(right)},${f(area.y + 6 * k)} Q${f(right - 18 * k)},${f(area.y + 4 * k)} ${f(right - 38 * k)},${f(area.y - 2 * k)}`} fill="none" stroke={stem} strokeWidth={0.8 * k} strokeLinecap="round" />
+      {corner(1)}
+      {corner(-1)}
+      <rect x={area.x} y={floor} width={area.w} height={area.y + area.h - floor} fill={wood} opacity={0.2} />
+      <line x1={area.x} x2={right} y1={floor} y2={floor} stroke={wood} strokeOpacity={0.6} strokeWidth={0.35 * k} />
+      {/* nothing reaches below the table's edge: the footer is written there */}
+      {leaf(area.x + 4 * k, floor - 14 * k, 17, -50, "l1")}
+      {leaf(area.x + 33 * k, floor - 8 * k, 13, 62, "l2")}
+      <Pumpkin x={bx} y={floor - 0.8 * k} s={0.25 * k} skin={orange} rib={rib} stem={stem} />
+      <Cone x={area.x + 35 * k} y={floor - 2 * k} s={0.17 * k} dark={stem} light={wood} />
+      <Pumpkin x={area.x + 26 * k} y={floor + 0.2 * k} s={0.13 * k} skin={cream} rib={creamRib} stem={stem} />
+      {[[39, -2], [41.5, -1], [43.5, -2.4], [40.5, -4], [42.8, -4.6], [45.5, -1.2]].map(([dx, dy]) => <circle key={`${dx}`} cx={area.x + dx * k} cy={floor + dy * k} r={1.35 * k} fill={berry} stroke={pal.base} strokeOpacity={0.4} strokeWidth={0.2 * k} />)}
+      {leaf(area.x + 6.5 * k, floor - 5 * k, 10, 96, "l3")}
+      {leaf(right - 6 * k, floor - 8 * k, 13, -34, "r1")}
+      {leaf(right - 15 * k, floor - 4.5 * k, 8, 74, "r2")}
+    </g>
+  );
+}
+
 const theme = { category: SEASONAL, group: "Thanksgiving", dense: true, palette: "autumn-cream", keywords: ["thanks", "gratitude", "autumn", "fall", "maple", "harvest", "greeting"] };
 const defs: BackgroundDef[] = [
+  { id: "harvest-frame", name: "Harvest frame", hint: "Corners and pumpkins, clear middle", render: harvest, ...theme, frames: true, keywords: [...theme.keywords, "pumpkin"] },
   { id: "maple-weave", name: "Maple weave", hint: "Interlaced autumn leaves", render: weave, ...theme },
   { id: "maple-lines", name: "Maple line art", hint: "Outlined leaves, lighter", render: lineArt, ...theme },
   { id: "maple-fall", name: "Falling leaves", hint: "Leaves drifting down", render: falling, ...theme },

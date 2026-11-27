@@ -9,7 +9,7 @@ import type { Design, FontRole, Profile } from "./types";
  */
 export interface FontDef {
   family: string;
-  category: "sans" | "serif" | "mono" | "display";
+  category: "sans" | "serif" | "mono" | "display" | "script";
   source: "bundled" | "google";
   weights?: string; // Google css2 weights, e.g. "400;600;700"
 }
@@ -39,7 +39,13 @@ export const GOOGLE_FONTS: FontDef[] = [
   { family: "IBM Plex Mono", category: "mono", source: "google", weights: "400;500;600;700" },
   { family: "Fira Code", category: "mono", source: "google", weights: "400;500;600;700" },
   { family: "Space Mono", category: "mono", source: "google", weights: "400;700" },
+  { family: "Dancing Script", category: "script", source: "google", weights: "600;700" },
+  { family: "Great Vibes", category: "script", source: "google", weights: "400" },
+  { family: "Pacifico", category: "script", source: "google", weights: "400" },
+  { family: "Kaushan Script", category: "script", source: "google", weights: "400" },
+  { family: "Caveat", category: "script", source: "google", weights: "600;700" },
 ];
+const SCRIPT_DEFAULT = "Dancing Script";
 
 /* ------------------------------------------------------------ user-added fonts (saved on the server) */
 const DEFAULT_WEIGHTS = "400;500;600;700";
@@ -133,6 +139,7 @@ export const FONT_ROLES: { id: FontRole; label: string; hint: string }[] = [
   { id: "label", label: "Labels", hint: "Eyebrow, footer, tag, author" },
   { id: "logo", label: "Logo text", hint: "Logo and its small line" },
   { id: "stat", label: "Big number", hint: "Stat layout number" },
+  { id: "script", label: "Script", hint: "Greeting headline and sign-off" },
 ];
 
 const MONO_DEFAULT = "JetBrains Mono Variable";
@@ -148,6 +155,7 @@ export function resolveFonts(profile: Profile, design?: Pick<Design, "fonts">): 
     label,
     logo: o.logo || profile.logoFont || label,
     stat: o.stat || profile.statFont || title,
+    script: o.script || profile.scriptFont || SCRIPT_DEFAULT,
   };
 }
 export const cssFamily = (f: string) => `'${f}', system-ui, sans-serif`;

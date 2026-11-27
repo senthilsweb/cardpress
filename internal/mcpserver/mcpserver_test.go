@@ -257,7 +257,7 @@ func TestReadingProfilesDraftsAndPresets(t *testing.T) {
 	}
 
 	_, out = call(t, cs, "list_design_presets", map[string]any{"profileId": "p"})
-	if len(out["layouts"].([]any)) != 6 || len(out["backgrounds"].([]any)) != 11 || len(out["sizes"].([]any)) != 10 || len(out["palettes"].([]any)) != 1 {
+	if len(out["layouts"].([]any)) != 7 || len(out["backgrounds"].([]any)) != 11 || len(out["sizes"].([]any)) != 10 || len(out["palettes"].([]any)) != 1 {
 		t.Fatalf("%v", out)
 	}
 }

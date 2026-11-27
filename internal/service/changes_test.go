@@ -344,3 +344,20 @@ func TestEmptiedFooterStaysEmpty(t *testing.T) {
 		t.Fatalf("got %s", raw)
 	}
 }
+
+func TestGreetingCardIsAccepted(t *testing.T) {
+	c := defaultCard()
+	c.Layout, c.Signature, c.NoOrnament = "greeting", "From all of us", true
+	c.Fonts = map[string]string{"script": "Great Vibes"}
+	raw, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseCardDesign(raw)
+	if err != nil || got.Signature != "From all of us" || !got.NoOrnament {
+		t.Fatalf("%v %s", err, raw)
+	}
+	if !removable("signature") || *cardWord(&got, "signature") != "From all of us" {
+		t.Fatal("the sign-off is not offered like other card words")
+	}
+}

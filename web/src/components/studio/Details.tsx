@@ -173,7 +173,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   const kind = d.kind;
   const stop = blockers(d, { value: ser.text, length: ser.length, limit: isPost ? LINKEDIN_LIMIT : undefined });
   const stopped = blockerLine(stop);
-  const card = (key: "eyebrow" | "title" | "subtitle" | "tag" | "footer" | "footerLeft" | "quoteAuthor" | "statValue") => (design[key] ?? "") as string;
+  const card = (key: "eyebrow" | "title" | "subtitle" | "tag" | "footer" | "footerLeft" | "quoteAuthor" | "statValue" | "signature") => (design[key] ?? "") as string;
   const field = (name: FieldName) => ({ name, kind, draftId: draft.id, changed: changed.includes(name), onSeen });
   const L = design.layout;
   /** The card's words, with the ones this layout does not draw said so. */
@@ -184,6 +184,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
     { name: "headline", key: "title", shown: true, label: L === "quote" ? "Quote" : L === "stat" ? "What the number means" : undefined, lines: L === "quote" ? 4 : 2, hint: "Enter starts a new line." },
     { name: "subtitle", key: "subtitle", shown: L !== "quote", hint: "Use | to split into points." },
     { name: "quoteAuthor", key: "quoteAuthor", shown: L === "quote" },
+    { name: "signature", key: "signature", shown: L === "greeting" },
     { name: "footerLeft", key: "footerLeft", shown: true },
     { name: "footer", key: "footer", shown: true },
   ] as const;

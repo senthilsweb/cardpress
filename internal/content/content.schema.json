@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CardPress content",
-  "x-schemaVersion": 3,
+  "x-schemaVersion": 4,
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -419,6 +419,18 @@
       "x-choices": true,
       "type": "string",
       "maxLength": 60
+    },
+    "signature": {
+      "x-label": "Sign-off",
+      "x-column": "drafts.design.signature",
+      "x-writer": "agent",
+      "x-kinds": [
+        "post",
+        "article"
+      ],
+      "x-choices": true,
+      "type": "string",
+      "maxLength": 200
     }
   }
 }

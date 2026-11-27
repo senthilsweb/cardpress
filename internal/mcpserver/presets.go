@@ -27,6 +27,7 @@ var layouts = []Preset{
 	{"quote", "Quote", "Big quote + author"},
 	{"stat", "Big number", "One stat that matters"},
 	{"split", "Headshot", "Your photo + title"},
+	{"greeting", "Greeting", "Centred wish with a sign-off"},
 }
 
 var backgrounds = []Preset{

@@ -132,7 +132,7 @@ func New(d Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{Name: "get_design", Title: "Read a card", Annotations: readOnly,
 		Description: "Read the card of a draft: every design field and the draft's revision. Images are reported as present or absent."}, t.getDesign)
 	mcp.AddTool(s, &mcp.Tool{Name: "update_card_text", Title: "Change the words on a card", Annotations: replaces,
-		Description: "Change only the words drawn on a draft's card: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue. " +
+		Description: "Change only the words drawn on a draft's card: eyebrow, headline, subtitle, footer, footerLeft, tag, quoteAuthor, statValue, signature. " +
 			"Send only the fields that change. Layout, colours, background, size, fonts and images cannot be changed: the person sets them in the studio."}, t.updateCardText)
 	mcp.AddTool(s, &mcp.Tool{Name: "create_draft", Title: "Start a draft", Annotations: changes,
 		Description: "Make an empty post or article with the brand's starting card. In a chat, pass conversationId. Returns its id and revision."}, t.createDraft)

@@ -11,7 +11,7 @@ export interface Palette {
 export type MarkKind = "diamond" | "initial" | "image" | "none";
 /** A font family name: a bundled one ("Inter Variable") or any Google Fonts family ("Fraunces"). See lib/fonts.ts. */
 export type FontChoice = string;
-export type FontRole = "title" | "body" | "label" | "logo" | "stat";
+export type FontRole = "title" | "body" | "label" | "logo" | "stat" | "script";
 
 export interface Profile {
   id: string;
@@ -30,10 +30,11 @@ export interface Profile {
   labelFont?: FontChoice; // eyebrow, footer, tag, author (default JetBrains Mono)
   logoFont?: FontChoice; // default: same as labels
   statFont?: FontChoice; // default: same as titles
+  scriptFont?: FontChoice; // greeting headline and sign-off (default Dancing Script)
   palettes: Palette[];
 }
 
-export type LayoutId = "hero" | "center" | "quote" | "stat" | "split" | "cover";
+export type LayoutId = "hero" | "center" | "quote" | "stat" | "split" | "cover" | "greeting";
 /** Built-ins plus anything dropped into card/bg/. */
 export type BackgroundId = string;
 
@@ -53,6 +54,10 @@ export interface Design {
   tag: string;
   quoteAuthor: string;
   statValue: string;
+  /** Who a greeting is from, drawn by the greeting layout. */
+  signature?: string;
+  /** Leaves out the greeting layout's flourish. */
+  noOrnament?: boolean;
   /** Legacy: captions now live in drafts. Read once to migrate, never written. */
   caption?: string;
   titleScale: number;

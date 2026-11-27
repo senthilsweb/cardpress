@@ -13,7 +13,7 @@ export const AS_RADIOS = 4;
 
 const LABEL: Record<string, string> = {
   headline: "Card headline", eyebrow: "Eyebrow", subtitle: "Subtitle", tag: "Tag",
-  footer: "Footer, right", footerLeft: "Footer, left", quoteAuthor: "Quote author", statValue: "Number",
+  footer: "Footer, right", footerLeft: "Footer, left", quoteAuthor: "Quote author", statValue: "Number", signature: "Sign-off",
   title: "Title", altText: "Alt text", hashtags: "Hashtags", summary: "Summary",
 };
 export const choiceLabel = (field: string) => LABEL[field] ?? field;
@@ -41,7 +41,7 @@ export const picked = (choices: Choice[], picks: Picks) =>
 
 const CARD: Record<string, keyof Design> = {
   headline: "title", eyebrow: "eyebrow", subtitle: "subtitle", tag: "tag",
-  footer: "footer", footerLeft: "footerLeft", quoteAuthor: "quoteAuthor", statValue: "statValue",
+  footer: "footer", footerLeft: "footerLeft", quoteAuthor: "quoteAuthor", statValue: "statValue", signature: "signature",
 };
 
 /**
