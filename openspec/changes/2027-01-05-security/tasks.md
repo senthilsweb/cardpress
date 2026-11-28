@@ -1,8 +1,8 @@
 # Tasks
 
 ## Bolt 1: passwords
-- [ ] Refuse common passwords and ones containing the e-mail name; renew cheaper hashes at sign-in
-- [ ] Tests
+- [x] Refuse common passwords and ones containing the e-mail name; renew cheaper hashes at sign-in
+- [x] Tests
 
 ## Bolt 2: sessions end
 - [ ] Idle and longest times in the configuration; the server enforces them; cookie hardening

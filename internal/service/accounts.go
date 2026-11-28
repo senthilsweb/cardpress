@@ -134,17 +134,6 @@ func checkPassword(hash, pw string) bool {
 // a hash to compare against when the email is unknown, so a wrong email takes as long as a wrong password
 var decoyHash, _ = hashPassword("decoy-password-for-timing")
 
-func checkNewPassword(pw string) error {
-	n := utf8.RuneCountInString(pw)
-	if n < minPassword {
-		return invalid("the password needs at least %d characters", minPassword)
-	}
-	if n > maxPassword {
-		return invalid("the password is too long (at most %d characters)", maxPassword)
-	}
-	return nil
-}
-
 /* ------------------------------------------------------------------ people */
 
 // SignupInput is what a person gives to create an account.
@@ -159,7 +148,7 @@ type SignupInput struct {
 
 var phoneRe = regexp.MustCompile(`^[0-9+()\-. ]{3,30}$`)
 
-func (in *SignupInput) normalize(needPassword bool) error {
+func (in *SignupInput) normalize(needPassword bool, minLength int) error {
 	in.FirstName, in.LastName = squash(in.FirstName), squash(in.LastName)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	in.Phone = strings.TrimSpace(in.Phone)
@@ -184,7 +173,7 @@ func (in *SignupInput) normalize(needPassword bool) error {
 		}
 	}
 	if needPassword {
-		return checkNewPassword(in.Password)
+		return checkNewPassword(in.Password, in.Email, minLength)
 	}
 	return nil
 }
@@ -324,7 +313,7 @@ func (a *Accounts) create(ctx context.Context, in SignupInput, role string) (Use
 // Signup creates an account. The first account becomes the administrator; later ones get the default role, unless sign-up
 // has been closed.
 func (a *Accounts) Signup(ctx context.Context, in SignupInput) (User, error) {
-	if err := in.normalize(true); err != nil {
+	if err := in.normalize(true, minPassword); err != nil {
 		return User{}, err
 	}
 	if !a.SignupOpen(ctx) {
@@ -341,7 +330,7 @@ type AdminCreateInput struct {
 
 // Add creates an account for someone else (an administrator's action).
 func (a *Accounts) Add(ctx context.Context, in AdminCreateInput) (User, error) {
-	if err := in.SignupInput.normalize(true); err != nil {
+	if err := in.SignupInput.normalize(true, minPassword); err != nil {
 		return User{}, err
 	}
 	if !ValidRole(in.Role) {
@@ -365,7 +354,7 @@ func (a *Accounts) UpdateProfile(ctx context.Context, id string, in ProfileInput
 		return User{}, err
 	}
 	s := SignupInput{FirstName: in.FirstName, LastName: in.LastName, Email: cur.Email, Phone: in.Phone, BirthDate: in.BirthDate}
-	if err := s.normalize(false); err != nil {
+	if err := s.normalize(false, minPassword); err != nil {
 		return User{}, err
 	}
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET first_name = ?, last_name = ?, phone = ?, birth_date = ? WHERE id = ?`, s.FirstName, s.LastName, s.Phone, s.BirthDate, id); err != nil {
@@ -439,7 +428,11 @@ func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, erro
 
 // SetPassword sets a new password for someone (an administrator's action, or the command line) and signs them out everywhere.
 func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
-	if err := checkNewPassword(password); err != nil {
+	u, err := a.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := checkNewPassword(password, u.Email, minPassword); err != nil {
 		return err
 	}
 	hash, err := hashPassword(password)
@@ -459,14 +452,14 @@ func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
 
 // ChangePassword changes your own password. It needs the current one, and signs you out on every other device.
 func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepToken string) error {
-	_, hash, err := a.loadUser(ctx, `id = ?`, id)
+	u, hash, err := a.loadUser(ctx, `id = ?`, id)
 	if err != nil {
 		return err
 	}
 	if !checkPassword(hash, current) {
 		return fmt.Errorf("%w: the current password is not right", ErrInvalid)
 	}
-	if err := checkNewPassword(next); err != nil {
+	if err := checkNewPassword(next, u.Email, minPassword); err != nil {
 		return err
 	}
 	newHash, err := hashPassword(next)
@@ -571,6 +564,11 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 		return User{}, "", ErrUnauthorized
 	}
 	a.clear(byAccount)
+	if cheaper(hash) { // made with less work than today's: renew it while the password is at hand
+		if renewed, err := hashPassword(password); err == nil {
+			_, _ = a.db.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, renewed, u.ID)
+		}
+	}
 	token, err := a.startSession(ctx, u.ID)
 	if err != nil {
 		return User{}, "", err
