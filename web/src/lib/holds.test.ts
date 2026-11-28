@@ -23,3 +23,11 @@ describe("holds on leaving a settings page", () => {
     await expect(holds.flush()).rejects.toThrow("offline");
   });
 });
+
+it("an agreement to lose changes ends when something new is unsaved", () => {
+  const holds = new Holds();
+  holds.set("a", { ask: "Discard?" });
+  holds.agreed = true;
+  holds.set("b", { ask: "Discard?" });
+  expect(holds.agreed).toBe(false);
+});

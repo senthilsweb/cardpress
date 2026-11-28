@@ -3,7 +3,7 @@ import type { Holds } from "@/lib/holds";
 
 export const Guard = createContext<Holds | null>(null);
 
-/** While `dirty`, leaving the page (another page, closing the dialog) asks first. */
+/** While `dirty`, leaving the page (another page, closing the dialog, a reload) asks first. */
 export function useUnsaved(dirty: boolean, question = "You have unsaved changes. Discard them?") {
   const holds = useContext(Guard);
   const id = useId();
@@ -12,6 +12,16 @@ export function useUnsaved(dirty: boolean, question = "You have unsaved changes.
     holds.set(id, { ask: question });
     return () => holds.remove(id);
   }, [holds, id, dirty, question]);
+  // reloading or closing the tab asks too, in the browser's own words
+  useEffect(() => {
+    if (!dirty) return;
+    const ask = (e: BeforeUnloadEvent) => {
+      if (holds?.agreed) return;
+      e.preventDefault(); e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [holds, dirty]);
 }
 
 /** Run `save` before the page is left, for a page that saves a moment after each change. */

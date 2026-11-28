@@ -1,6 +1,6 @@
 # Screen fixes: phones, unsaved settings, greeting footers
 
-**Status:** 1 of 3 bolts built and tested; not released. Found in the known gaps on 2026-11-27, on `v0.4.1`.
+**Status:** 2 of 3 bolts built and tested; not released. Found in the known gaps on 2026-11-27, on `v0.4.1`.
 
 ## What was seen
 - On a phone, the expanded article editor gave most of the width to the outline: the text ran one or two words to a line.
