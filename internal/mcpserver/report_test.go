@@ -19,12 +19,20 @@ func TestAReplyIsAcceptedOnlyInShapeAndInAConversationThatExists(t *testing.T) {
 	if res, out := call(t, cs, "report_reply", ok); res.IsError || out["shown"] != true {
 		t.Fatalf("%q %v", errText(res), out)
 	}
+	asked := map[string]any{"conversationId": "c", "outcome": "needs_answer", "message": "The article is ready.", "question": "Write the post as well?", "answers": []string{"Yes", "No"}}
+	if res, out := call(t, cs, "report_reply", asked); res.IsError || out["shown"] != true {
+		t.Fatalf("%q %v", errText(res), out)
+	}
 	for want, change := range map[string]map[string]any{
 		"message is limited": {"message": strings.Repeat("x", 241)},
 		"at most 4":          {"points": []string{"a", "b", "c", "d", "e"}},
 		"outcome must be":    {"outcome": "finished"},
 		"question is needed": {"outcome": "needs_answer"},
 		"not found":          {"conversationId": "gone"},
+		"go with a question": {"answers": []string{"Yes", "No"}},
+		"answers: at most 4": {"outcome": "needs_answer", "question": "Which?", "answers": []string{"a", "b", "c", "d", "e"}},
+		"must differ":        {"outcome": "needs_answer", "question": "Go on?", "answers": []string{"Yes", " yes "}},
+		"an answer is limit": {"outcome": "needs_answer", "question": "Which?", "answers": []string{strings.Repeat("x", 41)}},
 	} {
 		in := map[string]any{}
 		for k, v := range ok {

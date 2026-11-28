@@ -15,6 +15,7 @@ type replyIn struct {
 	Message        string   `json:"message" jsonschema:"one or two sentences: what happened, or the answer"`
 	Points         []string `json:"points,omitempty" jsonschema:"choices made and why, or the parts of an answer"`
 	Question       string   `json:"question,omitempty" jsonschema:"the one thing to ask"`
+	Answers        []string `json:"answers,omitempty" jsonschema:"fixed answers to the question, shown as buttons"`
 	Next           string   `json:"next,omitempty" jsonschema:"one suggested next step"`
 }
 
@@ -31,7 +32,7 @@ func (t tools) reportReply(ctx context.Context, _ *mcp.CallToolRequest, in reply
 	if err != nil {
 		return nil, replyOut{}, toolError(err)
 	}
-	r := agent.Report{Outcome: in.Outcome, Message: in.Message, Points: in.Points, Question: in.Question, Next: in.Next}
+	r := agent.Report{Outcome: in.Outcome, Message: in.Message, Points: in.Points, Question: in.Question, Answers: in.Answers, Next: in.Next}
 	if err := r.Check(); err != nil {
 		return nil, replyOut{}, errors.New("The reply was not accepted: " + err.Error() + ".")
 	}

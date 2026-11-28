@@ -1,6 +1,6 @@
 # Answer buttons for the assistant's questions
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built.
+**Status:** built in both repositories and tested with the stand-in (asked for by the owner on 2026-11-26). Not deployed; not tried with the real agent.
 
 ## Why
 The assistant sometimes asks for a Yes or No, or whether to continue. The chat shows the question as text only, so the

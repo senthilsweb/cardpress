@@ -36,3 +36,5 @@ Recorded as each bolt completes, from 2026-11-27. The changes between the table 
 | Greeting cards | The words fit: the greeting block is made smaller when too tall | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |
 | Greeting cards | Wash and Shading: a lighter wash behind the words, set by a slider | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |
 | Greeting cards | Ornament choices directly under Background | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |
+| Chat | Answer buttons in the studio: a question's fixed answers are pressed | [chat-answer-buttons](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2026-12-16-chat-answer-buttons) |
+| Chat | The coordinator sends the fixed answers (agent repository) | [chat-answer-buttons](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2026-12-16-chat-answer-buttons) |

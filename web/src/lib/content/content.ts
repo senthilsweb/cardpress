@@ -7,7 +7,7 @@
 import { z } from "zod";
 
 /** Moves when a field, a limit or a tool input changes. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export type Writer = "agent" | "person" | "system";
 export type Kind = "post" | "article";
@@ -177,6 +177,8 @@ export const ReportReplyInput = z.strictObject({
   message: z.string().min(1).max(240),
   points: z.array(z.string().max(120)).max(4).optional(),
   question: z.string().max(200).optional(),
+  /** Fixed answers to the question, which the studio shows as buttons. Only with `question` and `needs_answer`. */
+  answers: z.array(z.string().min(1).max(40)).min(1).max(4).optional(),
   next: z.string().max(120).optional(),
 });
 

@@ -45,7 +45,7 @@ export interface Choice {
 }
 export interface ReplyCheck { kind: DraftKind; passed: boolean; round?: number; note?: string }
 /** The assistant's short answer. One with no outcome was not reported: its last words, or a note from the studio. */
-export interface ReplyReport { outcome?: "done" | "needs_answer" | "not_done"; message: string; points?: string[]; question?: string; next?: string }
+export interface ReplyReport { outcome?: "done" | "needs_answer" | "not_done"; message: string; points?: string[]; question?: string; answers?: string[]; next?: string }
 /** What happened while a reply was written. */
 export interface ReplyDetail { steps?: string[]; saved?: SavedVersion[]; checks?: ReplyCheck[]; reports?: ReplyReport[]; error?: string }
 export interface ChatMessage {

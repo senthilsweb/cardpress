@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schemaVersion": 4,
+  "x-schemaVersion": 5,
   "tools": {
     "update_draft": {
       "type": "object",
@@ -145,6 +145,16 @@
         "question": {
           "type": "string",
           "maxLength": 200
+        },
+        "answers": {
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
         },
         "next": {
           "type": "string",

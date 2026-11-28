@@ -51,7 +51,7 @@ Not agreed yet; suggested order:
 | [`2026-12-13-background-categories`](changes/2026-12-13-background-categories/proposal.md) | Background categories and seasonal greetings | Released |  |
 | [`2026-12-14-greetings-and-picker`](changes/2026-12-14-greetings-and-picker/proposal.md) | Greeting texts and a template picker | Part released | 5 |
 | [`2026-12-15-user-guide`](changes/2026-12-15-user-guide/proposal.md) | User guide | Released |  |
-| [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | Proposed | 6 |
+| [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | Built, not released | 2 |
 | [`2026-12-19-greeting-layouts`](changes/2026-12-19-greeting-layouts/proposal.md) | Greeting layouts | Part released | 4 |
 | [`2026-12-20-pluggable-ornaments`](changes/2026-12-20-pluggable-ornaments/proposal.md) | Pluggable ornaments | `v0.4.0` |  |
 | [`2026-12-21-media-library`](changes/2026-12-21-media-library/proposal.md) | Media library, per brand | `v0.2.1`, `v0.3.0` |  |
@@ -177,10 +177,6 @@ Older items include checks against real accounts that cost money or post publicl
 - Deploy
 
 ### `2026-12-16-chat-answer-buttons`
-- `answers` in `ReportReplyInput`; regenerate the schemas for both repositories
-- Studio: check and keep `answers`; buttons on the reply card; chosen state
-- Coordinator instructions
-- Tests in both repositories
 - Deploy the studio, then the agent
 - One paid test
 

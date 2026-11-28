@@ -28,7 +28,7 @@ Tools that work on a draft take `draftId`; the brand is found from the draft and
 | `save_memory` | `profileId`, `key`, `content` | the note | write |
 | `delete_memory` | `profileId`, `key` | | write |
 | `propose_content`, `get_proposal` | as today | for outside agents that should not write | write / read |
-| `report_reply` | `conversationId`, `outcome`, `message`, `points?`, `question?`, `next?` | `shown`. Changes nothing; see below | read |
+| `report_reply` | `conversationId`, `outcome`, `message`, `points?`, `question?`, `answers?`, `next?` | `shown`. Changes nothing; see below | read |
 | `publish_post` | `draftId`, `network` | the job | key scope `agent` |
 
 `update_card_text.changes` fields, the words drawn on the card: `eyebrow`, `headline`, `subtitle`, `footer`, `footerLeft`, `tag`, `quoteAuthor`, `statValue`.
@@ -56,7 +56,9 @@ A change to an approved draft returns it to draft. The result says so (`returned
 
 **Writers' report.** A writer's record has `title` and `headline`. It saves `title` with `update_draft` and returns the `headline` in its report; the coordinator puts it on the card.
 
-**The reply.** The coordinator ends every turn, and every part of a graded turn, with `report_reply`. `outcome` is `done`, `needs_answer` or `not_done`; `message` (240) is required; `points` (4, each 120), `question` (200, required with `needs_answer`) and `next` (120) are optional. Plain text. The studio takes the input of the last call it accepted from the session's events and shows it; anything else the agent writes is not shown. With no accepted call the last agent message is shown, cut at 400 characters. Writers do not have this tool.
+**The reply.** The coordinator ends every turn, and every part of a graded turn, with `report_reply`. `outcome` is `done`, `needs_answer` or `not_done`; `message` (240) is required; `points` (4, each 120), `question` (200, required with `needs_answer`), `answers` (1 to 4 different texts of 40, only with `question` and `needs_answer`) and `next` (120) are optional. Plain text. The studio takes the input of the last call it accepted from the session's events and shows it; anything else the agent writes is not shown. With no accepted call the last agent message is shown, cut at 400 characters. Writers do not have this tool.
+
+**Answer buttons.** The studio shows `answers` as buttons under the question; a press sends that text as the person's next message. They are an addition within version 6 (content schema 5): CardPress first, then the agents, because an older CardPress refuses the unknown field.
 
 **Planning fields.** `audience` (200) and `topic` (100) are one line each, written by the agent or the person. `campaign` and `reviewNotes` are the person's: no tool writes them. None of the four is published. They are additions within version 5: agents that do not know them are unaffected.
 
