@@ -29,6 +29,7 @@ type Accounts interface {
 	ActiveSessions(ctx context.Context) (int, error)
 	SignOutEveryone(ctx context.Context, keepToken string) (int, error)
 	AllowSignup(addr string) bool
+	SecurityLog(ctx context.Context, before int64) ([]service.SecurityEvent, bool, error)
 	Logout(ctx context.Context, token string) error
 	Get(ctx context.Context, id string) (service.User, error)
 	UpdateProfile(ctx context.Context, id string, in service.ProfileInput) (service.User, error)
@@ -147,6 +148,7 @@ func (s *server) notSignedIn(w http.ResponseWriter, r *http.Request) {
 func (s *server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.Accounts != nil {
+			r = r.WithContext(service.WithAddress(r.Context(), s.clientAddr(r)))
 			var p *service.Principal
 			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			bearer := got != r.Header.Get("Authorization")

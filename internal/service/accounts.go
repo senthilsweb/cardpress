@@ -342,7 +342,11 @@ func (a *Accounts) Signup(ctx context.Context, in SignupInput) (User, error) {
 		return User{}, fmt.Errorf("%w: sign-up is closed on this server; ask an administrator to add you", ErrForbidden)
 	}
 	s, _ := a.Security(ctx)
-	return a.create(ctx, in, s.DefaultRole)
+	u, err := a.create(ctx, in, s.DefaultRole)
+	if err == nil {
+		a.record(ctx, EventSignUp, u.Email, strings.Join(u.Roles, ", "))
+	}
+	return u, err
 }
 
 // AdminCreateInput is an administrator adding a person.
@@ -359,7 +363,11 @@ func (a *Accounts) Add(ctx context.Context, in AdminCreateInput) (User, error) {
 	if !ValidRole(in.Role) {
 		return User{}, invalid("role must be admin, editor or writer")
 	}
-	return a.create(ctx, in.SignupInput, in.Role)
+	u, err := a.create(ctx, in.SignupInput, in.Role)
+	if err == nil {
+		a.record(ctx, EventUserAdded, u.Email, in.Role)
+	}
+	return u, err
 }
 
 // ProfileInput is what a person may change about themselves. Email and role are not among them.
@@ -415,6 +423,7 @@ func (a *Accounts) SetRole(ctx context.Context, id, role string) (User, error) {
 	if err := tx.Commit(); err != nil {
 		return User{}, err
 	}
+	a.record(ctx, EventRole, u.Email, role)
 	return a.Get(ctx, id)
 }
 
@@ -441,6 +450,7 @@ func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, erro
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET status = ? WHERE id = ?`, status, id); err != nil {
 		return User{}, err
 	}
+	a.record(ctx, EventStatus, u.Email, status)
 	if status == "disabled" {
 		if _, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id); err != nil {
 			return User{}, err
@@ -469,6 +479,7 @@ func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	a.record(ctx, EventPasswordSet, u.Email, "")
 	_, err = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id)
 	return err
 }
@@ -492,6 +503,7 @@ func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepTo
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, newHash, id); err != nil {
 		return err
 	}
+	a.record(ctx, EventPasswordOwn, u.Email, "")
 	_, err = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?`, id, tokenHash(keepToken))
 	return err
 }
@@ -611,7 +623,15 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 	ok := checkPassword(hash, password)
 	if err != nil || !ok || u.Status != "active" {
 		rules, _ := a.Security(ctx)
-		a.fail(rules, byAccount, byAddr)
+		paused := a.fail(rules, byAccount, byAddr)
+		why := "wrong email or password"
+		if err == nil && ok {
+			why = "the account is disabled"
+		}
+		a.record(WithAddress(ctx, addr), EventSignInFailed, email, why)
+		if paused {
+			a.record(WithAddress(ctx, addr), EventPaused, email, fmt.Sprintf("for %d minutes", rules.PauseMinutes))
+		}
 		return User{}, "", ErrUnauthorized
 	}
 	a.clear(byAccount)
@@ -624,12 +644,17 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 	if err != nil {
 		return User{}, "", err
 	}
+	a.record(WithAddress(ctx, addr), EventSignIn, u.Email, "")
 	_, _ = a.db.ExecContext(ctx, `UPDATE users SET last_login_at = ? WHERE id = ?`, a.stamp(), u.ID)
 	return u, token, nil
 }
 
 // Logout ends one session.
 func (a *Accounts) Logout(ctx context.Context, token string) error {
+	var email string
+	if a.db.QueryRowContext(ctx, `SELECT u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, tokenHash(token)).Scan(&email) == nil {
+		a.record(ctx, EventSignOut, email, "")
+	}
 	_, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
 	return err
 }

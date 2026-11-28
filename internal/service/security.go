@@ -109,12 +109,26 @@ func (a *Accounts) SetSecurity(ctx context.Context, s SecuritySettings) error {
 	}
 	_, err = a.db.ExecContext(ctx, `INSERT INTO preferences (key, value, updated_at) VALUES (?, ?, ?)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, prefSecurity, string(raw), a.stamp())
+	if err == nil {
+		a.record(ctx, EventSettings, "", fmt.Sprintf("sign-up %s; sessions %d/%d min; passwords %d+; %d tries, %d min pause",
+			openOrClosed(s.SignupOpen), s.IdleMinutes, s.MaxMinutes, s.MinPassword, s.Attempts, s.PauseMinutes))
+	}
 	return err
+}
+
+func openOrClosed(open bool) string {
+	if open {
+		return "open"
+	}
+	return "closed"
 }
 
 // ResetSecurity removes the saved settings, so the server's starting values apply.
 func (a *Accounts) ResetSecurity(ctx context.Context) error {
 	_, err := a.db.ExecContext(ctx, `DELETE FROM preferences WHERE key = ?`, prefSecurity)
+	if err == nil {
+		a.record(ctx, EventSettingsReset, "", "")
+	}
 	return err
 }
 
@@ -136,5 +150,8 @@ func (a *Accounts) SignOutEveryone(ctx context.Context, keepToken string) (int, 
 		return 0, err
 	}
 	n, err := res.RowsAffected()
+	if err == nil {
+		a.record(ctx, EventEveryoneOut, "", fmt.Sprintf("%d sessions ended", n))
+	}
 	return int(n), err
 }

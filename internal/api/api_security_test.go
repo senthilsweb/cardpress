@@ -25,7 +25,7 @@ func TestOnlyASignedInAdministratorSetsTheSecurityRules(t *testing.T) {
 	token := r.browser(t)
 	token.extra = map[string]string{"Authorization": "Bearer a-long-enough-server-token"}
 	for who, c := range map[string]*client{"an editor": editor, "the server token": token, "a stranger": r.browser(t)} {
-		for _, call := range [][2]string{{"GET", "/api/v1/security"}, {"PUT", "/api/v1/security"}, {"DELETE", "/api/v1/security"}, {"POST", "/api/v1/security/sign-out-everyone"}} {
+		for _, call := range [][2]string{{"GET", "/api/v1/security"}, {"PUT", "/api/v1/security"}, {"DELETE", "/api/v1/security"}, {"POST", "/api/v1/security/sign-out-everyone"}, {"GET", "/api/v1/security/log"}} {
 			if code := c.do(call[0], call[1], "{}").Code; code != 401 && code != 403 {
 				t.Errorf("%s may %s %s: %d", who, call[0], call[1], code)
 			}

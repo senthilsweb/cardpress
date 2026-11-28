@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/senthilsweb/cardpress/internal/service"
 )
@@ -56,6 +57,20 @@ func (s *server) resetSecurity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeSecurity(w, r)
+}
+
+// securityLog answers the newest events, or with ?before=<id> the ones older than that.
+func (s *server) securityLog(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.securityPerson(w, r); !ok {
+		return
+	}
+	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	events, more, err := s.Accounts.SecurityLog(r.Context(), before)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"events": events, "more": more})
 }
 
 func (s *server) signOutEveryone(w http.ResponseWriter, r *http.Request) {

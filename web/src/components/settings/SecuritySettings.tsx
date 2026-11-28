@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { IDLE_CHOICES, MAX_CHOICES, minutesLabel, securityProblem, withValue, type Security, type SecuritySettings as Settings } from "@/lib/security";
 import { attempt, FormSection, reason, SaveBar } from "./form";
 import { useUnsaved } from "./guard";
+import { SecurityLog } from "./SecurityLog";
 
 /** Who may join and how signing in behaves. Administrators only; the server refuses anyone else. */
 export function SecuritySettings() {
@@ -102,6 +103,7 @@ export function SecuritySettings() {
             {number("sec-pause", "pauseMinutes", "Pause (minutes)")}
           </div>
         </FormSection>
+        <SecurityLog version={data} />
       </div>
     </Pane>
   );

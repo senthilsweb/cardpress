@@ -26,8 +26,8 @@
 - [x] Tests, browser check of every screen under the policy
 
 ## Bolt 6: security log
-- [ ] Migration, recording, list on the Security page
-- [ ] Tests, browser check
+- [x] Migration, recording, list on the Security page
+- [x] Tests, browser check
 
 ## Bolt 7: docs
 - [ ] User guide, configuration, deployment and data model docs

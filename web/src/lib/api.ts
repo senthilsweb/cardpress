@@ -54,7 +54,7 @@ async function call<T>(method: string, path: string, body?: unknown, background 
 
 import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
-import type { Security, SecuritySettings } from "./security";
+import type { Security, SecurityEvent, SecuritySettings } from "./security";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
@@ -198,6 +198,7 @@ export const api = {
   security: () => call<Security>("GET", "/security"),
   saveSecurity: (s: SecuritySettings) => call<Security>("PUT", "/security", s),
   resetSecurity: () => call<Security>("DELETE", "/security"),
+  securityLog: (before?: number) => call<{ events: SecurityEvent[]; more: boolean }>("GET", `/security/log${before ? `?before=${before}` : ""}`),
   signOutEveryone: () => call<{ ended: number }>("POST", "/security/sign-out-everyone"),
   /** How long the sign-in has left; asking does not extend it. */
   sessionTimes: () => call<SessionTimes>("GET", "/auth/session"),

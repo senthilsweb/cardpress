@@ -1,6 +1,6 @@
 # Security: sessions, browser storage, sign-up settings and hardening
 
-**Status:** proposed by the owner on 2026-11-28; 5 of 7 bolts built and tested; not released.
+**Status:** proposed by the owner on 2026-11-28; 6 of 7 bolts built and tested; not released.
 
 ## Asked for
 1. Passwords protected where they are stored.

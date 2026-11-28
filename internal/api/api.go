@@ -305,6 +305,7 @@ func (s *server) table() []routeDef {
 		{"GET", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getSecurity},
 		{"PUT", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putSecurity},
 		{"DELETE", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetSecurity},
+		{"GET", "/security/log", rule{scope: scopeAdmin, perm: service.PermUsers}, s.securityLog},
 		{"POST", "/security/sign-out-everyone", rule{scope: scopeAdmin, perm: service.PermUsers}, s.signOutEveryone},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
