@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { AssetPicker } from "@/components/media/AssetPicker";
@@ -47,8 +48,7 @@ const MAX_DOCUMENT_BYTES = 20 << 20;
 const MAX_POST_IMAGES = 10;
 
 /** A saved view choice. Storage can be blocked or full, and the choice is only a convenience. */
-const loadPref = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
-const savePref = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* not remembered */ } };
+const loadPref = (key: string) => { const v = readPref(key); return typeof v === "string" ? v : null; };
 
 /**
  * Everything about the item on screen, each field once, in the groups of the content schema. Its status, what is
@@ -103,12 +103,12 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   const [editor, setEditor] = useState<Editor | null>(null);
   const [preview, setPreview] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-  const [width, setWidth] = useState<TextWidth>(() => parseWidth(loadPref("cardpress.editor.width")));
-  const [sizeIdx, setSizeIdx] = useState(() => parseSizeIndex(loadPref("cardpress.editor.size")));
-  const [outlineOff, setOutlineOff] = useState(() => loadPref("cardpress.editor.outline") === "off");
-  const chooseWidth = () => { const w: TextWidth = width === "narrow" ? "wide" : "narrow"; setWidth(w); savePref("cardpress.editor.width", w); };
-  const chooseSize = (d: 1 | -1) => { const i = stepSize(sizeIdx, d); setSizeIdx(i); savePref("cardpress.editor.size", String(i)); };
-  const toggleOutline = useCallback(() => setOutlineOff((off) => { savePref("cardpress.editor.outline", off ? "on" : "off"); return !off; }), []);
+  const [width, setWidth] = useState<TextWidth>(() => parseWidth(loadPref("editor.width")));
+  const [sizeIdx, setSizeIdx] = useState(() => parseSizeIndex(loadPref("editor.size")));
+  const [outlineOff, setOutlineOff] = useState(() => loadPref("editor.outline") === "off");
+  const chooseWidth = () => { const w: TextWidth = width === "narrow" ? "wide" : "narrow"; setWidth(w); savePref("editor.width", w); };
+  const chooseSize = (d: 1 | -1) => { const i = stepSize(sizeIdx, d); setSizeIdx(i); savePref("editor.size", String(i)); };
+  const toggleOutline = useCallback(() => setOutlineOff((off) => { savePref("editor.outline", off ? "on" : "off"); return !off; }), []);
   // kept as one element so the toolbar (memoised) is not drawn again on every keystroke
   const viewTools = useMemo(() => (draft?.kind === "post" ? undefined : (
     <>

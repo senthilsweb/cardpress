@@ -1,4 +1,5 @@
 import { hydrateAppearance } from "./appearance";
+import { hydratePrefs } from "./prefs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, completeProfiles, upgradePlaceholderText, withStandardPalettes } from "./profiles";
@@ -27,46 +28,11 @@ export interface Loaded {
   session: Session;
 }
 
-export interface LegacyData { profiles: Profile[]; designs: Record<string, Design>; theme?: "light" | "dark"; customFonts: FontDef[] }
-
 export type Boot =
   | { status: "loading" }
   | { status: "auth"; error?: string }
   | { status: "error"; message: string }
-  | { status: "legacy"; legacy: LegacyData; busy?: boolean; error?: string }
   | { status: "ready"; data: Loaded };
-
-/* The browser used to hold everything in localStorage. These are the old keys. */
-const LEGACY_KEYS = ["scs.profiles.v1", "scs.activeProfile.v1", "scs.designs.v1", "scs.theme", "scs.customFonts.v1"];
-
-function readJson<T>(key: string): T | undefined {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Old browser data worth importing, or undefined. Only the active profile is kept: the studio now has one. */
-export function readLegacy(): LegacyData | undefined {
-  const profiles = readJson<Profile[]>("scs.profiles.v1");
-  if (!Array.isArray(profiles) || !profiles.length || !profiles.every((p) => p && typeof p.id === "string" && Array.isArray(p.palettes))) return undefined;
-  const activeId = readJson<string>("scs.activeProfile.v1");
-  const keep = profiles.find((p) => p.id === activeId) ?? profiles[0];
-  const designs = readJson<Record<string, Design>>("scs.designs.v1") ?? {};
-  const fonts = readJson<FontDef[]>("scs.customFonts.v1");
-  let theme: "light" | "dark" | undefined;
-  try { const t = localStorage.getItem("scs.theme"); if (t === "light" || t === "dark") theme = t; } catch { /* ignore */ }
-  return {
-    profiles: [keep],
-    designs: designs[keep.id] ? { [keep.id]: designs[keep.id] } : {},
-    theme,
-    customFonts: Array.isArray(fonts) ? fonts.filter((f) => f && typeof f.family === "string") : [],
-  };
-}
-
-const clearLegacy = () => { try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ } };
 
 /** The caption the app used to ship with; it is a placeholder, not something the user wrote. */
 const OLD_PLACEHOLDER_CAPTION = "Write your post caption here.\n\nCharacter limits for each platform are shown below.";
@@ -87,6 +53,7 @@ function fromState(s: Awaited<ReturnType<typeof api.state>>, drafts: Draft[], ac
   const profiles = (s.profiles as Profile[]).length ? withStandardPalettes(s.profiles as Profile[]) : DEFAULT_PROFILES;
   const archived = Array.isArray(s.archived) ? completeProfiles(s.archived as Profile[]) : [];
   hydrateAppearance(s.preferences);
+  hydratePrefs(s.preferences);
   const fonts = Array.isArray(s.preferences.customFonts) ? (s.preferences.customFonts as FontDef[]) : [];
   const designs = Object.fromEntries(Object.entries(s.designs as Record<string, Design>).map(([k, d]) => [k, upgradePlaceholderText(d)]));
   return { profiles, archived, activeId, designs, customFonts: fonts, drafts, layout: parseLayout(s.preferences.layout), session };
@@ -105,8 +72,6 @@ export function useBoot() {
       if (!info.accounts && info.authRequired && !getToken()) return setBoot({ status: "auth" });
       let state = await api.state();
       if (!state.profiles.length) {
-        const legacy = readLegacy();
-        if (legacy) return setBoot({ status: "legacy", legacy });
         // someone new: their first brand is saved now, so the server knows it (accounts and posts are kept per brand)
         await createFirstBrand(session.user);
         state = await api.state();
@@ -141,22 +106,5 @@ export function useBoot() {
 
   const submitToken = (t: string) => { setToken(t.trim()); void load(); };
 
-  const importLegacy = async (l: LegacyData) => {
-    setBoot({ status: "legacy", legacy: l, busy: true });
-    try {
-      await api.importLegacy({
-        profiles: l.profiles,
-        designs: l.designs,
-        preferences: { ...(l.theme ? { theme: l.theme } : {}), ...(l.customFonts.length ? { customFonts: l.customFonts } : {}) },
-      });
-      clearLegacy(); // only after the server has it
-      await load();
-    } catch (e) {
-      setBoot({ status: "legacy", legacy: l, error: e instanceof Error ? e.message : "Import failed" });
-    }
-  };
-
-  const discardLegacy = () => { clearLegacy(); void load(); };
-
-  return { boot, retry: load, submitToken, importLegacy, discardLegacy, openBrand };
+  return { boot, retry: load, submitToken, openBrand };
 }

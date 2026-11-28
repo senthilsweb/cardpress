@@ -41,6 +41,7 @@ type Studio interface {
 	DeleteProfile(ctx context.Context, id string) error
 	ReplaceDesigns(ctx context.Context, designs map[string]json.RawMessage) error
 	SetPreference(ctx context.Context, key string, value json.RawMessage) error
+	Look(ctx context.Context) (palette, mode string, err error)
 	ImportLegacy(ctx context.Context, l service.Legacy) error
 	ListDrafts(ctx context.Context, profileID string) ([]service.Draft, error)
 	GetDraft(ctx context.Context, id string) (service.Draft, error)
@@ -405,6 +406,7 @@ func (s *server) state(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, err)
 		return
 	}
+	s.lookCookie(w, r, r.Context()) // a choice made in another browser reaches this one
 	writeJSON(w, http.StatusOK, st)
 }
 
@@ -444,9 +446,13 @@ func (s *server) putPreference(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &value) {
 		return
 	}
-	if err := s.Studio.SetPreference(r.Context(), r.PathValue("key"), value); err != nil {
+	key := r.PathValue("key")
+	if err := s.Studio.SetPreference(r.Context(), key, value); err != nil {
 		fail(w, r, err)
 		return
+	}
+	if key == service.PrefTheme || key == service.PrefPalette {
+		s.lookCookie(w, r, r.Context())
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

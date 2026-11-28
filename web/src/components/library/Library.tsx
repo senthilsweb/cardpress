@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { CalendarClock, Check, Columns3, Globe, List, Share2, ChevronLeft, Download, ExternalLink, FileText, Loader2, PenLine, Search, Table2, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,15 +42,16 @@ const base = () => import.meta.env.BASE_URL;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 const day = (iso: string) => new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 
-const SIZE_KEY = "cardpress.library.pageSize";
+const SIZE_KEY = "library.pageSize";
 const savedSize = (): number => {
-  try { const n = Number(localStorage.getItem(SIZE_KEY)); return (PAGE_SIZES as readonly number[]).includes(n) ? n : 20; } catch { return 20; }
+  const n = Number(readPref(SIZE_KEY));
+  return (PAGE_SIZES as readonly number[]).includes(n) ? n : 20;
 };
 
 export default function Library() {
   const { boot, retry, submitToken } = useLibraryBoot();
   if (boot.status !== "ready") {
-    return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={() => undefined} discardLegacy={() => undefined} />;
+    return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   }
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
@@ -62,17 +64,18 @@ function StatusBadge({ s }: { s: LibraryItem["status"] }) {
   return <Badge variant="outline">{label}</Badge>;
 }
 
-const VIEW_KEY = "cardpress.library.view";
-const COLUMNS_KEY = "cardpress.library.columns";
+const VIEW_KEY = "library.view";
+const COLUMNS_KEY = "library.columns";
 const savedView = (): "grid" | "list" => {
-  try { const v = localStorage.getItem(VIEW_KEY); if (v === "grid" || v === "list") return v; } catch { /* not remembered */ }
+  const v = readPref(VIEW_KEY);
+  if (v === "grid" || v === "list") return v;
   return window.matchMedia("(min-width: 1024px)").matches ? "grid" : "list";
 };
 const savedColumns = (): ColumnId[] => {
-  try { const v = JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? "null"); if (Array.isArray(v)) return v.filter((c) => COLUMNS.some((x) => x.id === c)); } catch { /* not remembered */ }
+  const v = readPref(COLUMNS_KEY);
+  if (Array.isArray(v)) return v.filter((c) => COLUMNS.some((x) => x.id === c));
   return defaultColumns();
 };
-const remember = (key: string, value: unknown) => { try { localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value)); } catch { /* not remembered */ } };
 
 function Page({ data }: { data: LibraryBoot }) {
   const [theme, toggleTheme] = useTheme();
@@ -146,11 +149,11 @@ function Page({ data }: { data: LibraryBoot }) {
   }, [filter, data.activeId, page, pageSize, sort]);
   useEffect(() => { setOpenId(null); setSelected(new Set()); void load(); }, [load]);
 
-  const changeSize = (n: number) => { setPageSize(n); remember(SIZE_KEY, String(n)); };
-  const changeView = (v: "grid" | "list") => { setView(v); remember(VIEW_KEY, v); };
+  const changeSize = (n: number) => { setPageSize(n); savePref(SIZE_KEY, n); };
+  const changeView = (v: "grid" | "list") => { setView(v); savePref(VIEW_KEY, v); };
   const toggleColumn = (id: ColumnId) => {
     const next = columns.includes(id) ? columns.filter((c) => c !== id) : COLUMNS.map((c) => c.id).filter((c) => c === id || columns.includes(c));
-    setColumns(next); remember(COLUMNS_KEY, next);
+    setColumns(next); savePref(COLUMNS_KEY, next);
   };
   const items = result?.items ?? [];
   /** A row changed in place: show it at once, then look again so the list agrees with the server. */

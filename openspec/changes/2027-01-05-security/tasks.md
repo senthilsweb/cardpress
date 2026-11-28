@@ -11,9 +11,9 @@
 - [x] Tests, browser check
 
 ## Bolt 3: nothing in browser storage
-- [ ] View choices saved on the server; the colours cookie
-- [ ] Remove every use of local and session storage, and old keys; a test that keeps it so
-- [ ] Tests, browser check
+- [x] View choices saved on the server; the colours cookie
+- [x] Remove every use of local and session storage, and old keys; a test that keeps it so
+- [x] Tests, browser check
 
 ## Bolt 4: security settings
 - [ ] Stored settings, API for administrators, sign out everyone

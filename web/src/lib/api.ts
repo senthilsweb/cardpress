@@ -3,14 +3,12 @@
 const env = import.meta.env as Record<string, string | undefined>;
 export const API_BASE = (env.PUBLIC_API_BASE || "/api/v1").replace(/\/+$/, "");
 
-// A token typed into the prompt is kept for this tab only. A build-time PUBLIC_API_TOKEN is visible to anyone who
-// can load the app, so use it only on a private network.
-const TOKEN_KEY = "cardpress.apiToken";
-export const getToken = (): string => {
-  try { return sessionStorage.getItem(TOKEN_KEY) || env.PUBLIC_API_TOKEN || ""; } catch { return env.PUBLIC_API_TOKEN || ""; }
-};
-export const setToken = (t: string) => { try { sessionStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ } };
-export const clearToken = () => { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } };
+// A token typed into the prompt is held in memory only, so it is asked for again after a reload. A build-time
+// PUBLIC_API_TOKEN is visible to anyone who can load the app, so use it only on a private network.
+let typed = "";
+export const getToken = (): string => typed || env.PUBLIC_API_TOKEN || "";
+export const setToken = (t: string) => { typed = t; };
+export const clearToken = () => { typed = ""; };
 
 export interface SessionTimes { remainingSeconds: number; idleSeconds: number; limit: "idle" | "max" }
 
@@ -239,7 +237,7 @@ export const api = {
   restoreProfile: (id: string) => call<void>("POST", `/profiles/${encodeURIComponent(id)}/restore`),
   deleteProfile: (id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(id)}`),
   putDesigns: (designs: Record<string, unknown>) => call<void>("PUT", "/designs", { designs }),
-  putPreference: (key: "theme" | "palette" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
+  putPreference: (key: "theme" | "palette" | "customFonts" | "layout" | "activeProfile" | "ui", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
   listDrafts: (profileId: string, background = false) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`, undefined, background).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
@@ -351,6 +349,4 @@ export const api = {
   undoReply: (id: string, messageId: string) => call<Conversation>("POST", `/chat/conversations/${encodeURIComponent(id)}/replies/${encodeURIComponent(messageId)}/undo`),
   decideProposal: (id: string, body: { status: "approved" | "rejected"; draftId?: string; edited?: ProposalEdit }) =>
     call<Proposal>("POST", `/chat/proposals/${encodeURIComponent(id)}/decision`, body),
-  importLegacy: (body: { profiles: unknown[]; designs: Record<string, unknown>; preferences: Record<string, unknown> }) =>
-    call<void>("POST", "/import/legacy", body),
 };

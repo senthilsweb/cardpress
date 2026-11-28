@@ -21,7 +21,7 @@ const REPO = "https://github.com/senthilsweb/cardpress";
 /** The user guide, inside the app: contents on the left, the page, and its sections on the right. */
 export default function Help() {
   const { boot, retry, submitToken } = useLibraryBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={noop} discardLegacy={noop} />;
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 

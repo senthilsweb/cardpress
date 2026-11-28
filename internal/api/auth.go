@@ -271,6 +271,7 @@ type sessionBody struct {
 func (s *server) session(w http.ResponseWriter, r *http.Request, u service.User, token string, status int) {
 	_, longest := s.Accounts.SessionLimits(r.Context())
 	setSessionCookie(w, r, token, int(longest.Seconds()))
+	s.lookCookie(w, r, service.WithPrincipal(r.Context(), service.Principal{User: &u}))
 	writeJSON(w, status, sessionBody{User: u, Perms: u.Perms()})
 }
 

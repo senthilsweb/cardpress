@@ -15,12 +15,20 @@ const base = import.meta.env.BASE_URL;
     <title>{title}</title>
     <script is:inline>
       try {
-        // first paint follows the choice kept in this browser (or the system); the server's is applied once it loads
-        const saved = JSON.parse(localStorage.getItem("cardpress.appearance") || "{}");
-        const dark = saved.mode === "dark" || (saved.mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        // first paint follows the server's colours cookie (or the system); the saved choice is applied once it loads
+        const look = /(?:^|;\s*)cardpress_look=([a-z]+)\.([a-z]+)/.exec(document.cookie);
+        const mode = look ? look[2] : "system";
+        const dark = mode === "dark" || (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
-        document.documentElement.dataset.palette = saved.theme || "parchment";
+        document.documentElement.dataset.palette = look ? look[1] : "parchment";
       } catch (e) {}
+      // earlier versions kept choices in the browser's storage: remove what they left
+      for (const store of ["localStorage", "sessionStorage"]) {
+        try {
+          const s = window[store];
+          Object.keys(s).filter((k) => k.startsWith("cardpress.") || k.startsWith("scs.")).forEach((k) => s.removeItem(k));
+        } catch (e) {}
+      }
     </script>
   </head>
   <body>

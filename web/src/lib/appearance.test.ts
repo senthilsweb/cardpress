@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { readAppearance, resolveMode, THEMES } from "./appearance";
+import { readAppearance, resolveMode, THEMES, readLook } from "./appearance";
 import { contrast } from "./contrast";
 
 describe("appearance", () => {
@@ -36,4 +36,12 @@ describe("every theme can be read", () => {
           expect(contrast(c[text], c[ground]), `${text} ${c[text]} on ${ground} ${c[ground]}`).toBeGreaterThanOrEqual(4.5);
         }
       });
+});
+
+describe("the colours cookie", () => {
+  it("is read among other cookies, and anything unknown takes the default", () => {
+    expect(readLook("a=1; cardpress_look=cobalt.dark; b=2")).toEqual({ theme: "cobalt", mode: "dark" });
+    expect(readLook("cardpress_look=pink.neon")).toEqual({ theme: "parchment", mode: "system" });
+    expect(readLook("")).toEqual({ theme: "parchment", mode: "system" });
+  });
 });
