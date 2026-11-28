@@ -33,6 +33,9 @@ type fake struct {
 	sent       []string // the text of what was sent: a message, or an outcome's description
 	rubrics    []string
 	rounds     []int
+	used       int   // what the session has cost
+	limit      int   // its spending limit
+	limits     []int // each limit set
 	gone       bool
 	interrupts int
 	drop       bool // the first stream ends after what was sent
@@ -104,6 +107,11 @@ func (f *fake) interrupt(context.Context, string) error {
 }
 func (f *fake) usage(context.Context, string) (agent.Usage, error) {
 	return agent.Usage{TotalCents: 7, ActiveSeconds: 4}, nil
+}
+func (f *fake) budget(context.Context, string) (int, int, error) { return f.used, f.limit, nil }
+func (f *fake) setBudget(_ context.Context, _ string, cents int) error {
+	f.limit, f.limits = cents, append(f.limits, cents)
+	return nil
 }
 func (f *fake) history(context.Context, string) ([]wireEvent, error) {
 	f.mu.Lock()
@@ -447,5 +455,62 @@ func TestWithoutAReportTheLastWordsAreShownCutShort(t *testing.T) {
 	out, _, err := ask(t, f, agent.Input{Studio: studio()})
 	if err != nil || len(out.Reports) != 1 || out.Reports[0].Outcome != "" || !strings.HasSuffix(out.Reply, "…") || len([]rune(out.Reply)) > 401 {
 		t.Fatalf("%v %+v", err, out)
+	}
+}
+
+// What is left of a brand's amount becomes the session's limit for the reply, never above the conversation's own, and
+// a reply that stops there says which limit it was.
+func TestAnAllowanceBecomesTheSessionsLimit(t *testing.T) {
+	cents := func(n int) *int { return &n }
+	say := func(f *fake) { f.say("Done."); f.idle("end_turn") }
+	stop := func(f *fake) { f.idle("budget_reached") }
+	run := func(f *fake, budget int, allowance *int) error {
+		c := &Client{api: f, m: manifest, timeout: 5 * time.Second, budget: budget}
+		_, err := c.Respond(context.Background(), agent.Input{SessionID: "sesn_1", Allowance: allowance, Messages: []agent.Message{{Role: "user", Content: "Go on."}}}, func(agent.Event) {})
+		return err
+	}
+
+	// 40 used, 30 left for the brand: the limit goes from the conversation's 200 down to 70
+	f := &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, cents(30)); err != nil || !slices.Equal(f.limits, []int{70}) {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	// plenty left: the conversation's limit stays, and is put back if an earlier reply lowered it
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 70}
+	if err := run(f, 200, cents(5000)); err != nil || !slices.Equal(f.limits, []int{200}) {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, cents(5000)); err != nil || len(f.limits) != 0 {
+		t.Fatalf("nothing to change: %v %v", err, f.limits)
+	}
+	// no allowance given: the session is left alone
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, nil); err != nil || len(f.limits) != 0 {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	// nothing left: nothing is sent
+	f = &fake{used: 40, limit: 200}
+	if err := run(f, 200, cents(0)); !errors.Is(err, agent.ErrBudget) || len(f.sent) != 0 {
+		t.Fatalf("%v %v", err, f.sent)
+	}
+	// the conversation's own limit is reached first
+	f = &fake{used: 200, limit: 200}
+	if err := run(f, 200, cents(5000)); err == nil || errors.Is(err, agent.ErrBudget) || !strings.Contains(err.Error(), "this conversation") {
+		t.Fatalf("%v", err)
+	}
+	// stopped during the reply: by the allowance, or by the conversation's limit
+	f = &fake{scripts: []func(*fake){stop}, used: 40, limit: 200}
+	if err := run(f, 200, cents(30)); !errors.Is(err, agent.ErrBudget) {
+		t.Fatalf("%v", err)
+	}
+	f = &fake{scripts: []func(*fake){stop}, used: 40, limit: 200}
+	if err := run(f, 200, cents(5000)); err == nil || errors.Is(err, agent.ErrBudget) {
+		t.Fatalf("%v", err)
+	}
+	// a session made without a limit cannot be given one
+	f = &fake{scripts: []func(*fake){say}, used: 40}
+	if err := run(f, 0, cents(30)); err != nil || len(f.limits) != 0 {
+		t.Fatalf("%v %v", err, f.limits)
 	}
 }

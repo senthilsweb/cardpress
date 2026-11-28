@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { BudgetBar } from "@/components/settings/BudgetBar";
 import { readPref, savePref } from "@/lib/prefs";
 import { CircleAlert, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -190,6 +191,7 @@ function Page({ data }: { data: LibraryBoot }) {
                       <div key={name}><dt className="text-xs text-muted-foreground">{name}</dt><dd className="mt-0.5 text-2xl font-semibold tracking-tight">{value}</dd></div>
                     ))}
                   </dl>
+                  {figures.budget && <BudgetBar budget={figures.budget} className="mt-4 max-w-sm" />}
                   <div className="mt-4">{u.replies === 0 ? <p className="text-sm text-muted-foreground">No assistant cost is recorded in this period.</p> : <CostChart series={u.series} bucket={u.bucket} />}</div>
                   <p className="mt-3 text-xs text-muted-foreground">List price of replies in the chat, in US dollars; not an invoice. Sessions started outside CardPress and deleted conversations are not counted.</p>
                 </Block>

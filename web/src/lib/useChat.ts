@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { api } from "./api";
 import type { AgentInfo, ChatMessage, ChatRequest, Conversation, Proposal, ProposalEdit } from "./chat";
 import type { Attachment } from "./compose";
@@ -69,12 +70,13 @@ export function useChat(profileId: string) {
     setBusy(true); setError(null); setStreaming(""); setProgress(null);
     const ctl = new AbortController();
     abort.current = ctl;
+    let taken = false; // the server took the message; a refusal before that leaves nothing in the thread
     try {
       await api.streamMessage(convId, content, {
-        onUser: (m: ChatMessage) => patch(convId, (c) => ({
+        onUser: (m: ChatMessage) => (taken = true, patch(convId, (c) => ({
           ...c, messages: [...(c.messages ?? []), m],
           sources: (c.sources ?? []).map((s) => (s.messageId ? s : { ...s, messageId: m.id })),
-        })),
+        }))),
         onDelta: (t) => setStreaming((s) => (s ?? "") + t),
         onProgress: (t) => {
           setProgress(t);
@@ -85,6 +87,7 @@ export function useChat(profileId: string) {
           proposals: [...(c.proposals ?? []).map((x) => (x.status === "pending" ? { ...x, status: "superseded" as const } : x)), p],
         })),
         onMessage: (m) => { patch(convId, (c) => ({ ...c, messages: [...(c.messages ?? []), m] })); setStreaming(null); },
+        onNotice: (text) => { if (text) toast.warning(text, { duration: 10_000 }); },
       }, ctl.signal, request);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError(message(e));
@@ -97,7 +100,7 @@ export function useChat(profileId: string) {
           if (ctl.signal.aborted && i < 5 && c.messages?.[c.messages.length - 1]?.role === "user") continue;
           patch(convId, () => c);
           // a failed reply says why in the thread, so it is not said twice
-          if (c.messages?.[c.messages.length - 1]?.status === "failed") setError(null);
+          if (taken && c.messages?.[c.messages.length - 1]?.status === "failed") setError(null);
         } catch { /* the next look will do */ }
         break;
       }

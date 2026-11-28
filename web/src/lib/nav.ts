@@ -45,7 +45,7 @@ export const SETTINGS_SECTIONS: readonly SectionDef[] = [
   { id: "brand-assistant", label: "Brand assistant", group: "Brand", about: "The open brand's tier, checks and budget.", words: "ai agent model tier strong best grader check rounds budget cost limit spend", perm: "users" },
   { id: "users", label: "Users", group: "Administration", about: "People and their roles.", words: "people role admin editor password disable", person: true, perm: "users" },
   { id: "security", label: "Security", group: "Administration", about: "Sign-up, sessions and passwords.", words: "sign-up signup register session timeout expire password lock sign out log audit", person: true, perm: "users" },
-  { id: "assistant", label: "Assistant", group: "Administration", about: "Whether the assistant is connected.", words: "ai agent claude chat", perm: "users" },
+  { id: "assistant", label: "Assistant", group: "Administration", about: "Whether the assistant is connected, and its budget.", words: "ai agent claude chat budget cost limit spend", perm: "users" },
 ];
 
 /** The pages whose name or words hold everything typed. */

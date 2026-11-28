@@ -24,6 +24,9 @@ const (
 	// a brand's assistant settings: the subject is the brand
 	EventAssistant      = "assistant_changed"
 	EventAssistantReset = "assistant_reset"
+	// a monthly amount passed its alert, or was used up: the subject is the brand, or the server
+	EventBudgetAlert = "budget_alert"
+	EventBudgetUsed  = "budget_used"
 )
 
 const (

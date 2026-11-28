@@ -7,6 +7,7 @@
 | A brand's guides | Table `brand_guides` (`profile_id`, `kind`, `version`, `body`, `created_by`, `created_at`); the highest version is in use; an empty body means "our house style" |
 | Server-wide values | `preferences` under `assistant`: the server's monthly amount. The environment gives the starting value, as with Security |
 | Tiers | The manifest |
+| Spending | Table `assistant_spend` (`profile_id`, `month`, `cents`) |
 | Alerts already given | Table `budget_alerts` (`scope`, `month`, `level`), so each is given once |
 
 Nothing saved for a brand means today's behaviour. Only an administrator signed in to the app may change the tier,
@@ -61,8 +62,9 @@ style, the fixed part folded and read-only above, a character count, History wit
 every form. The preview renders Markdown without raw HTML.
 
 ## Budget
-- **Spent** is the sum of `chat_usage.added_cents` of the brand's conversations in the calendar month (UTC). The
-  server's is the same over all brands. This is the platform's list cost, the same figure the dashboard shows.
+- **Spent** is kept per brand and calendar month (UTC) in `assistant_spend`, added to with each reply's cost. It is
+  apart from `chat_usage`, so deleting a conversation or a brand does not give money back. The server's is the sum over
+  all brands. It is the platform's list cost. A reply that fails or is stopped is counted too.
 - **Before a request:** nothing left for the brand or the server refuses it with a short reason.
 - **During a request:** the session's cap is set to what it has spent plus the least of what is left for the
   conversation, the brand and the server. The platform then pauses the session at that point, and the chat says the

@@ -1,6 +1,6 @@
 # Assistant settings for each brand: models, checks, writing guides and a budget
 
-**Status:** proposed by the owner on 2026-11-28; decisions taken the same day (below); being built: bolts 1 and 2 of 8 done.
+**Status:** proposed by the owner on 2026-11-28; decisions taken the same day (below); being built: bolts 1 to 3 of 8 done.
 
 ## Asked for
 1. Choose the model of the coordinator and of each writer, per brand. An administrator may pick a stronger one.
@@ -59,7 +59,9 @@ writer agent.
 3. **A model check of a guide when it is saved**, on top of the fixed rules.
 4. A plan, later, is per brand; a person on their own makes a brand for themselves.
 
-Open: how a guide reaches the writers. Proposed: read as data through a tool, not uploaded as a real skill per brand.
+5. **A guide is read as data through a tool**, not uploaded as a real skill per brand.
+6. **One guide per kind**, with a history and Restore. Named variations with one active can come later.
+
 Budget month, unless the owner says otherwise: the calendar month in UTC; a brand with no amount has no limit of its
 own.
 

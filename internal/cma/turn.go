@@ -167,7 +167,7 @@ func (t *turn) handle(e wireEvent) error {
 		case "retries_exhausted":
 			return fmt.Errorf("the agent kept failing and gave up%s", t.errSuffix())
 		case "budget_reached":
-			return errors.New("this conversation reached its spending limit, so the agent stopped. Start a new conversation")
+			return errBudgetReached
 		default: // end_turn, or anything that means "finished"
 			t.done = !t.graded || t.verdict != nil
 		}

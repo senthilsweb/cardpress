@@ -77,6 +77,14 @@ type Tiered interface {
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
 var ErrSessionGone = errors.New("the session cannot be continued")
 
+// ErrBudget is an agent saying it stopped because the allowance of the reply was used up.
+var ErrBudget = errors.New("the budget is used up")
+
+// Metered is an assistant that can say what a session has cost, for a reply that ended without saying so.
+type Metered interface {
+	SessionUsage(ctx context.Context, sessionID string) (Usage, error)
+}
+
 // Usage is the running total of a session: its cost at list price in cents, and the seconds it has been working.
 type Usage struct {
 	TotalCents    int
@@ -96,9 +104,9 @@ type Studio struct {
 	Rounds int
 	// Unchecked are first drafts that are not graded, because the brand's checks are off.
 	Unchecked []string
-	Cards          []Card   // items the assistant has not seen yet
-	Changes        []Change // what the person changed since it last saw an item
-	Notes          []string // the brand's notes as "key: content", for a session's first message
+	Cards     []Card   // items the assistant has not seen yet
+	Changes   []Change // what the person changed since it last saw an item
+	Notes     []string // the brand's notes as "key: content", for a session's first message
 }
 
 // Card is a draft's card as the assistant first sees it; Design is JSON with pictures as present or absent.
@@ -124,6 +132,9 @@ type Input struct {
 	Sources   []Source  // everything the conversation draws on, oldest first
 	// Restarted is true when an earlier session could not be continued: this one is new and has been given nothing.
 	Restarted bool
+	// Allowance is the most this reply may add to what the session has cost, in cents: what is left of the brand's and
+	// the server's monthly amounts. Nil is no limit but the conversation's own.
+	Allowance *int
 }
 
 // Event is progress while a reply is being written.

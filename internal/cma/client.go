@@ -17,7 +17,13 @@ type Client struct {
 	api     sessionAPI
 	m       Manifest
 	timeout time.Duration
+	budget  int // spend cap per conversation in cents; 0 = none
 }
+
+// errBudgetReached is the session stopping at its spending limit.
+var errBudgetReached = errors.New("the session reached its spending limit")
+
+const conversationLimit = "this conversation reached its spending limit, so the agent stopped. Start a new conversation"
 
 // DefaultTimeout bounds one reply. A graded article takes several minutes.
 const DefaultTimeout = 12 * time.Minute
@@ -32,7 +38,7 @@ func New(cfg Config, timeout time.Duration) (*Client, error) {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	return &Client{api: newSDKAPI(cfg), m: cfg.Manifest, timeout: timeout}, nil
+	return &Client{api: newSDKAPI(cfg), m: cfg.Manifest, timeout: timeout, budget: cfg.BudgetCents}, nil
 }
 
 // Name and IsAI let the screen say what is answering, and that the conversation goes to Anthropic.
@@ -42,6 +48,11 @@ func (c *Client) Ready() bool  { return true }
 
 // Versions are the coordinator's version and the content schema's, as the manifest gives them.
 func (c *Client) Versions() (string, int) { return c.m.AgentVersion, c.m.SchemaVersion }
+
+// SessionUsage is what a session has cost so far.
+func (c *Client) SessionUsage(ctx context.Context, sessionID string) (agent.Usage, error) {
+	return c.api.usage(ctx, sessionID)
+}
 
 // CreateSession starts a managed session for one conversation.
 func (c *Client) CreateSession(ctx context.Context) (string, error) {
@@ -84,6 +95,34 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return agent.Output{}, agent.ErrSessionGone
 		}
 		return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
+	}
+	// what is left of the brand's or the server's amount becomes the session's limit for this reply, under the
+	// conversation's own. The service stops the session there; the request that crosses it still completes.
+	allowed := false // true when it is the allowance, not the conversation's limit, that this reply would stop at
+	if in.Allowance != nil {
+		used, limit, err := c.api.budget(ctx, sid)
+		if err != nil {
+			if errors.Is(err, errSessionGone) {
+				return agent.Output{}, agent.ErrSessionGone
+			}
+			return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
+		}
+		target := used + *in.Allowance
+		if c.budget > 0 && c.budget <= target {
+			target = c.budget
+		} else {
+			allowed = true
+		}
+		switch {
+		case target <= used && allowed:
+			return agent.Output{}, agent.ErrBudget
+		case target <= used:
+			return agent.Output{}, errors.New(conversationLimit)
+		case limit > 0 && limit != target: // a session made without a limit cannot be given one
+			if err := c.api.setBudget(ctx, sid, target); err != nil {
+				return agent.Output{}, fmt.Errorf("could not set the session's spending limit: %w", err)
+			}
+		}
 	}
 	fresh := !slices.ContainsFunc(hist, func(e wireEvent) bool { return e.Type == "user.message" || e.Type == "user.define_outcome" })
 	var earlier []agent.Message
@@ -166,6 +205,12 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return agent.Output{}, fmt.Errorf("the agent took longer than %s and was stopped", c.timeout.Round(time.Second))
 		}
 		return agent.Output{}, ctx.Err()
+	}
+	if errors.Is(err, errBudgetReached) {
+		if allowed {
+			return agent.Output{}, agent.ErrBudget
+		}
+		return agent.Output{}, errors.New(conversationLimit)
 	}
 	if err != nil {
 		return agent.Output{}, err

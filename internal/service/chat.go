@@ -146,10 +146,13 @@ type Chat struct {
 	Studio ChatStudio
 	// OwnBrandsOnly is for an assistant whose key sees only its owner's brands: a person may ask it to work in those only.
 	OwnBrandsOnly bool
-	db            *sql.DB
-	agent         agent.Client
-	fetch         SourceFetcher
-	now           func() time.Time
+	// MonthCents is what every brand together may spend in a month, as the server was started; 0 is no amount. An
+	// administrator's saved amount replaces it.
+	MonthCents int
+	db         *sql.DB
+	agent      agent.Client
+	fetch      SourceFetcher
+	now        func() time.Time
 
 	mu   sync.Mutex
 	busy map[string]bool
@@ -476,6 +479,11 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		return fmt.Errorf("%w: a reply is already being written for this conversation", ErrConflict)
 	}
 	defer c.unlock(id)
+	// nothing left of the brand's or the server's amount for the month: nothing is sent
+	allowance, err := c.allowance(ctx, conv.ProfileID)
+	if err != nil {
+		return err
+	}
 
 	prior, err := c.messages(ctx, id, 0)
 	if err != nil {
@@ -514,9 +522,12 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 	rec, stored := &recorder{}, false
 	defer func() {
 		if err != nil && !stored {
-			if serr := c.keepUnfinished(ctx, id, user.Seq+1, rec, err); serr != nil {
+			mid, serr := c.keepUnfinished(ctx, id, user.Seq+1, rec, err)
+			if serr != nil {
 				log.Printf("chat: could not record an unfinished reply: %v", serr)
 			}
+			// what it cost counts against the budget all the same
+			c.meterUnfinished(context.WithoutCancel(ctx), id, mid, conv.ProfileID, emit)
 		}
 	}()
 	// the sources waiting to be sent go with this message
@@ -544,7 +555,7 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 	if err := c.watch(ctx, rec, studio); err != nil {
 		return err
 	}
-	in := agent.Input{SessionID: session, Sources: sources, Studio: studio}
+	in := agent.Input{SessionID: session, Sources: sources, Studio: studio, Allowance: allowance}
 	for _, m := range history {
 		if m.Status == ReplyFailed {
 			m.Content = failedInHistory
@@ -582,6 +593,9 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 		}
 		progress(agent.Event{Type: "delta", Text: restartNote + "\n\n"})
 		out, err = c.agent.Respond(ctx, in, progress)
+	}
+	if errors.Is(err, agent.ErrBudget) {
+		return agentErr("%s The agent stopped.", c.usedUp(ctx, conv.ProfileID))
 	}
 	if err != nil {
 		return agentErr("The agent could not reply: %v", err)
@@ -624,8 +638,11 @@ func (c *Chat) SendWith(ctx context.Context, id, content string, req ChatRequest
 	if out.SessionID != "" {
 		session = out.SessionID
 	}
-	if err := c.recordUsage(ctx, id, assistant.ID, session, out.Usage); err != nil {
+	if err := c.recordUsage(ctx, id, assistant.ID, session, conv.ProfileID, out.Usage); err != nil {
 		log.Printf("chat: could not record what the reply cost: %v", err)
+	}
+	for _, line := range c.noticeBudget(ctx, conv.ProfileID) {
+		emit(ChatEvent{"notice", map[string]string{"text": line}})
 	}
 	for _, sid := range fresh {
 		if _, err := c.db.ExecContext(ctx, `UPDATE conversation_sources SET delivered = 1 WHERE id = ?`, sid); err != nil {

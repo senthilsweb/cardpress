@@ -9,12 +9,13 @@ import { AccountSettings } from "@/components/studio/AccountSettings";
 import { ManageBrands, NewBrand } from "@/components/studio/Brands";
 import { SocialSettings } from "@/components/studio/SocialSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { AssistantSettings } from "./AssistantSettings";
 import { BrandAssistant } from "./BrandAssistant";
 import { BrandLook } from "./BrandLook";
 import { UsersSettings } from "./UsersSettings";
 import { Guard } from "./guard";
 import { copyPictures } from "@/lib/assetRefs";
-import { api, type ApiInfo } from "@/lib/api";
+import { api } from "@/lib/api";
 import { blankDesign, brandColor, move, pickActive } from "@/lib/brands";
 import { Holds } from "@/lib/holds";
 import type { BrandDetails } from "@/lib/brandDetails";
@@ -167,7 +168,7 @@ export function SettingsHost({ onLeave }: { onLeave?: () => void }) {
           )}
           {shown.id === "users" && <UsersSettings />}
           {shown.id === "security" && <SecuritySettings />}
-          {shown.id === "assistant" && <AssistantPage />}
+          {shown.id === "assistant" && <AssistantSettings />}
         </div>
       </Guard.Provider>
     </PanelDialog>
@@ -271,30 +272,5 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
       onRestore={(id) => changing(() => api.restoreProfile(id))}
       onDelete={(id) => changing(() => api.deleteProfile(id))}
       onNew={() => { setCopyOf(undefined); setAdding(true); }} />
-  );
-}
-
-/** Whether the assistant is connected. Read only: it is set up on the server (see the docs). */
-function AssistantPage() {
-  const [info, setInfo] = useState<ApiInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api.info().then(setInfo).catch((e) => setError(e instanceof Error ? e.message : "Could not load")); }, []);
-  const agent = info?.agent;
-  return (
-    <Pane>
-      <div className="space-y-3 text-sm">
-        {error && <p role="alert" className="text-destructive">{error}</p>}
-        {!info && !error && <p className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
-        {info && (
-          <dl className="grid grid-cols-[8rem_1fr] gap-y-2">
-            <dt className="text-muted-foreground">Status</dt>
-            <dd>{agent?.ready ? <span className="font-medium text-brand">Connected</span> : "Not set up"}</dd>
-            <dt className="text-muted-foreground">Name</dt><dd>{agent?.name ?? "None"}</dd>
-            <dt className="text-muted-foreground">Server</dt><dd>{info.name} {info.version}</dd>
-          </dl>
-        )}
-        <p className="text-xs text-muted-foreground">The assistant is set up on the server. It works for administrators, in their own brands.</p>
-      </div>
-    </Pane>
   );
 }

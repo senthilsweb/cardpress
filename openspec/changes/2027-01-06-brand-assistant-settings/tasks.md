@@ -12,10 +12,11 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [x] Tests
 
 ## Bolt 3: budget
-- [ ] The server's monthly amount (stored, API, Settings → Assistant)
-- [ ] Spent per brand and for the server by month; refusal before a request; the session's cap set for each request
-- [ ] Alerts at the percentage and at the amount: recorded once, a line in the chat, the bar on the dashboard and in settings
-- [ ] Tests, browser check
+- [x] The server's monthly amount (stored, API, Settings → Assistant; `CARDPRESS_AGENT_MONTH_CENTS`)
+- [x] Spent per brand and for the server by month, in a ledger that outlives deleted conversations and brands; refusal before a request (402); the session's cap set for each request
+- [x] A reply that fails or is stopped has its cost recorded too, so it counts
+- [x] Alerts at the percentage and at the amount: recorded once, a notice in the chat, the bar on the dashboard and in settings
+- [x] Tests, browser check (`scripts/record-demo/check-budget.mjs`; the stand-in knows spending limits)
 
 ## Bolt 4: tiers in the app
 - [ ] Manifest versions 6 and 7; the brand's tier chooses the coordinator when a session is created; the tier is recorded with the conversation

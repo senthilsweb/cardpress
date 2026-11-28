@@ -43,6 +43,8 @@ type BrandAssistantView struct {
 	Tiers []agent.Tier `json:"tiers"`
 	// TierGone names a saved tier the assistant no longer offers; the first tier is used in its place.
 	TierGone string `json:"tierGone,omitempty"`
+	// Budget is where the brand's amount stands this month.
+	Budget BudgetStatus `json:"budget"`
 }
 
 // Tiers are the sets of agents the assistant offers. An assistant that offers none has one, Standard.
@@ -118,7 +120,10 @@ func (c *Chat) BrandAssistant(ctx context.Context, profileID string) (BrandAssis
 		return v, err
 	}
 	var err error
-	v.Settings, v.Saved, v.TierGone, err = c.assistantFor(ctx, profileID)
+	if v.Settings, v.Saved, v.TierGone, err = c.assistantFor(ctx, profileID); err != nil {
+		return v, err
+	}
+	v.Budget, err = brandBudget(ctx, c.db, profileID, c.now())
 	return v, err
 }
 
@@ -147,7 +152,7 @@ func (c *Chat) SetBrandAssistant(ctx context.Context, profileID string, s BrandA
 	}
 	amount := "no amount"
 	if s.MonthCents > 0 {
-		amount = fmt.Sprintf("%d.%02d a month, alert %d%%", s.MonthCents/100, s.MonthCents%100, s.AlertPercent)
+		amount = fmt.Sprintf("%s a month, alert %d%%", money(s.MonthCents), s.AlertPercent)
 	}
 	recordEvent(ctx, c.db, c.stamp(), EventAssistant, name, fmt.Sprintf("tier %s; %s; %s", s.Tier, checks, amount))
 	return c.BrandAssistant(ctx, profileID)
@@ -171,12 +176,5 @@ func (c *Chat) brandName(ctx context.Context, profileID string) (string, error) 
 	if err := brandVisible(ctx, c.db, profileID); err != nil {
 		return "", err
 	}
-	var name sql.NullString
-	if err := c.db.QueryRowContext(ctx, `SELECT json_extract(data, '$.name') FROM profiles WHERE id = ?`, profileID).Scan(&name); err != nil {
-		return "", err
-	}
-	if name.String == "" {
-		return profileID, nil
-	}
-	return name.String, nil
+	return c.brandLabel(ctx, profileID)
 }

@@ -22,6 +22,9 @@ type sessionAPI interface {
 	history(ctx context.Context, sessionID string) ([]wireEvent, error)
 	stream(ctx context.Context, sessionID string) (eventStream, error)
 	usage(ctx context.Context, sessionID string) (agent.Usage, error)
+	// budget is what the session has cost and its spending limit, both in cents; a limit of 0 is none.
+	budget(ctx context.Context, sessionID string) (used, limit int, err error)
+	setBudget(ctx context.Context, sessionID string, cents int) error
 }
 
 // eventStream is a live event stream, already open (and so already buffering) when stream returns.
@@ -139,6 +142,27 @@ func (a *sdkAPI) usage(ctx context.Context, sid string) (agent.Usage, error) {
 		return agent.Usage{}, errors.New("the session reports no cost")
 	}
 	return agent.Usage{TotalCents: cents, ActiveSeconds: s.Usage.ActiveSeconds}, nil
+}
+
+func (a *sdkAPI) budget(ctx context.Context, sid string) (int, int, error) {
+	s, err := a.c.Beta.Sessions.Get(ctx, sid, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return 0, 0, gone(err)
+	}
+	used, err := strconv.Atoi(s.Usage.ListCost.Amount)
+	if err != nil {
+		used = 0 // a session that has done nothing yet reports no cost
+	}
+	limit, _ := strconv.Atoi(s.Budget.MaxListCost.Amount)
+	return used, limit, nil
+}
+
+// setBudget changes the limit of a session that was created with one.
+func (a *sdkAPI) setBudget(ctx context.Context, sid string, cents int) error {
+	_, err := a.c.Beta.Sessions.Update(ctx, sid, anthropic.BetaSessionUpdateParams{
+		Budget: anthropic.BetaManagedAgentsBudgetLimitParam{MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: strconv.Itoa(cents), Currency: "USD"}},
+	})
+	return gone(err)
 }
 
 func (a *sdkAPI) history(ctx context.Context, sid string) ([]wireEvent, error) {

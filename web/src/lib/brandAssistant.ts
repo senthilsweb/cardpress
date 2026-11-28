@@ -8,7 +8,16 @@ export interface BrandAssistant {
   alertPercent: number;
 }
 export interface Tier { id: string; name: string; models?: { role: string; model: string }[] }
-export interface BrandAssistantView { settings: BrandAssistant; defaults: BrandAssistant; saved: boolean; tiers: Tier[]; tierGone?: string }
+/** Where a monthly amount stands. `level` is "alert" past the alert percentage and "used" when nothing is left. */
+export interface BudgetStatus { month: string; monthCents: number; spentCents: number; alertPercent?: number; level?: "alert" | "used" }
+export interface BrandAssistantView { settings: BrandAssistant; defaults: BrandAssistant; saved: boolean; tiers: Tier[]; tierGone?: string; budget: BudgetStatus }
+/** The server's own rules for the assistant, across every brand. */
+export interface AssistantSettings { monthCents: number }
+export interface AssistantView { settings: AssistantSettings; defaults: AssistantSettings; saved: boolean; budget: BudgetStatus }
+export const MAX_SERVER_MONTH_CENTS = 10000000;
+
+/** How much of the amount is spent, from 0 to 100, for a bar. */
+export const spentShare = (b: BudgetStatus) => (b.monthCents > 0 ? Math.min(100, Math.round((b.spentCents * 100) / b.monthCents)) : 0);
 
 export const ROUND_CHOICES = [1, 2, 3, 4, 5] as const;
 export const ALERT_CHOICES = [50, 60, 70, 75, 80, 85, 90, 95] as const;

@@ -53,3 +53,43 @@ func (s *server) resetBrandAssistant(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, v)
 }
+
+func (s *server) getAssistant(w http.ResponseWriter, r *http.Request) {
+	if !s.assistantPerson(w, r) {
+		return
+	}
+	v, err := s.Chat.Assistant(r.Context())
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *server) putAssistant(w http.ResponseWriter, r *http.Request) {
+	if !s.assistantPerson(w, r) {
+		return
+	}
+	var in service.AssistantSettings
+	if !decode(w, r, &in) {
+		return
+	}
+	v, err := s.Chat.SetAssistant(r.Context(), in)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *server) resetAssistant(w http.ResponseWriter, r *http.Request) {
+	if !s.assistantPerson(w, r) {
+		return
+	}
+	v, err := s.Chat.ResetAssistant(r.Context())
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}

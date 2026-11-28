@@ -99,6 +99,8 @@ type Dashboard struct {
 	Next     []DashboardItem `json:"next"`
 	Recent   []DashboardItem `json:"recent"`
 	Usage    Usage           `json:"usage"`
+	// Budget is where the brand's monthly amount for the assistant stands, for one brand that has an amount.
+	Budget *BudgetStatus `json:"budget,omitempty"`
 }
 
 // DashboardQuery says whose figures and for how long: the last Days days (0: all), or From to To. Items are counted by
@@ -151,6 +153,13 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 			return out, err
 		}
 		ids = []string{q.ProfileID}
+		b, err := brandBudget(ctx, l.db, q.ProfileID, now)
+		if err != nil {
+			return out, err
+		}
+		if b.MonthCents > 0 {
+			out.Budget = &b
+		}
 	}
 
 	for _, id := range ids {

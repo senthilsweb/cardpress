@@ -41,6 +41,7 @@ type Config struct {
 	AgentManifest   string        // CARDPRESS_AGENT_MANIFEST: a file, an https address or the JSON
 	AgentWorkspace  string        // ANTHROPIC_WORKSPACE_ID, for a key that can act on several
 	AgentBudget     int           // spend cap per conversation in US cents (CARDPRESS_AGENT_BUDGET_CENTS), default 200; 0 = none
+	AgentMonth      int           // spend cap for every brand together in a calendar month, in US cents (CARDPRESS_AGENT_MONTH_CENTS); 0 = none
 	AgentTimeout    time.Duration // longest wait for one reply (CARDPRESS_AGENT_TIMEOUT)
 	Insecure        bool          // allow a non-loopback address without a token
 	ShowVersion     bool
@@ -137,6 +138,13 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("CARDPRESS_AGENT_BUDGET_CENTS must be a whole number of at least 0, got %q", v)
 		}
 		c.AgentBudget = n
+	}
+	if v := env("CARDPRESS_AGENT_MONTH_CENTS", ""); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > 10000000 {
+			return Config{}, fmt.Errorf("CARDPRESS_AGENT_MONTH_CENTS must be a whole number from 0 to 10000000, got %q", v)
+		}
+		c.AgentMonth = n
 	}
 	c.AgentTimeout = 12 * time.Minute
 	if v := env("CARDPRESS_AGENT_TIMEOUT", ""); v != "" {

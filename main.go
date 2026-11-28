@@ -152,7 +152,7 @@ func main() {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
-	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
+	chat.Studio, chat.OwnBrandsOnly, chat.MonthCents = studio, cfg.Agent == "cma", cfg.AgentMonth
 	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax})
 	opts := api.Options{
 		Build:              buildInfo(),
@@ -360,7 +360,7 @@ func runMCP(args []string) {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
-	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
+	chat.Studio, chat.OwnBrandsOnly, chat.MonthCents = studio, cfg.Agent == "cma", cfg.AgentMonth
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
 	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)

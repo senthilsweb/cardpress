@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountCents, amountText, assistantProblem, type BrandAssistant } from "./brandAssistant";
+import { amountCents, amountText, assistantProblem, spentShare, type BrandAssistant } from "./brandAssistant";
 
 const ok: BrandAssistant = { tier: "standard", checks: true, rounds: 3, monthCents: 0, alertPercent: 80 };
 
@@ -24,5 +24,10 @@ describe("a brand's assistant settings", () => {
     expect(assistantProblem({ ...ok, monthCents: Number.NaN })).toMatch(/budget/);
     expect(assistantProblem({ ...ok, monthCents: 100001 })).toMatch(/budget/);
     expect(assistantProblem({ ...ok, alertPercent: 40 })).toMatch(/Alert/);
+  });
+  it("says how much is spent", () => {
+    expect(spentShare({ month: "2026-11", monthCents: 0, spentCents: 40 })).toBe(0);
+    expect(spentShare({ month: "2026-11", monthCents: 200, spentCents: 50 })).toBe(25);
+    expect(spentShare({ month: "2026-11", monthCents: 200, spentCents: 260 })).toBe(100);
   });
 });

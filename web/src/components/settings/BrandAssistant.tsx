@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { ALERT_CHOICES, amountCents, amountText, assistantProblem, ROUND_CHOICES, type BrandAssistant as Settings, type BrandAssistantView } from "@/lib/brandAssistant";
 import { withValue } from "@/lib/security";
 import { attempt, FormSection, reason, SaveBar } from "./form";
+import { BudgetBar } from "./BudgetBar";
 import { useUnsaved } from "./guard";
 
 /** How the assistant works for the open brand: its tier, checks and budget. Administrators only; the server refuses anyone else. */
@@ -80,6 +81,7 @@ export function BrandAssistant({ profileId, brandName }: { profileId: string; br
           </div>
         </FormSection>
         <FormSection title="Budget" optional about="What the assistant may cost in a calendar month.">
+          <BudgetBar budget={data.budget} />
           <div className="flex flex-wrap gap-4">
             <div className="space-y-1">
               <Label htmlFor="ba-month">Monthly budget (USD)</Label>

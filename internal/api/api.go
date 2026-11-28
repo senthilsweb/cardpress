@@ -104,6 +104,9 @@ type Chatting interface {
 	BrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
 	SetBrandAssistant(ctx context.Context, profileID string, in service.BrandAssistant) (service.BrandAssistantView, error)
 	ResetBrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
+	Assistant(ctx context.Context) (service.AssistantView, error)
+	SetAssistant(ctx context.Context, in service.AssistantSettings) (service.AssistantView, error)
+	ResetAssistant(ctx context.Context) (service.AssistantView, error)
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
@@ -313,6 +316,9 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetSecurity},
 		{"GET", "/security/log", rule{scope: scopeAdmin, perm: service.PermUsers}, s.securityLog},
 		{"POST", "/security/sign-out-everyone", rule{scope: scopeAdmin, perm: service.PermUsers}, s.signOutEveryone},
+		{"GET", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getAssistant},
+		{"PUT", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putAssistant},
+		{"DELETE", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetAssistant},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
 }
@@ -1621,6 +1627,8 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusConflict, "stale", service.UserMessage(err))
 	case errors.Is(err, service.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
+	case errors.Is(err, service.ErrBudget):
+		writeError(w, r, http.StatusPaymentRequired, "budget_used", service.UserMessage(err))
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, r, http.StatusForbidden, "forbidden", service.UserMessage(err))
 	case errors.Is(err, service.ErrUnauthorized):

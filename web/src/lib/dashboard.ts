@@ -1,3 +1,4 @@
+import type { BudgetStatus } from "./brandAssistant";
 /** The dashboard's figures, as `GET /dashboard` gives them, and how they are written. */
 
 export interface Counts { total: number; draft: number; approved: number; scheduled: number; published: number; attention: number; pages: number }
@@ -8,7 +9,7 @@ export interface Usage { costCents: number; sessions: number; replies: number; a
 export interface BrandSummary { id: string; posts: Counts; articles: Counts; costCents: number; sessions: number }
 /** The person's figures over everything they may open. `users` is told to an admin only. */
 export interface Totals { brands: number; users?: number; disabledUsers?: number; costCents: number }
-export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage }
+export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage; /** Where the brand's monthly amount for the assistant stands, when it has one. */ budget?: BudgetStatus }
 
 /** `short` is for a phone, where the periods share one line. */
 export const PERIODS = [{ days: 7, label: "7 days", short: "7d" }, { days: 30, label: "30 days", short: "30d" }, { days: 90, label: "90 days", short: "90d" }, { days: 0, label: "All", short: "All" }] as const;

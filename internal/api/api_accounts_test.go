@@ -841,3 +841,61 @@ func TestBrandAssistant(t *testing.T) {
 		t.Fatalf("settings left behind: %d %v", n, err)
 	}
 }
+
+// The server's amount for the assistant is an administrator's, signed in to the app; a brand out of budget answers 402
+// before anything is sent, and the dashboard shows where the brand stands.
+func TestAssistantBudget(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed := r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	var got service.AssistantView
+	if code := admin.json("GET", "/api/v1/assistant", "", &got); code != 200 || got.Saved || got.Settings.MonthCents != 0 {
+		t.Fatalf("as started: %d %+v", code, got)
+	}
+	if code := ed.do("GET", "/api/v1/assistant", "").Code; code != 403 {
+		t.Errorf("an editor reads: %d", code)
+	}
+	if code := ed.do("PUT", "/api/v1/assistant", `{"monthCents":5}`).Code; code != 403 {
+		t.Errorf("an editor changes: %d", code)
+	}
+	var made struct{ Secret string }
+	if code := admin.json("POST", "/api/v1/api-keys", `{"name":"k"}`, &made); code != 201 {
+		t.Fatal(code)
+	}
+	if code := r.bearer(t, made.Secret).do("PUT", "/api/v1/assistant", `{"monthCents":5}`).Code; code != 403 {
+		t.Errorf("a key changes: %d", code)
+	}
+	if code := admin.do("PUT", "/api/v1/assistant", `{"monthCents":-1}`).Code; code != 400 {
+		t.Errorf("a negative amount: %d", code)
+	}
+	if code := admin.json("PUT", "/api/v1/assistant", `{"monthCents":5000}`, &got); code != 200 || !got.Saved || got.Budget.MonthCents != 5000 {
+		t.Fatalf("saved: %d %+v", code, got)
+	}
+	if code := admin.json("DELETE", "/api/v1/assistant", "", &got); code != 200 || got.Saved {
+		t.Fatalf("defaults: %d %+v", code, got)
+	}
+
+	// a brand whose amount is spent
+	if code := admin.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	if code := admin.do("PUT", "/api/v1/profiles/acme/assistant", `{"tier":"standard","checks":true,"rounds":3,"monthCents":100,"alertPercent":80}`).Code; code != 200 {
+		t.Fatal(code)
+	}
+	if _, err := r.db.Exec(`INSERT INTO assistant_spend (profile_id, month, cents) VALUES ('acme', ?, 100)`, time.Now().UTC().Format("2006-01")); err != nil {
+		t.Fatal(err)
+	}
+	var conv service.Conversation
+	if code := admin.json("POST", "/api/v1/chat/conversations", `{"profileId":"acme","text":"`+strings.Repeat("An article about budgets. ", 8)+`"}`, &conv); code != 201 {
+		t.Fatalf("start %d", code)
+	}
+	res := admin.do("POST", "/api/v1/chat/conversations/"+conv.ID+"/messages", `{"content":"Write it"}`)
+	if res.Code != 402 || !strings.Contains(res.Body.String(), "budget_used") || !strings.Contains(res.Body.String(), "This brand's assistant budget") {
+		t.Fatalf("out of budget: %d %s", res.Code, res.Body)
+	}
+	var dash service.Dashboard
+	if code := admin.json("GET", "/api/v1/dashboard?profileId=acme&days=7", "", &dash); code != 200 || dash.Budget == nil || dash.Budget.Level != service.BudgetUsed || dash.Budget.SpentCents != 100 {
+		t.Fatalf("the dashboard: %d %+v", code, dash.Budget)
+	}
+}
