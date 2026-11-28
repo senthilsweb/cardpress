@@ -32,7 +32,9 @@ type CardDesign struct {
 	StatValue   string `json:"statValue"`
 	// Signature is who a greeting is from, drawn by the greeting layout.
 	Signature string `json:"signature,omitempty"`
-	// NoOrnament leaves out the greeting layout\'s flourish.
+	// Ornament is the drawing between a greeting's headline and message: an id from the editor's set, or "none".
+	Ornament string `json:"ornament,omitempty"`
+	// NoOrnament is how older cards switched the ornament off.
 	NoOrnament bool    `json:"noOrnament,omitempty"`
 	TitleScale float64 `json:"titleScale"`
 	Intensity  float64 `json:"intensity"`
@@ -96,6 +98,9 @@ func (d CardDesign) validate() error {
 		if !idRe.MatchString(v) {
 			return invalid("design: %s %q is not a valid id", name, v)
 		}
+	}
+	if d.Ornament != "" && !idRe.MatchString(d.Ornament) {
+		return invalid("design: ornament %q is not a valid id", d.Ornament)
 	}
 	for name, lim := range map[string]struct {
 		v string

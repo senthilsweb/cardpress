@@ -1,6 +1,6 @@
 # Pluggable ornaments
 
-**Status:** proposed (asked for by the owner on 2026-11-26). Not built. Follows `2026-12-19-greeting-layouts`.
+**Status:** built (asked for by the owner on 2026-11-26); not yet deployed. Follows `2026-12-19-greeting-layouts`.
 
 ## Why
 The greeting layout draws one ornament, a heart flourish, with an on/off switch. Other occasions need their own, and
@@ -22,7 +22,8 @@ interface OrnamentDef {
 - **Design → Ornament**: small previews and **None**, in place of the switch.
 - A card keeps `ornament`: an id, or `none`. Without it: the heart flourish, so existing cards look the same. A card
   saved with `noOrnament` reads as `none`.
-- Colour follows the palette. A greeting template picks the occasion's ornament.
+- Colour follows the palette. The picker lists the ornaments suiting the background's
+  occasion first. A greeting template, when templates are built, picks the occasion's ornament.
 
 ## Server
 `ornament` is added to the card design (a short id, checked like `background`). No migration. The assistant cannot

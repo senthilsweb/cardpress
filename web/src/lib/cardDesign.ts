@@ -26,7 +26,8 @@ export function toCardDesign(d: Design): Design {
     showLogo: d.showLogo, showFooter: d.showFooter, photos: d.photos ?? [],
   };
   if (d.signature) out.signature = d.signature;
-  if (d.noOrnament) out.noOrnament = true;
+  if (d.ornament) out.ornament = d.ornament;
+  else if (d.noOrnament) out.noOrnament = true;
   if (d.noFooter) out.noFooter = true;
   if (d.noFooterLeft) out.noFooterLeft = true;
   if (d.screenshot) out.screenshot = d.screenshot;

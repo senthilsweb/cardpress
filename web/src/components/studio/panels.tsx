@@ -7,6 +7,7 @@ import type { Design, LayoutId, MarkKind, Palette, Profile } from "@/lib/types";
 import { bgById, categoryOf } from "@/card/backgrounds";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { LAYOUTS } from "@/card/Card";
+import { Ornament, ornamentOf, ornamentsFor } from "@/card/ornaments";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -132,6 +133,12 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand name, colours, fonts and logo</a></p>
       </Section>
 
+      {design.layout === "greeting" && (
+        <Section title="Ornament">
+          <OrnamentPicker value={ornamentOf(design)} occasion={bg.group} palette={palette} onChange={(id) => set({ ornament: id, noOrnament: undefined })} />
+        </Section>
+      )}
+
       <Section title="Fonts (this card)">
         <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the brand fonts.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -154,11 +161,28 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <SliderField label="Title size" value={design.titleScale} min={0.6} max={1.5} step={0.05} onChange={(v) => set({ titleScale: v })} format={(v) => `${Math.round(v * 100)}%`} />
         <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
         <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        {design.layout === "greeting" && <SwitchField id="ornament" label="Show ornament" checked={!design.noOrnament} onChange={(v) => set({ noOrnament: !v })} />}
         <SwitchField id="logo" label="Show logo" checked={design.showLogo} onChange={(v) => set({ showLogo: v })} />
         <SwitchField id="foot" label="Show footer" checked={design.showFooter} onChange={(v) => set({ showFooter: v })} />
       </Section>
     </>
+  );
+}
+
+/** Small previews in the card's own colours, and None. */
+function OrnamentPicker({ value, occasion, palette, onChange }: { value: string; occasion?: string; palette: Palette; onChange: (id: string) => void }) {
+  const choice = "h-auto flex-col gap-1 border border-border bg-card px-2 py-2 hover:border-brand/50 data-[state=on]:border-brand data-[state=on]:bg-accent data-[state=on]:text-foreground data-[state=on]:ring-1 data-[state=on]:ring-brand";
+  return (
+    // pressing the chosen one again changes nothing
+    <ToggleGroup type="single" value={value} onValueChange={(v) => { if (v) onChange(v); }} aria-label="Ornament" className="grid grid-cols-2 gap-2">
+      {[...ornamentsFor(occasion), { id: "none", name: "None" }].map((o) => (
+        <ToggleGroupItem key={o.id} value={o.id} className={choice}>
+          <span aria-hidden className="flex h-8 w-full items-center justify-center overflow-hidden rounded px-1.5" style={o.id === "none" ? undefined : { background: palette.base }}>
+            <Ornament id={o.id} colour={palette.sub} width="100%" />
+          </span>
+          <span className="text-[11px]">{o.name}</span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }
 

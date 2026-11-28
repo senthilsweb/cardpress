@@ -15,6 +15,13 @@ describe("card words", () => {
     expect(fullDesign(DEFAULT_DESIGN, saved).noFooterLeft).toBe(true);
   });
 
+  it("saves a picked ornament in place of the old switch", () => {
+    const saved = toCardDesign({ ...DEFAULT_DESIGN, noOrnament: true, ornament: "diya" });
+    expect([saved.ornament, saved.noOrnament]).toEqual(["diya", undefined]);
+    expect(toCardDesign({ ...DEFAULT_DESIGN, noOrnament: true }).noOrnament).toBe(true);
+    expect(fullDesign(DEFAULT_DESIGN, { background: "dots" }).ornament).toBeUndefined();
+  });
+
   it("clears the flag when text is written or the brand's is asked for", () => {
     expect(withFooterFlags({ footer: "x" }).noFooter).toBe(false);
     expect(withFooterFlags({ footer: "", noFooter: false }).noFooter).toBe(false);
