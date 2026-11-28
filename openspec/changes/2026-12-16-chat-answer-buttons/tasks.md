@@ -1,5 +1,8 @@
 # Tasks
 
+2026-11-28: the owner did basic testing of `v0.5.0`; the paid test is not confirmed.
+
+
 ## Bolt 1: buttons in the studio
 - [x] `answers` in `ReportReplyInput` (content schema 5); regenerate the schemas for both repositories
 - [x] Studio: check and keep `answers`; buttons on the reply card; chosen state

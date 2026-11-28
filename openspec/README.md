@@ -4,9 +4,14 @@ As of 2026-11-28. Latest release, deployed: **`v0.5.0`**. "Released" means in a 
 began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what is open there.
 
 ## Next
-Agreed on 2026-11-27: greetings (`12-14`, `12-19`) and embeddings (`12-11`) can wait; chat and bug fixes first.
-On 2026-11-28 the owner put posting by an agent on hold (`2026-12-02-conversational-designer`: step 4 and the chat's
-Post / Cancel card): the present flow works, and publishing stays with a person.
+The owner has issues from basic testing of `v0.5.0` to report, for a bug fix bolt.
+
+## Decisions
+| Date | Decision |
+|---|---|
+| 2026-11-27 | Greetings (`12-14`, `12-19`) and embeddings (`12-11`) can wait; chat and bug fixes first |
+| 2026-11-28 | Posting by an agent is on hold (`12-02`): the present flow works, and publishing stays with a person |
+| 2026-11-28 | The owner's remaining checks (a real phone, posts with attachments and others) are done later |
 
 ## All changes
 | Change | What | Stands | Open tasks |
@@ -35,7 +40,7 @@ Post / Cancel card): the present flow works, and publishing stays with a person.
 | [`2026-11-29-linkedin-test-connection-issue`](changes/2026-11-29-linkedin-test-connection-issue/proposal.md) | Issue: LinkedIn "Test connection" rejects the Client ID and secret on the deployed server | Released | 3 |
 | [`2026-11-30-linkedin-attachments`](changes/2026-11-30-linkedin-attachments/proposal.md) | LinkedIn attachments: your own image, several images, a document, a video | Released | 12 |
 | [`2026-12-01-opentelemetry`](changes/2026-12-01-opentelemetry/proposal.md) | OpenTelemetry: traces, metrics and logs over OTLP | Released | 3 |
-| [`2026-12-02-conversational-designer`](changes/2026-12-02-conversational-designer/proposal.md) | Conversational designer: the assistant writes the card's words and the post, and can post | Part released | 11 |
+| [`2026-12-02-conversational-designer`](changes/2026-12-02-conversational-designer/proposal.md) | Conversational designer: the assistant writes the card's words and the post, and can post | Part released; agent posting on hold | 12 |
 | [`2026-12-03-chat-workspace`](changes/2026-12-03-chat-workspace/proposal.md) | Chat workspace: talk on the left, see the post and the article | Part released; change lines in `v0.5.0` | 1 |
 | [`2026-12-04-publishing-calendar`](changes/2026-12-04-publishing-calendar/proposal.md) | Publishing calendar | Released |  |
 | [`2026-12-05-versions-and-publish-lock`](changes/2026-12-05-versions-and-publish-lock/proposal.md) | Versions of every change, and published items stay published | Released |  |
@@ -44,13 +49,13 @@ Post / Cancel card): the present flow works, and publishing stays with a person.
 | [`2026-12-08-studio-clarity`](changes/2026-12-08-studio-clarity/proposal.md) | A clearer studio: navigation and one place per item | Released | 1 |
 | [`2026-12-09-content-grid`](changes/2026-12-09-content-grid/proposal.md) | A grid of posts and articles | Released | 1 |
 | [`2026-12-10-chat-history`](changes/2026-12-10-chat-history/proposal.md) | The whole conversation, reopened | Released |  |
-| [`2026-12-11-content-embeddings`](changes/2026-12-11-content-embeddings/proposal.md) | Published posts and articles as vector embeddings | Proposed | 6 |
+| [`2026-12-11-content-embeddings`](changes/2026-12-11-content-embeddings/proposal.md) | Published posts and articles as vector embeddings | Proposed; deferred | 6 |
 | [`2026-12-12-chat-reply-summary`](changes/2026-12-12-chat-reply-summary/proposal.md) | Chat: a short reply instead of the agent's running text | Released |  |
 | [`2026-12-13-background-categories`](changes/2026-12-13-background-categories/proposal.md) | Background categories and seasonal greetings | Released |  |
-| [`2026-12-14-greetings-and-picker`](changes/2026-12-14-greetings-and-picker/proposal.md) | Greeting texts and a template picker | Part released | 5 |
+| [`2026-12-14-greetings-and-picker`](changes/2026-12-14-greetings-and-picker/proposal.md) | Greeting texts and a template picker | Part released; deferred | 5 |
 | [`2026-12-15-user-guide`](changes/2026-12-15-user-guide/proposal.md) | User guide | Released |  |
 | [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | `v0.5.0`, agents applied; paid test open | 1 |
-| [`2026-12-19-greeting-layouts`](changes/2026-12-19-greeting-layouts/proposal.md) | Greeting layouts | Part released | 4 |
+| [`2026-12-19-greeting-layouts`](changes/2026-12-19-greeting-layouts/proposal.md) | Greeting layouts | Part released; deferred | 4 |
 | [`2026-12-20-pluggable-ornaments`](changes/2026-12-20-pluggable-ornaments/proposal.md) | Pluggable ornaments | `v0.4.0` |  |
 | [`2026-12-21-media-library`](changes/2026-12-21-media-library/proposal.md) | Media library, per brand | `v0.2.1`, `v0.3.0` |  |
 | [`2026-12-22-dialogs-and-settings`](changes/2026-12-22-dialogs-and-settings/proposal.md) | One dialog design, and settings in a dialog | Released |  |
@@ -134,16 +139,17 @@ Older items include checks against real accounts that cost money or post publicl
 
 ### `2026-12-02-conversational-designer`
 - Job changes publish to it (the studio still checks jobs on its own)
-- API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
-- `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
-- Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit
-- Pinned test: the new method list and tool list; server instructions rewritten
-- Run for real against LinkedIn from an MCP client (ask the owner before each real post)
+- (on hold) API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
+- (on hold) `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
+- (on hold) Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit
+- (on hold) Pinned test: the new method list and tool list; server instructions rewritten
+- (on hold) Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 - Per-person vault and agent key, created on first chat
-- Recorded changes per reply; `requires_action` and `user.tool_confirmation` (with `publish_post`)
-- Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
+- (on hold) Recorded changes per reply; `requires_action` and `user.tool_confirmation` (with `publish_post`)
+- (on hold) Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
 - Try it against the real account (ask first: it costs money)
-- `openspec/project.md`: add that the assistant may post with confirmation, once that is built
+- (on hold) `openspec/project.md`: add that the assistant may post with confirmation, once that is built
+- Bug fix: the coordinator says publishing is done by the person (agent repository; needs an apply)
 
 ### `2026-12-03-chat-workspace`
 - Try a mounted PDF with a managed session (ask first: it costs money)
@@ -155,6 +161,7 @@ Older items include checks against real accounts that cost money or post publicl
 - Audience, topic and campaign columns once the content schema adds them
 
 ### `2026-12-11-content-embeddings`
+Deferred (owner, 2026-11-27).
 - Settings and start-up checks (model, dimension, key; off by default)
 - An embeddings migration (the next free number); libSQL vector index at start-up; one store function for nearest passages on both databases
 - Voyage client (documents and queries), passage splitting, background worker with retry and catch-up
@@ -163,6 +170,7 @@ Older items include checks against real accounts that cost money or post publicl
 - Docs: configuration, data model, privacy note; one paid run against Voyage (ask first)
 
 ### `2026-12-14-greetings-and-picker`
+Deferred (owner, 2026-11-27).
 - Greetings table, seed, service with cache, API
 - Settings → Greetings; add from the picker
 - `list_greetings` tool
@@ -173,6 +181,7 @@ Older items include checks against real accounts that cost money or post publicl
 - One paid test
 
 ### `2026-12-19-greeting-layouts`
+Deferred (owner, 2026-11-27).
 - Side art, Framed, Headline only
 - Art sets for Diwali, New Year, Lunar New Year
 - Templates in the picker

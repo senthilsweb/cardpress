@@ -1,5 +1,8 @@
 # Tasks
 
+2026-11-28: the owner did basic testing of `v0.5.0`. A check on a real phone is still to come.
+
+
 ## Bolt 1: phone screens
 - [x] The full preview fits the width of the screen
 - [x] The article editor leaves out the outline on a narrow screen

@@ -1,5 +1,9 @@
 # Tasks
 
+2026-11-28: the live site has published four card posts (2026-11-25 to 11-27, no errors, from the day's backup). Own image, document, several images
+and video were not among them; the owner will try these later.
+
+
 ## Before any bolt
 - [ ] Confirm against LinkedIn's documentation: the upload calls, post payloads, size and count limits for image, multi-image, document and video
 - [ ] Data model: an attachment kind on a draft and a job; job files as references to `doc_blobs`; migration
