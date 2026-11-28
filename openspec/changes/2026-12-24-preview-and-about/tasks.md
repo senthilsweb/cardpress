@@ -4,4 +4,4 @@
 - [x] Build commit and date; agent and schema version in `/info` for a signed-in person
 - [x] About card, in the person's menu
 - [x] Tests, user guide, browser check
-- [ ] Deploy
+- [x] Deploy

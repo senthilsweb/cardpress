@@ -3,5 +3,5 @@
 - [x] Chat card; options under the field in Details; live preview
 - [x] Agent project: instructions, skills, rubrics, schema version 3
 - [x] Tests, docs, browser check with the local stand-in
-- [ ] Deploy the server, apply the agents, set the manifest
-- [ ] One paid live test (ask first)
+- [x] Deploy the server, apply the agents, set the manifest
+- [x] One paid live test (the owner's live demo, 2026-11-26)

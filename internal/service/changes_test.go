@@ -360,4 +360,22 @@ func TestGreetingCardIsAccepted(t *testing.T) {
 	if !removable("signature") || *cardWord(&got, "signature") != "From all of us" {
 		t.Fatal("the sign-off is not offered like other card words")
 	}
+	for shade, ok := range map[float64]bool{0: true, 0.7: true, 1: true, -0.1: false, 1.1: false} {
+		s := shade
+		c.Shade = &s
+		raw, _ = json.Marshal(c)
+		got, err = ParseCardDesign(raw)
+		if (err == nil) != ok || (ok && (got.Shade == nil || *got.Shade != shade)) {
+			t.Fatalf("shade %v: %v %s", shade, err, raw)
+		}
+	}
+	c.Shade = nil
+	for id, ok := range map[string]bool{"diya": true, "none": true, "not an id": false, "<svg>": false} {
+		c.Ornament = id
+		raw, _ = json.Marshal(c)
+		got, err = ParseCardDesign(raw)
+		if (err == nil) != ok || (ok && got.Ornament != id) {
+			t.Fatalf("ornament %q: %v", id, err)
+		}
+	}
 }

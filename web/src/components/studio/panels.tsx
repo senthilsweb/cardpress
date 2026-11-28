@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Gift, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
@@ -7,6 +7,8 @@ import type { Design, LayoutId, MarkKind, Palette, Profile } from "@/lib/types";
 import { bgById, categoryOf } from "@/card/backgrounds";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { LAYOUTS } from "@/card/Card";
+import { Ornament, ornamentOf, ornamentsFor } from "@/card/ornaments";
+import { DEFAULT_SHADE, fillsCard } from "@/card/shade";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +18,7 @@ import { addGoogleFont, FONT_ROLES, resolveFonts, useFonts, ensureFont } from "@
 import { ColorField, Field, ImageField, Section, SliderField, SwitchField, TextField } from "./fields";
 import { MiniBackground } from "./preview";
 import { embedPictures } from "@/lib/assetRefs";
+import { backgroundFor, backgroundShowing, drawsPicture, type PictureKind } from "@/lib/cardPictures";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/export";
 import { settingsHref } from "@/lib/nav";
@@ -28,6 +31,9 @@ const LAYOUT_ICONS: Record<LayoutId, typeof LayoutPanelLeft> = {
 };
 
 /* ======================================================= Design */
+const SWITCHED = "picture-background";
+const samePictures = (a: Design, b: Design) => a.bgImage === b.bgImage && a.screenshot === b.screenshot && a.photos.join("\n") === b.photos.join("\n");
+
 export function DesignPanel({ design, set, profile, palette }: { design: Design; set: SetDesign; profile: Profile; palette: Palette }) {
   const [browsing, setBrowsing] = useState(false);
   const bg = bgById(design.background);
@@ -35,6 +41,27 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
     (bg.needs === "photos" && !design.photos.length) ||
     (bg.needs === "screenshot" && !design.screenshot) ||
     (bg.needs === "image" && !design.bgImage);
+  // an upload and the Undo button both finish after the card has been drawn again, so they read it as it is by then
+  const now = useRef({ design, set, headshot: !!profile.headshot });
+  now.current = { design, set, headshot: !!profile.headshot };
+  useEffect(() => () => { toast.dismiss(SWITCHED); }, []);
+  /** Change the background, and offer the way back. */
+  const switchTo = (id: string, patch: Partial<Design> = {}) => {
+    const before = now.current.design.background;
+    const shown = { ...now.current.design, ...patch };
+    now.current.set({ ...patch, background: id });
+    // nothing is undone if another card is open by then
+    const undo = () => { const d = now.current.design; if (d.background === id && samePictures(d, shown)) now.current.set({ background: before }); };
+    toast(`Background changed to ${bgById(id).name}`, { id: SWITCHED, action: { label: "Undo", onClick: undo } });
+  };
+  const addPictures = (patch: Partial<Design>) => {
+    // a new background picture starts shaded enough to read the words; a shade already chosen is kept
+    if (patch.bgImage && now.current.design.shade === undefined) patch = { ...patch, shade: DEFAULT_SHADE };
+    const id = backgroundFor(now.current.design, patch, now.current.headshot);
+    if (id) switchTo(id, patch);
+    else now.current.set(patch);
+  };
+  const unseen = (kind: PictureKind) => (drawsPicture(design, kind, !!profile.headshot) ? undefined : () => switchTo(backgroundShowing(kind).id));
   return (
     <>
       <Section title="Layout">
@@ -65,9 +92,11 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
       <Section
         title="Background"
         action={
-          <Button variant="ghost" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}>
-            <Shuffle /> Shuffle
-          </Button>
+          fillsCard(design) ? undefined : (
+            <Button variant="ghost" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}>
+              <Shuffle /> Shuffle
+            </Button>
+          )
         }
       >
         <button
@@ -90,22 +119,26 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <Button variant="outline" size="sm" className="w-full" onClick={() => setBrowsing(true)}>
           <Search /> Browse backgrounds
         </Button>
+        {fillsCard(design) && (
+          <SliderField label="Shading" value={design.shade ?? DEFAULT_SHADE} min={0} max={1} step={0.05} onChange={(v) => set({ shade: v })} format={() => (design.shade === undefined ? "As before" : `${Math.round(design.shade * 100)}%`)} />
+        )}
         <BackgroundPicker open={browsing} onOpenChange={setBrowsing} design={design} profile={profile} onUse={set} />
       </Section>
 
       <Section title="Images">
         <ImageField
-          label="Photos for the mosaic"
-          hint="For Photo mosaic. The first one also stands in as the headshot."
+          label="Photos"
+          hint="Tiles of the Photo mosaic background. On the Headshot layout, the first is the headshot if the brand has none."
           values={design.photos}
-          onChange={(v) => set({ photos: v })}
+          onChange={(v) => addPictures({ photos: v })}
+          onShow={unseen("photos")}
           multiple
           max={12}
           maxPx={700}
           brand={profile.id}
         />
-        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} brand={profile.id} />
-        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} brand={profile.id} />
+        <ImageField label="App screenshot" hint="Sits in the window of the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => addPictures({ screenshot: v[0] })} onShow={unseen("screenshot")} maxPx={1800} brand={profile.id} />
+        <ImageField label="Background image" hint="Fills the card (Own image background)." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => addPictures({ bgImage: v[0] })} onShow={unseen("image")} maxPx={2000} brand={profile.id} />
       </Section>
 
       <Section title="Colours">
@@ -132,6 +165,12 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand name, colours, fonts and logo</a></p>
       </Section>
 
+      {design.layout === "greeting" && (
+        <Section title="Ornament">
+          <OrnamentPicker value={ornamentOf(design)} occasion={bg.group} palette={palette} onChange={(id) => set({ ornament: id, noOrnament: undefined })} />
+        </Section>
+      )}
+
       <Section title="Fonts (this card)">
         <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the brand fonts.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -152,13 +191,34 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
 
       <Section title="Fine tune">
         <SliderField label="Title size" value={design.titleScale} min={0.6} max={1.5} step={0.05} onChange={(v) => set({ titleScale: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        {design.layout === "greeting" && <SwitchField id="ornament" label="Show ornament" checked={!design.noOrnament} onChange={(v) => set({ noOrnament: !v })} />}
+        {!fillsCard(design) && (
+          <>
+            <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
+          </>
+        )}
         <SwitchField id="logo" label="Show logo" checked={design.showLogo} onChange={(v) => set({ showLogo: v })} />
         <SwitchField id="foot" label="Show footer" checked={design.showFooter} onChange={(v) => set({ showFooter: v })} />
       </Section>
     </>
+  );
+}
+
+/** Small previews in the card's own colours, and None. */
+function OrnamentPicker({ value, occasion, palette, onChange }: { value: string; occasion?: string; palette: Palette; onChange: (id: string) => void }) {
+  const choice = "h-auto flex-col gap-1 border border-border bg-card px-2 py-2 hover:border-brand/50 data-[state=on]:border-brand data-[state=on]:bg-accent data-[state=on]:text-foreground data-[state=on]:ring-1 data-[state=on]:ring-brand";
+  return (
+    // pressing the chosen one again changes nothing
+    <ToggleGroup type="single" value={value} onValueChange={(v) => { if (v) onChange(v); }} aria-label="Ornament" className="grid grid-cols-2 gap-2">
+      {[...ornamentsFor(occasion), { id: "none", name: "None" }].map((o) => (
+        <ToggleGroupItem key={o.id} value={o.id} className={choice}>
+          <span aria-hidden className="flex h-8 w-full items-center justify-center overflow-hidden rounded px-1.5" style={o.id === "none" ? undefined : { background: palette.base }}>
+            <Ornament id={o.id} colour={palette.sub} width="100%" />
+          </span>
+          <span className="text-[11px]">{o.name}</span>
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }
 

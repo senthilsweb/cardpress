@@ -68,6 +68,7 @@ The Go tests use in-memory SQLite and local fake servers (LinkedIn, the managed-
 ## Adding things
 
 - A background: drop a file in `web/src/card/bg/`; see [Adding backgrounds](adding-backgrounds.md).
+- A greeting ornament: drop a file in `web/src/card/ornament/`; see [Adding ornaments](adding-ornaments.md).
 - A colour set: see [Palettes](palettes.md). A font: see [Fonts](fonts.md).
 - A size: edit `web/src/lib/sizes.ts`.
 - A migration: add the next numbered `.sql` file in `internal/store/migrations`.

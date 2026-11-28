@@ -6,6 +6,8 @@ import { isDark, mix, rgba } from "@/lib/color";
 import { cssFamily, ensureFont, resolveFonts } from "@/lib/fonts";
 import { fillPictures, picturesOf, usePictures } from "@/lib/assetRefs";
 import { bgById, type Area, type MaskKind } from "./backgrounds";
+import { Ornament, ornamentOf } from "./ornaments";
+import { shadeLayers } from "./shade";
 
 export interface LayoutDef {
   id: LayoutId;
@@ -130,17 +132,6 @@ function FitText({ text, size, width, style }: { text: string; size: number; wid
     <div style={{ width, display: "flex", justifyContent: "center", ...style }}>
       <span ref={ref} style={{ display: "inline-block", flexShrink: 0, textAlign: "center", fontSize: size }}>{text}</span>
     </div>
-  );
-}
-
-/** The flourish between a greeting's headline and its message: two strokes and a heart. */
-function Ornament({ colour, width }: { colour: string; width: number }) {
-  return (
-    <svg width={width} height={width / 9} viewBox="0 0 270 30" style={{ display: "block" }} aria-hidden>
-      <path d="M8 22 C45 6 82 6 116 15" fill="none" stroke={colour} strokeWidth={3.2} strokeLinecap="round" />
-      <path d="M262 22 C225 6 188 6 154 15" fill="none" stroke={colour} strokeWidth={3.2} strokeLinecap="round" />
-      <path d="M135 27 C120 17 119 6 127 4 C131 3 134 6 135 10 C136 6 139 3 143 4 C151 6 150 17 135 27 Z" fill="none" stroke={colour} strokeWidth={2.6} strokeLinejoin="round" />
-    </svg>
   );
 }
 
@@ -289,7 +280,7 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
           </div>
         )}
         {design.title && <FitText text={design.title} size={(land ? 17 : 18) * u * ts} width={width} style={{ fontFamily: script, fontWeight: 700, lineHeight: 1.2, color: pal.sub }} />}
-        {design.title && !design.noOrnament && <Ornament colour={pal.sub} width={(land ? 50 : 56) * u} />}
+        {design.title && <Ornament id={ornamentOf(design)} colour={pal.sub} width={(land ? 50 : 56) * u} />}
         {design.subtitle && (
           <div style={{ marginTop: 3 * u, maxWidth: Math.min(width * 0.86, 100 * u), fontSize: message * u, fontWeight: 500, lineHeight: 1.45, color: pal.text, whiteSpace: "pre-line" }}>{design.subtitle}</div>
         )}
@@ -328,8 +319,12 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
     );
   }
 
-  const bf = design.bottomFade;
-  const imgOverlay = fullBleedImage
+  // With a shade set, it alone shades one's own picture. Cards made before it keep their two fades.
+  const shaded = fullBleedImage && design.shade !== undefined;
+  const textTop = (L === "split" && !land ? H * 0.1 + W * 0.46 + 3 * u : art.area.y + art.area.h + 3 * u) / H;
+  const shades = shaded ? shadeLayers(pal.base, design.shade!, { layout: L, land, textTop, logo: !!logo, footer: !!footer }) : [];
+  const bf = shaded ? 0 : design.bottomFade;
+  const imgOverlay = fullBleedImage && !shaded
     ? `linear-gradient(${land ? "90deg" : "180deg"}, ${rgba(pal.base, 0.94)} 0%, ${rgba(pal.base, L === "center" || L === "quote" ? 0.8 : 0.82)} ${land ? 40 : 45}%, ${rgba(pal.base, L === "center" || L === "quote" ? 0.7 : 1 - design.intensity * 0.85)} 100%)`
     : null;
 
@@ -347,6 +342,7 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
         </g>
       </svg>
       {imgOverlay && <div style={{ position: "absolute", inset: 0, background: imgOverlay }} />}
+      {shades.map((background, i) => <div key={i} data-shade style={{ position: "absolute", inset: 0, background }} />)}
       {!fullBleedImage && (L === "center" || L === "quote") && design.background !== "plain" && (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}

@@ -1,6 +1,6 @@
 # Choosing options, and saving a reply as a version
 
-**Status:** built (approved by the owner on 2026-11-26 after trying the live chat). Not yet tried with the real agents.
+**Status:** built, released and deployed (2026-11-26).
 
 ## Why
 The assistant answered with several titles as chat text, so the person had to copy one by hand. And every attempt it made became a version, filling the history.

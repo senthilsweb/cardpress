@@ -1,6 +1,6 @@
 # A version for every merge
 
-**Status:** built (asked for by the owner on 2026-11-27). Takes effect with the first merge that includes it.
+**Status:** in use since `v0.2.0`.
 
 ## Why
 The running app calls itself `main`. Nothing says which release it is, and no tag marks what was deployed.

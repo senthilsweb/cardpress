@@ -1,6 +1,6 @@
 # Issue: the deployed server was killed for running out of memory
 
-Status: **fixed in code, to be redeployed.**
+Status: **fixed and released.**
 
 ## What was seen
 On the 256 MB Fly machine, a few minutes after an admin signed in and added a person, the server stopped answering. The log says: `Out of memory: Killed process (cardpress)`, about 162 MB in use. Fly restarted it; nothing was lost (the new account was already saved).

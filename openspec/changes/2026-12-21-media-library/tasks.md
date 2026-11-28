@@ -11,4 +11,4 @@ Part 2: using it
 - [x] `asset:` references in card designs, rendering and export
 - [x] An asset in use cannot be deleted, and the message says where
 - [x] Disk warning at 70%
-- [ ] Backup and disk check, deploy
+- [x] Backup and deploy (`v0.2.1` and `v0.3.0`; the database was 3.1 MB on the 1 GB volume)

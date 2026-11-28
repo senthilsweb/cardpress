@@ -1,6 +1,6 @@
 # Consistent controls, Add user at the top, Media in pages
 
-**Status:** being built (asked for by the owner on 2026-11-27).
+**Status:** released in `v0.2.1`; deployed.
 
 ## Why
 Drop-downs in the chat and for user roles do not look like the rest of the app. **Add a user** sits at the bottom of the

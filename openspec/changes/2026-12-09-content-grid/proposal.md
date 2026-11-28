@@ -1,6 +1,6 @@
 # A grid of posts and articles
 
-**Status:** proposed; the owner asked for it on 2026-11-25. Nothing is built.
+**Status:** built and released. Open: audience, topic and campaign columns.
 
 ## Why
 The Library lists items one under another, with actions hidden inside each opened row. There is no way to compare, sort or act on many items.

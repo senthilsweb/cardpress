@@ -1,6 +1,6 @@
 # Conversational designer: the assistant writes the card's words and the post, and can post
 
-**Status:** proposed. Nothing is built. The agent side lives in the separate `cardpress-agent` repository and depends on the MCP tools in [contract.md](contract.md), so the MCP work comes first. The screen and sources are in `2026-12-03-chat-workspace`.
+**Status:** partly built and released: drafts and designs over MCP, the live canvas, memory and the chat on managed agents. Posting over MCP (step 4), per-person vaults and the confirm card are not built. The agent side lives in the `cardpress-agent` repository; the contract is [contract.md](contract.md). The screen and sources are in `2026-12-03-chat-workspace`.
 
 ## Why
 Today the assistant only suggests text. An agent connected over MCP can read but not act. The person designs the card in the studio: layout, colours, background, fonts, branding. The goal is to do the words by talking, starting from that card: "change the title to ..., shorten the subtitle, put the series name in the tag", see each change on the canvas as the conversation goes on, have the post or article written, then say "post it". How the card looks stays the person's: the agent cannot change it.

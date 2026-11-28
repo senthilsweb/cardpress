@@ -1,6 +1,6 @@
 # Background categories and seasonal greetings
 
-**Status:** being built (asked for by the owner on 2026-11-26, to post a Thanksgiving greeting the same day).
+**Status:** released and deployed (2026-11-26).
 
 ## Why
 All backgrounds sit in one list and all are abstract. A greeting post (Thanksgiving, Diwali, New Year, Chinese New Year) needs artwork of its own, and a longer list needs categories.

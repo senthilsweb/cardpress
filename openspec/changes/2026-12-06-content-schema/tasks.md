@@ -8,4 +8,4 @@ The screens that show and edit these fields are step 5 (`2026-12-08-studio-clari
 
 Agent side (plan step 7, redeploy)
 - [x] Skills and rubrics use the generated files; `headline` naming in tools; contract and manifest version 6
-- [ ] Redeploy agents and update the manifest on Fly (ask first)
+- [x] Redeploy agents and update the manifest on Fly (ask first)

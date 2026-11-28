@@ -56,13 +56,17 @@ export interface Design {
   statValue: string;
   /** Who a greeting is from, drawn by the greeting layout. */
   signature?: string;
-  /** Leaves out the greeting layout's flourish. */
+  /** The greeting layout's ornament: an id from card/ornament, or "none". Without it, see ornamentOf. */
+  ornament?: string;
+  /** Older cards only: the flourish was switched off. Read as `ornament: "none"`. */
   noOrnament?: boolean;
   /** Legacy: captions now live in drafts. Read once to migrate, never written. */
   caption?: string;
   titleScale: number;
   intensity: number; // art strength 0..1
   bottomFade: number; // 0..1
+  /** Shading behind the words on one's own background picture, 0..1. Without it, the card keeps the older fades. */
+  shade?: number;
   showLogo: boolean;
   showFooter: boolean;
   /** An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose. */

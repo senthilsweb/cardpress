@@ -32,13 +32,17 @@ type CardDesign struct {
 	StatValue   string `json:"statValue"`
 	// Signature is who a greeting is from, drawn by the greeting layout.
 	Signature string `json:"signature,omitempty"`
-	// NoOrnament leaves out the greeting layout\'s flourish.
+	// Ornament is the drawing between a greeting's headline and message: an id from the editor's set, or "none".
+	Ornament string `json:"ornament,omitempty"`
+	// NoOrnament is how older cards switched the ornament off.
 	NoOrnament bool    `json:"noOrnament,omitempty"`
 	TitleScale float64 `json:"titleScale"`
 	Intensity  float64 `json:"intensity"`
 	BottomFade float64 `json:"bottomFade"`
-	ShowLogo   bool    `json:"showLogo"`
-	ShowFooter bool    `json:"showFooter"`
+	// Shade is how much one's own background picture is shaded behind the words. Nil keeps the older fades; 0 is none.
+	Shade      *float64 `json:"shade,omitempty"`
+	ShowLogo   bool     `json:"showLogo"`
+	ShowFooter bool     `json:"showFooter"`
 	// An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose.
 	NoFooter     bool              `json:"noFooter,omitempty"`
 	NoFooterLeft bool              `json:"noFooterLeft,omitempty"`
@@ -97,6 +101,9 @@ func (d CardDesign) validate() error {
 			return invalid("design: %s %q is not a valid id", name, v)
 		}
 	}
+	if d.Ornament != "" && !idRe.MatchString(d.Ornament) {
+		return invalid("design: ornament %q is not a valid id", d.Ornament)
+	}
 	for name, lim := range map[string]struct {
 		v string
 		n int
@@ -119,6 +126,9 @@ func (d CardDesign) validate() error {
 		if v < 0 || v > 1 {
 			return invalid("design: %s must be between 0 and 1", name)
 		}
+	}
+	if d.Shade != nil && (*d.Shade < 0 || *d.Shade > 1) {
+		return invalid("design: shade must be between 0 and 1")
 	}
 	if len(d.Photos) > maxDesignPhotos {
 		return invalid("design: at most %d photos", maxDesignPhotos)

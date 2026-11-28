@@ -6,4 +6,5 @@
 - [x] Phone layout
 - [x] Contrast and keyboard checks in every theme
 - [x] User guide text
-- [ ] New guide pictures, deploy
+- [x] Deploy
+- [ ] New guide pictures

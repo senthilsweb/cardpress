@@ -4,4 +4,4 @@
 - [x] Config (`CARDPRESS_AGENT*`), wiring, `cardpress agent-setup`
 - [x] Tests: state machine, scripted API fake, SDK request shapes against a local server
 - [x] Docs: docs/cma-agent.md
-- [ ] Try it against a real account (needs the user's API key; run `cardpress agent-setup`)
+- [x] Try it against a real account (the live chat, 2026-11-26; `agent-setup` was later removed)

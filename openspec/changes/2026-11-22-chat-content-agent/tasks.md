@@ -7,5 +7,5 @@
 - [x] Chat tab, proposal card (approve, edit, reject), history, reload; approving never overwrites the person's draft
 - [x] Run in a browser: refused addresses, a pasted article, a revision, approval into an empty draft, approval protecting a draft with text, reload, article mode, edit view; a real https page fetched
 - [x] Docs: `docs/chat.md`
-- [ ] Replace the demo agent with the Claude Managed Agent (`agent-cma-adapter`)
+- [x] Replace the demo agent with the Claude Managed Agent (`agent-cma-adapter`)
 - [ ] Try the fetcher on more real sites (pages needing JavaScript return a clear "no readable text" message)
