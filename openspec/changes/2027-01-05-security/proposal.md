@@ -1,6 +1,6 @@
 # Security: sessions, browser storage, sign-up settings and hardening
 
-**Status:** proposed by the owner on 2026-11-28; 7 of 7 bolts built and tested; not released.
+**Status:** proposed by the owner on 2026-11-28; released in `v0.6.0` and deployed on 2026-11-28.
 
 ## Asked for
 1. Passwords protected where they are stored.

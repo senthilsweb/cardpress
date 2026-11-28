@@ -1,10 +1,10 @@
 # Changes: where things stand
 
-As of 2026-11-28. Latest release, deployed: **`v0.5.0`**. "Released" means in a release or in the code deployed before versions
+As of 2026-11-28. Latest release, deployed: **`v0.6.0`**. "Released" means in a release or in the code deployed before versions
 began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what is open there.
 
 ## Next
-Security (`2027-01-05-security`) is built and waits for review and release. The owner also has issues from basic testing of
+The owner has issues from basic testing of
 `v0.5.0` to report, for a bug fix bolt.
 
 ## Decisions
@@ -72,7 +72,7 @@ Security (`2027-01-05-security`) is built and waits for review and release. The 
 | [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
 | [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | `v0.4.1` |  |
 | [`2027-01-04-screen-fixes`](changes/2027-01-04-screen-fixes/proposal.md) | Screen fixes: phones, unsaved settings, greeting footers | `v0.5.0` |  |
-| [`2027-01-05-security`](changes/2027-01-05-security/proposal.md) | Security: sessions, browser storage, sign-up settings, hardening | 7 of 7 bolts built, not released | 1 |
+| [`2027-01-05-security`](changes/2027-01-05-security/proposal.md) | Security: sessions, browser storage, sign-up settings, hardening | `v0.6.0` |  |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -194,6 +194,3 @@ Deferred (owner, 2026-11-27).
 
 ### `2026-12-28-versions`
 - Look at the version in About CardPress on a deployed app
-
-### `2027-01-05-security`
-- Deploy (ask first); everyone signs in once afterwards
