@@ -78,10 +78,10 @@ One box for the whole chat, also before a conversation exists. Attach (paperclip
 The chat header always has **History** and **+**. History is the right-hand drawer with two tabs: conversations (grouped by age, searchable by title, message and source name, showing the linked items and the recorded cost) and the brand's notes (read and remove). **+** starts a conversation about the item on screen. The app's database is the record of a conversation; the agent's session is a copy of it. When the agent says a session is gone (`agent.ErrSessionGone`), the chat starts another, sends the earlier messages and every source, says so in the reply, and carries on. Costs are kept per reply in `chat_usage`, as what each added to its session's total.
 
 ## Changes and Undo
-Table `chat_changes (id, conversation_id, message_id, draft_id, before, after, created_at, undone_at)`, holding only the fields a turn changed.
+The record is `chat_changes`, built by `2026-12-07-assistant-choices`: how each item stood before a reply. What the reply changed is worked out when it ends and kept with the reply (`detail.saved`: `fields`, `created`), so no further migration is needed.
 
-- The turn's card in the thread names them: "Changed title, tag · Undo", "Article created · View".
-- Undo restores `before` for each field that still equals `after`. A field the person has since changed is left, and the card says so.
-- Undo does not call the agent. The next message reports the restored values in `changes`.
-- A created item is not deleted by Undo. A post that was sent cannot be undone, and its card has no Undo.
-- Changes are recorded from tool results, so this arrives with step 5 of the designer change. Until then the current assistant's proposals work as today.
+- Under the reply, a line for each item: "Post: changed headline, tag" or "Article created", whether it is saved, and **View**.
+- **Undo** puts back everything the reply changed. It is refused, changing nothing, if the item was changed afterwards: the rule of `2026-12-07-assistant-choices`, which replaces the earlier plan to restore only the untouched fields.
+- A change of attachment is not listed or undone.
+- A created item is not deleted by Undo.
+- Replies from before this have no list and say only "changed".

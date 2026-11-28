@@ -7,6 +7,7 @@ import type { Choice, Conversation } from "@/lib/chat";
 import type { Draft } from "@/lib/draft";
 import { lockReason } from "@/lib/lock";
 import { useChoiceContext } from "@/lib/useChoices";
+import { changeLine } from "@/lib/reply";
 
 const KIND = { post: "Post", article: "Article" } as const;
 
@@ -65,7 +66,12 @@ export function FieldChoices({ draftId, field }: { draftId: string; field: strin
 }
 
 /** Under a reply: the options it offered, whether its change is saved, and the buttons to save or undo it. */
-export function ReplyActions({ conv, messageId, drafts, onVersion }: { conv: Conversation; messageId: string; drafts: Draft[]; onVersion: (draftId: string, version: number) => void }) {
+export function ReplyActions({ conv, messageId, drafts, onVersion, onShow }: {
+  conv: Conversation; messageId: string; drafts: Draft[];
+  onVersion: (draftId: string, version: number) => void;
+  /** Put a changed item on the canvas. */
+  onShow: (draftId: string) => void;
+}) {
   const store = useChoiceContext();
   const { changes, choices } = ofReply(conv, messageId);
   if (!store || (!changes.length && !choices.length)) return null;
@@ -75,19 +81,26 @@ export function ReplyActions({ conv, messageId, drafts, onVersion }: { conv: Con
   const locked = [...pending, ...choices].map((x) => lockReason(item(x.draftId))).find(Boolean);
   const edited = pending.some((c) => (item(c.draftId)?.revision ?? c.revision) > c.revision);
   const several = new Set([...changes, ...choices].map((x) => x.draftId)).size > 1;
+  const did = conv.messages?.find((m) => m.id === messageId)?.detail?.saved;
+  const STANDS = { pending: "not saved", undone: "undone", passed: "changed again later", saved: "" };
 
   return (
     <div className="max-w-[92%] space-y-2 rounded-lg border border-border bg-card p-2.5 text-xs" aria-label="Save this reply">
       {choices.map((c) => <OptionPicker key={c.id} choice={c} place="chat" label={several ? `${KIND[c.kind]}: ${choiceLabel(c.field).toLowerCase()}` : choiceLabel(c.field)} />)}
-      {changes.map((c) =>
-        c.status === "saved" && c.version ? (
-          <Button key={c.draftId} variant="outline" size="sm" title="Open this version" onClick={() => onVersion(c.draftId, c.version!)}><History /> Saved: {KIND[c.kind]} v{c.version}</Button>
-        ) : (
-          <p key={c.draftId} className="text-muted-foreground">
-            {KIND[c.kind]}: {c.status === "pending" ? "changed, not saved as a version" : c.status === "undone" ? "undone" : "changed again later"}
-          </p>
-        ),
-      )}
+      {changes.map((c) => {
+        const saved = c.status === "saved" && c.version;
+        const named = did?.find((x) => x.draftId === c.draftId);
+        const line = (named && changeLine(named)) ?? `${KIND[c.kind]}: changed`;
+        return (
+          <div key={c.draftId} className="space-y-1">
+            <p className="text-muted-foreground">
+              {line}{STANDS[c.status] && ` · ${STANDS[c.status]}`}
+              {item(c.draftId) && <> · <button type="button" className="cursor-pointer font-medium text-brand underline-offset-2 hover:underline" aria-label={`View the ${c.kind}`} onClick={() => onShow(c.draftId)}>View</button></>}
+            </p>
+            {saved && <Button variant="outline" size="sm" title="Open this version" onClick={() => onVersion(c.draftId, c.version!)}><History /> Saved: {KIND[c.kind]} v{c.version}</Button>}
+          </div>
+        );
+      })}
       {locked && (pending.length > 0 || picks.length > 0) && <p role="status" className="text-muted-foreground">{locked}</p>}
       {(pending.length > 0 || picks.length > 0) && (
         <div className="flex flex-wrap justify-end gap-1.5">

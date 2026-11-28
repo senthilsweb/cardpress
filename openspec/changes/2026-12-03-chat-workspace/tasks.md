@@ -25,6 +25,8 @@
 - [x] A lost session is restarted from the saved messages and sources
 - [x] `chat_usage` and the cost on screen (filled when the managed agent reports it)
 
-## C. Changes and Undo (with designer step 5)
-- [ ] Migration `chat_changes`; record from tool results; undo endpoint
-- [ ] Change cards with Undo and View
+## C. Changes and Undo
+## Bolt 3: change lines under a reply
+- [x] The record of changes and the undo endpoint (built by `2026-12-07-assistant-choices`)
+- [x] Name what a reply changed, with Undo and View; no migration (kept with the reply)
+- [x] Tests, user guide, browser check

@@ -11,6 +11,22 @@ export function checkLine(c: ReplyCheck): string {
   return c.round && c.round > 1 ? `${KIND[c.kind]} check passed (round ${c.round}).` : `${KIND[c.kind]} check passed.`;
 }
 
+const FIELD: Record<string, string> = {
+  body: "text", headline: "headline", footerLeft: "left footer", quoteAuthor: "quote author", statValue: "number",
+  signature: "sign-off", altText: "alt text", slug: "page address", unicodeStyles: "bold and italic",
+};
+/** How many changed fields are named before the rest are counted. */
+const NAMED = 3;
+
+/** What a reply did to an item: "Article created", or "Changed headline, tag". Undefined on replies that did not note it. */
+export function changeLine(s: SavedVersion): string | undefined {
+  if (s.created) return `${KIND[s.kind]} created`;
+  if (!s.fields?.length) return undefined;
+  const names = s.fields.map((f) => FIELD[f] ?? f);
+  const shown = names.length > NAMED + 1 ? [...names.slice(0, NAMED), `${names.length - NAMED} more`] : names;
+  return `${KIND[s.kind]}: changed ${shown.join(", ")}`;
+}
+
 /** Whether a reply has anything to put on a card under its words. */
 export const hasOutcome = (d?: ReplyDetail) => !!(d?.saved?.some((s) => s.version) || d?.checks?.length || d?.steps?.length);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, Conversation } from "./chat";
-import { answered, checkLine, savedLine, withOlder, hasOutcome } from "./reply";
+import { answered, changeLine, checkLine, savedLine, withOlder, hasOutcome } from "./reply";
 
 describe("reply cards", () => {
   it("say what was saved and how the check went", () => {
@@ -30,4 +30,12 @@ it("a question's answer is the next message, when it is one of the buttons", () 
   expect(answered([m("assistant", "?"), m("user", " yes ")], 0, ["Yes", "No"])).toBe("Yes");
   expect(answered([m("assistant", "?"), m("user", "Not yet")], 0, ["Yes", "No"])).toBeUndefined();
   expect(answered([m("assistant", "?"), m("assistant", "Yes")], 0, ["Yes"])).toBeUndefined();
+});
+
+it("a change is named, and a long one is cut", () => {
+  const s = (more: object) => ({ draftId: "d", kind: "post" as const, ...more });
+  expect(changeLine(s({ created: true, fields: ["body"] }))).toBe("Post created");
+  expect(changeLine(s({ fields: ["headline", "footerLeft"] }))).toBe("Post: changed headline, left footer");
+  expect(changeLine(s({ fields: ["title", "body", "headline", "tag", "altText"] }))).toBe("Post: changed title, text, headline, 2 more");
+  expect(changeLine(s({}))).toBeUndefined();
 });

@@ -38,7 +38,7 @@ Not agreed yet; suggested order:
 | [`2026-11-30-linkedin-attachments`](changes/2026-11-30-linkedin-attachments/proposal.md) | LinkedIn attachments: your own image, several images, a document, a video | Released | 12 |
 | [`2026-12-01-opentelemetry`](changes/2026-12-01-opentelemetry/proposal.md) | OpenTelemetry: traces, metrics and logs over OTLP | Released | 3 |
 | [`2026-12-02-conversational-designer`](changes/2026-12-02-conversational-designer/proposal.md) | Conversational designer: the assistant writes the card's words and the post, and can post | Part released | 11 |
-| [`2026-12-03-chat-workspace`](changes/2026-12-03-chat-workspace/proposal.md) | Chat workspace: talk on the left, see the post and the article | Part released | 3 |
+| [`2026-12-03-chat-workspace`](changes/2026-12-03-chat-workspace/proposal.md) | Chat workspace: talk on the left, see the post and the article | Part released; change lines built | 1 |
 | [`2026-12-04-publishing-calendar`](changes/2026-12-04-publishing-calendar/proposal.md) | Publishing calendar | Released |  |
 | [`2026-12-05-versions-and-publish-lock`](changes/2026-12-05-versions-and-publish-lock/proposal.md) | Versions of every change, and published items stay published | Released |  |
 | [`2026-12-06-content-schema`](changes/2026-12-06-content-schema/proposal.md) | Content fields: one schema for the studio and the agents | Released |  |
@@ -152,8 +152,6 @@ Older items include checks against real accounts that cost money or post publicl
 
 ### `2026-12-03-chat-workspace`
 - Try a mounted PDF with a managed session (ask first: it costs money)
-- Migration `chat_changes`; record from tool results; undo endpoint
-- Change cards with Undo and View
 
 ### `2026-12-08-studio-clarity`
 - New screenshots in the docs

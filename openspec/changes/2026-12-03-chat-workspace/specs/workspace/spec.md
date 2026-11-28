@@ -51,4 +51,8 @@ The system SHALL link a conversation to at most one post and one article.
 ### Requirement: Undo a turn
 #### Scenario: Undo
 - **WHEN** the person chooses Undo on a turn
-- **THEN** the fields it changed are restored, except any the person changed afterwards
+- **THEN** everything the reply changed is restored; if the item was changed afterwards, nothing is, and the reason is said
+
+#### Scenario: What changed
+- **WHEN** a reply changes an item
+- **THEN** a line under it names what changed, with View

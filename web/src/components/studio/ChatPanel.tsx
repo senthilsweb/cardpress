@@ -94,7 +94,7 @@ function Thread({ conv, chat, drafts, onApply, onShow, onVersion, onAnswer }: {
             }} />
           ) : m.content}</Bubble>}
           {m.role === "assistant" && <ReplyCard message={m} onVersion={onVersion} />}
-          {m.role === "assistant" && <ReplyActions conv={conv} messageId={m.id} drafts={drafts} onVersion={onVersion} />}
+          {m.role === "assistant" && <ReplyActions conv={conv} messageId={m.id} drafts={drafts} onVersion={onVersion} onShow={onShow} />}
           {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
             <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">
               {(conv.sources ?? []).filter((x) => x.messageId === m.id).map((x) => <SourceChip key={x.id} source={x} />)}

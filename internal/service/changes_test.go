@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -377,5 +378,31 @@ func TestGreetingCardIsAccepted(t *testing.T) {
 		if (err == nil) != ok || (ok && got.Ornament != id) {
 			t.Fatalf("ornament %q: %v", id, err)
 		}
+	}
+}
+
+func TestAReplySaysWhatItChanged(t *testing.T) {
+	w := newWriter(t)
+	var id string
+	said := func(c Conversation) SavedVersion {
+		t.Helper()
+		s := c.Messages[len(c.Messages)-1].Detail.Saved
+		if len(s) != 1 {
+			t.Fatal(s)
+		}
+		return s[0]
+	}
+	got, _ := w.reply(func(st *agent.Studio) { id = st.PostID; w.body(id, "One.") })
+	if s := said(got); !s.Created || !slices.Contains(s.Fields, "body") {
+		t.Fatal(s)
+	}
+	got, _ = w.reply(func(*agent.Studio) {
+		headline, tag := "A headline", "New"
+		if _, _, _, err := w.s.PatchCardText(w.ctx, id, CardText{Headline: &headline, Tag: &tag}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if s := said(got); s.Created || !slices.Equal(s.Fields, []string{"headline", "tag"}) {
+		t.Fatal(s)
 	}
 }
