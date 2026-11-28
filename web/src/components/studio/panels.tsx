@@ -133,6 +133,12 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         }} />
       </Section>
 
+      {design.layout === "greeting" && (
+        <Section title="Ornament">
+          <OrnamentPicker value={ornamentOf(design)} occasion={bg.group} palette={palette} onChange={(id) => set({ ornament: id, noOrnament: undefined })} />
+        </Section>
+      )}
+
       <Section title="Images">
         <ImageField
           label="Photos"
@@ -172,12 +178,6 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         </div>
         <p className="text-[11px] text-muted-foreground"><a className="text-brand hover:underline" href={settingsHref("brands", `?look=${encodeURIComponent(profile.id)}`)} onClick={flushPendingEdits}>Brand name, colours, fonts and logo</a></p>
       </Section>
-
-      {design.layout === "greeting" && (
-        <Section title="Ornament">
-          <OrnamentPicker value={ornamentOf(design)} occasion={bg.group} palette={palette} onChange={(id) => set({ ornament: id, noOrnament: undefined })} />
-        </Section>
-      )}
 
       <Section title="Fonts (this card)">
         <p className="text-[11px] leading-snug text-muted-foreground">This card only. Default uses the brand fonts.</p>

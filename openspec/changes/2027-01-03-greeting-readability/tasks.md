@@ -10,8 +10,8 @@
 - [x] Tests, user guide, browser check
 
 ## Bolt 3: ornament choices in reach
-- [ ] Ornament directly under Background
-- [ ] Browser check
+- [x] Ornament directly under Background
+- [x] Browser check
 
 ## Release
 - [ ] Deploy
