@@ -1,6 +1,6 @@
 # Sign-in kept in memory, and the prompt cache measured
 
-**Status:** proposed by the owner on 2026-11-28; being built: bolt 1 of 2 done.
+**Status:** proposed by the owner on 2026-11-28; built, not released.
 
 ## Asked for
 When a person has signed in, keep what is known about them so it is not queried every time; and the prompt cache.

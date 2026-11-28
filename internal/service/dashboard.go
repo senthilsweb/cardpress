@@ -58,13 +58,16 @@ type SessionSpend struct {
 
 // Usage is the assistant's cost and work in the period. Cost is the list price the agent service reports.
 type Usage struct {
-	CostCents     int            `json:"costCents"`
-	Sessions      int            `json:"sessions"`
-	Replies       int            `json:"replies"`
-	ActiveSeconds float64        `json:"activeSeconds"`
-	Bucket        string         `json:"bucket"` // "day" or "week"
-	Series        []Spend        `json:"series"`
-	Largest       []SessionSpend `json:"largest"`
+	CostCents     int     `json:"costCents"`
+	Sessions      int     `json:"sessions"`
+	Replies       int     `json:"replies"`
+	ActiveSeconds float64 `json:"activeSeconds"`
+	// InputTokens is the input of the replies that say it, CachedTokens the part that came from the prompt cache.
+	InputTokens  int64          `json:"inputTokens"`
+	CachedTokens int64          `json:"cachedTokens"`
+	Bucket       string         `json:"bucket"` // "day" or "week"
+	Series       []Spend        `json:"series"`
+	Largest      []SessionSpend `json:"largest"`
 }
 
 // BrandSummary is one brand's line.
@@ -333,7 +336,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 	for i, id := range ids {
 		args[i] = id
 	}
-	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, c.tier, u.session_id, u.added_cents, u.active_seconds, u.created_at
+	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, c.tier, u.session_id, u.added_cents, u.active_seconds, u.created_at, u.added_input, u.added_cached
 		FROM chat_usage u JOIN conversations c ON c.id = u.conversation_id
 		WHERE c.profile_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")+`) ORDER BY u.created_at, u.rowid`, args...)
 	if err != nil {
@@ -353,7 +356,8 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 		var pid, conv, title, tier, sid, created string
 		var cents int
 		var seconds float64
-		if err := rs.Scan(&pid, &conv, &title, &tier, &sid, &cents, &seconds, &created); err != nil {
+		var input, cached int64
+		if err := rs.Scan(&pid, &conv, &title, &tier, &sid, &cents, &seconds, &created, &input, &cached); err != nil {
 			return err
 		}
 		at, err := time.Parse(time.RFC3339, created)
@@ -379,6 +383,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 		s.upTo = max(s.upTo, seconds)
 		s.LastAt = at.UTC().Format(time.RFC3339)
 		u.CostCents += cents
+		u.InputTokens, u.CachedTokens = u.InputTokens+input, u.CachedTokens+cached
 		u.Replies++
 		brandCost[pid] += cents
 		if brandSessions[pid] == nil {

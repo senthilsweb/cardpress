@@ -143,7 +143,12 @@ func (a *sdkAPI) usage(ctx context.Context, sid string) (agent.Usage, error) {
 	if err != nil {
 		return agent.Usage{}, errors.New("the session reports no cost")
 	}
-	return agent.Usage{TotalCents: cents, ActiveSeconds: s.Usage.ActiveSeconds}, nil
+	// the service counts new input, what was written to the cache and what was read from it apart
+	u := s.Usage
+	return agent.Usage{
+		TotalCents: cents, ActiveSeconds: u.ActiveSeconds, CachedTokens: u.CacheReadInputTokens,
+		InputTokens: u.InputTokens + u.CacheCreation.Ephemeral5mInputTokens + u.CacheCreation.Ephemeral1hInputTokens + u.CacheReadInputTokens,
+	}, nil
 }
 
 func (a *sdkAPI) budget(ctx context.Context, sid string) (int, int, error) {

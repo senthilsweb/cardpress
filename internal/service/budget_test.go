@@ -271,3 +271,28 @@ func TestABrandsTier(t *testing.T) {
 		t.Fatalf("a tier that is gone: %q", got)
 	}
 }
+
+// Each reply adds its own part of the session's input and of what came from the prompt cache.
+func TestCachedInputIsCountedByReply(t *testing.T) {
+	spy := &spyAgent{out: agent.Output{Reply: "Done."}}
+	c, ctx := newChat(t, spy, &fakeFetcher{}), context.Background()
+	if _, err := c.db.Exec(`INSERT INTO profiles (id, owner_id, data, position, updated_at) VALUES ('p', '', '{}', 0, '')`); err != nil {
+		t.Fatal(err)
+	}
+	conv, _ := c.Start(ctx, "p", "", pasted)
+	_, emit := collect()
+	for _, u := range []agent.Usage{{TotalCents: 5, InputTokens: 1000, CachedTokens: 100}, {TotalCents: 8, InputTokens: 3000, CachedTokens: 1700}} {
+		spy.out.Usage = &u
+		if err := c.Send(ctx, conv.ID, "Go on", emit); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var input, cached, last int64
+	if err := c.db.QueryRow(`SELECT SUM(added_input), SUM(added_cached), MAX(total_input) FROM chat_usage`).Scan(&input, &cached, &last); err != nil || input != 3000 || cached != 1700 || last != 3000 {
+		t.Fatal(input, cached, last, err)
+	}
+	d, err := NewLibrary(c.db).Dashboard(ctx, DashboardQuery{ProfileID: "p"}, c.now())
+	if err != nil || d.Usage.InputTokens != 3000 || d.Usage.CachedTokens != 1700 {
+		t.Fatal(d.Usage.InputTokens, d.Usage.CachedTokens, err)
+	}
+}

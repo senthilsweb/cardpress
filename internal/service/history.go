@@ -43,12 +43,16 @@ func (c *Chat) recordUsage(ctx context.Context, convID, messageID, sessionID, pr
 	}
 	defer tx.Rollback() //nolint:errcheck
 	var before int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(total_cents), 0) FROM chat_usage WHERE conversation_id = ? AND session_id = ?`, convID, sessionID).Scan(&before); err != nil {
+	var input, cached int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(total_cents), 0), COALESCE(MAX(total_input), 0), COALESCE(MAX(total_cached), 0)
+		FROM chat_usage WHERE conversation_id = ? AND session_id = ?`, convID, sessionID).Scan(&before, &input, &cached); err != nil {
 		return err
 	}
 	added := max(0, u.TotalCents-before)
-	if _, err := tx.ExecContext(ctx, `INSERT INTO chat_usage (id, conversation_id, message_id, session_id, total_cents, added_cents, active_seconds, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, newID(), convID, messageID, sessionID, u.TotalCents, added, u.ActiveSeconds, c.stamp()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO chat_usage (id, conversation_id, message_id, session_id, total_cents, added_cents, active_seconds, created_at,
+		total_input, total_cached, added_input, added_cached) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		newID(), convID, messageID, sessionID, u.TotalCents, added, u.ActiveSeconds, c.stamp(),
+		u.InputTokens, u.CachedTokens, max(0, u.InputTokens-input), max(0, u.CachedTokens-cached)); err != nil {
 		return err
 	}
 	if added > 0 {

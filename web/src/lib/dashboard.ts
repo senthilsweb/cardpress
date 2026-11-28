@@ -5,7 +5,7 @@ export interface Counts { total: number; draft: number; approved: number; schedu
 export interface DashboardItem { type: "job" | "draft"; id: string; draftId?: string; profileId: string; kind: "post" | "article"; status: string; title: string; at: string }
 export interface Spend { start: string; costCents: number; replies: number }
 export interface SessionSpend { conversationId: string; profileId: string; title: string; /** The tier the conversation runs on, when it has one. */ tier?: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
-export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
+export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; /** All input, and the part read from the prompt cache. */ inputTokens?: number; cachedTokens?: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
 export interface BrandSummary { id: string; posts: Counts; articles: Counts; costCents: number; sessions: number }
 /** The person's figures over everything they may open. `users` is told to an admin only. */
 export interface Totals { brands: number; users?: number; disabledUsers?: number; costCents: number }
@@ -102,3 +102,6 @@ export function statusRows(kind: "post" | "article", c: Counts): { label: string
 
 /** A tier's id as a name: "strong" is "Strong". */
 export const tierLabel = (id?: string) => (id ? id[0].toUpperCase() + id.slice(1) : "–");
+
+/** How much of the input came from the prompt cache, or null when nothing says. */
+export const cachedShare = (u: { inputTokens?: number; cachedTokens?: number }) => (u.inputTokens ? `${Math.round(((u.cachedTokens ?? 0) * 100) / u.inputTokens)}%` : null);

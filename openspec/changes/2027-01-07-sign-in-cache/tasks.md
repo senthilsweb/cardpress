@@ -7,6 +7,10 @@
 - Not done: brand owners are read each time (see the proposal)
 
 ## Bolt 2: the prompt cache measured
-- [ ] Migration: cached and uncached input tokens per reply, read from the session's usage
-- [ ] The cached share on the dashboard
-- [ ] Tests, docs
+- [x] Migration: all and cached input tokens per reply, read from the session's usage
+- [x] The cached share on the dashboard
+- [x] Tests, docs
+- [ ] See the share on a real session (it comes with the next paid check)
+
+## Release
+- [ ] Deploy (ask first)

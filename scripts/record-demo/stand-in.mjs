@@ -120,7 +120,7 @@ export function startStandIn({ app, key, port }) {
     }
     const s = sessions.get(/^\/v1\/sessions\/([^/]+)/.exec(path)?.[1]);
     if (!s) return reply({ type: "error", error: { type: "not_found_error", message: "no session" } }, 404);
-    const about = (x) => ({ id: x.id, usage: { list_cost: { amount: String(x.cents), currency: "USD" }, active_seconds: 5 }, budget: x.budget ? { type: "limit", max_list_cost: { amount: String(x.budget), currency: "USD" } } : null });
+    const about = (x) => ({ id: x.id, usage: { list_cost: { amount: String(x.cents), currency: "USD" }, active_seconds: 5, input_tokens: x.cents * 100, cache_read_input_tokens: x.cents * 400 }, budget: x.budget ? { type: "limit", max_list_cost: { amount: String(x.budget), currency: "USD" } } : null });
     if (req.method === "POST" && !path.endsWith("/events")) { // an update of the session: its spending limit
       const cap = Number(JSON.parse(raw || "{}").budget?.max_list_cost?.amount);
       if (cap) s.budget = cap;

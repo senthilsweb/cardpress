@@ -16,7 +16,7 @@ import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { CostChart } from "./CostChart";
 import { api } from "@/lib/api";
-import { duration, money, periodLabel, PERIODS, readPeriod, statusRows, tierLabel, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
+import { cachedShare, duration, money, periodLabel, PERIODS, readPeriod, statusRows, tierLabel, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
 import { defaultTimezone, formatInZone } from "@/lib/jobs";
 import { libraryHref, studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
@@ -188,8 +188,8 @@ function Page({ data }: { data: LibraryBoot }) {
                 <div className="grid gap-4 md:grid-cols-2">{counts("post", figures.posts)}{counts("article", figures.articles)}</div>
 
                 <Block title={`Assistant · ${periodLabel(period)}`}>
-                  <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                    {([["Cost", money(u.costCents)], ["Sessions", String(u.sessions)], ["Replies", String(u.replies)], ["Working time", duration(u.activeSeconds)], ["Average session", u.sessions ? money(Math.round(u.costCents / u.sessions)) : "–"]] as const).map(([name, value]) => (
+                  <dl className={cn("grid grid-cols-2 gap-3", cachedShare(u) ? "sm:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-5")}>
+                    {([["Cost", money(u.costCents)], ["Sessions", String(u.sessions)], ["Replies", String(u.replies)], ["Working time", duration(u.activeSeconds)], ["Average session", u.sessions ? money(Math.round(u.costCents / u.sessions)) : "–"], ...(cachedShare(u) ? [["Cached input", cachedShare(u)!] as const] : [])] as const).map(([name, value]) => (
                       <div key={name}><dt className="text-xs text-muted-foreground">{name}</dt><dd className="mt-0.5 text-2xl font-semibold tracking-tight">{value}</dd></div>
                     ))}
                   </dl>

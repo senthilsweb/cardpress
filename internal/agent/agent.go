@@ -109,6 +109,9 @@ type Metered interface {
 type Usage struct {
 	TotalCents    int
 	ActiveSeconds float64
+	// InputTokens is all the input the session has used, CachedTokens the part read from the prompt cache.
+	InputTokens  int64
+	CachedTokens int64
 }
 
 // Studio is what an assistant that works in the studio is told with a message.

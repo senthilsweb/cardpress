@@ -367,7 +367,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 		case r.Method == "POST":
 			_, _ = w.Write([]byte(`{"data":[{"id":"sevt_1","type":"user.message"}]}`))
 		case r.URL.Path == "/v1/sessions/sesn_1":
-			_, _ = w.Write([]byte(`{"id":"sesn_1","usage":{"list_cost":{"amount":"144","currency":"USD"},"active_seconds":352.1}}`))
+			_, _ = w.Write([]byte(`{"id":"sesn_1","usage":{"list_cost":{"amount":"144","currency":"USD"},"active_seconds":352.1,"input_tokens":100,"cache_read_input_tokens":800,"cache_creation":{"ephemeral_5m_input_tokens":60,"ephemeral_1h_input_tokens":40}}}`))
 		default:
 			w.WriteHeader(404)
 			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"not_found_error","message":"no"}}`))
@@ -395,7 +395,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 			t.Errorf("outcome lacks %s: %s", want, got[1].body)
 		}
 	}
-	if u, err := a.usage(ctx, "sesn_1"); err != nil || u.TotalCents != 144 || u.ActiveSeconds < 352 {
+	if u, err := a.usage(ctx, "sesn_1"); err != nil || u.TotalCents != 144 || u.ActiveSeconds < 352 || u.InputTokens != 1000 || u.CachedTokens != 800 {
 		t.Fatalf("%v %+v", err, u)
 	}
 	if _, err := a.history(ctx, "nope"); !errors.Is(err, errSessionGone) {
