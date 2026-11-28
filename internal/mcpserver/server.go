@@ -120,6 +120,7 @@ func New(d Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{Name: agent.ReportTool, Title: "Answer in the chat", Annotations: readOnly,
 		Description: "Give your short answer to the person, once, as the last call of a turn: outcome (done, needs_answer, not_done), " +
 			"message (240 characters), and when useful points (4, each 120), question (200, needed with needs_answer) and next (120). " +
+			"When the question has a few fixed answers (yes or no, this or that), send them in answers (up to 4, each 40): they become buttons. " +
 			"Plain text, never the text of a post or article. It changes nothing."}, t.reportReply)
 
 	mcp.AddTool(s, &mcp.Tool{Name: "offer_choices", Title: "Offer options to pick from", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},

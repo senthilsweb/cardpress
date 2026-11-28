@@ -30,6 +30,9 @@ type SavedVersion struct {
 	DraftID string `json:"draftId"`
 	Kind    string `json:"kind"`
 	Version int    `json:"version,omitempty"`
+	// Fields name what the reply changed; Created says the item had no text before it.
+	Fields  []string `json:"fields,omitempty"`
+	Created bool     `json:"created,omitempty"`
 }
 
 // ChatDetail is what happened while a reply was written.

@@ -42,6 +42,8 @@ When there is a choice to make (three titles, two card headlines), the reply sho
 - **Picking** one shows it on the canvas at once, marked **Previewing. Not saved.**
 - **Save as version** puts the picked options into the item and saves it as a version. No model is called, so it costs nothing.
 - **Keep as is** drops the preview.
+- Under each reply a line says what changed ("Post: changed headline, tag"), with **View**.
+- A question with a few fixed answers shows them as buttons; a press sends that text as your message.
 - **Undo** puts the item back as it was before that reply. Only the latest change to an item can be undone, and not after you have edited it.
 
 A change you neither save nor undo stays in the draft, and the next reply builds on it. What you type yourself is kept as a version before the assistant changes it. A published item cannot be saved to or undone until you bring it back to draft.

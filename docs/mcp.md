@@ -14,7 +14,7 @@ CardPress can be used by an AI agent through the [Model Context Protocol](https:
 | `propose_content` | Suggest a post or an article. It becomes a **pending proposal**. | Adds a proposal, nothing else |
 | `get_proposal` | See whether a proposal was approved, edited or rejected, and the final text | No |
 | `get_design` | A draft's card: every design field and the draft's revision. Images only as present or absent | No |
-| `report_reply` | Give a short answer in the studio's chat | No |
+| `report_reply` | Give a short answer in the studio's chat, with answer buttons for a question | No |
 | `offer_choices` | While answering in the chat, offer options for a title, any card text (or none), alt text, summary or hashtags as buttons to pick from | Stores the options; no draft |
 | `update_card_text` | Change the words on a card: eyebrow, headline, subtitle, the two footers, tag, quote author, stat | Yes, those words |
 | `create_draft` | An empty post or article with the brand's starting card | Adds a draft |

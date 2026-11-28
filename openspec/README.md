@@ -1,14 +1,11 @@
 # Changes: where things stand
 
-As of 2026-11-27. Latest release, deployed: **`v0.4.0`**. "Released" means in a release or in the code deployed before versions
+As of 2026-11-27. Latest release, deployed: **`v0.4.1`**. "Released" means in a release or in the code deployed before versions
 began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what is open there.
 
 ## Next
-Not agreed yet; suggested order:
-1. The remaining greeting layouts, art sets and templates (`2026-12-19-greeting-layouts`).
-2. Saved greetings (`2026-12-14-greetings-and-picker`).
-3. Answer buttons in chat (`2026-12-16-chat-answer-buttons`; needs the agent repository).
-4. Content embeddings (`2026-12-11-content-embeddings`).
+Agreed on 2026-11-27: greetings (`12-14`, `12-19`) and embeddings (`12-11`) can wait; chat and bug fixes first.
+Suggested after those: the assistant posting after a confirmation (`2026-12-02-conversational-designer`).
 
 ## All changes
 | Change | What | Stands | Open tasks |
@@ -31,14 +28,14 @@ Not agreed yet; suggested order:
 | [`2026-11-25-library-and-account-menu`](changes/2026-11-25-library-and-account-menu/proposal.md) | Library and account menu | Released | 1 |
 | [`2026-11-26-content-workflow`](changes/2026-11-26-content-workflow/proposal.md) | Content workflow: draft, approve, publish | Released | 1 |
 | [`2026-11-27-public-pages`](changes/2026-11-27-public-pages/proposal.md) | Public pages for articles and posts | Released | 1 |
-| [`2026-11-28-editor-and-versions`](changes/2026-11-28-editor-and-versions/proposal.md) | A better long-article editor, and version history | Released | 1 |
-| [`2026-11-28-user-accounts`](changes/2026-11-28-user-accounts/proposal.md) | Sign-in, roles and separate workspaces | Released | 2 |
+| [`2026-11-28-editor-and-versions`](changes/2026-11-28-editor-and-versions/proposal.md) | A better long-article editor, and version history | Released |  |
+| [`2026-11-28-user-accounts`](changes/2026-11-28-user-accounts/proposal.md) | Sign-in, roles and separate workspaces | Released | 1 |
 | [`2026-11-29-editor-text-not-saved`](changes/2026-11-29-editor-text-not-saved/proposal.md) | Issue: typed text was never saved | Released |  |
 | [`2026-11-29-linkedin-test-connection-issue`](changes/2026-11-29-linkedin-test-connection-issue/proposal.md) | Issue: LinkedIn "Test connection" rejects the Client ID and secret on the deployed server | Released | 3 |
 | [`2026-11-30-linkedin-attachments`](changes/2026-11-30-linkedin-attachments/proposal.md) | LinkedIn attachments: your own image, several images, a document, a video | Released | 12 |
 | [`2026-12-01-opentelemetry`](changes/2026-12-01-opentelemetry/proposal.md) | OpenTelemetry: traces, metrics and logs over OTLP | Released | 3 |
 | [`2026-12-02-conversational-designer`](changes/2026-12-02-conversational-designer/proposal.md) | Conversational designer: the assistant writes the card's words and the post, and can post | Part released | 11 |
-| [`2026-12-03-chat-workspace`](changes/2026-12-03-chat-workspace/proposal.md) | Chat workspace: talk on the left, see the post and the article | Part released | 3 |
+| [`2026-12-03-chat-workspace`](changes/2026-12-03-chat-workspace/proposal.md) | Chat workspace: talk on the left, see the post and the article | Part released; change lines built | 1 |
 | [`2026-12-04-publishing-calendar`](changes/2026-12-04-publishing-calendar/proposal.md) | Publishing calendar | Released |  |
 | [`2026-12-05-versions-and-publish-lock`](changes/2026-12-05-versions-and-publish-lock/proposal.md) | Versions of every change, and published items stay published | Released |  |
 | [`2026-12-06-content-schema`](changes/2026-12-06-content-schema/proposal.md) | Content fields: one schema for the studio and the agents | Released |  |
@@ -51,7 +48,7 @@ Not agreed yet; suggested order:
 | [`2026-12-13-background-categories`](changes/2026-12-13-background-categories/proposal.md) | Background categories and seasonal greetings | Released |  |
 | [`2026-12-14-greetings-and-picker`](changes/2026-12-14-greetings-and-picker/proposal.md) | Greeting texts and a template picker | Part released | 5 |
 | [`2026-12-15-user-guide`](changes/2026-12-15-user-guide/proposal.md) | User guide | Released |  |
-| [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | Proposed | 6 |
+| [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | Built, not released | 2 |
 | [`2026-12-19-greeting-layouts`](changes/2026-12-19-greeting-layouts/proposal.md) | Greeting layouts | Part released | 4 |
 | [`2026-12-20-pluggable-ornaments`](changes/2026-12-20-pluggable-ornaments/proposal.md) | Pluggable ornaments | `v0.4.0` |  |
 | [`2026-12-21-media-library`](changes/2026-12-21-media-library/proposal.md) | Media library, per brand | `v0.2.1`, `v0.3.0` |  |
@@ -66,7 +63,8 @@ Not agreed yet; suggested order:
 | [`2026-12-31-controls-and-media-pages`](changes/2026-12-31-controls-and-media-pages/proposal.md) | Consistent controls, Add user at the top, Media in pages | `v0.2.1` |  |
 | [`2027-01-01-settings-forms`](changes/2027-01-01-settings-forms/proposal.md) | A first brand of one's own, and settings forms that save the same way | `v0.3.0` |  |
 | [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
-| [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | Built, next release | 1 |
+| [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | `v0.4.1` |  |
+| [`2027-01-04-screen-fixes`](changes/2027-01-04-screen-fixes/proposal.md) | Screen fixes: phones, unsaved settings, greeting footers | Built, not released | 1 |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -106,11 +104,7 @@ Older items include checks against real accounts that cost money or post publicl
 ### `2026-11-27-public-pages`
 - Re-record the demo (deferred: not part of this change)
 
-### `2026-11-28-editor-and-versions`
-- Check dark mode and a narrow screen
-
 ### `2026-11-28-user-accounts`
-- Phone-width check of the new screens
 - Re-record the demo
 
 ### `2026-11-29-linkedin-test-connection-issue`
@@ -152,8 +146,6 @@ Older items include checks against real accounts that cost money or post publicl
 
 ### `2026-12-03-chat-workspace`
 - Try a mounted PDF with a managed session (ask first: it costs money)
-- Migration `chat_changes`; record from tool results; undo endpoint
-- Change cards with Undo and View
 
 ### `2026-12-08-studio-clarity`
 - New screenshots in the docs
@@ -177,10 +169,6 @@ Older items include checks against real accounts that cost money or post publicl
 - Deploy
 
 ### `2026-12-16-chat-answer-buttons`
-- `answers` in `ReportReplyInput`; regenerate the schemas for both repositories
-- Studio: check and keep `answers`; buttons on the reply card; chosen state
-- Coordinator instructions
-- Tests in both repositories
 - Deploy the studio, then the agent
 - One paid test
 
@@ -196,5 +184,5 @@ Older items include checks against real accounts that cost money or post publicl
 ### `2026-12-28-versions`
 - Look at the version in About CardPress on a deployed app
 
-### `2027-01-03-greeting-readability`
+### `2027-01-04-screen-fixes`
 - Deploy

@@ -23,6 +23,8 @@ const (
 	maxReportPoint   = 120
 	maxReportAsk     = 200
 	maxReportNext    = 120
+	maxReportAnswers = 4
+	maxReportAnswer  = 40
 	// maxLastWords is how much is shown of an assistant that did not report.
 	maxLastWords = 400
 )
@@ -34,7 +36,9 @@ type Report struct {
 	Message  string   `json:"message"`
 	Points   []string `json:"points,omitempty"`
 	Question string   `json:"question,omitempty"`
-	Next     string   `json:"next,omitempty"`
+	// Answers are the replies the person can press under the question.
+	Answers []string `json:"answers,omitempty"`
+	Next    string   `json:"next,omitempty"`
 }
 
 // Check tidies a reported answer and refuses one that is not in shape, naming the field.
@@ -59,6 +63,23 @@ func (r *Report) Check() error {
 	if r.Outcome == OutcomeNeedsAnswer && r.Question == "" {
 		return fmt.Errorf("question is needed with %s", OutcomeNeedsAnswer)
 	}
+	var answers []string
+	for _, a := range r.Answers {
+		if a = strings.TrimSpace(a); a == "" {
+			continue
+		}
+		if slices.ContainsFunc(answers, func(b string) bool { return strings.EqualFold(a, b) }) {
+			return fmt.Errorf("answers must differ from each other")
+		}
+		answers = append(answers, a)
+	}
+	r.Answers = answers
+	if len(r.Answers) > 0 && (r.Outcome != OutcomeNeedsAnswer || r.Question == "") {
+		return fmt.Errorf("answers go with a question and %s", OutcomeNeedsAnswer)
+	}
+	if len(r.Answers) > maxReportAnswers {
+		return fmt.Errorf("answers: at most %d", maxReportAnswers)
+	}
 	check := func(name, v string, max int) error {
 		if utf8.RuneCountInString(v) > max {
 			return fmt.Errorf("%s is limited to %d characters", name, max)
@@ -78,6 +99,11 @@ func (r *Report) Check() error {
 	}
 	for _, p := range r.Points {
 		if err := check("a point", p, maxReportPoint); err != nil {
+			return err
+		}
+	}
+	for _, a := range r.Answers {
+		if err := check("an answer", a, maxReportAnswer); err != nil {
 			return err
 		}
 	}

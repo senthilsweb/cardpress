@@ -6,7 +6,9 @@ export interface Hold {
 
 export class Holds {
   private all = new Map<string, Hold>();
-  set(id: string, hold: Hold) { this.all.set(id, hold); }
+  /** The person has just agreed to lose what is unsaved, so nothing asks a second time. */
+  agreed = false;
+  set(id: string, hold: Hold) { this.all.set(id, hold); this.agreed = false; }
   remove(id: string) { this.all.delete(id); }
   /** The question to put to the person, or undefined when nothing would be lost. */
   question(): string | undefined {

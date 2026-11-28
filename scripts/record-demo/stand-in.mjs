@@ -45,6 +45,23 @@ export function startStandIn({ app, key, port }) {
     const studio = Object.fromEntries(block.split("\n").map((l) => [l.slice(0, l.indexOf(": ")), l.slice(l.indexOf(": ") + 2)]));
     const used = (name) => emit(s, { type: "agent.mcp_tool_use", name, input: {}, mcp_server_name: "cardpress" });
     try {
+      // "ask me" shows a question with buttons, and writes nothing
+      if (text.includes("ask me")) {
+        const ask = {
+          conversationId: studio.conversationId, outcome: "needs_answer", message: "The article draft is ready; the post is not written yet.",
+          question: "Write the post as well?", answers: ["Yes", "No", "Only a short one, for later this week"],
+        };
+        const use = emit(s, { type: "agent.mcp_tool_use", name: "report_reply", input: ask, mcp_server_name: "cardpress" });
+        await tool("report_reply", ask);
+        emit(s, { type: "agent.mcp_tool_result", mcp_tool_use_id: use.id, is_error: false });
+        if (outcome) {
+          emit(s, { type: "session.status_idle", stop_reason: { type: "end_turn" } });
+          emit(s, { type: "span.outcome_evaluation_start", iteration: 0 });
+          emit(s, { type: "span.outcome_evaluation_end", result: "satisfied", iteration: 0, explanation: "ok" });
+        }
+        emit(s, { type: "session.status_idle", stop_reason: { type: "end_turn" } });
+        return;
+      }
       emit(s, { type: "session.thread_created", agent_name: "greetings-writer", session_thread_id: "t" });
       await sleep(600);
       used("get_draft");

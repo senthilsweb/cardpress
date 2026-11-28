@@ -71,7 +71,7 @@ export function SettingsHost({ onLeave }: { onLeave?: () => void }) {
   const leaving = useCallback((go: () => void) => {
     const save = () => holds.flush().then(go, () => { toast.error("Not saved"); });
     const question = holds.question();
-    if (question) setAsking({ question, go: () => { setAsking(null); void save(); } });
+    if (question) setAsking({ question, go: () => { setAsking(null); holds.agreed = true; void save(); } });
     else void save();
   }, [holds]);
 

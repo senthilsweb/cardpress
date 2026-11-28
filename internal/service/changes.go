@@ -177,21 +177,38 @@ func (c *Chat) openChanges(ctx context.Context, convID string, draftIDs []string
 
 // written lists the items the reply being written has changed.
 func (c *Chat) written(ctx context.Context, convID string) ([]SavedVersion, error) {
-	rows, err := c.db.QueryContext(ctx, `SELECT d.id, d.kind FROM chat_changes x JOIN drafts d ON d.id = x.draft_id
+	rows, err := c.db.QueryContext(ctx, `SELECT d.id, d.kind, x.before FROM chat_changes x JOIN drafts d ON d.id = x.draft_id
 		WHERE x.conversation_id = ? AND x.status = ? AND x.after_revision > 0 ORDER BY d.kind DESC`, convID, ChangeOpen) // the post first
 	if err != nil {
 		return nil, err
 	}
 	var out []SavedVersion
+	var before []string
 	for rows.Next() {
 		var v SavedVersion
-		if err := rows.Scan(&v.DraftID, &v.Kind); err != nil {
+		var was string
+		if err := rows.Scan(&v.DraftID, &v.Kind, &was); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		out = append(out, v)
+		out, before = append(out, v), append(before, was)
 	}
-	return out, closeRows(rows)
+	if err := closeRows(rows); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		var was snapshot
+		if json.Unmarshal([]byte(before[i]), &was) != nil {
+			continue // the item is listed without saying what changed
+		}
+		d, err := c.Studio.GetDraft(ctx, out[i].DraftID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Fields = changedFields(was, d)
+		out[i].Created = DraftText(was.Doc) == "" && DraftText(d.Doc) != ""
+	}
+	return out, nil
 }
 
 // settle hands the finished reply what was changed and offered while it was written.

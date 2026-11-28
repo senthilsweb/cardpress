@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Conversation, Proposal, ProposalEdit } from "@/lib/chat";
 import type { ChatStore } from "@/lib/useChat";
+import type { Attachment } from "@/lib/compose";
 import type { Draft, DraftKind } from "@/lib/draft";
 import { ChatHistory } from "./ChatHistory";
 import { ReplyCard, ReplyWords } from "./ReplyCard";
@@ -12,6 +13,7 @@ import { ReplyActions } from "./Choices";
 import { ChatInput, SourceChip } from "./ChatInput";
 import { cn } from "@/lib/utils";
 import { costText } from "@/lib/history";
+import { answered } from "@/lib/reply";
 
 const host = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
@@ -52,8 +54,10 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
   );
 }
 
-function Thread({ conv, chat, drafts, onApply, onShow, onVersion }: {
+function Thread({ conv, chat, drafts, onApply, onShow, onVersion, onAnswer }: {
   conv: Conversation; chat: ChatStore; drafts: Draft[];
+  /** Send a pressed answer; absent while none can be sent. */
+  onAnswer?: (text: string) => void;
   onVersion: (draftId: string, version: number) => void;
   onApply: (content: ProposalEdit, opts: { useTitle: boolean }) => Promise<string>;
   onShow: (draftId?: string) => void;
@@ -80,12 +84,17 @@ function Thread({ conv, chat, drafts, onApply, onShow, onVersion }: {
 
   return (
     <div className="space-y-3 px-3 py-3">
-      {messages.map((m) => (
+      {messages.map((m, i) => (
         <div key={m.id} className="space-y-2">
           {/* a failed or stopped reply may have no words of its own */}
-          {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.detail?.reports?.length ? <ReplyWords reports={m.detail.reports} /> : m.content}</Bubble>}
+          {m.content && m.status !== "stopped" && <Bubble role={m.role}>{m.detail?.reports?.length ? (
+            <ReplyWords reports={m.detail.reports} answering={{
+              chosen: answered(messages, i, m.detail.reports.at(-1)?.answers ?? []),
+              onAnswer: i === messages.length - 1 ? onAnswer : undefined,
+            }} />
+          ) : m.content}</Bubble>}
           {m.role === "assistant" && <ReplyCard message={m} onVersion={onVersion} />}
-          {m.role === "assistant" && <ReplyActions conv={conv} messageId={m.id} drafts={drafts} onVersion={onVersion} />}
+          {m.role === "assistant" && <ReplyActions conv={conv} messageId={m.id} drafts={drafts} onVersion={onVersion} onShow={onShow} />}
           {(conv.sources ?? []).some((x) => x.messageId === m.id) && (
             <div className="flex flex-wrap justify-end gap-1.5" aria-label="Sent with this message">
               {(conv.sources ?? []).filter((x) => x.messageId === m.id).map((x) => <SourceChip key={x.id} source={x} />)}
@@ -143,6 +152,14 @@ export function ChatPanel({ chat, onApply, onShow, onVersion, draftId, viewing, 
   const sources = conv?.sources ?? [];
   const waiting = sources.filter((s) => !s.messageId);
 
+  const send = async (text: string, attachments: Attachment[]) => {
+    const sent = await chat.submit(text, attachments, draftId, { write, viewing });
+    if (sent) setChosen([]);
+    return sent;
+  };
+  // a pressed answer goes as a typed message would
+  const onAnswer = off || chat.busy || conv?.sourceKind === "mcp" ? undefined : (text: string) => void send(text, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="space-y-1.5 border-b border-border px-3 py-2">
@@ -177,7 +194,7 @@ export function ChatPanel({ chat, onApply, onShow, onVersion, draftId, viewing, 
       )}
       {/* the thread and the box stay mounted, so an unsent message is not lost */}
       <div className={cn("min-h-0 flex-1 overflow-y-auto", listing && "hidden")} aria-live="polite">
-        {conv ? <Thread conv={conv} chat={chat} drafts={drafts} onApply={onApply} onShow={onShow} onVersion={onVersion} /> : <Welcome chat={chat} />}
+        {conv ? <Thread conv={conv} chat={chat} drafts={drafts} onApply={onApply} onShow={onShow} onVersion={onVersion} onAnswer={onAnswer} /> : <Welcome chat={chat} />}
       </div>
 
       {chat.error && <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-destructive">{chat.error}</p>}
@@ -202,11 +219,7 @@ export function ChatPanel({ chat, onApply, onShow, onVersion, draftId, viewing, 
           )}
           replying={chat.streaming !== null} busy={chat.busy && chat.streaming === null}
           waiting={waiting} onRemoveWaiting={(id) => { if (conv) void chat.removeSource(conv.id, id); }}
-          onSend={async (text, attachments) => {
-            const sent = await chat.submit(text, attachments, draftId, { write, viewing });
-            if (sent) setChosen([]);
-            return sent;
-          }} onStop={chat.stop}
+          onSend={send} onStop={chat.stop}
         />
       )}
       </div>

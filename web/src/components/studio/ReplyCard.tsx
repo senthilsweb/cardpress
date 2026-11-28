@@ -3,9 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { ChatMessage, ReplyReport } from "@/lib/chat";
 import { checkLine, hasOutcome, savedLine } from "@/lib/reply";
+import { cn } from "@/lib/utils";
+
+/** The replies to the latest question: live until one is given, then showing which was chosen. */
+export interface Answering { chosen?: string; onAnswer?: (text: string) => void }
 
 /** The assistant's short answer, in place of everything it wrote while working. */
-export function ReplyWords({ reports }: { reports: ReplyReport[] }) {
+export function ReplyWords({ reports, answering }: { reports: ReplyReport[]; answering?: Answering }) {
   return (
     <div className="space-y-2.5">
       {reports.map((r, i) => (
@@ -16,6 +20,18 @@ export function ReplyWords({ reports }: { reports: ReplyReport[] }) {
           </p>
           {r.points && r.points.length > 0 && <ul className="list-disc space-y-0.5 pl-4">{r.points.map((p, j) => <li key={j}>{p}</li>)}</ul>}
           {r.question && <p className="font-medium">{r.question}</p>}
+          {/* only the last answer of a reply can be replied to */}
+          {r.question && r.answers && i === reports.length - 1 && (
+            <div role="group" aria-label="Answers" className="flex flex-wrap gap-1.5 py-0.5">
+              {r.answers.map((a) => (
+                <Button key={a} type="button" size="sm" variant={answering?.chosen === a ? "brand" : "outline"} aria-pressed={answering?.chosen === a}
+                  disabled={!answering?.onAnswer} className={cn("h-auto min-h-8 whitespace-normal py-1 text-left", answering?.chosen === a && "disabled:opacity-100")}
+                  onClick={() => answering?.onAnswer?.(a)}>
+                  {a}
+                </Button>
+              ))}
+            </div>
+          )}
           {r.next && <p className="text-muted-foreground">Next: {r.next}</p>}
         </div>
       ))}
