@@ -15,6 +15,7 @@ export type Block =
   | { type: "list"; ordered: boolean; items: { depth: number; spans: Span[] }[] }
   | { type: "quote"; spans: Span[] }
   | { type: "table"; head: Span[][]; rows: Span[][][] }
+  | { type: "code"; text: string }
   | { type: "rule" };
 
 const INLINE = /(`[^`]+`)|(\*\*(?=\S)[\s\S]+?\*\*|__(?=\S)[\s\S]+?__)|(\*(?=\S)[^*]+?\*|(?<![A-Za-z0-9])_(?=\S)[^_]+?_(?![A-Za-z0-9]))|\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/;
@@ -49,7 +50,12 @@ export function blocks(source: string): Block[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const heading = HEADING.exec(line), item = ITEM.exec(line);
-    if (!line.trim()) flush();
+    if (line.trimStart().startsWith("```")) {
+      flush();
+      const code: string[] = [];
+      for (i++; i < lines.length && !lines[i].trimStart().startsWith("```"); i++) code.push(lines[i]);
+      out.push({ type: "code", text: code.join("\n") });
+    } else if (!line.trim()) flush();
     else if (heading) { flush(); out.push({ type: "heading", level: heading[1].length, spans: spans(heading[2]) }); }
     else if (RULE.test(line)) { flush(); out.push({ type: "rule" }); }
     else if (line.includes("|") && DIVIDER.test(lines[i + 1] ?? "") && (lines[i + 1] ?? "").includes("|")) {

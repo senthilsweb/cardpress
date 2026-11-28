@@ -122,6 +122,9 @@ type Studio struct {
 	Grade          []string // those of Write that are first drafts, to be written as graded outcomes, in this order
 	// Rounds is how often the grader may send a draft back; 0 leaves it to the agent.
 	Rounds int
+	// Guides are the brand's own writing guides that the grader of this message's first drafts must know, by kind
+	// ("post", "article", "greeting").
+	Guides map[string]string
 	// Unchecked are first drafts that are not graded, because the brand's checks are off.
 	Unchecked []string
 	Cards     []Card   // items the assistant has not seen yet

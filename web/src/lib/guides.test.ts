@@ -21,6 +21,10 @@ describe("the preview of a guide", () => {
     expect(spans("a **b** *c* `d` [e](https://x.example)").map((s) => s.type)).toEqual(["text", "bold", "text", "italic", "text", "code", "text", "link"]);
     expect(spans("snake_case_name and <b>x</b> [y](javascript:alert(1))")).toEqual([{ type: "text", text: "snake_case_name and <b>x</b> [y](javascript:alert(1))" }]);
   });
+  it("reads the code blocks our own rules have", () => {
+    expect(blocks("```json\n{ \"a\": 1 }\n```\nafter")).toEqual([{ type: "code", text: "{ \"a\": 1 }" }, { type: "paragraph", spans: [{ type: "text", text: "after" }] }]);
+    expect(blocks("```\nopen")).toEqual([{ type: "code", text: "open" }]);
+  });
   it("ends on odd input", () => {
     for (const odd of ["|", "**", "- ", "#", "> ", "|\n|---|", "[]()", "*".repeat(500)]) expect(() => blocks(odd)).not.toThrow();
   });

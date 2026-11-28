@@ -36,9 +36,10 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [ ] One real check of a good and a bad guide (ask first: a fraction of a cent each)
 
 ## Bolt 7: the writers use the guide
-- [ ] `get_writing_guide` on the MCP server; the rubric built from the fixed lines and the guide
-- [ ] Agent repository: skills read the guide first; writers may call the tool; rubrics in two parts; the coordinator's "Posting" correction
-- [ ] Tests; one real post with a guide (ask first)
+- [x] `get_writing_guide` on the MCP server; the rubric built with the brand's guide
+- [x] Agent repository: skills read the guide first; writers may call the tool; style lines marked; manifest carries our styles and rules; the coordinator no longer offers to post
+- [x] Tests
+- [ ] One real post with a guide, after the deploy and apply (ask first)
 
 ## Bolt 8: docs
 - [ ] User guide, configuration, data model, the contract (version 7), `docs/cma-agent.md`

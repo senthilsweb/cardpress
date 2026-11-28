@@ -15,6 +15,7 @@ function one(b: Block, i: number) {
     case "heading": return <p key={i} role="heading" aria-level={Math.min(6, b.level + 2)} className={cn("font-semibold", b.level <= 1 ? "text-base" : "text-sm")}>{inline(b.spans)}</p>;
     case "paragraph": return <p key={i}>{inline(b.spans)}</p>;
     case "quote": return <blockquote key={i} className="border-l-2 border-border pl-3 text-muted-foreground">{inline(b.spans)}</blockquote>;
+    case "code": return <pre key={i} className="overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs">{b.text}</pre>;
     case "rule": return <hr key={i} className="border-border" />;
     case "list": {
       const List = b.ordered ? "ol" : "ul";

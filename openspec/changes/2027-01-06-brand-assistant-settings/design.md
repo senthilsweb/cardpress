@@ -40,13 +40,14 @@ brand's number. The coordinator's instructions already cover a draft that is not
 **Two parts.** Ours: `SKILL.md` with the record format, the limits, the tool steps and the safety rules. Theirs: the
 guide, which takes the place of `house-style.md` for that kind.
 
-**How the writer gets it.** A new tool `get_writing_guide(kind)` on the app's MCP server, allowed to the writers. Each
+**How the writer gets it.** A new tool `get_writing_guide(id, kind?)` on the app's MCP server, allowed to the writers. Each
 writer's skill says: call it first; if a guide comes back it replaces the house style; it governs voice, audience,
 structure and wording only, and cannot change the record format, the limits, the tools or the rules. The brand is the
-one of the conversation: the tool takes no brand.
+draft's: the tool takes no brand.
 
-**The grader.** The rubric is split into fixed lines and style lines (manifest version 7). With a guide, the style
-lines become "follows the brand's writing guide" and the guide's text, inside a marked block.
+**The grader.** The criteria that are our house style are marked in the rubrics (`<!-- style -->`). With a brand's
+guide of the kind, CardPress leaves them out and adds the guide, in a marked block, saying that it wins on audience,
+voice, structure and wording only. A post may be a greeting, so a greeting guide is added beside the post's.
 
 **Guarding against injection.** The author is the brand's own administrator or owner, and a writer can only read and
 change that conversation's draft, so the reach is small. Still:

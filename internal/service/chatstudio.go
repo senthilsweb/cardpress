@@ -221,6 +221,26 @@ func (c *Chat) prepare(ctx context.Context, conv Conversation, req ChatRequest) 
 	} else {
 		st.Unchecked, st.Grade = st.Grade, nil
 	}
+	for _, kind := range st.Grade {
+		// a post may turn out to be a greeting, so the grader of a post is told both
+		kinds := []string{kind}
+		if kind == "post" {
+			kinds = append(kinds, "greeting")
+		}
+		for _, k := range kinds {
+			body, err := c.WritingGuide(ctx, conv.ProfileID, k)
+			if err != nil {
+				return nil, err
+			}
+			if body == "" {
+				continue
+			}
+			if st.Guides == nil {
+				st.Guides = map[string]string{}
+			}
+			st.Guides[k] = body
+		}
+	}
 	seen := map[string]sight{}
 	_ = json.Unmarshal([]byte(rawSeen), &seen)
 	for _, id := range []string{st.PostID, st.ArticleID} {

@@ -165,7 +165,7 @@ func main() {
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Guides: chat, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
 		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
@@ -365,7 +365,7 @@ func runMCP(args []string) {
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
 	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)
 	connections := service.NewSettings(db.DB, nil, os.Getenv) // only says what is filled in; reads no secret
-	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
+	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Guides: chat, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
 	log.Printf("cardpress MCP over stdio is ready (%s database)", db.Driver)
 	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
 		log.Fatal(err)

@@ -226,7 +226,8 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 		if in.Studio.Rounds > 0 { // the brand's own number
 			rounds = in.Studio.Rounds
 		}
-		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, o.Rubric, rounds) }, kind); err != nil {
+		rubric := withGuides(o.Rubric, kind, in.Studio.Guides)
+		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, rubric, rounds) }, kind); err != nil {
 			break
 		}
 	}

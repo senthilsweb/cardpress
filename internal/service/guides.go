@@ -251,3 +251,24 @@ func (c *Chat) RestoreGuide(ctx context.Context, profileID, kind string, version
 	recordEvent(ctx, c.db, c.stamp(), EventGuide, name, fmt.Sprintf("%s guide: version %d restored", kind, version))
 	return c.Guides(ctx, profileID)
 }
+
+// WritingGuide is the guide a brand's writers are to follow for one kind; empty when the brand uses our house style. A
+// saved guide that the rules no longer allow is not handed out.
+func (c *Chat) WritingGuide(ctx context.Context, profileID, kind string) (string, error) {
+	if err := brandNotHidden(ctx, c.db, profileID); err != nil {
+		return "", err
+	}
+	if err := guideKind(kind); err != nil {
+		return "", err
+	}
+	g, err := currentGuide(ctx, c.db, profileID, kind)
+	if err != nil {
+		return "", err
+	}
+	body, err := cleanGuide(g.Body)
+	if err != nil {
+		log.Printf("the %s guide of brand %s is not used: %v", kind, profileID, err)
+		return "", nil
+	}
+	return body, nil
+}
