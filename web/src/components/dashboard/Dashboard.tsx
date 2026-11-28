@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { CircleAlert, Info, Plus } from "lucide-react";
+import { CircleAlert, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -56,8 +56,7 @@ function Loading() {
 function Page({ data }: { data: LibraryBoot }) {
   const [theme, toggleTheme] = useTheme();
   const [brand, setBrand] = useState(data.activeId);
-  // with no brand saved yet there is nothing to ask about one: the figures of "all", which are empty, are shown
-  const [all, setAll] = useState(() => data.noBrand || new URLSearchParams(window.location.search).get("scope") === "all");
+  const [all, setAll] = useState(() => new URLSearchParams(window.location.search).get("scope") === "all");
   const [period, setPeriod] = useState<Period>(() => { try { return readPeriod(localStorage.getItem(PERIOD_KEY)); } catch { return { days: 30 }; } });
   const [figures, setFigures] = useState<Figures | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,10 +149,10 @@ function Page({ data }: { data: LibraryBoot }) {
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6">
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1 max-sm:basis-full">
-                <h1 className="truncate text-2xl font-semibold tracking-tight">{data.noBrand ? "Dashboard" : all ? "All brands" : nameOf(brand)}</h1>
+                <h1 className="truncate text-2xl font-semibold tracking-tight">{all ? "All brands" : nameOf(brand)}</h1>
                 <p className="text-sm text-muted-foreground">What is written, what is waiting, and what the assistant has cost.</p>
               </div>
-              {data.profiles.length > 1 && !data.noBrand && (
+              {data.profiles.length > 1 && (
                 <ToggleGroup type="single" aria-label="Brands shown" className={group} value={all ? "all" : "one"} onValueChange={(v) => { if (v) { setAll(v === "all"); setFigures(null); } }}>
                   <ToggleGroupItem value="one">This brand</ToggleGroupItem>
                   <ToggleGroupItem value="all">All brands</ToggleGroupItem>
@@ -164,15 +163,8 @@ function Page({ data }: { data: LibraryBoot }) {
                 {PERIODS.map((p) => <ToggleGroupItem key={p.days} value={String(p.days)} aria-label={p.label} className="max-sm:px-2"><span className="max-sm:hidden">{p.label}</span><span className="sm:hidden">{p.short}</span></ToggleGroupItem>)}
                 <DateRangeTab value={custom} start={onScreen} onApply={setPeriod} />
               </ToggleGroup>
-              <Button asChild variant="brand" size="sm"><a href={studioHref()}><Plus /> Write</a></Button>
+              <Button asChild variant="gold" size="sm"><a href={studioHref()}><Plus /> Write</a></Button>
             </div>
-
-            {data.noBrand && (
-              <Alert role="status">
-                <Info aria-hidden />
-                <AlertDescription>No brand yet. <Button asChild variant="link" className="h-auto p-0"><a href={studioHref()}>Open the studio</a></Button> to start your first one.</AlertDescription>
-              </Alert>
-            )}
 
             {error && (
               <Alert variant="destructive">

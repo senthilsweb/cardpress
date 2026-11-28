@@ -10,6 +10,8 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
         brand: "bg-brand text-on-brand shadow-sm hover:bg-brand/90",
+        gold: "bg-gold text-on-gold shadow-sm hover:bg-gold/85",
+        cancel: "bg-cancel text-on-cancel shadow-sm hover:bg-cancel/90",
         destructive: "bg-destructive text-white shadow-sm hover:bg-destructive/90",
         outline: "border border-input bg-card shadow-sm hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",

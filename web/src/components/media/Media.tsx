@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CircleAlert, Download, ExternalLink, Info, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Pencil, Search, Trash2, Upload } from "lucide-react";
+import { CircleAlert, Download, ExternalLink, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import { Thumb } from "./Thumb";
 import { api } from "@/lib/api";
 import { formatInZone } from "@/lib/jobs";
 import { ACCEPT, ASSET_PAGE_SIZES, fileProblem, fileSize, KIND_LABEL, nameFromFile, prepareUpload, splitTags, type Asset, type AssetKind, type Assets } from "@/lib/assets";
-import { libraryHref, studioHref } from "@/lib/nav";
+import { libraryHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,6 @@ function Page({ data }: { data: LibraryBoot }) {
   const run = useRef(0);
 
   const load = useCallback(() => {
-    if (data.noBrand) return;
     const mine = ++run.current;
     setError("");
     api.assets(brand, query).then((l) => {
@@ -68,7 +67,7 @@ function Page({ data }: { data: LibraryBoot }) {
       setLibrary(l);
       if (l.page !== query.page) setQuery((q) => ({ ...q, page: l.page })); // the page asked for was past the end
     }, (e) => { if (mine === run.current) { setLibrary(null); setError(message(e)); } });
-  }, [brand, query, data.noBrand]);
+  }, [brand, query]);
   useEffect(load, [load]);
   // search waits for a pause in typing
   useEffect(() => {
@@ -83,7 +82,7 @@ function Page({ data }: { data: LibraryBoot }) {
 
   /** Files go one at a time, which a small server can hold. */
   const upload = async (files: File[]) => {
-    if (!files.length || sending || data.noBrand) return;
+    if (!files.length || sending) return;
     const failed: string[] = [];
     let added = 0;
     for (const [n, f] of files.entries()) {
@@ -158,24 +157,17 @@ function Page({ data }: { data: LibraryBoot }) {
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0 flex-1 max-sm:basis-full">
                 <h1 className="text-2xl font-semibold tracking-tight">Media</h1>
-                <p className="text-sm text-muted-foreground">{data.noBrand ? "Pictures, documents and video links." : `Pictures, documents and video links of ${name}.`}</p>
+                <p className="text-sm text-muted-foreground">Pictures, documents and video links of {name}.</p>
               </div>
               <Button asChild variant="ghost" size="sm" className="lg:hidden"><a href={libraryHref()}>Posts and articles</a></Button>
-              {!data.noBrand && (
-                <>
-                  <AddVideo brand={brand} onAdded={showNewest} />
-                  <Button variant="brand" size="sm" disabled={!!sending} onClick={() => input.current?.click()}><Upload /> Upload</Button>
-                  <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" aria-label="Choose files to upload" onChange={(e) => { void upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
-                </>
-              )}
+              <AddVideo brand={brand} onAdded={showNewest} />
+              <Button variant="gold" size="sm" disabled={!!sending} onClick={() => input.current?.click()}><Upload /> Upload</Button>
+              <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" aria-label="Choose files to upload" onChange={(e) => { void upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
             </div>
 
-            {data.noBrand && (
-              <Alert role="status"><Info aria-hidden /><AlertDescription>No brand yet. <Button asChild variant="link" className="h-auto p-0"><a href={studioHref()}>Open the studio</a></Button> to start your first one.</AlertDescription></Alert>
-            )}
             {error && <Alert variant="destructive"><CircleAlert aria-hidden /><AlertDescription>{error}</AlertDescription><Button size="sm" variant="outline" onClick={load}>Try again</Button></Alert>}
             {sending && <Alert role="status"><Loader2 aria-hidden className="animate-spin" /><AlertDescription>Adding {sending.name}{sending.of > 1 ? ` (${sending.at} of ${sending.of})` : ""}…</AlertDescription></Alert>}
-            {!library && !error && !data.noBrand && (
+            {!library && !error && (
               <div role="status" aria-label="Loading" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{[0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-48" />)}</div>
             )}
 
@@ -277,7 +269,7 @@ function Page({ data }: { data: LibraryBoot }) {
             <DialogDescription>It leaves this brand’s library for good.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button variant="cancel" onClick={() => setDeleting(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deleting && void remove(deleting)}>Delete</Button>
           </DialogFooter>
         </DialogContent>
@@ -315,7 +307,7 @@ function AddVideo({ brand, onAdded }: { brand: string; onAdded: () => void }) {
           <div className="space-y-1"><Label htmlFor="video-tags">Tags (optional)</Label><Input id="video-tags" placeholder="events, launch" value={tags} onChange={(e) => setTags(e.target.value)} /></div>
           {problem && <p role="alert" className="text-xs text-destructive">{problem}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="button" size="sm" variant="cancel" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" size="sm" variant="brand" disabled={busy}>Add</Button>
           </div>
         </form>
@@ -349,7 +341,7 @@ function Edit({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; o
             {problem && <p role="alert" className="text-xs text-destructive">{problem}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="cancel" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="brand" disabled={busy}>Save</Button>
           </DialogFooter>
         </form>

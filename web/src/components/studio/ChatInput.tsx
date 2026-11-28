@@ -131,7 +131,7 @@ export function ChatInput({ placeholder, replying, busy, waiting, onRemoveWaitin
               : <Textarea autoFocus rows={5} value={entry} onChange={(e) => setEntry(e.target.value)} placeholder="Paste the article or your notes here…" aria-label="Text to write from" className="text-xs"
                   onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setAdding(null); } }} />}
             <div className="flex justify-end gap-1.5">
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setAdding(null); setProblem(null); }}>Cancel</Button>
+              <Button type="button" variant="cancel" size="sm" onClick={() => { setAdding(null); setProblem(null); }}>Cancel</Button>
               <Button type="button" variant="outline" size="sm" disabled={!entry.trim()} onClick={confirmEntry}>Add</Button>
             </div>
           </div>

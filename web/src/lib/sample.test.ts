@@ -13,7 +13,9 @@ const oldDefault: Design = {
 
 describe("sample card", () => {
   it("starts from the sample text", () => {
-    expect(DEFAULT_DESIGN.title).toBe("Many Questions.\nOne SQL Row.");
+    expect(DEFAULT_DESIGN.title).toBe(SAMPLE_TEXT.title);
+    // a new brand's card carries no links of anyone's
+    expect([DEFAULT_DESIGN.footer, DEFAULT_DESIGN.footerLeft]).toEqual(["", ""]);
     expect(DEFAULT_DESIGN.footer).toBe(SAMPLE_TEXT.footer);
     expect(DEFAULT_DESIGN.footerLeft).toBe(SAMPLE_TEXT.footerLeft);
   });

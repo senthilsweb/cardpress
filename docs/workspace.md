@@ -35,7 +35,7 @@ Figures come from items, publishing jobs, `chat_usage` and `users` (`GET /api/v1
 A brand is an identity (name, handle, logo, fonts, colour sets) with its own card, drafts, publishing queue, assistant conversations and social accounts. The brand menu in the header lists the brands; the open one is ticked.
 
 - **Switch**: open the brand menu in the header and pick another brand. The whole studio changes to that brand, and the last one you opened is remembered on the server.
-- **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text.
+- **New brand…** (Settings, Brands): a name, a handle, and either a blank start or a copy of the open brand's logo, colours and fonts. A copy never includes accounts, drafts or posts. A blank brand opens with placeholder card text. A person with no brand gets one on first sign-in, named after them (`lib/firstBrand.ts`).
 - **Manage brands…** (Settings, Brands): open, reorder, duplicate or archive brands, and restore or delete archived ones. Archiving hides a brand and keeps everything; posts already scheduled still go out. Deleting is only possible from the archive, and is refused while the brand has scheduled or unfinished posts. At least one brand always stays.
 - **Details** (New brand, and Brand look): type (company or individual), name, address, mobile and email, all optional. They are personal data kept in their own table (`brand_details`): only the brand's owner and administrators read them, and they are never on a card or a public page, in a profile export, or sent to the assistant.
 - **Accounts** are per brand: Social accounts shows the open brand's, and a post is published with that brand's account only. The publish confirmation names the brand. See [Social accounts](social-settings.md).
@@ -101,7 +101,8 @@ All of this is remembered: it is saved on the server as the `layout` preference,
 Settings open in a dialog over the page in use (`components/settings/SettingsDialog.tsx`). It takes the page's settings address (`/settings/social/` and the like) while open, so links, bookmarks and the browser's Back button work; closing gives the earlier address back. An address visited directly opens the dialog over an empty frame, and closing goes to the studio.
 
 - The left column groups the pages and searches their names and words; **Ctrl/⌘ + K** goes to the search. On a phone it is a drop-down and the dialog fills the screen.
-- A page with something unsaved asks before it is left or closed. **Brand look** saves as you type, and once more on leaving.
+- A page with something unsaved asks before it is left or closed. Nothing saves on its own: every form has **Save** and **Cancel** (`components/settings/form.tsx`), in sections, with a message saying whether it worked.
+- Button colours: green saves and confirms, yellow adds something new, dark grey cancels, red deletes.
 - After a change to a brand or its accounts, closing loads the page behind again.
 
 The dialog is `components/ui/panel-dialog.tsx` (the background picker uses it too); a settings page is a `Pane` (`components/ui/pane.tsx`) and says what would be lost with `useUnsaved` (`components/settings/guard.tsx`).

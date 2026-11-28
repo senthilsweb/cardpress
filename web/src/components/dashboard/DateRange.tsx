@@ -79,7 +79,7 @@ export function DateRangeTab({ value, start, onApply }: { value?: Days; start: D
         />
         <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
           <p role="status" className="min-w-0 flex-1 text-xs text-muted-foreground">{problem || rangeLabel(from, to)}</p>
-          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" variant="cancel" onClick={() => setOpen(false)}>Cancel</Button>
           <Button size="sm" variant="brand" disabled={!!problem} onClick={() => { onApply({ from, to }); setOpen(false); }}>Apply</Button>
         </div>
       </PopoverContent>

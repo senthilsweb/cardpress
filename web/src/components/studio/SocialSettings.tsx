@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, Eye, EyeOff, Loader2, Lock, PlugZap, Trash2, X } from "lucide-react";
 import { Pane } from "@/components/ui/pane";
 import { useUnsaved } from "@/components/settings/guard";
+import { SaveBar } from "@/components/settings/form";
+import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +58,6 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
 }) {
   const [reveal, setReveal] = useState<Record<string, boolean>>({});
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const storingNeedsKey = !canStore && changedFields(net, edits).some((f) => edits[f.key].trim() !== "");
   const status = net.complete ? "Ready" : net.fields.some((f) => f.set) ? "Incomplete" : "Not set up";
 
   const remove = async (f: SettingsField) => {
@@ -113,7 +114,6 @@ function NetworkFields({ net, edits, setEdit, canStore, busy, onRemove }: {
           </div>
         );
       })}
-      {storingNeedsKey && <p className="text-xs text-destructive">Cannot save: no encryption key.</p>}
     </div>
   );
 }
@@ -130,7 +130,6 @@ export function SocialSettings({ profileId, brandName, onChanged }: { profileId:
   const [busy, setBusy] = useState<"save" | "test" | "remove" | null>(null);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [results, setResults] = useState<Record<string, TestResult | null>>({});
-  const [savedNet, setSavedNet] = useState<string | null>(null);
   const top = useRef<HTMLSpanElement>(null);
 
   const load = useCallback(async () => {
@@ -154,16 +153,15 @@ export function SocialSettings({ profileId, brandName, onChanged }: { profileId:
 
   const save = async () => {
     if (!net) return;
-    setBusy("save"); setErr(net.id, null); setSavedNet(null); setResults((r) => ({ ...r, [net.id]: null }));
+    setBusy("save"); setErr(net.id, null); setResults((r) => ({ ...r, [net.id]: null }));
     try {
       const out: Record<string, string | null> = {};
       for (const f of changedFields(net, edits[net.id] ?? {})) out[f.key] = (edits[net.id] ?? {})[f.key];
       replace(await api.putNetwork(profileId, net.id, out));
       onChanged();
       setEdits((e) => ({ ...e, [net.id]: {} }));
-      setSavedNet(net.id);
-      window.setTimeout(() => setSavedNet((s) => (s === net.id ? null : s)), 2500);
-    } catch (e) { setErr(net.id, errMsg(e)); toTop(); } finally { setBusy(null); }
+      toast.success(`${net.name} saved`);
+    } catch (e) { setErr(net.id, errMsg(e)); toast.error(`${net.name} not saved`, { description: errMsg(e) }); toTop(); } finally { setBusy(null); }
   };
 
   const test = async () => {
@@ -179,25 +177,19 @@ export function SocialSettings({ profileId, brandName, onChanged }: { profileId:
       replace(await api.putNetwork(profileId, n.id, { [f.key]: "" }));
       onChanged();
       setEdits((e) => { const { [f.key]: _gone, ...rest } = e[n.id] ?? {}; return { ...e, [n.id]: rest }; });
-    } catch (e) { setErr(n.id, errMsg(e)); } finally { setBusy(null); }
+      toast.success(`${f.label} removed`);
+    } catch (e) { setErr(n.id, errMsg(e)); toast.error(`${f.label} not removed`, { description: errMsg(e) }); } finally { setBusy(null); }
   };
 
   const footer = net && (
-    <div className="space-y-2.5">
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" aria-live="polite">
-          {savedNet === net.id ? <span className="flex items-center gap-1 text-brand"><Check className="h-3.5 w-3.5" /> Saved</span> : dirty ? "Unsaved changes" : ""}
-        </span>
-        {net.testable && (
-          <Button variant="outline" size="sm" onClick={test} disabled={busy !== null || dirty || !net.complete} title={dirty ? "Save your changes first" : !net.complete ? "Fill in every field first" : undefined}>
-            {busy === "test" ? <Loader2 className="animate-spin" /> : <PlugZap />} Test connection
-          </Button>
-        )}
-        <Button variant="brand" size="sm" onClick={save} disabled={!dirty || busy !== null || storingNeedsKey}>
-          {busy === "save" && <Loader2 className="animate-spin" />} Save
+    <SaveBar dirty={dirty} busy={busy === "save"} problem={storingNeedsKey ? "Cannot save: no encryption key." : null}
+      onSave={() => { if (busy === null && !storingNeedsKey) void save(); }}
+      onCancel={() => { setEdits((e) => ({ ...e, [net.id]: {} })); setErr(net.id, null); }}
+      extra={net.testable && (
+        <Button variant="outline" size="sm" onClick={test} disabled={busy !== null || dirty || !net.complete} title={dirty ? "Save your changes first" : !net.complete ? "Fill in every field first" : undefined}>
+          {busy === "test" ? <Loader2 className="animate-spin" /> : <PlugZap />} Test connection
         </Button>
-      </div>
-    </div>
+      )} />
   );
 
   return (
@@ -243,7 +235,7 @@ export function SocialSettings({ profileId, brandName, onChanged }: { profileId:
             key={net.id}
             net={net}
             edits={edits[net.id] ?? {}}
-            setEdit={(k, v) => { setEdits((e) => ({ ...e, [net.id]: { ...(e[net.id] ?? {}), [k]: v } })); setSavedNet(null); }}
+            setEdit={(k, v) => setEdits((e) => ({ ...e, [net.id]: { ...(e[net.id] ?? {}), [k]: v } }))}
             canStore={view.canStore}
             busy={busy !== null}
             onRemove={(f) => removeField(net, f)}

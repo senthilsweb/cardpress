@@ -205,6 +205,8 @@ export const api = {
   state: () => call<ApiState>("GET", "/state"),
   putProfiles: (profiles: unknown[]) => call<void>("PUT", "/profiles", { profiles }),
   createProfile: (profile: unknown) => call<void>("POST", "/profiles", profile),
+  /** Save one brand, leaving every other as it is. */
+  saveProfile: (profile: { id: string }) => call<void>("PUT", `/profiles/${encodeURIComponent(profile.id)}`, profile),
   dashboard: (q: { profileId: string; all: boolean; period: Period; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), ...periodQuery(q.period), tz: q.tz })}`),
   brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
   saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
