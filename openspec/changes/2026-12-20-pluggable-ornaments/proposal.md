@@ -1,6 +1,6 @@
 # Pluggable ornaments
 
-**Status:** built (asked for by the owner on 2026-11-26); not yet deployed. Follows `2026-12-19-greeting-layouts`.
+**Status:** built (asked for by the owner); in the release after `v0.3.0`, not yet deployed.
 
 ## Why
 The greeting layout draws one ornament, a heart flourish, with an on/off switch. Other occasions need their own, and

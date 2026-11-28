@@ -1,7 +1,6 @@
 # Dashboard totals and a date range
 
-**Status:** being built (asked for by the owner on 2026-11-27, for the release after `v0.2.0`). Extends
-`2026-12-26-brand-dashboard`.
+**Status:** released in `v0.2.1`; deployed.
 
 ## Why
 The dashboard does not say how many brands or people there are, shows cost only for what is in view, and offers four

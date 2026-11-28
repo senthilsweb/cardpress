@@ -6,4 +6,4 @@
 - [x] Seasonal palettes
 - [x] Tests, `docs/adding-backgrounds.md`
 - [x] Check in the browser, including PNG export
-- [ ] Deploy
+- [x] Deploy

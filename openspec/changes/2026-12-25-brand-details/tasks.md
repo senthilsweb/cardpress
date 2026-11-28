@@ -4,4 +4,4 @@
 - [x] Country list
 - [x] New brand section, Brand look section, type in the list
 - [x] Tests (access, privacy), docs, user guide, browser check
-- [ ] Backup and deploy
+- [x] Backup and deploy

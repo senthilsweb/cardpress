@@ -1,6 +1,6 @@
 # An added picture is seen
 
-**Status:** built (asked for by the owner on 2026-11-27); not yet deployed.
+**Status:** built (asked for by the owner); in the release after `v0.3.0`, not yet deployed.
 
 ## Why
 A card holds three kinds of picture, and the chosen background decides which is drawn. Adding a background image to a

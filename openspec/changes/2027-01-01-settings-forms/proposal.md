@@ -1,6 +1,6 @@
 # A first brand of one's own, and settings forms that save the same way
 
-**Status:** being built (asked for by the owner on 2026-11-27, after `v0.2.1`).
+**Status:** released in `v0.3.0`; deployed.
 
 ## Faults
 1. A new person's brand carried the project owner's name, handle, website and logo text, and the sample card carried

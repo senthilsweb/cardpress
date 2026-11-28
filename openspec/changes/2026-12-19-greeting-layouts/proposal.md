@@ -1,6 +1,6 @@
 # Greeting layouts
 
-**Status:** step 1 built (agreed by the owner on 2026-11-26: drawn art, square by default, ornament on with a switch); not yet deployed. The other presets, art sets and templates are not built.
+**Status:** step 1 released and deployed (2026-11-27). The other presets, art sets and templates are not built.
 
 ## Why
 The card layouts are made for articles and announcements: small line, headline, subtitle, aligned left. A greeting card

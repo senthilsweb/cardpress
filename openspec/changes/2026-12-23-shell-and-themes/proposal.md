@@ -1,6 +1,6 @@
 # A header, a labelled side bar, and colour themes
 
-**Status:** agreed by the owner on 2026-11-27 (header contents as drawn; Parchment stays the default). Built on 2026-11-27, not yet deployed. Media is not in the side bar until the media library exists.
+**Status:** released and deployed (2026-11-27). Open: new guide pictures.
 
 ## Why
 The navigation is icons without names, the logo and brand sit in the same square, and the colours cannot be chosen.

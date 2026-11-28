@@ -1,7 +1,6 @@
 # Dashboard controls: shadcn throughout, the date range in a pop-up
 
-**Status:** being built (asked for by the owner on 2026-11-27, after seeing `2026-12-29-dashboard-totals`). Released with
-the next large set of changes.
+**Status:** released in `v0.2.1`; deployed.
 
 ## Why
 The custom dates appeared as two browser date fields on a row of their own, which took space and did not look like the

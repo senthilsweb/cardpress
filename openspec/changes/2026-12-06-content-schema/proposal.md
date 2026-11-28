@@ -1,6 +1,6 @@
 # Content fields: one schema for the studio and the agents
 
-**Status:** revised 2026-11-25: the owner asked for strongly typed models (Zod or Pydantic) rather than a hand-written schema. Specification only: nothing is built.
+**Status:** built and released; agents applied with the content schema on 2026-11-26.
 
 ## Why
 The same facts about a post or article are written down in several places: database columns, server checks, tool descriptions, agent skills and grading rubrics. They already disagree:

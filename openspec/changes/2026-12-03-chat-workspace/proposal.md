@@ -1,6 +1,6 @@
 # Chat workspace: talk on the left, see the post and the article
 
-**Status:** parts A (layout and linked drafts) and B (sources and the message box) are built; Undo is not.
+**Status:** parts A (layout and linked drafts) and B (sources and the message box) and history are released. Change cards with Undo (part C) are not built; Save as version and Undo of `2026-12-07-assistant-choices` replaced part of the need.
 
 ## Why
 - The assistant is a drawer that covers part of the canvas.

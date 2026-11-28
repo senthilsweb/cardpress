@@ -51,4 +51,4 @@ Build order across this change and `2026-12-03-chat-workspace`:
 
 ## 6. Docs
 - [x] `docs/chat.md`, `docs/cma-agent.md`, `docs/configuration.md`, `docs/data-model.md` (`docs/mcp.md` with step 4)
-- [ ] `openspec/project.md`: the LLM writes the card's words and the post, never the look, and may post with confirmation; remove "blocked on the agent repo"
+- [ ] `openspec/project.md`: add that the assistant may post with confirmation, once that is built

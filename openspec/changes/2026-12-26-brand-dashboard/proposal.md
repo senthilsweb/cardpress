@@ -1,6 +1,6 @@
 # A dashboard for each brand
 
-**Status:** built (agreed by the owner on 2026-11-27, with a Sign in button on the home page), not deployed.
+**Status:** released in `v0.2.0`; deployed.
 
 ## Why
 Nothing shows how much has been written, what is waiting, or what the assistant has cost.

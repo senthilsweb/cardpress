@@ -1,6 +1,6 @@
 # A clearer studio: navigation and one place per item
 
-**Status:** revised 2026-11-25 after the owner's review. The owner accepted Chat | Details | Design and asked for a second-level navigation in place of the account popup and the right drawers. Nothing is built.
+**Status:** built and released; the frame was later redrawn (`2026-12-23-shell-and-themes`). Open: new screenshots in the docs.
 
 ## Why
 The owner finds the studio confusing. What causes it:

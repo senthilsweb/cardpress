@@ -1,6 +1,6 @@
 # One dialog design, and settings in a dialog
 
-**Status:** in progress (asked for by the owner on 2026-11-26, with a reference picture; started 2026-11-27). Built, not deployed. Media waits for the media library.
+**Status:** released in `v0.2.0` and earlier; deployed.
 
 ## Why
 Popups differ from one another, and settings are separate pages that leave the work behind.

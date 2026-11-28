@@ -1,7 +1,6 @@
 # Media library, per brand
 
-**Status:** part 1 (storage, API, the Media page) released in `v0.2.1`; part 2 (choosing from the library, `asset:`
-references, in-use protection, disk warning) built, not deployed. Asked for by the owner on 2026-11-26.
+**Status:** part 1 released in `v0.2.1`, part 2 in `v0.3.0`; deployed.
 
 ## Why
 Pictures are uploaded again for every card and stored inside each card's design. A brand needs one place for its logos,

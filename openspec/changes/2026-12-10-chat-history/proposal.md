@@ -1,6 +1,6 @@
 # The whole conversation, reopened
 
-**Status:** proposed. Nothing is built.
+**Status:** built and released.
 
 ## Why
 A reopened conversation shows its messages, but not all that happened in it. What the assistant did while working is lost, and a reply that failed leaves no trace although drafts may have been saved.
