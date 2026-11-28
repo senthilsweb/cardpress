@@ -7,7 +7,7 @@ import { cssFamily, ensureFont, resolveFonts } from "@/lib/fonts";
 import { fillPictures, picturesOf, usePictures } from "@/lib/assetRefs";
 import { bgById, type Area, type MaskKind } from "./backgrounds";
 import { Ornament, ornamentOf } from "./ornaments";
-import { shadeLayers } from "./shade";
+import { greetingWash, shadeLayers, washesArt } from "./shade";
 import { fitScale } from "./fit";
 
 export interface LayoutDef {
@@ -376,8 +376,11 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
       {!fullBleedImage && (L === "center" || L === "quote") && design.background !== "plain" && (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
-      {!fullBleedImage && greeting && !bg.frames && design.background !== "plain" && (
-        // a greeting's words fill more of the card, so the wash behind them is wider and stronger
+      {washesArt(design, bg.frames) && design.shade !== undefined && greetingWash(pal.base, design.shade) && (
+        <div data-wash style={{ position: "absolute", inset: 0, background: greetingWash(pal.base, design.shade)! }} />
+      )}
+      {washesArt(design, bg.frames) && design.shade === undefined && (
+        // cards made before the Shading setting keep their wider, stronger wash
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 72% 62% at 50% 50%, ${rgba(pal.base, 0.95)} 0%, ${rgba(pal.base, 0.86)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
       {bf > 0 && <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(pal.fade, 0)} 45%, ${rgba(pal.fade, bf)} 100%)` }} />}

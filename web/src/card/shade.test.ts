@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fillsCard, shadeLayers, type ShadePlace } from "./shade";
+import { fillsCard, greetingWash, shadeLayers, washesArt, type ShadePlace } from "./shade";
 
 const at = (patch: Partial<ShadePlace> = {}): ShadePlace => ({ layout: "hero", land: false, textTop: 0.6, logo: true, footer: true, ...patch });
 
@@ -22,5 +22,20 @@ describe("shading one's own picture", () => {
 
   it("applies only to a picture that fills the card", () => {
     expect([fillsCard({ background: "image", bgImage: "a" }), fillsCard({ background: "image" }), fillsCard({ background: "dots", bgImage: "a" })]).toEqual([true, false, false]);
+  });
+});
+
+describe("the wash behind a greeting's words", () => {
+  const card = { layout: "greeting" as const, background: "maple-weave" };
+
+  it("is laid over art that reaches under the words only", () => {
+    expect(washesArt(card)).toBe(true);
+    expect([washesArt(card, true), washesArt({ ...card, background: "plain" }), washesArt({ ...card, layout: "hero" }), washesArt({ ...card, background: "image", bgImage: "a" })]).toEqual([false, false, false, false]);
+  });
+
+  it("follows the shade, from nothing to solid at the middle", () => {
+    expect(greetingWash("#000000", 0)).toBeNull();
+    expect(greetingWash("#000000", 0.4)).toContain("rgba(0,0,0,0.46) 0%");
+    expect(greetingWash("#000000", 1)).toContain("rgba(0,0,0,1) 0%");
   });
 });

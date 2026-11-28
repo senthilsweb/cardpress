@@ -8,7 +8,7 @@ import { bgById, categoryOf } from "@/card/backgrounds";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { LAYOUTS } from "@/card/Card";
 import { Ornament, ornamentOf, ornamentsFor } from "@/card/ornaments";
-import { DEFAULT_SHADE, fillsCard } from "@/card/shade";
+import { DEFAULT_SHADE, fillsCard, washesArt } from "@/card/shade";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -75,7 +75,11 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
                 type="button"
                 title={l.hint}
                 // a greeting is square unless another size was chosen
-                onClick={() => set({ layout: l.id, ...(l.id === "greeting" && design.sizeId === "li-post" ? { sizeId: "li-square" } : {}) })}
+                onClick={() => set({
+                  layout: l.id,
+                  ...(l.id === "greeting" && design.sizeId === "li-post" ? { sizeId: "li-square" } : {}),
+                  ...(l.id === "greeting" && design.layout !== "greeting" && design.shade === undefined ? { shade: DEFAULT_SHADE } : {}),
+                })}
                 className={cn(
                   "flex cursor-pointer flex-col items-center gap-1.5 rounded-md border px-2 py-2.5 text-[11.5px] transition-colors",
                   on ? "border-brand bg-accent text-foreground" : "border-border bg-card text-muted-foreground hover:border-brand/50 hover:text-foreground"
@@ -119,10 +123,14 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <Button variant="outline" size="sm" className="w-full" onClick={() => setBrowsing(true)}>
           <Search /> Browse backgrounds
         </Button>
-        {fillsCard(design) && (
+        {(fillsCard(design) || washesArt(design, bg.frames)) && (
           <SliderField label="Shading" value={design.shade ?? DEFAULT_SHADE} min={0} max={1} step={0.05} onChange={(v) => set({ shade: v })} format={() => (design.shade === undefined ? "As before" : `${Math.round(design.shade * 100)}%`)} />
         )}
-        <BackgroundPicker open={browsing} onOpenChange={setBrowsing} design={design} profile={profile} onUse={set} />
+        <BackgroundPicker open={browsing} onOpenChange={setBrowsing} design={design} profile={profile} onUse={(patch) => {
+          // a background newly chosen for a greeting starts with the lighter wash
+          const fresh = design.layout === "greeting" && design.shade === undefined && patch.background !== design.background;
+          set(fresh ? { ...patch, shade: DEFAULT_SHADE } : patch);
+        }} />
       </Section>
 
       <Section title="Images">

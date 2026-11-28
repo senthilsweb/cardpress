@@ -7,6 +7,18 @@ export const DEFAULT_SHADE = 0.7;
 /** Whether the card's background is a picture of one's own, filling it. */
 export const fillsCard = (d: Pick<Design, "background" | "bgImage">): boolean => d.background === "image" && !!d.bgImage;
 
+/** Whether a greeting lays a wash over the card's art, behind its words. Framing art and plain colour need none. */
+export const washesArt = (d: Pick<Design, "layout" | "background" | "bgImage">, frames?: boolean): boolean =>
+  d.layout === "greeting" && !fillsCard(d) && !frames && d.background !== "plain";
+
+/** That wash for a shade the person set: smaller and lighter than the one older cards keep. Nothing at 0. */
+export function greetingWash(colour: string, shade: number): string | null {
+  const s = Math.min(Math.max(shade, 0), 1);
+  if (s === 0) return null;
+  const a = (part: number) => rgba(colour, Math.round(Math.min(s * part, 1) * 1000) / 1000);
+  return `radial-gradient(ellipse 64% 56% at 50% 50%, ${a(1.15)} 0%, ${a(0.86)} 55%, ${a(0)} 100%)`;
+}
+
 export interface ShadePlace {
   layout: LayoutId;
   /** A wide card, with words on the left. */

@@ -1,6 +1,6 @@
 # Greeting cards: words that fit, art that shows
 
-**Status:** bolt 1 of 3 built and tested; not yet deployed. Reported by the owner on 2026-11-27, on `v0.4.0`. Follows `2026-12-19-greeting-layouts`.
+**Status:** bolts 1 and 2 of 3 built and tested; not yet deployed. Reported by the owner on 2026-11-27, on `v0.4.0`. Follows `2026-12-19-greeting-layouts`.
 
 ## What was seen
 - On the greeting layout the background looked faded: a wash up to 95% solid lay over most of the card.

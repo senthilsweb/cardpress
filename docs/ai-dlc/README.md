@@ -34,3 +34,4 @@ Recorded as each bolt completes, from 2026-11-27. The changes between the table 
 | Unit of work | Bolt | OpenSpec change |
 |---|---|---|
 | Greeting cards | The words fit: the greeting block is made smaller when too tall | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |
+| Greeting cards | Wash and Shading: a lighter wash behind the words, set by a slider | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |
