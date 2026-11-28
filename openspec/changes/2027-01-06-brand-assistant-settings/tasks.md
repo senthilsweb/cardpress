@@ -24,8 +24,9 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [x] Tests
 
 ## Bolt 5: tiers in the agent repository
-- [ ] Strong and Best agents generated from the Standard ones; manifest version 7
-- [ ] One real session on a stronger tier (ask first: it costs money)
+- [x] Strong and Best agents generated from the Standard ones; manifest version 7 (cardpress-agent, branch `feature/tiers`)
+- [x] Preview of the apply: 8 agents to create, nothing else changed
+- [ ] One real session on a stronger tier, after the apply (ask first: it costs money)
 
 ## Bolt 6: writing guides in the app
 - [ ] Migration; guides with versions; the fixed rules for a guide's text; API
