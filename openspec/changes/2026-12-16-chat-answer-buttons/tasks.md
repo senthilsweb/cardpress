@@ -10,5 +10,5 @@
 - [x] Agent repository tests
 
 ## Release
-- [ ] Deploy the studio, then the agent
+- [x] Deploy the studio, then the agent
 - [ ] One paid test
