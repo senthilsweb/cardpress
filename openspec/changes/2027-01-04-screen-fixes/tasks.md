@@ -15,4 +15,4 @@
 - [x] Browser check on a pale background
 
 ## Release
-- [ ] Deploy
+- [x] Deploy

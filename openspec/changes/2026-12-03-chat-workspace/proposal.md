@@ -1,6 +1,6 @@
 # Chat workspace: talk on the left, see the post and the article
 
-**Status:** parts A (layout and linked drafts), B (sources and the message box) and history are released. Part C (what a reply changed, with Undo and View) is built, not released. Trying a mounted PDF with a managed session is open.
+**Status:** parts A (layout and linked drafts), B (sources and the message box) and history are released. Part C (what a reply changed, with Undo and View) is released in `v0.5.0`. Trying a mounted PDF with a managed session is open.
 
 ## Why
 - The assistant is a drawer that covers part of the canvas.
