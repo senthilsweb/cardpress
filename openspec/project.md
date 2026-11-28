@@ -17,4 +17,8 @@ Self-hosted studio for LinkedIn and blog social cards in my brand colours and fo
 - Docs: `docs/`. Changes: `openspec/changes/<date>-<slug>/` (proposal.md, tasks.md, specs/).
 
 ## Changes
+Work follows **AI-DLC bolts**: a change's `tasks.md` is split into `## Bolt N: name` sections. When a bolt is built and
+tested, the same commit ticks its tasks and updates the proposal's status, [README.md](README.md) and the bolt record in
+`docs/ai-dlc/README.md`. "Released" and "deployed" are written only once a release tag and a deploy confirm them.
+
 [README.md](README.md) lists every change, where it stands and what is still open.
