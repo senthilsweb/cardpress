@@ -31,6 +31,7 @@ import (
 	"github.com/senthilsweb/cardpress/internal/mcpserver"
 	"github.com/senthilsweb/cardpress/internal/pages"
 	"github.com/senthilsweb/cardpress/internal/secrets"
+	"github.com/senthilsweb/cardpress/internal/secure"
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/source"
 	"github.com/senthilsweb/cardpress/internal/store"
@@ -159,7 +160,7 @@ func main() {
 		Notes:              studio,
 		AssistantAdminOnly: cfg.Agent == "cma", // its tools act as one account, so only the admin may use it
 		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Media: newMedia(db.DB, cfg), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
-		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
+		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, ClientIPHeader: cfg.ClientIPHeader, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
@@ -203,13 +204,17 @@ func main() {
 		}
 		_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 		_ = mime.AddExtensionType(".woff2", "font/woff2")
-		mux.Handle(prefix, http.StripPrefix(strings.TrimSuffix(prefix, "/"), static(site)))
+		scripts, err := secure.InlineScripts(site)
+		if err != nil {
+			log.Fatal(err)
+		}
+		mux.Handle(prefix, http.StripPrefix(strings.TrimSuffix(prefix, "/"), static(site, secure.AppPolicy(scripts))))
 		if prefix != "/" {
 			mux.Handle("/", http.RedirectHandler(prefix, http.StatusFound))
 		}
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: telemetry.HTTP(logRequests(mux)), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: telemetry.HTTP(logRequests(secure.Headers(mux))), ReadHeaderTimeout: 10 * time.Second}
 	srv.RegisterOnShutdown(events.Close) // open studios stop listening, so the server can stop
 	go func() {
 		<-ctx.Done()
@@ -241,7 +246,7 @@ func onOff(b bool) string {
 }
 
 // static serves the embedded files. Hashed assets under /_astro are cached for a year.
-func static(site fs.FS) http.Handler {
+func static(site fs.FS, policy string) http.Handler {
 	files := http.FileServer(http.FS(site))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := path.Clean("/" + r.URL.Path)
@@ -250,8 +255,7 @@ func static(site fs.FS) http.Handler {
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", policy)
 		if _, err := fs.Stat(site, strings.TrimPrefix(p, "/")); err != nil && p != "/" {
 			// unknown path: fall back to the app shell
 			r = r.Clone(r.Context())

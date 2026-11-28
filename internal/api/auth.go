@@ -28,6 +28,7 @@ type Accounts interface {
 	ResetSecurity(ctx context.Context) error
 	ActiveSessions(ctx context.Context) (int, error)
 	SignOutEveryone(ctx context.Context, keepToken string) (int, error)
+	AllowSignup(addr string) bool
 	Logout(ctx context.Context, token string) error
 	Get(ctx context.Context, id string) (service.User, error)
 	UpdateProfile(ctx context.Context, id string, in service.ProfileInput) (service.User, error)
@@ -286,6 +287,10 @@ func (s *server) signup(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	if !s.Accounts.AllowSignup(s.clientAddr(r)) {
+		fail(w, r, service.ErrTooManyAttempts)
+		return
+	}
 	u, err := s.Accounts.Signup(r.Context(), in)
 	if err != nil {
 		fail(w, r, err)
@@ -307,11 +312,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	addr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		addr = r.RemoteAddr
-	}
-	u, token, err := s.Accounts.Login(r.Context(), in.Email, in.Password, addr)
+	u, token, err := s.Accounts.Login(r.Context(), in.Email, in.Password, s.clientAddr(r))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -377,6 +378,25 @@ func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// clientAddr is the address a request came from, for counting failed sign-ins. Behind a proxy it is read from the
+// header the configuration names, which the proxy must set itself: whatever a visitor sends under that name is replaced.
+func (s *server) clientAddr(r *http.Request) string {
+	if s.ClientIPHeader != "" {
+		values := r.Header.Values(s.ClientIPHeader)
+		if len(values) > 0 { // a list grows at the end: the last is the one the nearest proxy wrote
+			parts := strings.Split(values[len(values)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
+			}
+		}
+	}
+	addr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return addr
 }
 
 // setSessionCookie writes the session cookie, or removes it (maxAge below zero).

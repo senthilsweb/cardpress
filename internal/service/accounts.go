@@ -13,6 +13,7 @@ import (
 	"net/mail"
 	"regexp"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,7 @@ const (
 	maxPhone        = 30
 	failuresAllowed = 5
 	lockFor         = 15 * time.Minute
+	signupsAllowed  = 20 // from one address in an hour
 )
 
 // AccountsOptions are the settings that decide who may join.
@@ -58,6 +60,7 @@ type Accounts struct {
 
 	mu       sync.Mutex
 	failures map[string]*failure // keyed by "email|address", and by the address alone
+	signups  map[string][]time.Time
 }
 
 type failure struct {
@@ -80,7 +83,7 @@ func NewAccounts(db *sql.DB, o AccountsOptions) *Accounts {
 	if o.SessionMax < o.SessionIdle {
 		o.SessionMax = o.SessionIdle
 	}
-	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}}
+	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}, signups: map[string][]time.Time{}}
 }
 
 func (a *Accounts) stamp() string { return a.now().UTC().Format(time.RFC3339) }
@@ -563,6 +566,31 @@ func (a *Accounts) clear(keys ...string) {
 	for _, k := range keys {
 		delete(a.failures, k)
 	}
+}
+
+// AllowSignup counts a try to create an account from addr and says whether it may go on: each one costs the server a
+// password hash and may leave an account behind.
+func (a *Accounts) AllowSignup(addr string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	recent := func(all []time.Time) []time.Time {
+		return slices.DeleteFunc(all, func(t time.Time) bool { return now.Sub(t) >= time.Hour })
+	}
+	if len(a.signups) > 10000 { // keep the table small
+		for k, v := range a.signups {
+			if len(recent(v)) == 0 {
+				delete(a.signups, k)
+			}
+		}
+	}
+	tries := recent(a.signups[addr])
+	if len(tries) >= signupsAllowed {
+		a.signups[addr] = tries
+		return false
+	}
+	a.signups[addr] = append(tries, now)
+	return true
 }
 
 // Login checks an email and password and starts a session. It returns the session token for the cookie. addr is the

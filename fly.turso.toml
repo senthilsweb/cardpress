@@ -7,6 +7,7 @@ primary_region = "iad"
   dockerfile = "Dockerfile"
 
 [env]
+  CARDPRESS_CLIENT_IP_HEADER = "Fly-Client-IP"   # the visitor's address, set by Fly's proxy
   ADDR = ":8080"
 
 [http_service]

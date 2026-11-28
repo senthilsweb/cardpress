@@ -32,6 +32,7 @@ type Config struct {
 	DefaultRole     string        // the role of a person who signs up (CARDPRESS_DEFAULT_ROLE): editor (default) or writer
 	SignupClosed    bool          // CARDPRESS_SIGNUP=closed: only an administrator adds people after the first account
 	AdminEmail      string        // CARDPRESS_ADMIN_EMAIL: if set, only this email may create the first (admin) account
+	ClientIPHeader  string        // CARDPRESS_CLIENT_IP_HEADER: the header a proxy sets with the client's address
 	SessionIdle     time.Duration // CARDPRESS_SESSION_IDLE: a sign-in ends after this long without use (20m)
 	SessionMax      time.Duration // CARDPRESS_SESSION_MAX: and after this long in all (12h)
 	PublicURL       string        // the address readers use, for the public pages (CARDPRESS_PUBLIC_URL), e.g. https://example.com
@@ -174,6 +175,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	c.DefaultRole = strings.ToLower(env("CARDPRESS_DEFAULT_ROLE", "editor"))
 	c.SignupClosed = strings.EqualFold(env("CARDPRESS_SIGNUP", "open"), "closed")
 	c.AdminEmail = strings.ToLower(env("CARDPRESS_ADMIN_EMAIL", ""))
+	c.ClientIPHeader = env("CARDPRESS_CLIENT_IP_HEADER", "")
 	c.PublicURL = strings.TrimRight(env("CARDPRESS_PUBLIC_URL", ""), "/")
 	c.SiteName = env("CARDPRESS_SITE_NAME", "")
 	for _, o := range strings.Split(env("CARDPRESS_CORS_ORIGINS", ""), ",") {

@@ -21,9 +21,9 @@
 - [x] Tests, browser check
 
 ## Bolt 5: hardening
-- [ ] Client address behind a proxy; limit on sign-ups
-- [ ] Security headers and content security policy; no caching of API answers
-- [ ] Tests, browser check of every screen under the policy
+- [x] Client address behind a proxy; limit on sign-ups
+- [x] Security headers and content security policy; no caching of API answers
+- [x] Tests, browser check of every screen under the policy
 
 ## Bolt 6: security log
 - [ ] Migration, recording, list on the Security page

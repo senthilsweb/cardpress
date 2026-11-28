@@ -147,7 +147,9 @@ type Options struct {
 	CORSOrigins  []string // exact origins allowed to call the API from a browser
 	LocalGuard   bool     // no token: answer only to localhost names (see ProtectOptions)
 	AllowedHosts []string // extra host names the server may be reached by when LocalGuard is on
-	Audit        interface {
+	// ClientIPHeader, behind a proxy, names the header it sets with the visitor's address.
+	ClientIPHeader string
+	Audit          interface {
 		List(ctx context.Context, limit int) ([]mcpserver.AuditEntry, error)
 	} // MCP call log; nil if MCP is off
 	Version  string
