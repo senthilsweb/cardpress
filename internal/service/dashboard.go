@@ -45,13 +45,15 @@ type Spend struct {
 
 // SessionSpend is what one assistant session cost in the period.
 type SessionSpend struct {
-	ConversationID string  `json:"conversationId"`
-	ProfileID      string  `json:"profileId"`
-	Title          string  `json:"title"`
-	CostCents      int     `json:"costCents"`
-	Replies        int     `json:"replies"`
-	ActiveSeconds  float64 `json:"activeSeconds"`
-	LastAt         string  `json:"lastAt"`
+	ConversationID string `json:"conversationId"`
+	ProfileID      string `json:"profileId"`
+	Title          string `json:"title"`
+	// Tier is the tier the conversation runs on; empty when it has none.
+	Tier          string  `json:"tier,omitempty"`
+	CostCents     int     `json:"costCents"`
+	Replies       int     `json:"replies"`
+	ActiveSeconds float64 `json:"activeSeconds"`
+	LastAt        string  `json:"lastAt"`
 }
 
 // Usage is the assistant's cost and work in the period. Cost is the list price the agent service reports.
@@ -331,7 +333,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 	for i, id := range ids {
 		args[i] = id
 	}
-	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, u.session_id, u.added_cents, u.active_seconds, u.created_at
+	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, c.tier, u.session_id, u.added_cents, u.active_seconds, u.created_at
 		FROM chat_usage u JOIN conversations c ON c.id = u.conversation_id
 		WHERE c.profile_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")+`) ORDER BY u.created_at, u.rowid`, args...)
 	if err != nil {
@@ -348,10 +350,10 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 	brandCost, brandSessions := map[string]int{}, map[string]map[string]bool{}
 	first := time.Time{}
 	for rs.Next() {
-		var pid, conv, title, sid, created string
+		var pid, conv, title, tier, sid, created string
 		var cents int
 		var seconds float64
-		if err := rs.Scan(&pid, &conv, &title, &sid, &cents, &seconds, &created); err != nil {
+		if err := rs.Scan(&pid, &conv, &title, &tier, &sid, &cents, &seconds, &created); err != nil {
 			return err
 		}
 		at, err := time.Parse(time.RFC3339, created)
@@ -368,7 +370,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 		}
 		s := sessions[key]
 		if s == nil {
-			s = &session{SessionSpend: SessionSpend{ConversationID: conv, ProfileID: pid, Title: title}, before: before[key]}
+			s = &session{SessionSpend: SessionSpend{ConversationID: conv, ProfileID: pid, Title: title, Tier: tier}, before: before[key]}
 			sessions[key] = s
 			order = append(order, key)
 		}

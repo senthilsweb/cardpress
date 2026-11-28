@@ -23,8 +23,9 @@ checks and budgets: not an API key.
 | Per conversation | 200 cents | | `CARDPRESS_AGENT_BUDGET_CENTS` (as now) |
 
 ## Tiers
-- Manifest version 7 lists the tiers: for each an id, a name, the coordinator's agent id and version, and the models
-  for display. The first is the default. Version 6 is still read, as one tier, Standard.
+- Manifest version 7 may list `tiers`: for each an `id`, a `name`, the coordinator's `agent_id` and `agent_version`,
+  and `models` (`role`, `model`) for display. The first is the default. A manifest without them (versions 5 and 6) has
+  one tier, Standard, made from `agent_id`.
 - In the agent repository each tier is its own coordinator and writers, made from the same instructions and skills
   with only the models different, so the tiers cannot drift apart.
 - The tier is read when a conversation's session is created and stays with it. A change applies to new

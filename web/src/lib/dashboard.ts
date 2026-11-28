@@ -4,7 +4,7 @@ import type { BudgetStatus } from "./brandAssistant";
 export interface Counts { total: number; draft: number; approved: number; scheduled: number; published: number; attention: number; pages: number }
 export interface DashboardItem { type: "job" | "draft"; id: string; draftId?: string; profileId: string; kind: "post" | "article"; status: string; title: string; at: string }
 export interface Spend { start: string; costCents: number; replies: number }
-export interface SessionSpend { conversationId: string; profileId: string; title: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
+export interface SessionSpend { conversationId: string; profileId: string; title: string; /** The tier the conversation runs on, when it has one. */ tier?: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
 export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
 export interface BrandSummary { id: string; posts: Counts; articles: Counts; costCents: number; sessions: number }
 /** The person's figures over everything they may open. `users` is told to an admin only. */
@@ -99,3 +99,6 @@ export function statusRows(kind: "post" | "article", c: Counts): { label: string
     ...(c.attention ? [{ label: "Needs a look", count: c.attention }] : []),
   ];
 }
+
+/** A tier's id as a name: "strong" is "Strong". */
+export const tierLabel = (id?: string) => (id ? id[0].toUpperCase() + id.slice(1) : "–");

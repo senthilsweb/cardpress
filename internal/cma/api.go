@@ -15,7 +15,8 @@ import (
 
 // sessionAPI is the part of the Managed Agents API the client uses. The real one wraps the SDK; tests use a scripted fake.
 type sessionAPI interface {
-	newSession(ctx context.Context, title string) (string, error)
+	// newSession starts a session on an agent; version pins it when it is a number.
+	newSession(ctx context.Context, title, agentID, version string) (string, error)
 	sendMessage(ctx context.Context, sessionID, text string) (eventID string, err error)
 	sendOutcome(ctx context.Context, sessionID, description, rubric string, iterations int) (eventID string, err error)
 	interrupt(ctx context.Context, sessionID string) error
@@ -77,17 +78,17 @@ func gone(err error) error {
 	return err
 }
 
-func (a *sdkAPI) newSession(ctx context.Context, title string) (string, error) {
+func (a *sdkAPI) newSession(ctx context.Context, title, agentID, version string) (string, error) {
 	m := a.cfg.Manifest
 	p := anthropic.BetaSessionNewParams{
-		Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(m.AgentID)},
+		Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(agentID)},
 		EnvironmentID: m.EnvironmentID,
 		VaultIDs:      []string{m.VaultID},
 		Title:         anthropic.String(title),
 		Metadata:      map[string]string{"app": "cardpress"},
 	}
-	if v, err := strconv.Atoi(m.AgentVersion); err == nil {
-		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: m.AgentID, Version: anthropic.Int(int64(v))}}
+	if v, err := strconv.Atoi(version); err == nil {
+		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: agentID, Version: anthropic.Int(int64(v))}}
 	}
 	if a.cfg.BudgetCents > 0 {
 		p.Budget = anthropic.BetaManagedAgentsBudgetLimitParam{MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: strconv.Itoa(a.cfg.BudgetCents), Currency: "USD"}}

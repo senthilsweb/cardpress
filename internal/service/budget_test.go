@@ -195,3 +195,79 @@ func TestAReplyStoppedByTheBudgetStillCounts(t *testing.T) {
 		t.Fatalf("the conversation's cost: %v", got.CostCents)
 	}
 }
+
+// tieredAgent is a spy that offers tiers.
+type tieredAgent struct {
+	spyAgent
+	tiers []agent.Tier
+	on    []string // the tier of each session started
+}
+
+func (a *tieredAgent) Tiers() []agent.Tier { return a.tiers }
+func (a *tieredAgent) CreateSessionOn(ctx context.Context, tier string) (string, error) {
+	a.on = append(a.on, tier)
+	return a.CreateSession(ctx)
+}
+
+// A brand's tier is the one its new conversations start on. A conversation keeps its tier when the brand's changes and
+// when its session has to be started again, and a saved tier that is no longer offered gives way to the first.
+func TestABrandsTier(t *testing.T) {
+	spy := &tieredAgent{tiers: []agent.Tier{{ID: "standard", Name: "Standard"}, {ID: "strong", Name: "Strong"}, {ID: "best", Name: "Best"}}}
+	spy.out = agent.Output{Reply: "Done."}
+	c, ctx := newChat(t, spy, &fakeFetcher{}), context.Background()
+	if _, err := c.db.Exec(`INSERT INTO profiles (id, owner_id, data, position, updated_at) VALUES ('p', '', '{}', 0, '')`); err != nil {
+		t.Fatal(err)
+	}
+	_, emit := collect()
+	set := func(tier string) {
+		t.Helper()
+		if _, err := c.SetBrandAssistant(ctx, "p", BrandAssistant{Tier: tier, Checks: true, Rounds: 3, AlertPercent: 80}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	say := func(convID string) {
+		t.Helper()
+		if err := c.Send(ctx, convID, "Go on", emit); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tierOf := func(convID string) (tier string) {
+		if err := c.db.QueryRow(`SELECT tier FROM conversations WHERE id = ?`, convID).Scan(&tier); err != nil {
+			t.Fatal(err)
+		}
+		return tier
+	}
+
+	first, _ := c.Start(ctx, "p", "", pasted)
+	say(first.ID)
+	set("strong")
+	second, _ := c.Start(ctx, "p", "", pasted)
+	say(second.ID)
+	say(first.ID) // an open conversation goes on as it began
+	if got := strings.Join(spy.on, " "); got != "standard strong" || tierOf(first.ID) != "standard" || tierOf(second.ID) != "strong" {
+		t.Fatalf("started on %q; %q %q", got, tierOf(first.ID), tierOf(second.ID))
+	}
+	// its session is lost: the new one is on the same tier, not the brand's present one
+	set("best")
+	if _, err := c.db.Exec(`UPDATE conversations SET session_id = '' WHERE id = ?`, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	say(second.ID)
+	if got := spy.on[len(spy.on)-1]; got != "strong" {
+		t.Fatalf("restarted on %q", got)
+	}
+	if _, err := c.SetBrandAssistant(ctx, "p", BrandAssistant{Tier: "platinum", Checks: true, Rounds: 3, AlertPercent: 80}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a tier that is not offered: %v", err)
+	}
+	// the assistant stops offering the brand's tier
+	spy.tiers = spy.tiers[:2]
+	v, err := c.BrandAssistant(ctx, "p")
+	if err != nil || v.TierGone != "best" || v.Settings.Tier != "standard" || len(v.Tiers) != 2 {
+		t.Fatalf("%v %+v", err, v)
+	}
+	third, _ := c.Start(ctx, "p", "", pasted)
+	say(third.ID)
+	if got := spy.on[len(spy.on)-1]; got != "standard" || tierOf(third.ID) != "standard" {
+		t.Fatalf("a tier that is gone: %q", got)
+	}
+}

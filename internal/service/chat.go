@@ -687,18 +687,34 @@ func (c *Chat) insertMessage(ctx context.Context, convID string, m ChatMessage) 
 }
 
 func (c *Chat) session(ctx context.Context, id string) (string, error) {
-	var s string
-	if err := c.db.QueryRowContext(ctx, `SELECT session_id FROM conversations WHERE id = ?`, id).Scan(&s); err != nil {
+	var s, tier, profileID string
+	var err error
+	if err := c.db.QueryRowContext(ctx, `SELECT session_id, tier, profile_id FROM conversations WHERE id = ?`, id).Scan(&s, &tier, &profileID); err != nil {
 		return "", err
 	}
 	if s != "" {
 		return s, nil
 	}
-	s, err := c.agent.CreateSession(ctx)
-	if err != nil {
+	tiered, ok := c.agent.(agent.Tiered)
+	if !ok {
+		if s, err = c.agent.CreateSession(ctx); err != nil {
+			return "", agentErr("The agent could not start a session: %v", err)
+		}
+		_, err = c.db.ExecContext(ctx, `UPDATE conversations SET session_id = ? WHERE id = ?`, s, id)
+		return s, err
+	}
+	// a conversation keeps the tier it started on, while that is on offer; a new one takes the brand's
+	if !c.hasTier(tier) {
+		plan, _, _, perr := c.assistantFor(ctx, profileID)
+		if perr != nil {
+			return "", perr
+		}
+		tier = plan.Tier
+	}
+	if s, err = tiered.CreateSessionOn(ctx, tier); err != nil {
 		return "", agentErr("The agent could not start a session: %v", err)
 	}
-	_, err = c.db.ExecContext(ctx, `UPDATE conversations SET session_id = ? WHERE id = ?`, s, id)
+	_, err = c.db.ExecContext(ctx, `UPDATE conversations SET session_id = ?, tier = ? WHERE id = ?`, s, tier, id)
 	return s, err
 }
 

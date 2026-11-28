@@ -19,9 +19,9 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [x] Tests, browser check (`scripts/record-demo/check-budget.mjs`; the stand-in knows spending limits)
 
 ## Bolt 4: tiers in the app
-- [ ] Manifest versions 6 and 7; the brand's tier chooses the coordinator when a session is created; the tier is recorded with the conversation
-- [ ] The dashboard shows the tier
-- [ ] Tests
+- [x] Manifest versions 5 to 7; version 7 lists the tiers; the brand's tier chooses the agents when a session is created; the tier is kept with the conversation
+- [x] The dashboard shows the tier of the largest sessions
+- [x] Tests
 
 ## Bolt 5: tiers in the agent repository
 - [ ] Strong and Best agents generated from the Standard ones; manifest version 7

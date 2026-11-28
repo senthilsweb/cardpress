@@ -72,6 +72,8 @@ type TierModel struct {
 // Tiered is an assistant that offers tiers. The first is the one used when nothing is chosen.
 type Tiered interface {
 	Tiers() []Tier
+	// CreateSessionOn is CreateSession on the agents of one tier.
+	CreateSessionOn(ctx context.Context, tier string) (string, error)
 }
 
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.

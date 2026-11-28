@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +18,10 @@ import (
 // ManifestVersion is the contract version this adapter speaks. Version 5 is still accepted, so that the server and the
 // agents can be deployed one after the other.
 const (
-	ManifestVersion = 6
+	ManifestVersion = 7
 	oldestManifest  = 5
+	// schemaFrom is the first version that must carry the content schema.
+	schemaFrom = 6
 )
 
 // Outcome is how a first draft of one kind is asked for and graded.
@@ -26,6 +29,22 @@ type Outcome struct {
 	Description   string `json:"description"`
 	Rubric        string `json:"rubric"`
 	MaxIterations int    `json:"max_iterations"`
+}
+
+// Tier is one set of agents: a coordinator with its writers, the same work on other models. From version 7.
+type Tier struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	AgentID      string `json:"agent_id"`
+	AgentVersion string `json:"agent_version"` // pinned when given
+	// Models says which model does what, for the screen.
+	Models []TierModel `json:"models,omitempty"`
+}
+
+// TierModel is a role ("Coordinator", "Article writer") and the name of its model.
+type TierModel struct {
+	Role  string `json:"role"`
+	Model string `json:"model"`
 }
 
 // Manifest is what the agent repository publishes about its deployed agents (built by its build-manifest.sh). It holds
@@ -41,6 +60,29 @@ type Manifest struct {
 	// Schema is the content schema the agents were built with, and SchemaVersion its version. Required from version 6.
 	Schema        json.RawMessage `json:"schema,omitempty"`
 	SchemaVersion int             `json:"schema_version,omitempty"`
+	// Tiers are the sets of agents on offer, the default first. A manifest without them has one: its agent_id.
+	Tiers []Tier `json:"tiers,omitempty"`
+}
+
+var tierID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+
+// tiers are the manifest's tiers; one made from agent_id when it lists none.
+func (m Manifest) tiers() []Tier {
+	if len(m.Tiers) > 0 {
+		return m.Tiers
+	}
+	return []Tier{{ID: "standard", Name: "Standard", AgentID: m.AgentID, AgentVersion: m.AgentVersion}}
+}
+
+// tier finds a tier by id; the first one for an id that is empty or not on offer.
+func (m Manifest) tier(id string) Tier {
+	all := m.tiers()
+	for _, t := range all {
+		if t.ID == id {
+			return t
+		}
+	}
+	return all[0]
 }
 
 const maxManifest = 1 << 20
@@ -95,7 +137,7 @@ func LoadManifest(ctx context.Context, from string) (Manifest, error) {
 		}
 	}
 	if len(m.Schema) == 0 {
-		if m.Version >= ManifestVersion {
+		if m.Version >= schemaFrom {
 			return m, fmt.Errorf("the manifest has no schema")
 		}
 	} else {
@@ -114,6 +156,26 @@ func LoadManifest(ctx context.Context, from string) (Manifest, error) {
 		if n, err := strconv.Atoi(v); err != nil || n < 1 {
 			return m, fmt.Errorf("the manifest's agent_version is not a version number: %q", v)
 		}
+	}
+	if len(m.Tiers) > 8 {
+		return m, fmt.Errorf("the manifest has %d tiers; at most 8", len(m.Tiers))
+	}
+	seen := map[string]bool{}
+	for _, t := range m.Tiers {
+		switch {
+		case !tierID.MatchString(t.ID):
+			return m, fmt.Errorf("the manifest has a tier whose id is not a short lower-case name: %q", t.ID)
+		case seen[t.ID]:
+			return m, fmt.Errorf("the manifest has the tier %q twice", t.ID)
+		case strings.TrimSpace(t.Name) == "" || t.AgentID == "":
+			return m, fmt.Errorf("the manifest's tier %q needs a name and an agent_id", t.ID)
+		}
+		if v := t.AgentVersion; v != "" {
+			if n, err := strconv.Atoi(v); err != nil || n < 1 {
+				return m, fmt.Errorf("the manifest's tier %q has an agent_version that is not a version number: %q", t.ID, v)
+			}
+		}
+		seen[t.ID] = true
 	}
 	return m, nil
 }

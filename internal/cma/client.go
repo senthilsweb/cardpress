@@ -54,9 +54,28 @@ func (c *Client) SessionUsage(ctx context.Context, sessionID string) (agent.Usag
 	return c.api.usage(ctx, sessionID)
 }
 
-// CreateSession starts a managed session for one conversation.
+// CreateSession starts a managed session for one conversation, on the default tier.
 func (c *Client) CreateSession(ctx context.Context) (string, error) {
-	return c.api.newSession(ctx, "CardPress conversation")
+	return c.CreateSessionOn(ctx, "")
+}
+
+// CreateSessionOn starts a managed session on a tier's agents; the default tier for one that is not on offer.
+func (c *Client) CreateSessionOn(ctx context.Context, tier string) (string, error) {
+	t := c.m.tier(tier)
+	return c.api.newSession(ctx, "CardPress conversation", t.AgentID, t.AgentVersion)
+}
+
+// Tiers are the sets of agents the manifest offers, the default first.
+func (c *Client) Tiers() []agent.Tier {
+	var out []agent.Tier
+	for _, t := range c.m.tiers() {
+		tier := agent.Tier{ID: t.ID, Name: t.Name}
+		for _, m := range t.Models {
+			tier.Models = append(tier.Models, agent.TierModel{Role: m.Role, Model: m.Model})
+		}
+		out = append(out, tier)
+	}
+	return out
 }
 
 // Respond sends the person's newest message with its context and follows the session until the agent has finished. Each

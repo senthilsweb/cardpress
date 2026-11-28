@@ -33,9 +33,10 @@ type fake struct {
 	sent       []string // the text of what was sent: a message, or an outcome's description
 	rubrics    []string
 	rounds     []int
-	used       int   // what the session has cost
-	limit      int   // its spending limit
-	limits     []int // each limit set
+	started    []string // the agent and version of each session started
+	used       int      // what the session has cost
+	limit      int      // its spending limit
+	limits     []int    // each limit set
 	gone       bool
 	interrupts int
 	drop       bool // the first stream ends after what was sent
@@ -90,7 +91,10 @@ func (f *fake) deliver(kind, text string) (string, error) {
 	return id, nil
 }
 
-func (f *fake) newSession(context.Context, string) (string, error) { return "sesn_1", nil }
+func (f *fake) newSession(_ context.Context, _, agentID, version string) (string, error) {
+	f.started = append(f.started, agentID+"@"+version)
+	return "sesn_1", nil
+}
 func (f *fake) sendMessage(_ context.Context, _ string, text string) (string, error) {
 	return f.deliver("user.message", text)
 }
@@ -332,7 +336,7 @@ func TestTheManifest(t *testing.T) {
 	for want, from := range map[string]string{
 		"CARDPRESS_AGENT_MANIFEST": "", "could not read": "/no/such/file", "not valid JSON": "{nope",
 		"version 4":                       strings.Replace(string(b), `"version":5`, `"version":4`, 1),
-		"version 7":                       strings.Replace(string(b), `"version":5`, `"version":7`, 1),
+		"version 8":                       strings.Replace(string(b), `"version":5`, `"version":8`, 1),
 		"has no schema":                   strings.Replace(string(b), `"version":5`, `"version":6`, 1),
 		"carries version":                 strings.Replace(string(b), `{"version":5`, `{"schema":`+string(content.Schema)+`,"schema_version":1,"version":5`, 1),
 		"vault_id":                        strings.Replace(string(b), `"vlt_1"`, `""`, 1),
@@ -369,7 +373,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 	defer srv.Close()
 	a := newSDKAPI(Config{Manifest: manifest, BudgetCents: 250, APIKey: "k", WorkspaceID: "wrkspc_1", BaseURL: srv.URL})
 	ctx := context.Background()
-	if sid, err := a.newSession(ctx, "T"); err != nil || sid != "sesn_1" {
+	if sid, err := a.newSession(ctx, "T", "agent_1", "3"); err != nil || sid != "sesn_1" {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"id":"agent_1"`, `"version":3`, `"environment_id":"env_1"`, `"vault_ids":["vlt_1"]`, `"amount":"250"`} {
@@ -512,5 +516,54 @@ func TestAnAllowanceBecomesTheSessionsLimit(t *testing.T) {
 	f = &fake{scripts: []func(*fake){say}, used: 40}
 	if err := run(f, 0, cents(30)); err != nil || len(f.limits) != 0 {
 		t.Fatalf("%v %v", err, f.limits)
+	}
+}
+
+// From version 7 the manifest lists tiers: a session is started on the agents of the tier asked for, and on the first
+// tier when the one asked for is not on offer. A manifest without tiers has one, made from its agent_id.
+func TestTiers(t *testing.T) {
+	ctx := context.Background()
+	if tiers := (&Client{m: manifest}).Tiers(); len(tiers) != 1 || tiers[0].ID != "standard" || tiers[0].Name != "Standard" {
+		t.Fatalf("without tiers: %+v", tiers)
+	}
+	m := manifest
+	m.Version, m.Schema = 7, content.Schema
+	m.Tiers = []Tier{
+		{ID: "standard", Name: "Standard", AgentID: "agent_1", AgentVersion: "3", Models: []TierModel{{Role: "Coordinator", Model: "Haiku 5.5"}}},
+		{ID: "strong", Name: "Strong", AgentID: "agent_2", AgentVersion: "1"},
+		{ID: "best", Name: "Best", AgentID: "agent_3"},
+	}
+	b, _ := json.Marshal(m)
+	loaded, err := LoadManifest(ctx, string(b))
+	if err != nil || len(loaded.Tiers) != 3 {
+		t.Fatalf("%v %+v", err, loaded.Tiers)
+	}
+	f := &fake{}
+	c := &Client{api: f, m: loaded}
+	tiers := c.Tiers()
+	if len(tiers) != 3 || tiers[1].ID != "strong" || tiers[0].Models[0].Model != "Haiku 5.5" {
+		t.Fatalf("%+v", tiers)
+	}
+	for _, id := range []string{"strong", "best", "", "gone"} {
+		if _, err := c.CreateSessionOn(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := c.CreateSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(f.started, " "); got != "agent_2@1 agent_3@ agent_1@3 agent_1@3 agent_1@3" {
+		t.Fatalf("the agents started: %s", got)
+	}
+	for want, change := range map[string][2]string{
+		"short lower-case name": {`"id":"strong"`, `"id":"Strong one"`},
+		"twice":                 {`"id":"strong"`, `"id":"standard"`},
+		"needs a name":          {`"name":"Best"`, `"name":" "`},
+		"needs a name and":      {`"agent_id":"agent_3"`, `"agent_id":""`},
+		"not a version number":  {`"agent_version":"1"`, `"agent_version":"newest"`},
+	} {
+		if _, err := LoadManifest(ctx, strings.Replace(string(b), change[0], change[1], 1)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v", want, err)
+		}
 	}
 }

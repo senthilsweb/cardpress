@@ -16,7 +16,7 @@ import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { CostChart } from "./CostChart";
 import { api } from "@/lib/api";
-import { duration, money, periodLabel, PERIODS, readPeriod, statusRows, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
+import { duration, money, periodLabel, PERIODS, readPeriod, statusRows, tierLabel, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
 import { defaultTimezone, formatInZone } from "@/lib/jobs";
 import { libraryHref, studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
@@ -139,6 +139,8 @@ function Page({ data }: { data: LibraryBoot }) {
     </Card>
   );
   const u = figures?.usage;
+  // a tier is shown once a conversation has one
+  const tiers = !!u?.largest.some((s) => s.tier);
   const group = "rounded-lg border border-border bg-card p-0.5";
 
   return (
@@ -199,11 +201,12 @@ function Page({ data }: { data: LibraryBoot }) {
                 {u.largest.length > 0 && (
                   <Block title="Largest sessions">
                     <Table className="min-w-[32rem]">
-                      <TableHeader><TableRow><TableHead>Conversation</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Replies</TableHead><TableHead className="text-right">Working time</TableHead><TableHead className="text-right">Last reply</TableHead></TableRow></TableHeader>
+                      <TableHeader><TableRow><TableHead>Conversation</TableHead>{tiers && <TableHead>Tier</TableHead>}<TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Replies</TableHead><TableHead className="text-right">Working time</TableHead><TableHead className="text-right">Last reply</TableHead></TableRow></TableHeader>
                       <TableBody className="tabular-nums">
                         {u.largest.map((s) => (
                           <TableRow key={`${s.conversationId}-${s.lastAt}`}>
                             <TableCell className="max-w-0 truncate">{link(s.profileId, studioHref(`?conversation=${encodeURIComponent(s.conversationId)}`), s.title || "Conversation", "font-medium text-brand underline-offset-4 hover:underline")}{all && <span className="text-xs text-muted-foreground"> · {nameOf(s.profileId)}</span>}</TableCell>
+                            {tiers && <TableCell className="text-xs text-muted-foreground">{tierLabel(s.tier)}</TableCell>}
                             <TableCell className="text-right">{money(s.costCents)}</TableCell>
                             <TableCell className="text-right">{s.replies}</TableCell>
                             <TableCell className="text-right">{duration(s.activeSeconds)}</TableCell>
