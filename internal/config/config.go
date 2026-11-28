@@ -42,6 +42,7 @@ type Config struct {
 	AgentWorkspace  string        // ANTHROPIC_WORKSPACE_ID, for a key that can act on several
 	AgentBudget     int           // spend cap per conversation in US cents (CARDPRESS_AGENT_BUDGET_CENTS), default 200; 0 = none
 	AgentMonth      int           // spend cap for every brand together in a calendar month, in US cents (CARDPRESS_AGENT_MONTH_CENTS); 0 = none
+	SessionCache    bool          // keep a signed-in person in memory briefly (CARDPRESS_SESSION_CACHE); on unless off
 	AgentTimeout    time.Duration // longest wait for one reply (CARDPRESS_AGENT_TIMEOUT)
 	Insecure        bool          // allow a non-loopback address without a token
 	ShowVersion     bool
@@ -145,6 +146,13 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("CARDPRESS_AGENT_MONTH_CENTS must be a whole number from 0 to 10000000, got %q", v)
 		}
 		c.AgentMonth = n
+	}
+	switch v := strings.ToLower(env("CARDPRESS_SESSION_CACHE", "on")); v {
+	case "on":
+		c.SessionCache = true
+	case "off":
+	default:
+		return Config{}, fmt.Errorf("CARDPRESS_SESSION_CACHE must be on or off, got %q", v)
 	}
 	c.AgentTimeout = 12 * time.Minute
 	if v := env("CARDPRESS_AGENT_TIMEOUT", ""); v != "" {

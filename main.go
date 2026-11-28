@@ -153,7 +153,11 @@ func main() {
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	chat.Studio, chat.OwnBrandsOnly, chat.MonthCents = studio, cfg.Agent == "cma", cfg.AgentMonth
-	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax})
+	var keep time.Duration
+	if cfg.SessionCache {
+		keep = service.DefaultSessionCache
+	}
+	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax, SessionCache: keep})
 	opts := api.Options{
 		Build:              buildInfo(),
 		Events:             events,
