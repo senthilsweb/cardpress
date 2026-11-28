@@ -22,6 +22,12 @@ type Accounts interface {
 	Login(ctx context.Context, email, password, addr string) (service.User, string, error)
 	Session(ctx context.Context, token string, use bool) (service.User, service.SessionTimes, error)
 	SessionLimits(ctx context.Context) (idle, max time.Duration)
+	Security(ctx context.Context) (service.SecuritySettings, bool)
+	SecurityDefaults() service.SecuritySettings
+	SetSecurity(ctx context.Context, s service.SecuritySettings) error
+	ResetSecurity(ctx context.Context) error
+	ActiveSessions(ctx context.Context) (int, error)
+	SignOutEveryone(ctx context.Context, keepToken string) (int, error)
 	Logout(ctx context.Context, token string) error
 	Get(ctx context.Context, id string) (service.User, error)
 	UpdateProfile(ctx context.Context, id string, in service.ProfileInput) (service.User, error)

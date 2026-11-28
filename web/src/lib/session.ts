@@ -18,7 +18,9 @@ export interface User {
   lastLoginAt?: string;
 }
 
-export interface Session { user?: User; perms: Perm[] }
+export interface Session { user?: User; perms: Perm[]; passwordMin?: number }
+/** The shortest password the server takes, until it says otherwise. */
+export const PASSWORD_MIN = 10;
 
 export const ROLES = [
   { value: "admin", label: "Admin", hint: "Everything, and everyone's work" },

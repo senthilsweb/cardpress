@@ -16,9 +16,9 @@
 - [x] Tests, browser check
 
 ## Bolt 4: security settings
-- [ ] Stored settings, API for administrators, sign out everyone
-- [ ] Settings → Security
-- [ ] Tests, browser check
+- [x] Stored settings, API for administrators, sign out everyone
+- [x] Settings → Security
+- [x] Tests, browser check
 
 ## Bolt 5: hardening
 - [ ] Client address behind a proxy; limit on sign-ups

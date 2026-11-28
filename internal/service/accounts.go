@@ -144,6 +144,11 @@ func checkPassword(hash, pw string) bool {
 // a hash to compare against when the email is unknown, so a wrong email takes as long as a wrong password
 var decoyHash, _ = hashPassword("decoy-password-for-timing")
 
+func (a *Accounts) minLength(ctx context.Context) int {
+	s, _ := a.Security(ctx)
+	return s.MinPassword
+}
+
 /* ------------------------------------------------------------------ people */
 
 // SignupInput is what a person gives to create an account.
@@ -198,7 +203,11 @@ func (a *Accounts) Count(ctx context.Context) (int, error) {
 // SignupOpen reports whether a stranger may create an account now: always for the first, then unless it was closed.
 func (a *Accounts) SignupOpen(ctx context.Context) bool {
 	n, err := a.Count(ctx)
-	return err == nil && (n == 0 || !a.opts.SignupClosed)
+	if err != nil {
+		return false
+	}
+	s, _ := a.Security(ctx)
+	return n == 0 || s.SignupOpen
 }
 
 func (a *Accounts) loadUser(ctx context.Context, where string, args ...any) (User, string, error) {
@@ -323,13 +332,14 @@ func (a *Accounts) create(ctx context.Context, in SignupInput, role string) (Use
 // Signup creates an account. The first account becomes the administrator; later ones get the default role, unless sign-up
 // has been closed.
 func (a *Accounts) Signup(ctx context.Context, in SignupInput) (User, error) {
-	if err := in.normalize(true, minPassword); err != nil {
+	if err := in.normalize(true, a.minLength(ctx)); err != nil {
 		return User{}, err
 	}
 	if !a.SignupOpen(ctx) {
 		return User{}, fmt.Errorf("%w: sign-up is closed on this server; ask an administrator to add you", ErrForbidden)
 	}
-	return a.create(ctx, in, a.opts.DefaultRole)
+	s, _ := a.Security(ctx)
+	return a.create(ctx, in, s.DefaultRole)
 }
 
 // AdminCreateInput is an administrator adding a person.
@@ -340,7 +350,7 @@ type AdminCreateInput struct {
 
 // Add creates an account for someone else (an administrator's action).
 func (a *Accounts) Add(ctx context.Context, in AdminCreateInput) (User, error) {
-	if err := in.SignupInput.normalize(true, minPassword); err != nil {
+	if err := in.SignupInput.normalize(true, a.minLength(ctx)); err != nil {
 		return User{}, err
 	}
 	if !ValidRole(in.Role) {
@@ -442,7 +452,7 @@ func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
 	if err != nil {
 		return err
 	}
-	if err := checkNewPassword(password, u.Email, minPassword); err != nil {
+	if err := checkNewPassword(password, u.Email, a.minLength(ctx)); err != nil {
 		return err
 	}
 	hash, err := hashPassword(password)
@@ -469,7 +479,7 @@ func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepTo
 	if !checkPassword(hash, current) {
 		return fmt.Errorf("%w: the current password is not right", ErrInvalid)
 	}
-	if err := checkNewPassword(next, u.Email, minPassword); err != nil {
+	if err := checkNewPassword(next, u.Email, a.minLength(ctx)); err != nil {
 		return err
 	}
 	newHash, err := hashPassword(next)
@@ -489,11 +499,11 @@ func (a *Accounts) ResetPasswordByEmail(ctx context.Context, email string) (stri
 	if err != nil {
 		return "", err
 	}
-	b := make([]byte, 12)
+	b := make([]byte, 48) // 64 characters, cut to what the rules ask
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	pw := base64.RawURLEncoding.EncodeToString(b)
+	pw := base64.RawURLEncoding.EncodeToString(b)[:max(16, a.minLength(ctx))]
 	return pw, a.SetPassword(ctx, u.ID, pw)
 }
 
@@ -517,32 +527,34 @@ func (a *Accounts) locked(keys ...string) bool {
 	return false
 }
 
-func (a *Accounts) fail(keys ...string) {
+func (a *Accounts) fail(rules SecuritySettings, keys ...string) (paused bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
 	for _, k := range keys {
 		f := a.failures[k]
-		if f == nil || now.Sub(f.first) > lockFor {
+		if f == nil || now.Sub(f.first) > rules.pause() {
 			f = &failure{first: now}
 			a.failures[k] = f
 		}
 		f.n++
-		limit := failuresAllowed
+		limit := rules.Attempts
 		if !strings.Contains(k, "|") {
-			limit = failuresAllowed * 6 // the address alone: many people may share one
+			limit = rules.Attempts * 6 // the address alone: many people may share one
 		}
 		if f.n >= limit {
-			f.until = now.Add(lockFor)
+			paused = paused || !now.Before(f.until)
+			f.until = now.Add(rules.pause())
 		}
 	}
 	if len(a.failures) > 10000 { // keep the table small
 		for k, f := range a.failures {
-			if now.Sub(f.first) > lockFor {
+			if now.Sub(f.first) > rules.pause() {
 				delete(a.failures, k)
 			}
 		}
 	}
+	return paused
 }
 
 func (a *Accounts) clear(keys ...string) {
@@ -570,7 +582,8 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 	}
 	ok := checkPassword(hash, password)
 	if err != nil || !ok || u.Status != "active" {
-		a.fail(byAccount, byAddr)
+		rules, _ := a.Security(ctx)
+		a.fail(rules, byAccount, byAddr)
 		return User{}, "", ErrUnauthorized
 	}
 	a.clear(byAccount)

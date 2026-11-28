@@ -25,8 +25,9 @@ type SessionTimes struct {
 }
 
 // SessionLimits are the longest a sign-in may go unused, and last in all.
-func (a *Accounts) SessionLimits(context.Context) (idle, max time.Duration) {
-	return a.opts.SessionIdle, a.opts.SessionMax
+func (a *Accounts) SessionLimits(ctx context.Context) (idle, max time.Duration) {
+	s, _ := a.Security(ctx)
+	return s.idle(), s.max()
 }
 
 // StartSession signs a person in without a password (used after sign-up).

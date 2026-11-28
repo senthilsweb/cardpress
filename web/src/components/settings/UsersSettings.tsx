@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import { ROLES, roleLabel, useSession, type User } from "@/lib/session";
+import { PASSWORD_MIN, ROLES, roleLabel, useSession, type User } from "@/lib/session";
 
 const EMPTY = { firstName: "", lastName: "", email: "", password: "", role: "editor" };
 const roleOptions = ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>);
@@ -18,7 +18,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : "Something wen
 
 /** People and roles. Administrators only; the server refuses anyone else. */
 export function UsersSettings() {
-  const { user: me } = useSession();
+  const { user: me, passwordMin = PASSWORD_MIN } = useSession();
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -68,7 +68,7 @@ export function UsersSettings() {
                   <div className="space-y-1"><Label htmlFor="nu-last">Last name</Label><Input id="nu-last" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required /></div>
                 </div>
                 <div className="space-y-1"><Label htmlFor="nu-email">Email</Label><Input id="nu-email" type="email" autoComplete="off" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
-                <div className="space-y-1"><Label htmlFor="nu-pw">Password</Label><Input id="nu-pw" type="text" autoComplete="off" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 10 characters" required /></div>
+                <div className="space-y-1"><Label htmlFor="nu-pw">Password</Label><Input id="nu-pw" type="text" autoComplete="off" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={`At least ${passwordMin} characters`} required /></div>
                 <div className="space-y-1">
                   <Label htmlFor="nu-role">Role</Label>
                   <Select value={form.role} onValueChange={(role) => setForm({ ...form, role })}>
@@ -83,7 +83,7 @@ export function UsersSettings() {
                 <Button type="button" size="sm" variant={discard ? "destructive" : "cancel"} onClick={closeForm}>{discard ? "Discard" : "Cancel"}</Button>
                 {discard
                   ? <Button type="button" size="sm" variant="cancel" onClick={() => setDiscard(false)}>Keep editing</Button>
-                  : <Button type="submit" size="sm" variant="gold" disabled={busy === "add" || form.password.length < 10}>{busy === "add" && <Loader2 className="animate-spin" />} Add user</Button>}
+                  : <Button type="submit" size="sm" variant="gold" disabled={busy === "add" || form.password.length < passwordMin}>{busy === "add" && <Loader2 className="animate-spin" />} Add user</Button>}
               </DialogFooter>
             </form>
           </DialogContent>
@@ -119,9 +119,9 @@ export function UsersSettings() {
                   </div>
                   {pwFor === u.id && (
                     <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); void act(u.id, async () => { await api.setUserPassword(u.id, pw); setPwFor(null); setPw(""); }, "Password saved", "Password not saved"); }}>
-                      <Input aria-label="New password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder="At least 10 characters" className="h-8" />
+                      <Input aria-label="New password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder={`At least ${passwordMin} characters`} className="h-8" />
                       <Button type="button" size="sm" variant="cancel" onClick={() => { setPwFor(null); setPw(""); }}>Cancel</Button>
-                      <Button type="submit" size="sm" variant="brand" disabled={pw.length < 10 || busy === u.id}>Save</Button>
+                      <Button type="submit" size="sm" variant="brand" disabled={pw.length < passwordMin || busy === u.id}>Save</Button>
                     </form>
                   )}
                 </li>

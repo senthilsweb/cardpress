@@ -9,12 +9,13 @@ export function SessionProvider({ initial, children }: { initial: Session; child
   const value = useMemo(() => ({
     user,
     perms: initial.perms,
+    passwordMin: initial.passwordMin,
     can: (p: Perm) => initial.perms.includes(p),
     setUser,
     signOut: async () => {
       try { await api.logout(); } catch { /* the page goes to sign-in either way */ }
       window.location.assign(loginUrl());
     },
-  }), [user, initial.perms]);
+  }), [user, initial.perms, initial.passwordMin]);
   return <SessionContext.Provider value={value}>{children}{user && <SessionWatch />}</SessionContext.Provider>;
 }

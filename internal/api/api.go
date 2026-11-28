@@ -300,6 +300,10 @@ func (s *server) table() []routeDef {
 		{"POST", "/chat/conversations/{id}/replies/{mid}/save", write(scopeConversation), s.saveReply},
 		{"POST", "/chat/conversations/{id}/replies/{mid}/undo", write(scopeConversation), s.undoReply},
 		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
+		{"GET", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getSecurity},
+		{"PUT", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putSecurity},
+		{"DELETE", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetSecurity},
+		{"POST", "/security/sign-out-everyone", rule{scope: scopeAdmin, perm: service.PermUsers}, s.signOutEveryone},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
 }
@@ -360,6 +364,8 @@ func (s *server) info(w http.ResponseWriter, r *http.Request) {
 		n, _ := s.Accounts.Count(r.Context())
 		out["needsSetup"] = n == 0
 		out["signupOpen"] = s.Accounts.SignupOpen(r.Context())
+		rules, _ := s.Accounts.Security(r.Context())
+		out["passwordMin"] = rules.MinPassword
 		if p, ok := principalOf(r); ok {
 			out["signedIn"] = true
 			if p.User != nil {
