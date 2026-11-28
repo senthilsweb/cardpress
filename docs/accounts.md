@@ -14,7 +14,7 @@ Open the editor, the library or any page except the landing page on a new server
 |---|---|
 | First name, last name | Required. The full name is made from them |
 | Email | Required. Used to sign in; one account per email, in any case |
-| Password | Required, at least 10 characters (up to 200), no other rules. A few words work well |
+| Password | Required, at least 10 characters (up to 200; an admin can ask for more). Common passwords, repeats, simple sequences and ones containing your email name are refused |
 | Phone | Optional |
 | Date of birth | Optional, picked from three drop-downs (day, month, year) |
 
@@ -47,13 +47,35 @@ A brand is the workspace: there is no separate concept. Each person's brands, de
 
 ## Signing in
 
-A session lasts 14 days and is renewed while you use it. Signing out ends it. Changing your password signs you out on your other devices, and so does an admin setting one or disabling you. After five wrong passwords for one account, or too many from one address, sign-in pauses for 15 minutes. The message for a wrong email and a wrong password is the same.
+A sign-in ends after **20 minutes without use**, and after **12 hours** however much it is used. One minute before, the app asks **Stay signed in?**; at the end it goes to sign-in and returns to the same page. Typing, clicking and moving the pointer count as use; a screen refreshing itself does not. Signing out ends it. Changing your password signs you out on your other devices, and so does an admin setting one or disabling you. After five wrong passwords for one account, or too many from one address, sign-in pauses for 15 minutes. The message for a wrong email and a wrong password is the same. All these times and limits can be changed under [Security](#security).
 
-The session is an `HttpOnly`, `SameSite=Lax` cookie (`Secure` over https). Browser requests from another site are refused. Passwords are stored as argon2id hashes; no endpoint returns one.
+The session is a random token in an `HttpOnly`, `SameSite=Lax` cookie (`__Host-` and `Secure` over https); the database holds only its hash, so ending a session, disabling a person or changing a role takes effect at once. Browser requests from another site are refused. Passwords are stored as salted argon2id hashes, which cannot be turned back into the password; no endpoint returns one.
+
+**Nothing is kept in the browser's storage.** Preferences are saved with the person on the server. One more cookie, `cardpress_look`, holds the colour theme and light or dark, so a page has the right colours at once.
 
 ## From the app
 
-**Settings** (in the navigation on the left) has **Account** (your names, phone and date of birth, and **Password**), **API keys**, and for admins **Users** (add a person, change a role, disable or enable, set a password) and **Assistant**. Your name at the bottom of the navigation opens **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
+**Settings** (in the navigation on the left) has **Account** (your names, phone and date of birth, and **Password**), **API keys**, and for admins **Users** (add a person, change a role, disable or enable, set a password), **Security** and **Assistant**. Your name at the bottom of the navigation opens **Sign out**. A writer does not see Approve, Publish, Schedule, Social accounts or the page controls; the server refuses them as well.
+
+## Security
+
+**Settings, Security** (admins, signed in to the app; an API key or the server token cannot use it):
+
+| Setting | Default | Range |
+|---|---|---|
+| Anyone can create an account | on (`CARDPRESS_SIGNUP`) | |
+| Role of a new account | Editor (`CARDPRESS_DEFAULT_ROLE`) | Editor or Writer |
+| Sign out after no use for | 20 minutes (`CARDPRESS_SESSION_IDLE`) | 5 minutes to 24 hours |
+| Always sign out after | 12 hours (`CARDPRESS_SESSION_MAX`) | up to 30 days |
+| Shortest password | 10 | 10 to 64 |
+| Failed sign-ins before a pause | 5 | 3 to 20 |
+| Pause | 15 minutes | 1 to 1440 |
+
+The environment gives the starting values. What an admin saves replaces them and applies at once, to open sessions too; **Use defaults** goes back. The first account can always be created.
+
+**Sign out everyone** ends every session but yours. API keys keep working; revoke those under API keys.
+
+**Security log** lists sign-ins, failed sign-ins and pauses, sign-outs, new accounts, password, role and status changes, and changes to these settings, with the time, the email and the address. It never holds a password or a token. The newest 2000 lines are kept.
 
 ## API keys, the token and MCP
 
@@ -66,14 +88,19 @@ A person can make **API keys** (Settings, API keys) for programs such as an MCP 
 | Variable | Default | |
 |---|---|---|
 | `CARDPRESS_DEFAULT_ROLE` | `editor` | The role of a person who signs up: `editor` or `writer` |
-| `CARDPRESS_SIGNUP` | `open` | `closed` stops self sign-up once the first account exists; admins then add people |
+| `CARDPRESS_SIGNUP` | `open` | `closed` stops self sign-up once the first account exists. Starting value of the Security page |
+| `CARDPRESS_SESSION_IDLE` | `20m` | A sign-in ends after this long without use |
+| `CARDPRESS_SESSION_MAX` | `12h` | and after this long in all |
+| `CARDPRESS_CLIENT_IP_HEADER` | | Behind a proxy, the header it sets with the visitor's address. See [Deployment](deployment.md) |
 | `CARDPRESS_ADMIN_EMAIL` | | If set, only this email can create the first (admin) account |
 
 ## How it works
 
 | Piece | Where |
 |---|---|
-| Accounts, passwords, sessions, rate limiting | `internal/service/accounts.go`, `principal.go` |
+| Accounts and passwords | `internal/service/accounts.go`, `passwords.go`, `principal.go` |
+| Sessions, security settings, security log | `internal/service/sessions.go`, `security.go`, `securitylog.go` |
+| Response headers and content security policy | `internal/secure/headers.go` |
 | Who may call each route (the policy table) | `internal/api/auth.go`, `table()` in `internal/api/api.go` |
 | Ownership of brands and what each list shows | `internal/service/studio.go`, `brands.go`, `library.go` |
 | Sign-in and sign-up pages | `web/src/components/auth/AuthPage.tsx` |

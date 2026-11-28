@@ -4,7 +4,7 @@ The **Library** is the list of everything you have posted, scheduled and drafted
 
 ## Grid and List
 
-The library shows as a **Grid** (a table, the default on wide screens) or a **List**. The choice is remembered in this browser.
+The library shows as a **Grid** (a table, the default on wide screens) or a **List**. The choice is saved with your account.
 
 - **Sort:** click a column heading (Title, Type, Status, When, Brand). Click again to reverse the order. Dates start with the newest.
 - **Columns:** shows or hides Type, Status, When, Brand (with All brands), Written by, Approved by, Version, Planned, Public page and LinkedIn.

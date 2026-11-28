@@ -9,6 +9,8 @@ All routes are under `/api/v1`. Once an account exists, a request needs a **sign
 | `GET /info` | Name, version, database driver, whether accounts are on, whether first-run set-up is needed, whether sign-up is open, and (signed in) who you are and what you may do. A signed-in person, or the token, is also told `build` (commit, date) and the assistant's `version` and `schemaVersion` |
 | `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout` | Create the first (admin) account or, when sign-up is open, your own; sign in; sign out |
 | `GET /auth/me`, `PUT /auth/me`, `PUT /auth/password` | Your details, change them, change your password (a key cannot) |
+| `GET /auth/session`, `POST /auth/session` | How long the sign-in has left; `POST` counts as use. A request with the header `X-CardPress-Background` does not |
+| `GET/PUT/DELETE /security`, `GET /security/log`, `POST /security/sign-out-everyone` | Security settings and log: an admin signed in to the app only |
 | `GET/POST /api-keys`, `DELETE /api-keys/{id}` | Your API keys: list (never the secret), create (the secret is returned once), revoke (a key cannot manage keys) |
 | `GET/POST /users`, `PUT /users/{id}`, `PUT /users/{id}/password` | Admin only: list, add, change role or status, set a password |
 | `GET /state` | Your brands, designs and preferences |

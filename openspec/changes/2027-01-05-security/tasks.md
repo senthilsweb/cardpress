@@ -30,7 +30,7 @@
 - [x] Tests, browser check
 
 ## Bolt 7: docs
-- [ ] User guide, configuration, deployment and data model docs
+- [x] User guide, configuration, deployment and data model docs
 
 ## Release
 - [ ] Deploy (ask first)
