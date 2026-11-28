@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { fileToDataUrl } from "@/lib/image";
 import { cn } from "@/lib/utils";
 
@@ -129,6 +130,8 @@ export function ImageField(props: {
   keepPng?: boolean;
   /** Whose library to use. */
   brand?: string;
+  /** Given when the card holds a picture it does not draw: pressing Use shows it. */
+  onShow?: () => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -166,6 +169,12 @@ export function ImageField(props: {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+        {props.onShow && props.values.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="warn">Not on the card</Badge>
+            <Button type="button" variant="ghost" size="sm" onClick={props.onShow} aria-label={`Use: ${props.label}`}>Use</Button>
           </div>
         )}
         {pictures.failed && <p role="alert" className="text-xs text-destructive">A library picture could not be loaded.</p>}

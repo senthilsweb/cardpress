@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Gift, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
@@ -17,6 +17,7 @@ import { addGoogleFont, FONT_ROLES, resolveFonts, useFonts, ensureFont } from "@
 import { ColorField, Field, ImageField, Section, SliderField, SwitchField, TextField } from "./fields";
 import { MiniBackground } from "./preview";
 import { embedPictures } from "@/lib/assetRefs";
+import { backgroundFor, backgroundShowing, drawsPicture, type PictureKind } from "@/lib/cardPictures";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/export";
 import { settingsHref } from "@/lib/nav";
@@ -29,6 +30,9 @@ const LAYOUT_ICONS: Record<LayoutId, typeof LayoutPanelLeft> = {
 };
 
 /* ======================================================= Design */
+const SWITCHED = "picture-background";
+const samePictures = (a: Design, b: Design) => a.bgImage === b.bgImage && a.screenshot === b.screenshot && a.photos.join("\n") === b.photos.join("\n");
+
 export function DesignPanel({ design, set, profile, palette }: { design: Design; set: SetDesign; profile: Profile; palette: Palette }) {
   const [browsing, setBrowsing] = useState(false);
   const bg = bgById(design.background);
@@ -36,6 +40,25 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
     (bg.needs === "photos" && !design.photos.length) ||
     (bg.needs === "screenshot" && !design.screenshot) ||
     (bg.needs === "image" && !design.bgImage);
+  // an upload and the Undo button both finish after the card has been drawn again, so they read it as it is by then
+  const now = useRef({ design, set, headshot: !!profile.headshot });
+  now.current = { design, set, headshot: !!profile.headshot };
+  useEffect(() => () => { toast.dismiss(SWITCHED); }, []);
+  /** Change the background, and offer the way back. */
+  const switchTo = (id: string, patch: Partial<Design> = {}) => {
+    const before = now.current.design.background;
+    const shown = { ...now.current.design, ...patch };
+    now.current.set({ ...patch, background: id });
+    // nothing is undone if another card is open by then
+    const undo = () => { const d = now.current.design; if (d.background === id && samePictures(d, shown)) now.current.set({ background: before }); };
+    toast(`Background changed to ${bgById(id).name}`, { id: SWITCHED, action: { label: "Undo", onClick: undo } });
+  };
+  const addPictures = (patch: Partial<Design>) => {
+    const id = backgroundFor(now.current.design, patch, now.current.headshot);
+    if (id) switchTo(id, patch);
+    else now.current.set(patch);
+  };
+  const unseen = (kind: PictureKind) => (drawsPicture(design, kind, !!profile.headshot) ? undefined : () => switchTo(backgroundShowing(kind).id));
   return (
     <>
       <Section title="Layout">
@@ -96,17 +119,18 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
 
       <Section title="Images">
         <ImageField
-          label="Photos for the mosaic"
-          hint="For Photo mosaic. The first one also stands in as the headshot."
+          label="Photos"
+          hint="Tiles of the Photo mosaic background. On the Headshot layout, the first is the headshot if the brand has none."
           values={design.photos}
-          onChange={(v) => set({ photos: v })}
+          onChange={(v) => addPictures({ photos: v })}
+          onShow={unseen("photos")}
           multiple
           max={12}
           maxPx={700}
           brand={profile.id}
         />
-        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} brand={profile.id} />
-        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} brand={profile.id} />
+        <ImageField label="App screenshot" hint="Sits in the window of the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => addPictures({ screenshot: v[0] })} onShow={unseen("screenshot")} maxPx={1800} brand={profile.id} />
+        <ImageField label="Background image" hint="Fills the card (Own image background)." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => addPictures({ bgImage: v[0] })} onShow={unseen("image")} maxPx={2000} brand={profile.id} />
       </Section>
 
       <Section title="Colours">
