@@ -101,6 +101,9 @@ type Chatting interface {
 	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
 	AgentDetails() service.AgentInfo
+	BrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
+	SetBrandAssistant(ctx context.Context, profileID string, in service.BrandAssistant) (service.BrandAssistantView, error)
+	ResetBrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
@@ -229,6 +232,9 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
 		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
 		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
+		{"GET", "/profiles/{id}/assistant", write(scopeBrandPath), s.getBrandAssistant},
+		{"PUT", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putBrandAssistant},
+		{"DELETE", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetBrandAssistant},
 		{"GET", "/profiles/{id}/assets", write(scopeBrandPath), s.listAssets},
 		{"POST", "/profiles/{id}/assets", write(scopeBrandPath), s.addAsset},
 		{"PUT", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.updateAsset},

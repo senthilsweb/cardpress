@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"log"
 )
 
@@ -20,6 +21,9 @@ const (
 	EventSettings      = "security_changed"
 	EventSettingsReset = "security_reset"
 	EventEveryoneOut   = "everyone_signed_out"
+	// a brand's assistant settings: the subject is the brand
+	EventAssistant      = "assistant_changed"
+	EventAssistantReset = "assistant_reset"
 )
 
 const (
@@ -55,18 +59,23 @@ func clip(s string, n int) string {
 
 // record adds a line to the log. A log that cannot be written never stops what is being done.
 func (a *Accounts) record(ctx context.Context, event, subject, detail string) {
+	recordEvent(ctx, a.db, a.stamp(), event, subject, detail)
+}
+
+// recordEvent is record for any part of the service that holds the database.
+func recordEvent(ctx context.Context, db *sql.DB, at, event, subject, detail string) {
 	actor := ""
 	if p, ok := PrincipalFrom(ctx); ok && p.User != nil {
 		actor = p.User.Email
 	}
 	addr, _ := ctx.Value(addressKey{}).(string)
 	ctx = context.WithoutCancel(ctx) // recorded even if the visitor has gone
-	if _, err := a.db.ExecContext(ctx, `INSERT INTO security_events (at, event, actor, subject, address, detail) VALUES (?, ?, ?, ?, ?, ?)`,
-		a.stamp(), event, actor, clip(subject, 254), clip(addr, 64), clip(detail, 300)); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO security_events (at, event, actor, subject, address, detail) VALUES (?, ?, ?, ?, ?, ?)`,
+		at, event, actor, clip(subject, 254), clip(addr, 64), clip(detail, 300)); err != nil {
 		log.Printf("security log: %v", err)
 		return
 	}
-	if _, err := a.db.ExecContext(ctx, `DELETE FROM security_events WHERE id <= (SELECT MAX(id) FROM security_events) - ?`, keptEvents); err != nil {
+	if _, err := db.ExecContext(ctx, `DELETE FROM security_events WHERE id <= (SELECT MAX(id) FROM security_events) - ?`, keptEvents); err != nil {
 		log.Printf("security log: %v", err)
 	}
 }

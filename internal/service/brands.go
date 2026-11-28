@@ -242,6 +242,7 @@ func (s *Studio) DeleteProfile(ctx context.Context, id string) error {
 		`DELETE FROM agent_memories WHERE profile_id = ?`,
 		`DELETE FROM credentials WHERE profile_id = ?`,
 		`DELETE FROM brand_details WHERE profile_id = ?`,
+		`DELETE FROM brand_assistant WHERE profile_id = ?`,
 		`DELETE FROM assets WHERE profile_id = ?`,
 		`DELETE FROM profiles WHERE id = ?`,
 	} {

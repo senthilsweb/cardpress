@@ -54,6 +54,7 @@ async function call<T>(method: string, path: string, body?: unknown, background 
 
 import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
+import type { BrandAssistant, BrandAssistantView } from "./brandAssistant";
 import type { Security, SecurityEvent, SecuritySettings } from "./security";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
@@ -225,6 +226,10 @@ export const api = {
   dashboard: (q: { profileId: string; all: boolean; period: Period; tz: string }) => call<Dashboard>("GET", `/dashboard?${new URLSearchParams({ ...(q.all ? { scope: "all" } : { profileId: q.profileId }), ...periodQuery(q.period), tz: q.tz })}`),
   brandDetails: (id: string) => call<BrandDetails>("GET", `/profiles/${encodeURIComponent(id)}/details`),
   saveBrandDetails: (id: string, d: BrandDetails) => call<BrandDetails>("PUT", `/profiles/${encodeURIComponent(id)}/details`, d),
+  /** How the assistant works for a brand. Changing it is for administrators. */
+  brandAssistant: (id: string) => call<BrandAssistantView>("GET", `/profiles/${encodeURIComponent(id)}/assistant`),
+  saveBrandAssistant: (id: string, s: BrandAssistant) => call<BrandAssistantView>("PUT", `/profiles/${encodeURIComponent(id)}/assistant`, s),
+  resetBrandAssistant: (id: string) => call<BrandAssistantView>("DELETE", `/profiles/${encodeURIComponent(id)}/assistant`),
   /** A brand's media library. */
   assets: (brand: string, q: AssetQuery) => call<Assets>("GET", `/profiles/${encodeURIComponent(brand)}/assets?${assetParams(q)}`),
   addAsset: (brand: string, form: FormData) => call<Asset>("POST", `/profiles/${encodeURIComponent(brand)}/assets`, form),

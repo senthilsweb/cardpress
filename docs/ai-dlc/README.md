@@ -42,3 +42,4 @@ Recorded as each bolt completes, from 2026-11-27. The changes between the table 
 | Screens | Phone screens: the full preview fits the width of the screen | [screen-fixes](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-04-screen-fixes) |
 | Screens | Unsaved settings: reloading or closing the tab asks while a settings form has unsaved changes | [screen-fixes](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-04-screen-fixes) |
 | Screens | Greeting footers: a greeting card's footer is a little larger and stronger | [screen-fixes](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-04-screen-fixes) |
+| Assistant per brand | Settings and their page: a brand's tier, checks and budget are saved by an administrator | [brand-assistant-settings](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-06-brand-assistant-settings) |

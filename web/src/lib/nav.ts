@@ -16,7 +16,7 @@ export const settingsHref = (section?: SettingsSection, query = "") => `${base()
 
 export type Area = "dashboard" | "studio" | "library" | "calendar" | "settings" | "help";
 
-export type SettingsSection = "account" | "appearance" | "api-keys" | "brands" | "look" | "social" | "users" | "security" | "assistant";
+export type SettingsSection = "account" | "appearance" | "api-keys" | "brands" | "look" | "social" | "brand-assistant" | "users" | "security" | "assistant";
 
 export const SETTINGS_GROUPS = ["Me", "Brand", "Administration"] as const;
 
@@ -42,6 +42,7 @@ export const SETTINGS_SECTIONS: readonly SectionDef[] = [
   { id: "brands", label: "Brands", group: "Brand", about: "Open, order, copy and archive brands.", words: "brand client rename duplicate archive new" },
   { id: "look", label: "Brand look", group: "Brand", about: "A brand's name, logo, fonts and colours.", words: "logo font palette colour color handle website" },
   { id: "social", label: "Social accounts", group: "Brand", about: "Where the open brand publishes.", words: "linkedin x twitter instagram facebook connect token publish", perm: "social" },
+  { id: "brand-assistant", label: "Brand assistant", group: "Brand", about: "The open brand's tier, checks and budget.", words: "ai agent model tier strong best grader check rounds budget cost limit spend", perm: "users" },
   { id: "users", label: "Users", group: "Administration", about: "People and their roles.", words: "people role admin editor password disable", person: true, perm: "users" },
   { id: "security", label: "Security", group: "Administration", about: "Sign-up, sessions and passwords.", words: "sign-up signup register session timeout expire password lock sign out log audit", person: true, perm: "users" },
   { id: "assistant", label: "Assistant", group: "Administration", about: "Whether the assistant is connected.", words: "ai agent claude chat", perm: "users" },

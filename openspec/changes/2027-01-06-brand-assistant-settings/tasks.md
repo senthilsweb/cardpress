@@ -3,15 +3,16 @@
 Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repository.
 
 ## Bolt 1: the settings and their page
-- [ ] Migration; stored settings per brand and for the server; API for administrators; security log entries
-- [ ] Settings → Brand → Assistant: tier, checks and budget fields, Save / Cancel, Use defaults
-- [ ] Tests, browser check
+- [x] Migration; stored settings per brand; API (read by who sees the brand, changed by administrators); security log entries
+- [x] Settings → Brand assistant: tier, checks and budget fields, Save / Cancel, Use defaults
+- [x] Tests, browser check (`scripts/record-demo/check-brand-assistant.mjs`)
 
 ## Bolt 2: checks
 - [ ] On or off and the number of rounds, used when a graded request is built
 - [ ] Tests
 
 ## Bolt 3: budget
+- [ ] The server's monthly amount (stored, API, Settings → Assistant)
 - [ ] Spent per brand and for the server by month; refusal before a request; the session's cap set for each request
 - [ ] Alerts at the percentage and at the amount: recorded once, a line in the chat, the bar on the dashboard and in settings
 - [ ] Tests, browser check

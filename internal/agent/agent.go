@@ -55,6 +55,25 @@ type Versioned interface {
 	Versions() (agent string, schema int)
 }
 
+// Tier is one set of agents an assistant offers, for a brand to be given: the same work on other models.
+type Tier struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Models says which model does what, for the screen: "Coordinator" and each writer.
+	Models []TierModel `json:"models,omitempty"`
+}
+
+// TierModel is one line of a tier: a role and the model's name.
+type TierModel struct {
+	Role  string `json:"role"`
+	Model string `json:"model"`
+}
+
+// Tiered is an assistant that offers tiers. The first is the one used when nothing is chosen.
+type Tiered interface {
+	Tiers() []Tier
+}
+
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
 var ErrSessionGone = errors.New("the session cannot be continued")
 

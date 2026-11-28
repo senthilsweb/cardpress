@@ -17,6 +17,7 @@ const EVENTS: Record<string, string> = {
   sign_up: "Account created", user_added: "User added", password_changed: "Password changed", password_set: "Password set",
   role_changed: "Role changed", status_changed: "Account status changed", security_changed: "Security changed",
   security_reset: "Security defaults restored", everyone_signed_out: "Everyone signed out",
+  assistant_changed: "Brand assistant changed", assistant_reset: "Brand assistant defaults restored",
 };
 
 /** An event in words, with whose account it is about and who did it when that is someone else. */
