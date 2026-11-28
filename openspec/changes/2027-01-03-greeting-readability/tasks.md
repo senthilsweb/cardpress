@@ -14,4 +14,4 @@
 - [x] Browser check
 
 ## Release
-- [ ] Deploy
+- [x] Deploy
