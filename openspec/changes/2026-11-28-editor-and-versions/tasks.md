@@ -7,4 +7,4 @@
 - [x] History drawer: list, read, restore, save with a note
 - [x] Tests: the version rules, pictures stored once, pruning; the editor helpers; the pending-edit hand-over
 - [x] Docs: "Editing a long article", History
-- [ ] Check dark mode and a narrow screen
+- [x] Check dark mode and a narrow screen (emulated at 390 px in Chrome, 2026-11-27)

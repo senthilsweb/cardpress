@@ -4,11 +4,8 @@ As of 2026-11-27. Latest release, deployed: **`v0.4.1`**. "Released" means in a 
 began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what is open there.
 
 ## Next
-Not agreed yet; suggested order:
-1. The remaining greeting layouts, art sets and templates (`2026-12-19-greeting-layouts`).
-2. Saved greetings (`2026-12-14-greetings-and-picker`).
-3. Answer buttons in chat (`2026-12-16-chat-answer-buttons`; needs the agent repository).
-4. Content embeddings (`2026-12-11-content-embeddings`).
+Agreed on 2026-11-27: greetings (`12-14`, `12-19`) and embeddings (`12-11`) can wait; chat and bug fixes first.
+Suggested after those: the assistant posting after a confirmation (`2026-12-02-conversational-designer`).
 
 ## All changes
 | Change | What | Stands | Open tasks |
@@ -31,8 +28,8 @@ Not agreed yet; suggested order:
 | [`2026-11-25-library-and-account-menu`](changes/2026-11-25-library-and-account-menu/proposal.md) | Library and account menu | Released | 1 |
 | [`2026-11-26-content-workflow`](changes/2026-11-26-content-workflow/proposal.md) | Content workflow: draft, approve, publish | Released | 1 |
 | [`2026-11-27-public-pages`](changes/2026-11-27-public-pages/proposal.md) | Public pages for articles and posts | Released | 1 |
-| [`2026-11-28-editor-and-versions`](changes/2026-11-28-editor-and-versions/proposal.md) | A better long-article editor, and version history | Released | 1 |
-| [`2026-11-28-user-accounts`](changes/2026-11-28-user-accounts/proposal.md) | Sign-in, roles and separate workspaces | Released | 2 |
+| [`2026-11-28-editor-and-versions`](changes/2026-11-28-editor-and-versions/proposal.md) | A better long-article editor, and version history | Released |  |
+| [`2026-11-28-user-accounts`](changes/2026-11-28-user-accounts/proposal.md) | Sign-in, roles and separate workspaces | Released | 1 |
 | [`2026-11-29-editor-text-not-saved`](changes/2026-11-29-editor-text-not-saved/proposal.md) | Issue: typed text was never saved | Released |  |
 | [`2026-11-29-linkedin-test-connection-issue`](changes/2026-11-29-linkedin-test-connection-issue/proposal.md) | Issue: LinkedIn "Test connection" rejects the Client ID and secret on the deployed server | Released | 3 |
 | [`2026-11-30-linkedin-attachments`](changes/2026-11-30-linkedin-attachments/proposal.md) | LinkedIn attachments: your own image, several images, a document, a video | Released | 12 |
@@ -67,7 +64,7 @@ Not agreed yet; suggested order:
 | [`2027-01-01-settings-forms`](changes/2027-01-01-settings-forms/proposal.md) | A first brand of one's own, and settings forms that save the same way | `v0.3.0` |  |
 | [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
 | [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | `v0.4.1` |  |
-| [`2027-01-04-screen-fixes`](changes/2027-01-04-screen-fixes/proposal.md) | Screen fixes: phones, unsaved settings, greeting footers | Being built | 3 |
+| [`2027-01-04-screen-fixes`](changes/2027-01-04-screen-fixes/proposal.md) | Screen fixes: phones, unsaved settings, greeting footers | Built, not released | 1 |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -107,11 +104,7 @@ Older items include checks against real accounts that cost money or post publicl
 ### `2026-11-27-public-pages`
 - Re-record the demo (deferred: not part of this change)
 
-### `2026-11-28-editor-and-versions`
-- Check dark mode and a narrow screen
-
 ### `2026-11-28-user-accounts`
-- Phone-width check of the new screens
 - Re-record the demo
 
 ### `2026-11-29-linkedin-test-connection-issue`
@@ -192,6 +185,4 @@ Older items include checks against real accounts that cost money or post publicl
 - Look at the version in About CardPress on a deployed app
 
 ### `2027-01-04-screen-fixes`
-- A greeting card's footer is a little larger and stronger
-- Browser check on a pale background
 - Deploy

@@ -11,8 +11,8 @@
 - [x] Test and browser check
 
 ## Bolt 3: greeting footers
-- [ ] A greeting card's footer is a little larger and stronger
-- [ ] Browser check on a pale background
+- [x] A greeting card's footer is a little larger and stronger
+- [x] Browser check on a pale background
 
 ## Release
 - [ ] Deploy

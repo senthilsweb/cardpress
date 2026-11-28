@@ -22,7 +22,7 @@
 ## Bolt 4: finish
 - [x] Docs: accounts and roles, configuration, data model, deployment
 - [x] Who wrote and approved an item, shown in the library
-- [ ] Phone-width check of the new screens
+- [x] Phone-width check of the new screens (emulated at 390 px in Chrome, 2026-11-27)
 - [ ] Re-record the demo
 
 ## Bolt 5: API keys

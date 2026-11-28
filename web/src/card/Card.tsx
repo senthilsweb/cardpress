@@ -241,9 +241,11 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
   const footLeft = design.footerLeft || (design.noFooterLeft ? "" : profile.website);
   const footRight = design.footer || (design.noFooter ? "" : profile.handle);
   const clip: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  // on a greeting the footer sits over art, often pale, so it is a little larger and stronger
+  const greets = design.layout === "greeting";
   const footer = design.showFooter && (footLeft || footRight) ? (
-    <div style={{ position: "absolute", left: pad, right: pad, bottom: 2.6 * u, display: "flex", alignItems: "baseline", gap: 3 * u, fontFamily: MONO, fontSize: 1.5 * u, letterSpacing: "0.02em", color: pal.text }}>
-      {footLeft && <span style={{ ...clip, opacity: 0.65 }}>{footLeft}</span>}
+    <div style={{ position: "absolute", left: pad, right: pad, bottom: 2.6 * u, display: "flex", alignItems: "baseline", gap: 3 * u, fontFamily: MONO, fontSize: (greets ? 1.75 : 1.5) * u, fontWeight: greets ? 500 : undefined, letterSpacing: "0.02em", color: pal.text }}>
+      {footLeft && <span style={{ ...clip, opacity: greets ? 0.92 : 0.65 }}>{footLeft}</span>}
       {footRight && <span style={{ ...clip, marginLeft: "auto", textAlign: "right", color: pal.sub, fontWeight: 600 }}>{footRight}</span>}
     </div>
   ) : null;
