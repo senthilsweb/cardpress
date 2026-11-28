@@ -26,6 +26,9 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [x] Tool `list_connections`
 
 ## 4. Posting over MCP
+On hold since 2026-11-28 (owner): publishing stays with a person. This also holds `publish_post` and the Post / Cancel
+card in step 5, and the `project.md` line in step 6.
+
 - [ ] API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
 - [ ] `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
 - [ ] Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit

@@ -5,7 +5,8 @@ began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what
 
 ## Next
 Agreed on 2026-11-27: greetings (`12-14`, `12-19`) and embeddings (`12-11`) can wait; chat and bug fixes first.
-Suggested after those: the assistant posting after a confirmation (`2026-12-02-conversational-designer`).
+On 2026-11-28 the owner put posting by an agent on hold (`2026-12-02-conversational-designer`: step 4 and the chat's
+Post / Cancel card): the present flow works, and publishing stays with a person.
 
 ## All changes
 | Change | What | Stands | Open tasks |
