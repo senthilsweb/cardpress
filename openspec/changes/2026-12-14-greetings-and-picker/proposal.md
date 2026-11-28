@@ -1,6 +1,6 @@
 # Greeting texts and a template picker
 
-**Status:** part 1, the picker, is released and deployed. The greetings table, Settings page and `list_greetings` are not built. A greetings writer exists in the agent repository (`2026-12-18-greetings-writer` there).
+**Status:** open tasks deferred (owner, 2026-11-27). Part 1, the picker, is released and deployed. The greetings table, Settings page and `list_greetings` are not built. A greetings writer exists in the agent repository (`2026-12-18-greetings-writer` there).
 
 ## Why
 - A greeting card needs words as well as art, and people reuse the same greetings.

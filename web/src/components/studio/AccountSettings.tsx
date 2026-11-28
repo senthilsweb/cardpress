@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatePicker } from "@/components/auth/AuthPage";
 import { api, type ApiKey } from "@/lib/api";
 import { formatInZone } from "@/lib/jobs";
-import { joinDate, roleLabel, splitDate, useSession } from "@/lib/session";
+import { PASSWORD_MIN, joinDate, roleLabel, splitDate, useSession } from "@/lib/session";
 
 /** Your own details and password. Email and role are changed by an administrator. */
 type Part = "profile" | "password" | "keys";
@@ -18,7 +18,7 @@ const PART_LABEL: Record<Part, string> = { profile: "Profile", password: "Passwo
 
 /** `parts` picks the tabs: the Account settings page shows profile and password, API keys has its own page. */
 export function AccountSettings({ parts }: { parts: Part[] }) {
-  const { user, setUser } = useSession();
+  const { user, setUser, passwordMin = PASSWORD_MIN } = useSession();
   const [tab, setTab] = useState<string>(parts[0]);
   const [f, setF] = useState({ firstName: user?.firstName ?? "", lastName: user?.lastName ?? "", phone: user?.phone ?? "" });
   const [dob, setDob] = useState(() => splitDate(user?.birthDate));
@@ -57,7 +57,7 @@ export function AccountSettings({ parts }: { parts: Part[] }) {
   const pwTyped = !!(pw.current || pw.next || pw.again);
   // what stands in the way of saving, said once something has been typed
   const profileProblem = profileChanged && !(f.firstName.trim() && f.lastName.trim()) ? "Enter your first and last name." : null;
-  const pwProblem = !pwTyped ? null : !pw.current ? "Enter your current password." : pw.next.length < 10 ? "The new password needs at least 10 characters." : pw.next !== pw.again ? "The two new passwords are not the same." : null;
+  const pwProblem = !pwTyped ? null : !pw.current ? "Enter your current password." : pw.next.length < passwordMin ? `The new password needs at least ${passwordMin} characters.` : pw.next !== pw.again ? "The two new passwords are not the same." : null;
 
   return (
     <Pane
@@ -89,7 +89,7 @@ export function AccountSettings({ parts }: { parts: Part[] }) {
           </FormSection>
         </TabsContent>
         <TabsContent value="password" className="mt-0">
-          <FormSection title="Change password" about="At least 10 characters.">
+          <FormSection title="Change password" about={`At least ${passwordMin} characters.`}>
             <div className="space-y-1.5"><Label htmlFor="as-cur">Current password</Label><Input id="as-cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></div>
             <div className="space-y-1.5"><Label htmlFor="as-new">New password</Label><Input id="as-new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></div>
             <div className="space-y-1.5"><Label htmlFor="as-again">New password again</Label><Input id="as-again" type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></div>

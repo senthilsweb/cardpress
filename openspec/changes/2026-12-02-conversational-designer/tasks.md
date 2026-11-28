@@ -26,11 +26,14 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [x] Tool `list_connections`
 
 ## 4. Posting over MCP
-- [ ] API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
-- [ ] `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
-- [ ] Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit
-- [ ] Pinned test: the new method list and tool list; server instructions rewritten
-- [ ] Run for real against LinkedIn from an MCP client (ask the owner before each real post)
+On hold since 2026-11-28 (owner): publishing stays with a person. This also holds `publish_post` and the Post / Cancel
+card in step 5, and the `project.md` line in step 6.
+
+- [ ] (on hold) API key scope `agent`, accepted on `/mcp` only; `editor` unchanged (migration: `api_keys.scope` has a check that allows only `editor`)
+- [ ] (on hold) `PUT /api/v1/drafts/{id}/card` and the browser upload after a save or a draft event
+- [ ] (on hold) Tool `publish_post`: scope, card check, approve if needed, create and run the job, daily limit
+- [ ] (on hold) Pinned test: the new method list and tool list; server instructions rewritten
+- [ ] (on hold) Run for real against LinkedIn from an MCP client (ask the owner before each real post)
 
 ## 5. The chat on the managed agents
 - [x] Read the manifest (version 5), pin its agent version; remove `agent-setup` and the id settings
@@ -39,16 +42,20 @@ Build order across this change and `2026-12-03-chat-workspace`:
 - [x] Single vault: admin only, in brands the admin owns
 - [ ] Per-person vault and agent key, created on first chat
 - [x] Adapter: tool and sub-agent events as progress, outcomes in turn, verdict in the reply
-- [ ] Recorded changes per reply; `requires_action` and `user.tool_confirmation` (with `publish_post`)
+- [ ] (on hold) Recorded changes per reply; `requires_action` and `user.tool_confirmation` (with `publish_post`)
 - [x] The message blocks of the contract, with escaping; every source in every outcome; what was last seen kept per draft
 - [x] Chat stream event `progress`
-- [ ] Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
+- [ ] (on hold) Chat events `evaluation`, `confirm`; `POST /chat/conversations/{id}/confirm`; the Post / Cancel card
 - [x] Migration `chat_usage`; show a conversation's cost
 - [x] Read the session's usage after a reply
 - Not planned: recording usage after a stopped or failed reply (the owner reads costs in the Claude console)
 - [x] Tests with a scripted fake; a local run against a stand-in service with the real library and MCP
 - [ ] Try it against the real account (ask first: it costs money)
 
+## Bug fix (for the next bug fix bolt)
+- [ ] The coordinator says publishing is done by the person (from Full preview) instead of calling `publish_post`, which
+  CardPress does not have (agent repository; needs an apply)
+
 ## 6. Docs
 - [x] `docs/chat.md`, `docs/cma-agent.md`, `docs/configuration.md`, `docs/data-model.md` (`docs/mcp.md` with step 4)
-- [ ] `openspec/project.md`: add that the assistant may post with confirmation, once that is built
+- [ ] (on hold) `openspec/project.md`: add that the assistant may post with confirmation, once that is built

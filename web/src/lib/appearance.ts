@@ -24,14 +24,14 @@ export const readAppearance = (preferences: Record<string, unknown>): Appearance
   mode: isMode(preferences.theme) ? preferences.theme : "system",
 });
 
-// kept in this browser too, so the first paint after a reload has the right colours (see Base.astro)
-export const CACHE = "cardpress.appearance";
-const cached = (): Appearance => {
-  try {
-    const v = JSON.parse(localStorage.getItem(CACHE) ?? "{}");
-    return readAppearance({ palette: v.theme, theme: v.mode });
-  } catch { return readAppearance({}); }
+// The server sets this cookie, so the first paint after a reload has the right colours (see Base.astro). It holds the
+// colour theme and the mode, nothing else.
+export const LOOK_COOKIE = "cardpress_look";
+export const readLook = (cookies: string): Appearance => {
+  const m = new RegExp(`(?:^|;\\s*)${LOOK_COOKIE}=([a-z]+)\\.([a-z]+)`).exec(cookies);
+  return readAppearance({ palette: m?.[1], theme: m?.[2] });
 };
+const cached = (): Appearance => readLook(typeof document === "undefined" ? "" : document.cookie);
 
 let current: Appearance | undefined;
 const listeners = new Set<() => void>();
@@ -45,7 +45,6 @@ function apply(a: Appearance) {
 }
 function set(a: Appearance) {
   current = a;
-  try { localStorage.setItem(CACHE, JSON.stringify(a)); } catch { /* the first paint follows the system */ }
   apply(a);
   listeners.forEach((l) => l());
 }

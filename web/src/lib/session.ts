@@ -18,7 +18,9 @@ export interface User {
   lastLoginAt?: string;
 }
 
-export interface Session { user?: User; perms: Perm[] }
+export interface Session { user?: User; perms: Perm[]; passwordMin?: number }
+/** The shortest password the server takes, until it says otherwise. */
+export const PASSWORD_MIN = 10;
 
 export const ROLES = [
   { value: "admin", label: "Admin", hint: "Everything, and everyone's work" },
@@ -45,6 +47,8 @@ export const useSession = () => useContext(SessionContext);
 export const base = () => import.meta.env.BASE_URL;
 export const loginUrl = (next?: string) => `${base()}login/${next ? `?next=${encodeURIComponent(next)}` : ""}`;
 export const signupUrl = () => `${base()}signup/`;
+/** Sign-in after a session ended by itself: it says so, and comes back here afterwards. */
+export const endedUrl = () => `${loginUrl(window.location.pathname + window.location.search)}&ended=1`;
 
 /** Months for the date-of-birth drop-down. */
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

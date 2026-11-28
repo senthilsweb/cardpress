@@ -41,6 +41,7 @@ type Studio interface {
 	DeleteProfile(ctx context.Context, id string) error
 	ReplaceDesigns(ctx context.Context, designs map[string]json.RawMessage) error
 	SetPreference(ctx context.Context, key string, value json.RawMessage) error
+	Look(ctx context.Context) (palette, mode string, err error)
 	ImportLegacy(ctx context.Context, l service.Legacy) error
 	ListDrafts(ctx context.Context, profileID string) ([]service.Draft, error)
 	GetDraft(ctx context.Context, id string) (service.Draft, error)
@@ -146,7 +147,9 @@ type Options struct {
 	CORSOrigins  []string // exact origins allowed to call the API from a browser
 	LocalGuard   bool     // no token: answer only to localhost names (see ProtectOptions)
 	AllowedHosts []string // extra host names the server may be reached by when LocalGuard is on
-	Audit        interface {
+	// ClientIPHeader, behind a proxy, names the header it sets with the visitor's address.
+	ClientIPHeader string
+	Audit          interface {
 		List(ctx context.Context, limit int) ([]mcpserver.AuditEntry, error)
 	} // MCP call log; nil if MCP is off
 	Version  string
@@ -206,6 +209,8 @@ func (s *server) table() []routeDef {
 		{"GET", "/auth/me", any, s.meOrNotConfigured},
 		{"PUT", "/auth/me", any, s.updateMeOrNotConfigured},
 		{"PUT", "/auth/password", any, s.changePasswordOrNotConfigured},
+		{"GET", "/auth/session", any, s.sessionTimes},
+		{"POST", "/auth/session", any, s.sessionTimes},
 		{"GET", "/api-keys", any, s.listKeysOrOff},
 		{"POST", "/api-keys", any, s.createKeyOrOff},
 		{"DELETE", "/api-keys/{id}", any, s.revokeKeyOrOff},
@@ -297,6 +302,11 @@ func (s *server) table() []routeDef {
 		{"POST", "/chat/conversations/{id}/replies/{mid}/save", write(scopeConversation), s.saveReply},
 		{"POST", "/chat/conversations/{id}/replies/{mid}/undo", write(scopeConversation), s.undoReply},
 		{"POST", "/chat/proposals/{id}/decision", write(scopeProposal), s.decideProposal},
+		{"GET", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getSecurity},
+		{"PUT", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putSecurity},
+		{"DELETE", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetSecurity},
+		{"GET", "/security/log", rule{scope: scopeAdmin, perm: service.PermUsers}, s.securityLog},
+		{"POST", "/security/sign-out-everyone", rule{scope: scopeAdmin, perm: service.PermUsers}, s.signOutEveryone},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
 }
@@ -338,7 +348,7 @@ func (s *server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Expose-Headers", "X-Request-Id")
 			if r.Method == http.MethodOptions {
 				h.Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-CardPress-Background")
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -357,6 +367,8 @@ func (s *server) info(w http.ResponseWriter, r *http.Request) {
 		n, _ := s.Accounts.Count(r.Context())
 		out["needsSetup"] = n == 0
 		out["signupOpen"] = s.Accounts.SignupOpen(r.Context())
+		rules, _ := s.Accounts.Security(r.Context())
+		out["passwordMin"] = rules.MinPassword
 		if p, ok := principalOf(r); ok {
 			out["signedIn"] = true
 			if p.User != nil {
@@ -403,6 +415,7 @@ func (s *server) state(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, err)
 		return
 	}
+	s.lookCookie(w, r, r.Context()) // a choice made in another browser reaches this one
 	writeJSON(w, http.StatusOK, st)
 }
 
@@ -442,9 +455,13 @@ func (s *server) putPreference(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &value) {
 		return
 	}
-	if err := s.Studio.SetPreference(r.Context(), r.PathValue("key"), value); err != nil {
+	key := r.PathValue("key")
+	if err := s.Studio.SetPreference(r.Context(), key, value); err != nil {
 		fail(w, r, err)
 		return
+	}
+	if key == service.PrefTheme || key == service.PrefPalette {
+		s.lookCookie(w, r, r.Context())
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1105,6 +1122,12 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-beat.C:
+			// a stream opened with a sign-in ends when the sign-in does
+			if p, ok := principalOf(r); ok && s.Accounts != nil && p.User != nil && p.Key == "" {
+				if _, _, err := s.Accounts.Session(r.Context(), sessionToken(r), false); err != nil {
+					return
+				}
+			}
 			fmt.Fprint(w, ": still here\n\n")
 		case e, open := <-events:
 			if !open {

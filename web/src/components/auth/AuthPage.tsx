@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, type ApiInfo } from "@/lib/api";
 import { BuiltWith, Logo } from "@/components/studio/Logo";
-import { base, daysIn, joinDate, loginUrl, MONTHS, signupUrl } from "@/lib/session";
+import { base, daysIn, joinDate, loginUrl, MONTHS, PASSWORD_MIN, signupUrl } from "@/lib/session";
 
 /** Where to go after signing in: a page of this app only. */
 function nextPage(): string {
@@ -107,7 +107,7 @@ function Login({ info }: { info: ApiInfo }) {
     catch (err) { setError(err instanceof Error ? err.message : "Could not sign in"); setBusy(false); }
   };
   return (
-    <Card title="Sign in">
+    <Card title="Sign in" lead={new URLSearchParams(window.location.search).has("ended") ? "You were signed out. Sign in to carry on." : undefined}>
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
@@ -124,12 +124,13 @@ function Login({ info }: { info: ApiInfo }) {
 
 function Signup({ info }: { info: ApiInfo }) {
   const first = !!info.needsSetup;
+  const min = info.passwordMin ?? PASSWORD_MIN;
   const [f, setF] = useState({ firstName: "", lastName: "", email: "", password: "", phone: "" });
   const [dob, setDob] = useState({ y: "", m: "", d: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const ready = f.firstName.trim() && f.lastName.trim() && f.email.trim() && f.password.length >= 10;
+  const ready = f.firstName.trim() && f.lastName.trim() && f.email.trim() && f.password.length >= min;
 
   if (!info.signupOpen) {
     return <Card title="Sign-up is closed"><p className="text-sm text-muted-foreground">Ask an administrator to add you, then <a className="text-brand hover:underline" href={loginUrl()}>sign in</a>.</p></Card>;
@@ -150,7 +151,7 @@ function Signup({ info }: { info: ApiInfo }) {
           <div className="space-y-1.5"><Label htmlFor="last">Last name</Label><Input id="last" value={f.lastName} onChange={set("lastName")} autoComplete="family-name" required /></div>
         </div>
         <div className="space-y-1.5"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={f.email} onChange={set("email")} autoComplete="email" required /></div>
-        <Password id="password" label="Password" value={f.password} onChange={(v) => setF((x) => ({ ...x, password: v }))} hint="At least 10 characters. A few words work well." autoComplete="new-password" />
+        <Password id="password" label="Password" value={f.password} onChange={(v) => setF((x) => ({ ...x, password: v }))} hint={`At least ${min} characters. A few words work well.`} autoComplete="new-password" />
         <Collapsible className="rounded-md border border-border px-3 py-2">
           <CollapsibleTrigger type="button" className="flex w-full cursor-pointer items-center gap-1 text-sm text-muted-foreground data-[state=open]:mb-3 [&[data-state=open]>svg]:rotate-90"><ChevronRight aria-hidden className="h-4 w-4" /> Optional details</CollapsibleTrigger>
           <CollapsibleContent>

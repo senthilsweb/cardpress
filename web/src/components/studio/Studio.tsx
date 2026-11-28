@@ -69,8 +69,8 @@ function useBox<T extends HTMLElement>() {
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
 export default function Studio() {
-  const { boot, retry, submitToken, importLegacy, discardLegacy, openBrand } = useBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={importLegacy} discardLegacy={discardLegacy} />;
+  const { boot, retry, submitToken, openBrand } = useBoot();
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   // keyed by brand: opening another brand starts the whole studio over for it, so nothing of the last one is left on screen
   return <SessionProvider initial={boot.data.session}><Workspace key={boot.data.activeId} initial={boot.data} openBrand={openBrand} /></SessionProvider>;
 }

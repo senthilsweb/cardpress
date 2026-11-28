@@ -36,9 +36,10 @@ const (
 	PrefFonts          = "customFonts"
 	PrefLayout         = "layout"        // sidebar and section fold state, editor height
 	PrefActive         = "activeProfile" // the brand that was open last
+	PrefUI             = "ui"            // view choices: list or grid, columns, page sizes and the like
 )
 
-var allowedPrefs = map[string]bool{PrefTheme: true, PrefPalette: true, PrefFonts: true, PrefLayout: true, PrefActive: true}
+var allowedPrefs = map[string]bool{PrefTheme: true, PrefPalette: true, PrefFonts: true, PrefLayout: true, PrefActive: true, PrefUI: true}
 
 // State is everything the studio loads at start.
 type State struct {
@@ -391,6 +392,35 @@ func (s *Studio) SetPreference(ctx context.Context, key string, value json.RawMe
 		 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
 		key, string(value), s.stamp())
 	return err
+}
+
+// Look is the caller's colour theme and mode, each "" when not chosen.
+func (s *Studio) Look(ctx context.Context) (palette, mode string, err error) {
+	query, args := `SELECT key, value FROM preferences WHERE key IN (?, ?)`, []any{PrefPalette, PrefTheme}
+	if uid := userScope(ctx); uid != "" {
+		query, args = `SELECT key, value FROM user_preferences WHERE key IN (?, ?) AND user_id = ?`, []any{PrefPalette, PrefTheme, uid}
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return "", "", err
+		}
+		var word string
+		if json.Unmarshal([]byte(value), &word) != nil {
+			continue
+		}
+		if key == PrefPalette {
+			palette = word
+		} else {
+			mode = word
+		}
+	}
+	return palette, mode, rows.Err()
 }
 
 // ImportLegacy loads state that used to live in a browser. It only works on an empty database, so it can never

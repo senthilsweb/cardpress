@@ -1,4 +1,7 @@
 # Tasks
+
+Deferred (owner, 2026-11-27): the open tasks can wait.
+
 - [x] Agree the open questions
 - [x] `signature` field: models (agent repository), server, Details, choices
 - [x] Script font role

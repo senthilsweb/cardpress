@@ -54,7 +54,7 @@ Rows are owned by a person through `owner_id`, `created_by` and `user_id`, shown
 | `assets` | 0027 | `id` (PK), `profile_id`, `kind` (image, pdf, video), `name`, `tags` (JSON), `hash`, `link`, `mime`, `size`, `width`, `height`, `thumb`, `thumb_mime`, `created_by`, `created_at`, `updated_at`. A brand's media library. Card designs and brands name an entry as `asset:<id>` |
 | `asset_blobs` | 0027 | `hash` (PK), `data`. Each distinct file once; removed with its last entry |
 | `designs` | 0001 | `profile_id` (PK), `data` (JSON: the brand's current card design), `updated_at` |
-| `preferences` | 0001 | `key` (PK), `value` (JSON), `updated_at`. Keys: `theme`, `layout`, `customFonts`, `activeProfile`, `envProfile` |
+| `preferences` | 0001 | `key` (PK), `value` (JSON), `updated_at`. Keys: `theme`, `layout`, `customFonts`, `activeProfile`, `envProfile`, `security` |
 
 `envProfile` names the brand that the `CARDPRESS_<NETWORK>_<FIELD>` environment variables belong to. It is set when the first brand is saved and is never moved.
 
@@ -129,6 +129,7 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0025 | `chat_changes` (what a reply changed, for save and undo) and `choices` (options offered) |
 | 0026 | `brand_details` |
 | 0027 | `assets`, `asset_blobs` |
+| 0028 | `security_events` |
 
 ## A post's own file
 
@@ -173,8 +174,9 @@ stateDiagram-v2
 |---|---|
 | `users` | `id` (PK), `email` (unique, lower-case), `first_name`, `last_name`, `phone`, `birth_date` (`YYYY-MM-DD` or empty), `password_hash` (argon2id), `status` (`active` or `disabled`), `created_at`, `last_login_at`. The full name is `first_name last_name`; it is not stored |
 | `user_roles` | `user_id`, `role` (`admin`, `editor` or `writer`); primary key `(user_id, role)`. One row each today, but a person may hold several: what they may do is everything any of their roles allows |
-| `sessions` | `token_hash` (PK, the hash of the cookie value), `user_id`, `created_at`, `last_seen_at`, `expires_at` |
-| `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, layout, the open brand, custom fonts. System-wide keys (such as `envProfile`) stay in `preferences` |
+| `sessions` | `token_hash` (PK, the hash of the cookie value), `user_id`, `created_at`, `last_seen_at` (last use), `expires_at` (`created_at` plus the longest session at sign-in) |
+| `security_events` (0028) | `id` (PK), `at`, `event`, `actor`, `subject` (emails), `address`, `detail`. The newest 2000; never a password or token |
+| `user_preferences` | `(user_id, key)` (PK), `value`, `updated_at`: theme, palette, layout, the open brand, custom fonts and `ui` (view choices). System-wide keys (such as `envProfile` and `security`, the saved security settings) stay in `preferences` |
 | `api_keys` | `id` (PK), `user_id`, `name`, `prefix` (the key's first characters, to tell keys apart), `key_hash` (SHA-256 of the key; unique; **the key itself is never stored**), `scope` (`editor`), `created_at`, `last_used_at`, `revoked_at` (empty while the key works) |
 
 Indexes: `users.email` is unique; `user_roles` and `user_preferences` are keyed by their primary keys; `sessions` has `(user_id)` and `(expires_at)`; `api_keys` has `(user_id)` and a unique `key_hash`; `profiles` has `(owner_id)`.
@@ -183,7 +185,7 @@ A brand belongs to the person in `profiles.owner_id`, and everything keyed by `p
 
 **What the roles are.** `user_roles.role` is the only place a role is kept. What a role may do (`write`, `approve`, `publish`, `social`, `users`) is code, not data: writer has `write`; editor adds `approve`, `publish` and `social`; admin has all five. A person with several rows may do everything any of them allows. An API key's scope (`api_keys.scope`, today `editor`) names a set of those permissions; the key may do what its scope **and** its person's roles both allow, and is never an admin.
 
-**Sessions and keys.** A session lasts 14 days from the last use (`expires_at` moves forward as it is used); expired rows are removed. A key is revoked by setting `revoked_at`; a revoked key, or a key whose person is `disabled`, is refused. `last_used_at` is written at most once a minute.
+**Sessions and keys.** A session ends when unused for the idle time or older than the longest time (20 minutes and 12 hours unless changed); both are checked on every request, and ended rows are removed. A key is revoked by setting `revoked_at`; a revoked key, or a key whose person is `disabled`, is refused. `last_used_at` is written at most once a minute.
 
 **What is removed with what.** Deleting a brand removes its designs, drafts (with their versions), posts and attempts, conversations (with messages and proposals) and credentials. Deleting a draft removes its versions. Disabling a person keeps their rows and ends their sessions and keys.
 

@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Boot, LegacyData } from "@/lib/boot";
+import type { Boot } from "@/lib/boot";
 import { API_BASE } from "@/lib/api";
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
@@ -25,8 +25,6 @@ export function BootScreen(props: {
   boot: Exclude<Boot, { status: "ready" }>;
   retry: () => void;
   submitToken: (t: string) => void;
-  importLegacy: (l: LegacyData) => void;
-  discardLegacy: () => void;
 }) {
   const { boot } = props;
   const [token, setToken] = useState("");
@@ -42,35 +40,17 @@ export function BootScreen(props: {
       </Shell>
     );
   }
-  if (boot.status === "auth") {
-    return (
-      <Shell title="This server needs an access token">
-        <form onSubmit={(e) => { e.preventDefault(); if (token.trim()) props.submitToken(token); }} className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="tok">Access token</Label>
-            <Input id="tok" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} autoFocus />
-            {boot.error && <p className="text-xs text-destructive">{boot.error}</p>}
-            <p className="text-xs text-muted-foreground">Set as CARDPRESS_API_TOKEN on the server. Kept for this tab only.</p>
-          </div>
-          <Button type="submit" variant="brand" size="sm" disabled={!token.trim()}>Continue</Button>
-        </form>
-      </Shell>
-    );
-  }
-  // legacy
-  const l = boot.legacy;
-  const name = l.profiles[0]?.name ?? "your profile";
   return (
-    <Shell title="Move your saved work to the server?">
-      <p className="mb-2 text-sm text-muted-foreground">
-        Found the profile “{name}”{l.customFonts.length ? ` and ${l.customFonts.length} added font(s)` : ""} saved in this browser.
-      </p>
-      <p className="mb-4 text-xs text-muted-foreground">Copies it to the server, then clears it from this browser.</p>
-      {boot.error && <p className="mb-3 text-xs text-destructive">{boot.error}</p>}
-      <div className="flex gap-2">
-        <Button variant="brand" size="sm" disabled={boot.busy} onClick={() => props.importLegacy(l)}>{boot.busy && <Loader2 className="animate-spin" />} Import</Button>
-        <Button variant="outline" size="sm" disabled={boot.busy} onClick={props.discardLegacy}>Discard old browser data</Button>
-      </div>
+    <Shell title="This server needs an access token">
+      <form onSubmit={(e) => { e.preventDefault(); if (token.trim()) props.submitToken(token); }} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="tok">Access token</Label>
+          <Input id="tok" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} autoFocus />
+          {boot.error && <p className="text-xs text-destructive">{boot.error}</p>}
+          <p className="text-xs text-muted-foreground">Set as CARDPRESS_API_TOKEN on the server. Asked for again after a reload.</p>
+        </div>
+        <Button type="submit" variant="brand" size="sm" disabled={!token.trim()}>Continue</Button>
+      </form>
     </Shell>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { CircleAlert, Download, ExternalLink, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Pencil, Search, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,16 +28,14 @@ import { libraryHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
-
-const noop = () => undefined;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
-const VIEW_KEY = "cardpress.media.view";
-const SIZE_KEY = "cardpress.media.pageSize";
-const savedSize = () => { try { const n = Number(localStorage.getItem(SIZE_KEY)); return (ASSET_PAGE_SIZES as readonly number[]).includes(n) ? n : 24; } catch { return 24; } };
+const VIEW_KEY = "media.view";
+const SIZE_KEY = "media.pageSize";
+const savedSize = () => { const n = Number(readPref(SIZE_KEY)); return (ASSET_PAGE_SIZES as readonly number[]).includes(n) ? n : 24; };
 
 export default function Media() {
   const { boot, retry, submitToken } = useLibraryBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={noop} discardLegacy={noop} />;
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 
@@ -51,7 +50,7 @@ function Page({ data }: { data: LibraryBoot }) {
   // what the server is asked for; a new filter starts at the first page
   const [query, setQuery] = useState(() => ({ text: "", kind: "" as "" | AssetKind, tag: "", page: 1, pageSize: savedSize() }));
   const ask = useCallback((change: Partial<typeof query>) => setQuery((q) => ({ ...q, page: 1, ...change })), []);
-  const [view, setView] = useState<"grid" | "list">(() => { try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid"; } catch { return "grid"; } });
+  const [view, setView] = useState<"grid" | "list">(() => (readPref(VIEW_KEY) === "list" ? "list" : "grid"));
   const [sending, setSending] = useState<{ name: string; at: number; of: number } | null>(null);
   const [dropping, setDropping] = useState(false);
   const [editing, setEditing] = useState<Asset | null>(null);
@@ -77,7 +76,7 @@ function Page({ data }: { data: LibraryBoot }) {
   /** After adding: the newest are first, so show the first page. */
   const showNewest = () => { if (query.page === 1) load(); else ask({}); };
 
-  const changeView = (v: "grid" | "list") => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not remembered */ } };
+  const changeView = (v: "grid" | "list") => { setView(v); savePref(VIEW_KEY, v); };
   const switchBrand = (id: string) => { void api.putPreference("activeProfile", id).then(() => { setLibrary(null); ask({ tag: "" }); setBrand(id); }, (e) => toast.error("Could not switch", { description: message(e) })); };
 
   /** Files go one at a time, which a small server can hold. */
@@ -253,7 +252,7 @@ function Page({ data }: { data: LibraryBoot }) {
 
                 <Pager label="Pages of the media library" page={library.page} pages={library.pages} pageSize={library.pageSize} total={library.total} sizes={ASSET_PAGE_SIZES}
                   onPage={(page) => { setQuery((q) => ({ ...q, page })); document.querySelector("main")?.scrollTo(0, 0); }}
-                  onSize={(pageSize) => { try { localStorage.setItem(SIZE_KEY, String(pageSize)); } catch { /* not remembered */ } ask({ pageSize }); }} />
+                  onSize={(pageSize) => { savePref(SIZE_KEY, pageSize); ask({ pageSize }); }} />
 
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <div role="meter" aria-label="Library space used" aria-valuemin={0} aria-valuemax={library.limitBytes} aria-valuenow={library.usedBytes} className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">

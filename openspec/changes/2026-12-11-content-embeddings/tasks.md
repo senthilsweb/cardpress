@@ -1,4 +1,7 @@
 # Tasks (not started)
+
+Deferred (owner, 2026-11-27): can wait.
+
 - [ ] Settings and start-up checks (model, dimension, key; off by default)
 - [ ] An embeddings migration (the next free number); libSQL vector index at start-up; one store function for nearest passages on both databases
 - [ ] Voyage client (documents and queries), passage splitting, background worker with retry and catch-up

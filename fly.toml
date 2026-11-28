@@ -11,6 +11,8 @@ primary_region = "iad"
 [env]
   ADDR = ":8080"
   CARDPRESS_DB_URL = "file:/data/cardpress.db"
+  # Fly's proxy puts the visitor's address here; failed sign-ins are counted by it
+  CARDPRESS_CLIENT_IP_HEADER = "Fly-Client-IP"
   # Go cleans up before it reaches this much memory. Keep it well under the machine size below: one password check
   # needs 64 MB, and without a limit the left-overs of a few sign-ins filled a 256 MB machine.
   GOMEMLIMIT = "150MiB"

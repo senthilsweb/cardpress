@@ -82,7 +82,13 @@ The guard below is a second layer, and the way machines (scripts, MCP over HTTP)
 
 With **no token**, the server also answers only to `localhost` host names and refuses cross-site browser requests that change things, which stops a website you visit from driving your local CardPress (see [MCP](mcp.md#access-rules-http-and-the-json-api)). If you reach it under another name, add it to `CARDPRESS_ALLOWED_HOSTS`.
 
-The web app asks for the token when it needs one and keeps it for that browser tab only (`sessionStorage`). A `PUBLIC_API_TOKEN` set at build time is visible to anyone who can load the app, so use it only on a private network.
+The web app asks for the token when it needs one and holds it in memory only, so it is asked for again after a reload. A `PUBLIC_API_TOKEN` set at build time is visible to anyone who can load the app, so use it only on a private network.
+
+## Security behind a proxy
+
+Run CardPress behind HTTPS. The proxy should send `X-Forwarded-Proto: https`, so cookies are marked `Secure` and `Strict-Transport-Security` is sent. Set `CARDPRESS_CLIENT_IP_HEADER` to the header the proxy fills with the visitor's address (for example `Fly-Client-IP`, or `X-Real-IP`); otherwise failed sign-ins are counted by the proxy's address and one stranger's mistakes pause everyone. Never set it when visitors can reach CardPress directly.
+
+CardPress sends a content security policy with the app (its own scripts only; styles and fonts also from Google Fonts), refuses to be framed, and does not let API answers be cached. If the web app is hosted separately, give its host a policy of its own.
 
 ## Docker
 

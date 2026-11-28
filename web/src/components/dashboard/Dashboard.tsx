@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { CircleAlert, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,16 +21,14 @@ import { libraryHref, studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
 import { cn } from "@/lib/utils";
-
-const noop = () => undefined;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
-const PERIOD_KEY = "cardpress.dashboard.days";
+const PERIOD_KEY = "dashboard.days";
 /** The day so many days before today. */
 const dayAgo = (back: number) => { const d = new Date(); d.setDate(d.getDate() - back); return toDay(d); };
 
 export default function Dashboard() {
   const { boot, retry, submitToken } = useLibraryBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={noop} discardLegacy={noop} />;
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 
@@ -57,7 +56,7 @@ function Page({ data }: { data: LibraryBoot }) {
   const [theme, toggleTheme] = useTheme();
   const [brand, setBrand] = useState(data.activeId);
   const [all, setAll] = useState(() => new URLSearchParams(window.location.search).get("scope") === "all");
-  const [period, setPeriod] = useState<Period>(() => { try { return readPeriod(localStorage.getItem(PERIOD_KEY)); } catch { return { days: 30 }; } });
+  const [period, setPeriod] = useState<Period>(() => { const saved = readPref(PERIOD_KEY); return readPeriod(typeof saved === "string" ? saved : null); });
   const [figures, setFigures] = useState<Figures | null>(null);
   const [error, setError] = useState<string | null>(null);
   const run = useRef(0);
@@ -70,7 +69,7 @@ function Page({ data }: { data: LibraryBoot }) {
       .catch((e) => { if (mine === run.current) { setFigures(null); setError(message(e)); } });
   }, [brand, all, period]);
   useEffect(load, [load]);
-  useEffect(() => { try { localStorage.setItem(PERIOD_KEY, writePeriod(period)); } catch { /* not remembered */ } }, [period]);
+  useEffect(() => { if (readPref(PERIOD_KEY) !== undefined || writePeriod(period) !== "30") savePref(PERIOD_KEY, writePeriod(period)); }, [period]);
   useEffect(() => { window.history.replaceState(window.history.state, "", `${window.location.pathname}${all ? "?scope=all" : ""}`); }, [all]);
 
   const switchBrand = (id: string) => { void api.putPreference("activeProfile", id).then(() => { setBrand(id); setAll(false); setFigures(null); }, (e) => toast.error("Could not switch", { description: message(e) })); };

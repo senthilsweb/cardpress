@@ -24,8 +24,8 @@ export function useChat(profileId: string) {
   const live = useRef({ busy: false, current: null as Conversation | null });
   live.current = { busy, current };
 
-  const refreshList = useCallback(async () => {
-    const r = await api.listConversations(profileId);
+  const refreshList = useCallback(async (background = false) => {
+    const r = await api.listConversations(profileId, "", background);
     setList(r.conversations);
     setAgent(r.agent);
     return r.conversations;
@@ -51,10 +51,10 @@ export function useChat(profileId: string) {
     const check = async () => {
       if (document.hidden || live.current.busy) return;
       try {
-        const cs = await refreshList();
+        const cs = await refreshList(true);
         const cur = live.current.current;
         const item = cur && cs.find((c) => c.id === cur.id);
-        if (cur && item && item.updatedAt > cur.updatedAt) setCurrent(await api.getConversation(cur.id)); // new content in the open thread
+        if (cur && item && item.updatedAt > cur.updatedAt) setCurrent(await api.getConversation(cur.id, true)); // new content in the open thread
       } catch { /* the next check will try again */ }
     };
     const t = window.setInterval(() => void check(), 15_000);

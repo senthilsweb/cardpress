@@ -3,14 +3,14 @@
 const env = import.meta.env as Record<string, string | undefined>;
 export const API_BASE = (env.PUBLIC_API_BASE || "/api/v1").replace(/\/+$/, "");
 
-// A token typed into the prompt is kept for this tab only. A build-time PUBLIC_API_TOKEN is visible to anyone who
-// can load the app, so use it only on a private network.
-const TOKEN_KEY = "cardpress.apiToken";
-export const getToken = (): string => {
-  try { return sessionStorage.getItem(TOKEN_KEY) || env.PUBLIC_API_TOKEN || ""; } catch { return env.PUBLIC_API_TOKEN || ""; }
-};
-export const setToken = (t: string) => { try { sessionStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ } };
-export const clearToken = () => { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } };
+// A token typed into the prompt is held in memory only, so it is asked for again after a reload. A build-time
+// PUBLIC_API_TOKEN is visible to anyone who can load the app, so use it only on a private network.
+let typed = "";
+export const getToken = (): string => typed || env.PUBLIC_API_TOKEN || "";
+export const setToken = (t: string) => { typed = t; };
+export const clearToken = () => { typed = ""; };
+
+export interface SessionTimes { remainingSeconds: number; idleSeconds: number; limit: "idle" | "max" }
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public requestId?: string) {
@@ -18,8 +18,13 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+import { endedUrl } from "./session";
+
+/** Marks a request the app makes by itself: it is answered, but does not keep the person signed in. */
+const BACKGROUND = "X-CardPress-Background";
+
+async function call<T>(method: string, path: string, body?: unknown, background = false): Promise<T> {
+  const headers: Record<string, string> = background ? { [BACKGROUND]: "1" } : {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const isForm = typeof FormData !== "undefined" && body instanceof FormData; // the browser sets the multipart boundary itself
@@ -40,7 +45,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     const e = (json as { error?: { code?: string; message?: string }; requestId?: string } | undefined) ?? {};
     // a session that has ended (not a wrong password) sends the person to sign in again
     if (res.status === 401 && !path.startsWith("/auth/login") && typeof window !== "undefined" && !/\/(login|signup)\/?$/.test(window.location.pathname)) {
-      window.location.assign(`${import.meta.env.BASE_URL}login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      window.location.assign(endedUrl());
     }
     throw new ApiError(res.status, e.error?.code ?? "http", e.error?.message ?? `Request failed (${res.status})`, e.requestId);
   }
@@ -49,6 +54,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
+import type { Security, SecurityEvent, SecuritySettings } from "./security";
 import type { Attempt, Job, NewJob } from "./jobs";
 import type { LibraryFilter, LibraryPage, LibrarySort } from "./library";
 import type { CalendarEntry, ReadyItem } from "./calendar";
@@ -64,7 +70,7 @@ export interface ApiInfo {
   /** The source the server was made from; told to a signed-in person. */
   build?: { commit?: string; date?: string };
   /** Accounts are on: the app needs a first (admin) account, then people sign in. */
-  accounts?: boolean; needsSetup?: boolean; signupOpen?: boolean; signedIn?: boolean; user?: User; perms?: Perm[];
+  accounts?: boolean; needsSetup?: boolean; signupOpen?: boolean; passwordMin?: number; signedIn?: boolean; user?: User; perms?: Perm[];
 }
 /** A saved state of a draft (text only when one is fetched on its own). */
 export interface DraftVersion {
@@ -189,6 +195,15 @@ export const api = {
   signup: (input: SignupInput) => call<{ user: User; perms: Perm[] }>("POST", "/auth/signup", input),
   login: (email: string, password: string) => call<{ user: User; perms: Perm[] }>("POST", "/auth/login", { email, password }),
   logout: () => call<void>("POST", "/auth/logout"),
+  security: () => call<Security>("GET", "/security"),
+  saveSecurity: (s: SecuritySettings) => call<Security>("PUT", "/security", s),
+  resetSecurity: () => call<Security>("DELETE", "/security"),
+  securityLog: (before?: number) => call<{ events: SecurityEvent[]; more: boolean }>("GET", `/security/log${before ? `?before=${before}` : ""}`),
+  signOutEveryone: () => call<{ ended: number }>("POST", "/security/sign-out-everyone"),
+  /** How long the sign-in has left; asking does not extend it. */
+  sessionTimes: () => call<SessionTimes>("GET", "/auth/session"),
+  /** The person is using the app: the idle time starts again. */
+  staySignedIn: () => call<SessionTimes>("POST", "/auth/session"),
   updateMe: (input: { firstName: string; lastName: string; phone: string; birthDate: string }) => call<{ user: User; perms: Perm[] }>("PUT", "/auth/me", input),
   changePassword: (current: string, next: string) => call<void>("PUT", "/auth/password", { current, new: next }),
   apiKeys: () => call<{ keys: ApiKey[]; scopes: string[] }>("GET", "/api-keys"),
@@ -228,8 +243,8 @@ export const api = {
   restoreProfile: (id: string) => call<void>("POST", `/profiles/${encodeURIComponent(id)}/restore`),
   deleteProfile: (id: string) => call<void>("DELETE", `/profiles/${encodeURIComponent(id)}`),
   putDesigns: (designs: Record<string, unknown>) => call<void>("PUT", "/designs", { designs }),
-  putPreference: (key: "theme" | "palette" | "customFonts" | "layout" | "activeProfile", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
-  listDrafts: (profileId: string) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`).then((r) => r.drafts),
+  putPreference: (key: "theme" | "palette" | "customFonts" | "layout" | "activeProfile" | "ui", value: unknown) => call<void>("PUT", `/preferences/${key}`, value),
+  listDrafts: (profileId: string, background = false) => call<{ drafts: Draft[] }>("GET", `/drafts?profileId=${encodeURIComponent(profileId)}`, undefined, background).then((r) => r.drafts),
   createDraft: (input: DraftInput) => call<Draft>("POST", "/drafts", input),
   updateDraft: (id: string, input: DraftInput & { revision?: number }) => call<Draft>("PUT", `/drafts/${encodeURIComponent(id)}`, input),
   /** Change the named planning fields; allowed at any status. */
@@ -238,7 +253,7 @@ export const api = {
   setPageFields: (id: string, fields: Partial<Pick<Draft, "slug" | "summary">>) => call<Draft>("PATCH", `/drafts/${encodeURIComponent(id)}/page-fields`, fields),
   deleteDraft: (id: string) => call<void>("DELETE", `/drafts/${encodeURIComponent(id)}`),
   listen,
-  getDraft: (id: string) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`),
+  getDraft: (id: string, background = false) => call<Draft>("GET", `/drafts/${encodeURIComponent(id)}`, undefined, background),
   /** Put an approved item's page on the public web. `cover` is the card as a PNG, used as the preview image. */
   publishPage: (id: string, meta: { slug?: string; summary?: string }, cover?: Blob) => {
     const form = new FormData();
@@ -278,7 +293,7 @@ export const api = {
   putNetwork: (profileId: string, id: string, fields: Record<string, string | null>) => call<NetworkSettings>("PUT", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}`, { fields }),
   testNetwork: (profileId: string, id: string) => call<TestResult>("POST", `/profiles/${encodeURIComponent(profileId)}/settings/${encodeURIComponent(id)}/test`),
   /** One brand's posts, or every brand's with `scope: "all"`. */
-  listJobs: (profileId: string, scope: "brand" | "all" = "brand") => call<{ jobs: Job[] }>("GET", scope === "all" ? "/publish/jobs?scope=all" : `/publish/jobs?profileId=${encodeURIComponent(profileId)}`).then((r) => r.jobs),
+  listJobs: (profileId: string, scope: "brand" | "all" = "brand", background = false) => call<{ jobs: Job[] }>("GET", scope === "all" ? "/publish/jobs?scope=all" : `/publish/jobs?profileId=${encodeURIComponent(profileId)}`, undefined, background).then((r) => r.jobs),
   /** Confirms a post: publish now (no `scheduledAt`) or later. The image is the card as a PNG. */
   /** `image` is the card; a post with a picture of its own sends none (the server uses the picture it holds). */
   createJob: (meta: NewJob, image?: Blob) => {
@@ -317,7 +332,7 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, "http", `Could not load the image (${res.status})`);
     return res.blob();
   },
-  listConversations: (profileId: string, q = "") => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  listConversations: (profileId: string, q = "", background = false) => call<{ conversations: Conversation[]; agent: AgentInfo }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`, undefined, background),
   /** The conversations changed before this one. */
   olderConversations: (profileId: string, after: string) => call<{ conversations: Conversation[] }>("GET", `/chat/conversations?profileId=${encodeURIComponent(profileId)}&after=${encodeURIComponent(after)}`).then((r) => r.conversations),
   listNotes: (profileId: string) => call<{ notes: BrandNote[] }>("GET", `/chat/memories?profileId=${encodeURIComponent(profileId)}`).then((r) => r.notes),
@@ -330,7 +345,7 @@ export const api = {
     return call<ChatSource>("POST", `/chat/conversations/${encodeURIComponent(conversationId)}/sources`, body);
   },
   removeSource: (conversationId: string, sourceId: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(conversationId)}/sources/${encodeURIComponent(sourceId)}`),
-  getConversation: (id: string) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`),
+  getConversation: (id: string, background = false) => call<Conversation>("GET", `/chat/conversations/${encodeURIComponent(id)}`, undefined, background),
   deleteConversation: (id: string) => call<void>("DELETE", `/chat/conversations/${encodeURIComponent(id)}`),
   streamMessage,
   /** Record a person's answer. Approving does not save or publish anything: the browser applies the content to a draft. */
@@ -340,6 +355,4 @@ export const api = {
   undoReply: (id: string, messageId: string) => call<Conversation>("POST", `/chat/conversations/${encodeURIComponent(id)}/replies/${encodeURIComponent(messageId)}/undo`),
   decideProposal: (id: string, body: { status: "approved" | "rejected"; draftId?: string; edited?: ProposalEdit }) =>
     call<Proposal>("POST", `/chat/proposals/${encodeURIComponent(id)}/decision`, body),
-  importLegacy: (body: { profiles: unknown[]; designs: Record<string, unknown>; preferences: Record<string, unknown> }) =>
-    call<void>("POST", "/import/legacy", body),
 };

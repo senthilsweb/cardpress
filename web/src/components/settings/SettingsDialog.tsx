@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, CircleUser, KeyRound, Loader2, Paintbrush, Palette, Plug, SwatchBook, Users } from "lucide-react";
+import { SecuritySettings } from "./SecuritySettings";
+import { Bot, CircleUser, KeyRound, Loader2, Paintbrush, Palette, Plug, ShieldCheck, SwatchBook, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PanelDialog } from "@/components/ui/panel-dialog";
 import { Pane } from "@/components/ui/pane";
@@ -24,7 +25,7 @@ import type { Design, Profile } from "@/lib/types";
 
 const ICONS: Record<SettingsSection, React.ReactNode> = {
   account: <CircleUser aria-hidden />, appearance: <SwatchBook aria-hidden />, "api-keys": <KeyRound aria-hidden />, brands: <Palette aria-hidden />,
-  look: <Paintbrush aria-hidden />, social: <Plug aria-hidden />, users: <Users aria-hidden />, assistant: <Bot aria-hidden />,
+  look: <Paintbrush aria-hidden />, social: <Plug aria-hidden />, users: <Users aria-hidden />, security: <ShieldCheck aria-hidden />, assistant: <Bot aria-hidden />,
 };
 
 /** Where the dialog is: a page, and what its address asked for (a new brand, or whose look). */
@@ -164,6 +165,7 @@ export function SettingsHost({ onLeave }: { onLeave?: () => void }) {
             <BrandPages section={shown.id} at={at} go={go} onChanged={() => { changed.current = true; }} />
           )}
           {shown.id === "users" && <UsersSettings />}
+          {shown.id === "security" && <SecuritySettings />}
           {shown.id === "assistant" && <AssistantPage />}
         </div>
       </Guard.Provider>

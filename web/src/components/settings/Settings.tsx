@@ -7,12 +7,10 @@ import { studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
 import { useTheme } from "@/lib/useTheme";
 
-const noop = () => undefined;
-
 /** A settings address visited directly: the frame, with the settings dialog open over it (`SettingsDialog.tsx`). */
 export default function Settings() {
   const { boot, retry, submitToken } = useLibraryBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={noop} discardLegacy={noop} />;
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 

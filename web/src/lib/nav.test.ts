@@ -13,7 +13,7 @@ describe("settings sections", () => {
     const editor = visibleSections(true, (p) => p !== "users").map((s) => s.id);
     expect(editor).toEqual(["account", "appearance", "api-keys", "brands", "look", "social"]);
     const admin = visibleSections(true, () => true).map((s) => s.id);
-    expect(admin).toEqual(["account", "appearance", "api-keys", "brands", "look", "social", "users", "assistant"]);
+    expect(admin).toEqual(["account", "appearance", "api-keys", "brands", "look", "social", "users", "security", "assistant"]);
     // without accounts there is no person: no account, keys or users pages
     expect(visibleSections(false, (p) => p !== "users").map((s) => s.id)).toEqual(["appearance", "brands", "look", "social"]);
   });
@@ -27,7 +27,7 @@ describe("settings sections", () => {
 describe("settings in a dialog", () => {
   it("finds pages by name and by what is on them", () => {
     const ids = (q: string) => findSections(SETTINGS_SECTIONS, q).map((s) => s.id);
-    expect(ids("password")).toEqual(["account", "users"]);
+    expect(ids("password")).toEqual(["account", "users", "security"]);
     expect(ids("LinkedIn")).toEqual(["social"]);
     expect(ids("brand logo")).toEqual(["look"]);
     expect(ids("zzz")).toEqual([]);

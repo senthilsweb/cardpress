@@ -1,6 +1,6 @@
 # Published posts and articles as vector embeddings
 
-**Status:** proposed by the owner on 2026-11-25. Specification only: nothing is built. Searching and ranking by meaning is a later change that uses what this one stores.
+**Status:** deferred (owner, 2026-11-27); proposed by the owner on 2026-11-25. Specification only: nothing is built. Searching and ranking by meaning is a later change that uses what this one stores.
 
 ## Why
 Finding earlier work today means matching words in a title. The owner wants to search by meaning and rank by closeness, for people ("what have we said about data contracts?") and for the agents (avoid repeating a published post, link related articles). That needs each published item stored as vectors.

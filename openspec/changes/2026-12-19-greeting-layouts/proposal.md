@@ -1,6 +1,6 @@
 # Greeting layouts
 
-**Status:** step 1 released and deployed (2026-11-27). The other presets, art sets and templates are not built.
+**Status:** open tasks deferred (owner, 2026-11-27). step 1 released and deployed (2026-11-27). The other presets, art sets and templates are not built.
 
 ## Why
 The card layouts are made for articles and announcements: small line, headline, subtitle, aligned left. A greeting card

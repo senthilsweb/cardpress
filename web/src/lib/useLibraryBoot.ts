@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { withStandardPalettes } from "./profiles";
-import { readLegacy } from "./boot";
+import { hydratePrefs } from "./prefs";
 import { createFirstBrand } from "./firstBrand";
-import { studioHref } from "./nav";
 import { brandColor, pickActive } from "./brands";
 import type { Design, Profile } from "./types";
 import { requireSession } from "./gate";
@@ -42,8 +41,6 @@ export function useLibraryBoot() {
       if (!info.accounts && info.authRequired && !getToken()) return setBoot({ status: "auth" });
       let state = await api.state();
       if (!state.profiles.length) {
-        // data an older version kept in this browser is brought in by the studio, which asks about it
-        if (readLegacy()) { window.location.assign(studioHref()); return; }
         await createFirstBrand(session.user);
         state = await api.state();
       }
@@ -52,6 +49,7 @@ export function useLibraryBoot() {
       const designs = state.designs as Record<string, Design>;
       const colors = Object.fromEntries(profiles.map((p) => [p.id, brandColor(p, designs[p.id])]));
       hydrateAppearance(state.preferences);
+      hydratePrefs(state.preferences);
       const fonts = Array.isArray(state.preferences.customFonts) ? (state.preferences.customFonts as FontDef[]) : [];
       hydrateCustomFonts(fonts, (list) => { api.putPreference("customFonts", list).catch(() => undefined); });
       setBoot({ status: "ready", data: { profiles, activeId, colors, designs, session } });

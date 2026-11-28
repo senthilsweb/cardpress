@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { CalendarDays, Check, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, CircleHelp, FileText, LayoutDashboard, Moon, PanelLeftClose, PanelLeftOpen, PenLine, Plus, Settings, SlidersHorizontal, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,7 +49,7 @@ function BrandTile({ name, color }: { name: string; color: string }) {
   );
 }
 
-const COMPACT = "cardpress.sidebar.compact";
+const COMPACT = "sidebar.compact";
 
 /**
  * The frame of every signed-in page: a header (the logo, the brand, the page's controls, light or dark, the guide and the
@@ -60,8 +61,8 @@ export function Shell({ area, sub, brands, activeId, colors, switching = false, 
   const { user, can } = useSession();
   const [open, setOpen] = useState<Item["id"] | null>(null);
   const [about, setAbout] = useState(false);
-  const [compact, setCompact] = useState(() => { try { return localStorage.getItem(COMPACT) === "1"; } catch { return false; } });
-  const toggleCompact = () => setCompact((v) => { try { localStorage.setItem(COMPACT, v ? "0" : "1"); } catch { /* not remembered */ } return !v; });
+  const [compact, setCompact] = useState(() => readPref(COMPACT) === true);
+  const toggleCompact = () => { savePref(COMPACT, !compact); setCompact(!compact); };
   const root = useRef<HTMLDivElement>(null);
   const active = brands.find((b) => b.id === activeId) ?? brands[0];
   const color = colors[active?.id] ?? "#888";

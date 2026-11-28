@@ -13,6 +13,7 @@ import (
 	"net/mail"
 	"regexp"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -33,10 +34,9 @@ const (
 	maxPassword     = 200
 	maxName         = 60
 	maxPhone        = 30
-	sessionLife     = 14 * 24 * time.Hour
-	sessionRenewAt  = 24 * time.Hour // a session is extended when it is used and has not been seen for this long
 	failuresAllowed = 5
 	lockFor         = 15 * time.Minute
+	signupsAllowed  = 20 // from one address in an hour
 )
 
 // AccountsOptions are the settings that decide who may join.
@@ -47,6 +47,9 @@ type AccountsOptions struct {
 	SignupClosed bool
 	// AdminEmail, if set, is the only email that may create the first (admin) account.
 	AdminEmail string
+	// SessionIdle ends a sign-in not used for this long (20 minutes if unset); SessionMax ends it however much it is
+	// used (12 hours if unset).
+	SessionIdle, SessionMax time.Duration
 }
 
 // Accounts manages people, their roles and their sign-ins.
@@ -57,6 +60,7 @@ type Accounts struct {
 
 	mu       sync.Mutex
 	failures map[string]*failure // keyed by "email|address", and by the address alone
+	signups  map[string][]time.Time
 }
 
 type failure struct {
@@ -70,7 +74,16 @@ func NewAccounts(db *sql.DB, o AccountsOptions) *Accounts {
 	if !ValidRole(o.DefaultRole) || o.DefaultRole == RoleAdmin {
 		o.DefaultRole = RoleEditor
 	}
-	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}}
+	if o.SessionIdle <= 0 {
+		o.SessionIdle = DefaultSessionIdle
+	}
+	if o.SessionMax <= 0 {
+		o.SessionMax = DefaultSessionMax
+	}
+	if o.SessionMax < o.SessionIdle {
+		o.SessionMax = o.SessionIdle
+	}
+	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}, signups: map[string][]time.Time{}}
 }
 
 func (a *Accounts) stamp() string { return a.now().UTC().Format(time.RFC3339) }
@@ -134,15 +147,9 @@ func checkPassword(hash, pw string) bool {
 // a hash to compare against when the email is unknown, so a wrong email takes as long as a wrong password
 var decoyHash, _ = hashPassword("decoy-password-for-timing")
 
-func checkNewPassword(pw string) error {
-	n := utf8.RuneCountInString(pw)
-	if n < minPassword {
-		return invalid("the password needs at least %d characters", minPassword)
-	}
-	if n > maxPassword {
-		return invalid("the password is too long (at most %d characters)", maxPassword)
-	}
-	return nil
+func (a *Accounts) minLength(ctx context.Context) int {
+	s, _ := a.Security(ctx)
+	return s.MinPassword
 }
 
 /* ------------------------------------------------------------------ people */
@@ -159,7 +166,7 @@ type SignupInput struct {
 
 var phoneRe = regexp.MustCompile(`^[0-9+()\-. ]{3,30}$`)
 
-func (in *SignupInput) normalize(needPassword bool) error {
+func (in *SignupInput) normalize(needPassword bool, minLength int) error {
 	in.FirstName, in.LastName = squash(in.FirstName), squash(in.LastName)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	in.Phone = strings.TrimSpace(in.Phone)
@@ -184,7 +191,7 @@ func (in *SignupInput) normalize(needPassword bool) error {
 		}
 	}
 	if needPassword {
-		return checkNewPassword(in.Password)
+		return checkNewPassword(in.Password, in.Email, minLength)
 	}
 	return nil
 }
@@ -199,7 +206,11 @@ func (a *Accounts) Count(ctx context.Context) (int, error) {
 // SignupOpen reports whether a stranger may create an account now: always for the first, then unless it was closed.
 func (a *Accounts) SignupOpen(ctx context.Context) bool {
 	n, err := a.Count(ctx)
-	return err == nil && (n == 0 || !a.opts.SignupClosed)
+	if err != nil {
+		return false
+	}
+	s, _ := a.Security(ctx)
+	return n == 0 || s.SignupOpen
 }
 
 func (a *Accounts) loadUser(ctx context.Context, where string, args ...any) (User, string, error) {
@@ -324,13 +335,18 @@ func (a *Accounts) create(ctx context.Context, in SignupInput, role string) (Use
 // Signup creates an account. The first account becomes the administrator; later ones get the default role, unless sign-up
 // has been closed.
 func (a *Accounts) Signup(ctx context.Context, in SignupInput) (User, error) {
-	if err := in.normalize(true); err != nil {
+	if err := in.normalize(true, a.minLength(ctx)); err != nil {
 		return User{}, err
 	}
 	if !a.SignupOpen(ctx) {
 		return User{}, fmt.Errorf("%w: sign-up is closed on this server; ask an administrator to add you", ErrForbidden)
 	}
-	return a.create(ctx, in, a.opts.DefaultRole)
+	s, _ := a.Security(ctx)
+	u, err := a.create(ctx, in, s.DefaultRole)
+	if err == nil {
+		a.record(ctx, EventSignUp, u.Email, strings.Join(u.Roles, ", "))
+	}
+	return u, err
 }
 
 // AdminCreateInput is an administrator adding a person.
@@ -341,13 +357,17 @@ type AdminCreateInput struct {
 
 // Add creates an account for someone else (an administrator's action).
 func (a *Accounts) Add(ctx context.Context, in AdminCreateInput) (User, error) {
-	if err := in.SignupInput.normalize(true); err != nil {
+	if err := in.SignupInput.normalize(true, a.minLength(ctx)); err != nil {
 		return User{}, err
 	}
 	if !ValidRole(in.Role) {
 		return User{}, invalid("role must be admin, editor or writer")
 	}
-	return a.create(ctx, in.SignupInput, in.Role)
+	u, err := a.create(ctx, in.SignupInput, in.Role)
+	if err == nil {
+		a.record(ctx, EventUserAdded, u.Email, in.Role)
+	}
+	return u, err
 }
 
 // ProfileInput is what a person may change about themselves. Email and role are not among them.
@@ -365,7 +385,7 @@ func (a *Accounts) UpdateProfile(ctx context.Context, id string, in ProfileInput
 		return User{}, err
 	}
 	s := SignupInput{FirstName: in.FirstName, LastName: in.LastName, Email: cur.Email, Phone: in.Phone, BirthDate: in.BirthDate}
-	if err := s.normalize(false); err != nil {
+	if err := s.normalize(false, minPassword); err != nil {
 		return User{}, err
 	}
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET first_name = ?, last_name = ?, phone = ?, birth_date = ? WHERE id = ?`, s.FirstName, s.LastName, s.Phone, s.BirthDate, id); err != nil {
@@ -403,6 +423,7 @@ func (a *Accounts) SetRole(ctx context.Context, id, role string) (User, error) {
 	if err := tx.Commit(); err != nil {
 		return User{}, err
 	}
+	a.record(ctx, EventRole, u.Email, role)
 	return a.Get(ctx, id)
 }
 
@@ -429,6 +450,7 @@ func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, erro
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET status = ? WHERE id = ?`, status, id); err != nil {
 		return User{}, err
 	}
+	a.record(ctx, EventStatus, u.Email, status)
 	if status == "disabled" {
 		if _, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id); err != nil {
 			return User{}, err
@@ -439,7 +461,11 @@ func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, erro
 
 // SetPassword sets a new password for someone (an administrator's action, or the command line) and signs them out everywhere.
 func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
-	if err := checkNewPassword(password); err != nil {
+	u, err := a.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := checkNewPassword(password, u.Email, a.minLength(ctx)); err != nil {
 		return err
 	}
 	hash, err := hashPassword(password)
@@ -453,20 +479,21 @@ func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	a.record(ctx, EventPasswordSet, u.Email, "")
 	_, err = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, id)
 	return err
 }
 
 // ChangePassword changes your own password. It needs the current one, and signs you out on every other device.
 func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepToken string) error {
-	_, hash, err := a.loadUser(ctx, `id = ?`, id)
+	u, hash, err := a.loadUser(ctx, `id = ?`, id)
 	if err != nil {
 		return err
 	}
 	if !checkPassword(hash, current) {
 		return fmt.Errorf("%w: the current password is not right", ErrInvalid)
 	}
-	if err := checkNewPassword(next); err != nil {
+	if err := checkNewPassword(next, u.Email, a.minLength(ctx)); err != nil {
 		return err
 	}
 	newHash, err := hashPassword(next)
@@ -476,6 +503,7 @@ func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepTo
 	if _, err := a.db.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, newHash, id); err != nil {
 		return err
 	}
+	a.record(ctx, EventPasswordOwn, u.Email, "")
 	_, err = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?`, id, tokenHash(keepToken))
 	return err
 }
@@ -486,11 +514,11 @@ func (a *Accounts) ResetPasswordByEmail(ctx context.Context, email string) (stri
 	if err != nil {
 		return "", err
 	}
-	b := make([]byte, 12)
+	b := make([]byte, 48) // 64 characters, cut to what the rules ask
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	pw := base64.RawURLEncoding.EncodeToString(b)
+	pw := base64.RawURLEncoding.EncodeToString(b)[:max(16, a.minLength(ctx))]
 	return pw, a.SetPassword(ctx, u.ID, pw)
 }
 
@@ -514,32 +542,34 @@ func (a *Accounts) locked(keys ...string) bool {
 	return false
 }
 
-func (a *Accounts) fail(keys ...string) {
+func (a *Accounts) fail(rules SecuritySettings, keys ...string) (paused bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
 	for _, k := range keys {
 		f := a.failures[k]
-		if f == nil || now.Sub(f.first) > lockFor {
+		if f == nil || now.Sub(f.first) > rules.pause() {
 			f = &failure{first: now}
 			a.failures[k] = f
 		}
 		f.n++
-		limit := failuresAllowed
+		limit := rules.Attempts
 		if !strings.Contains(k, "|") {
-			limit = failuresAllowed * 6 // the address alone: many people may share one
+			limit = rules.Attempts * 6 // the address alone: many people may share one
 		}
 		if f.n >= limit {
-			f.until = now.Add(lockFor)
+			paused = paused || !now.Before(f.until)
+			f.until = now.Add(rules.pause())
 		}
 	}
 	if len(a.failures) > 10000 { // keep the table small
 		for k, f := range a.failures {
-			if now.Sub(f.first) > lockFor {
+			if now.Sub(f.first) > rules.pause() {
 				delete(a.failures, k)
 			}
 		}
 	}
+	return paused
 }
 
 func (a *Accounts) clear(keys ...string) {
@@ -548,6 +578,31 @@ func (a *Accounts) clear(keys ...string) {
 	for _, k := range keys {
 		delete(a.failures, k)
 	}
+}
+
+// AllowSignup counts a try to create an account from addr and says whether it may go on: each one costs the server a
+// password hash and may leave an account behind.
+func (a *Accounts) AllowSignup(addr string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	recent := func(all []time.Time) []time.Time {
+		return slices.DeleteFunc(all, func(t time.Time) bool { return now.Sub(t) >= time.Hour })
+	}
+	if len(a.signups) > 10000 { // keep the table small
+		for k, v := range a.signups {
+			if len(recent(v)) == 0 {
+				delete(a.signups, k)
+			}
+		}
+	}
+	tries := recent(a.signups[addr])
+	if len(tries) >= signupsAllowed {
+		a.signups[addr] = tries
+		return false
+	}
+	a.signups[addr] = append(tries, now)
+	return true
 }
 
 // Login checks an email and password and starts a session. It returns the session token for the cookie. addr is the
@@ -567,70 +622,39 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 	}
 	ok := checkPassword(hash, password)
 	if err != nil || !ok || u.Status != "active" {
-		a.fail(byAccount, byAddr)
+		rules, _ := a.Security(ctx)
+		paused := a.fail(rules, byAccount, byAddr)
+		why := "wrong email or password"
+		if err == nil && ok {
+			why = "the account is disabled"
+		}
+		a.record(WithAddress(ctx, addr), EventSignInFailed, email, why)
+		if paused {
+			a.record(WithAddress(ctx, addr), EventPaused, email, fmt.Sprintf("for %d minutes", rules.PauseMinutes))
+		}
 		return User{}, "", ErrUnauthorized
 	}
 	a.clear(byAccount)
+	if cheaper(hash) { // made with less work than today's: renew it while the password is at hand
+		if renewed, err := hashPassword(password); err == nil {
+			_, _ = a.db.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, renewed, u.ID)
+		}
+	}
 	token, err := a.startSession(ctx, u.ID)
 	if err != nil {
 		return User{}, "", err
 	}
+	a.record(WithAddress(ctx, addr), EventSignIn, u.Email, "")
 	_, _ = a.db.ExecContext(ctx, `UPDATE users SET last_login_at = ? WHERE id = ?`, a.stamp(), u.ID)
 	return u, token, nil
 }
 
-// StartSession signs a person in without a password (used after sign-up).
-func (a *Accounts) StartSession(ctx context.Context, userID string) (string, error) {
-	return a.startSession(ctx, userID)
-}
-
-func (a *Accounts) startSession(ctx context.Context, userID string) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	token := base64.RawURLEncoding.EncodeToString(b)
-	now := a.now().UTC()
-	_, err := a.db.ExecContext(ctx, `INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
-		tokenHash(token), userID, now.Format(time.RFC3339), now.Format(time.RFC3339), now.Add(sessionLife).Format(time.RFC3339))
-	if err != nil {
-		return "", err
-	}
-	_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, now.Format(time.RFC3339)) // tidy up
-	return token, nil
-}
-
-// Authenticate returns the person a session token belongs to, extending the session while it is in use.
-func (a *Accounts) Authenticate(ctx context.Context, token string) (User, error) {
-	if token == "" {
-		return User{}, ErrUnauthorized
-	}
-	var uid, seen, expires string
-	err := a.db.QueryRowContext(ctx, `SELECT user_id, last_seen_at, expires_at FROM sessions WHERE token_hash = ?`, tokenHash(token)).Scan(&uid, &seen, &expires)
-	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, ErrUnauthorized
-	}
-	if err != nil {
-		return User{}, err
-	}
-	now := a.now().UTC()
-	if exp, err := time.Parse(time.RFC3339, expires); err != nil || now.After(exp) {
-		_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
-		return User{}, ErrUnauthorized
-	}
-	u, _, err := a.loadUser(ctx, `id = ?`, uid)
-	if err != nil || u.Status != "active" {
-		return User{}, ErrUnauthorized
-	}
-	if last, err := time.Parse(time.RFC3339, seen); err != nil || now.Sub(last) > sessionRenewAt {
-		_, _ = a.db.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?`,
-			now.Format(time.RFC3339), now.Add(sessionLife).Format(time.RFC3339), tokenHash(token))
-	}
-	return u, nil
-}
-
 // Logout ends one session.
 func (a *Accounts) Logout(ctx context.Context, token string) error {
+	var email string
+	if a.db.QueryRowContext(ctx, `SELECT u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, tokenHash(token)).Scan(&email) == nil {
+		a.record(ctx, EventSignOut, email, "")
+	}
 	_, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
 	return err
 }

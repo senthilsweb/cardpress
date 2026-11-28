@@ -1,4 +1,7 @@
 # Tasks
+
+Deferred (owner, 2026-11-27): the open tasks can wait.
+
 - [x] Agree the open questions (owner: separate schema and subagent for greetings)
 - [x] Picker popup: search, categories, previews, matching colours, keyboard use, narrow screens
 - [ ] Greetings table, seed, service with cache, API

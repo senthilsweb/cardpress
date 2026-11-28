@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readPref, savePref } from "@/lib/prefs";
 import { CalendarClock, ChevronLeft, ChevronRight, Loader2, Lock, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,11 @@ import { cn } from "@/lib/utils";
 const base = () => import.meta.env.BASE_URL;
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 const noop = () => undefined;
-const VIEW_KEY = "cardpress.calendar.view";
+const VIEW_KEY = "calendar.view";
 
 export default function Calendar() {
   const { boot, retry, submitToken } = useLibraryBoot();
-  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} importLegacy={noop} discardLegacy={noop} />;
+  if (boot.status !== "ready") return <BootScreen boot={boot} retry={retry} submitToken={submitToken} />;
   return <SessionProvider initial={boot.data.session}><Page data={boot.data} /></SessionProvider>;
 }
 
@@ -43,7 +44,7 @@ function Page({ data }: { data: LibraryBoot }) {
   // the address keeps the view and the day, so a reload or a shared link shows the same thing: /calendar/?view=week&day=2026-11-26
   const q = new URLSearchParams(window.location.search);
   const [view, setView] = useState<CalendarView>(() => {
-    const v = q.get("view") ?? (() => { try { return localStorage.getItem(VIEW_KEY); } catch { return null; } })();
+    const v = q.get("view") ?? readPref(VIEW_KEY);
     return v === "month" || v === "week" || v === "day" ? v : wide ? "month" : "day";
   });
   const [anchor, setAnchor] = useState<Date>(() => parseDayKey(q.get("day")) ?? startOfDay(new Date()));
@@ -57,7 +58,7 @@ function Page({ data }: { data: LibraryBoot }) {
 
   useEffect(() => {
     window.history.replaceState(null, "", `${window.location.pathname}?view=${view}&day=${dayKey(anchor)}`);
-    try { localStorage.setItem(VIEW_KEY, view); } catch { /* not remembered */ }
+    savePref(VIEW_KEY, view);
   }, [view, anchor]);
 
   const load = useCallback(async () => {

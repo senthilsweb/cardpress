@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/senthilsweb/cardpress/internal/service"
 	"github.com/senthilsweb/cardpress/internal/telemetry"
@@ -19,7 +20,16 @@ type Accounts interface {
 	Signup(ctx context.Context, in service.SignupInput) (service.User, error)
 	StartSession(ctx context.Context, userID string) (string, error)
 	Login(ctx context.Context, email, password, addr string) (service.User, string, error)
-	Authenticate(ctx context.Context, token string) (service.User, error)
+	Session(ctx context.Context, token string, use bool) (service.User, service.SessionTimes, error)
+	SessionLimits(ctx context.Context) (idle, max time.Duration)
+	Security(ctx context.Context) (service.SecuritySettings, bool)
+	SecurityDefaults() service.SecuritySettings
+	SetSecurity(ctx context.Context, s service.SecuritySettings) error
+	ResetSecurity(ctx context.Context) error
+	ActiveSessions(ctx context.Context) (int, error)
+	SignOutEveryone(ctx context.Context, keepToken string) (int, error)
+	AllowSignup(addr string) bool
+	SecurityLog(ctx context.Context, before int64) ([]service.SecurityEvent, bool, error)
 	Logout(ctx context.Context, token string) error
 	Get(ctx context.Context, id string) (service.User, error)
 	UpdateProfile(ctx context.Context, id string, in service.ProfileInput) (service.User, error)
@@ -36,6 +46,35 @@ type Accounts interface {
 }
 
 const cookieName = "cardpress_session"
+
+// secureCookieName is used over HTTPS: a browser accepts the "__Host-" prefix only for a secure cookie of this very host,
+// so nothing on a sibling domain or a plain page can set it.
+const secureCookieName = "__Host-" + cookieName
+
+// backgroundHeader marks a request a screen makes by itself. It is answered, but does not count as the person using
+// the app, so an open tab does not stay signed in for ever.
+const backgroundHeader = "X-CardPress-Background"
+
+func overHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// sessionToken is the session cookie's value, or "". Over HTTPS only the prefixed cookie is read.
+func sessionToken(r *http.Request) string {
+	name := cookieName
+	if overHTTPS(r) {
+		name = secureCookieName
+	}
+	if c, err := r.Cookie(name); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+// byItself reports a request that does not count as use of the session.
+func byItself(r *http.Request) bool {
+	return r.Header.Get(backgroundHeader) != "" || (r.Method == http.MethodGet && (r.URL.Path == prefix+"/events" || r.URL.Path == prefix+"/auth/session"))
+}
 
 // scope says what a route names, so the one place that checks access knows which brand the request is about.
 type scope int
@@ -109,6 +148,7 @@ func (s *server) notSignedIn(w http.ResponseWriter, r *http.Request) {
 func (s *server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.Accounts != nil {
+			r = r.WithContext(service.WithAddress(r.Context(), s.clientAddr(r)))
 			var p *service.Principal
 			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			bearer := got != r.Header.Get("Authorization")
@@ -121,8 +161,8 @@ func (s *server) authenticate(next http.Handler) http.Handler {
 					p = &service.Principal{User: &u, Key: id, Scope: scope}
 				}
 			default:
-				if c, err := r.Cookie(cookieName); err == nil {
-					if u, err := s.Accounts.Authenticate(r.Context(), c.Value); err == nil {
+				if token := sessionToken(r); token != "" {
+					if u, _, err := s.Accounts.Session(r.Context(), token, !byItself(r)); err == nil {
 						p = &service.Principal{User: &u}
 					}
 				}
@@ -238,16 +278,19 @@ type sessionBody struct {
 }
 
 func (s *server) session(w http.ResponseWriter, r *http.Request, u service.User, token string, status int) {
-	http.SetCookie(w, &http.Cookie{
-		Name: cookieName, Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
-		Secure: r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"), MaxAge: 14 * 24 * 3600,
-	})
+	_, longest := s.Accounts.SessionLimits(r.Context())
+	setSessionCookie(w, r, token, int(longest.Seconds()))
+	s.lookCookie(w, r, service.WithPrincipal(r.Context(), service.Principal{User: &u}))
 	writeJSON(w, status, sessionBody{User: u, Perms: u.Perms()})
 }
 
 func (s *server) signup(w http.ResponseWriter, r *http.Request) {
 	var in service.SignupInput
 	if !decode(w, r, &in) {
+		return
+	}
+	if !s.Accounts.AllowSignup(s.clientAddr(r)) {
+		fail(w, r, service.ErrTooManyAttempts)
 		return
 	}
 	u, err := s.Accounts.Signup(r.Context(), in)
@@ -271,11 +314,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	addr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		addr = r.RemoteAddr
-	}
-	u, token, err := s.Accounts.Login(r.Context(), in.Email, in.Password, addr)
+	u, token, err := s.Accounts.Login(r.Context(), in.Email, in.Password, s.clientAddr(r))
 	if err != nil {
 		fail(w, r, err)
 		return
@@ -284,10 +323,10 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(cookieName); err == nil {
-		_ = s.Accounts.Logout(r.Context(), c.Value)
+	if token := sessionToken(r); token != "" {
+		_ = s.Accounts.Logout(r.Context(), token)
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	setSessionCookie(w, r, "", -1)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -336,15 +375,57 @@ func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	keep := ""
-	if c, err := r.Cookie(cookieName); err == nil {
-		keep = c.Value
-	}
-	if err := s.Accounts.ChangePassword(r.Context(), p.ID, in.Current, in.New, keep); err != nil {
+	if err := s.Accounts.ChangePassword(r.Context(), p.ID, in.Current, in.New, sessionToken(r)); err != nil {
 		fail(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// clientAddr is the address a request came from, for counting failed sign-ins. Behind a proxy it is read from the
+// header the configuration names, which the proxy must set itself: whatever a visitor sends under that name is replaced.
+func (s *server) clientAddr(r *http.Request) string {
+	if s.ClientIPHeader != "" {
+		values := r.Header.Values(s.ClientIPHeader)
+		if len(values) > 0 { // a list grows at the end: the last is the one the nearest proxy wrote
+			parts := strings.Split(values[len(values)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
+			}
+		}
+	}
+	addr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return addr
+}
+
+// setSessionCookie writes the session cookie, or removes it (maxAge below zero).
+func setSessionCookie(w http.ResponseWriter, r *http.Request, token string, maxAge int) {
+	name, secure := cookieName, overHTTPS(r)
+	if secure {
+		name = secureCookieName
+	}
+	http.SetCookie(w, &http.Cookie{Name: name, Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure, MaxAge: maxAge})
+}
+
+// sessionTimes says how long the sign-in has left. Asked with GET it changes nothing; with POST the person is using the
+// app, and the idle time has started again.
+func (s *server) sessionTimes(w http.ResponseWriter, r *http.Request) {
+	token := sessionToken(r)
+	p, _ := principalOf(r)
+	if s.Accounts == nil || p.User == nil || p.Key != "" || token == "" {
+		s.off(w, r)
+		return
+	}
+	_, t, err := s.Accounts.Session(r.Context(), token, r.Method == http.MethodPost)
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	idle, _ := s.Accounts.SessionLimits(r.Context())
+	writeJSON(w, http.StatusOK, map[string]any{"remainingSeconds": int(t.Remaining.Seconds()), "limit": t.Limit, "idleSeconds": int(idle.Seconds())})
 }
 
 /* ------------------------------------------------------------------ people (administrators) */

@@ -29,9 +29,12 @@ Settings come from environment variables, with a few command-line flags. With Do
 | `CARDPRESS_DEFAULT_ROLE` | The role of a person who signs up: `editor` (default) or `writer` |
 | `CARDPRESS_MEDIA_BRAND_MB` | How many MB of files each brand's media library may hold. Default `200` |
 | `CARDPRESS_SIGNUP` | `closed` stops self sign-up once the first account exists (admins add people). Default `open` |
+| `CARDPRESS_SESSION_IDLE` | A sign-in ends after this long without use (`5m` to `24h`). Default `20m` |
+| `CARDPRESS_SESSION_MAX` | A sign-in ends after this long however much it is used (`15m` to `720h`). Default `12h` |
+| `CARDPRESS_CLIENT_IP_HEADER` | Behind a proxy, the header it sets with the visitor's address, used to count failed sign-ins (Fly: `Fly-Client-IP`). Set it only when a proxy always overwrites that header |
 | `CARDPRESS_ADMIN_EMAIL` | If set, only this email can create the first (admin) account. Set it on a server reachable from the internet |
 
-See [Accounts and roles](accounts.md). API keys are made in the app (Settings, API keys), not in the environment.
+Sign-up, the default role and the session times are starting values: an admin can change them under **Settings, Security**, and what is saved there wins. See [Accounts and roles](accounts.md). API keys are made in the app (Settings, API keys), not in the environment.
 
 ## Public pages
 
