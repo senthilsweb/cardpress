@@ -32,6 +32,7 @@ type fake struct {
 	scripts    []func(f *fake)
 	sent       []string // the text of what was sent: a message, or an outcome's description
 	rubrics    []string
+	rounds     []int
 	gone       bool
 	interrupts int
 	drop       bool // the first stream ends after what was sent
@@ -90,8 +91,9 @@ func (f *fake) newSession(context.Context, string) (string, error) { return "ses
 func (f *fake) sendMessage(_ context.Context, _ string, text string) (string, error) {
 	return f.deliver("user.message", text)
 }
-func (f *fake) sendOutcome(_ context.Context, _ string, d, rubric string, _ int) (string, error) {
+func (f *fake) sendOutcome(_ context.Context, _ string, d, rubric string, rounds int) (string, error) {
 	f.rubrics = append(f.rubrics, rubric)
+	f.rounds = append(f.rounds, rounds)
 	return f.deliver("user.define_outcome", d)
 }
 func (f *fake) interrupt(context.Context, string) error {
@@ -232,6 +234,15 @@ func TestFirstDraftsAreGradedOneAfterTheOtherWithEverySource(t *testing.T) {
 	}
 	if strings.Join(f.rubrics, ",") != "POST RUBRIC,ARTICLE RUBRIC" {
 		t.Fatal(f.rubrics)
+	}
+	if !slices.Equal(f.rounds, []int{3, 3}) {
+		t.Fatalf("the manifest's rounds: %v", f.rounds)
+	}
+	// a brand with its own number of rounds
+	own, five := &fake{scripts: []func(*fake){grade("Post saved.", "satisfied")}}, studio()
+	five.Write, five.Grade, five.Rounds = []string{"post"}, []string{"post"}, 5
+	if _, _, err := ask(t, own, agent.Input{Studio: five}); err != nil || !slices.Equal(own.rounds, []int{5}) {
+		t.Fatalf("the brand's rounds: %v %v", err, own.rounds)
 	}
 	for i, kind := range []string{"post", "article"} {
 		if !strings.Contains(f.sent[i], "write: "+kind+"\n") || !strings.Contains(f.sent[i], "THE SOURCE") || !strings.Contains(f.sent[i], "Write a") {

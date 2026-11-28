@@ -92,6 +92,10 @@ type Studio struct {
 	ArticleID      string
 	Write          []string // the kinds the person ticked for this message
 	Grade          []string // those of Write that are first drafts, to be written as graded outcomes, in this order
+	// Rounds is how often the grader may send a draft back; 0 leaves it to the agent.
+	Rounds int
+	// Unchecked are first drafts that are not graded, because the brand's checks are off.
+	Unchecked []string
 	Cards          []Card   // items the assistant has not seen yet
 	Changes        []Change // what the person changed since it last saw an item
 	Notes          []string // the brand's notes as "key: content", for a session's first message

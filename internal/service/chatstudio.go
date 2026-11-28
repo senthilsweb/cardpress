@@ -211,6 +211,16 @@ func (c *Chat) prepare(ctx context.Context, conv Conversation, req ChatRequest) 
 			st.Grade = append(st.Grade, kind)
 		}
 	}
+	// the brand says whether first drafts are graded, and how often one may be sent back
+	plan, _, _, err := c.assistantFor(ctx, conv.ProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Checks {
+		st.Rounds = plan.Rounds
+	} else {
+		st.Unchecked, st.Grade = st.Grade, nil
+	}
 	seen := map[string]sight{}
 	_ = json.Unmarshal([]byte(rawSeen), &seen)
 	for _, id := range []string{st.PostID, st.ArticleID} {
@@ -260,7 +270,8 @@ func (c *Chat) remember(ctx context.Context, convID string, st *agent.Studio) er
 		}
 		seen[id] = now
 	}
-	done := kinds(append(strings.Split(graded, ","), st.Grade...))
+	// a first draft written without a check has still been written: turning checks on later does not grade a second one
+	done := kinds(append(append(strings.Split(graded, ","), st.Grade...), st.Unchecked...))
 	b, err := json.Marshal(seen)
 	if err != nil {
 		return err

@@ -8,8 +8,8 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [x] Tests, browser check (`scripts/record-demo/check-brand-assistant.mjs`)
 
 ## Bolt 2: checks
-- [ ] On or off and the number of rounds, used when a graded request is built
-- [ ] Tests
+- [x] On or off and the number of rounds, used when a graded request is built; a first draft written without a check is not graded later
+- [x] Tests
 
 ## Bolt 3: budget
 - [ ] The server's monthly amount (stored, API, Settings → Assistant)

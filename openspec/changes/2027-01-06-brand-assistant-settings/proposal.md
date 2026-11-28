@@ -1,6 +1,6 @@
 # Assistant settings for each brand: models, checks, writing guides and a budget
 
-**Status:** proposed by the owner on 2026-11-28; decisions taken the same day (below); being built: bolt 1 of 8 done.
+**Status:** proposed by the owner on 2026-11-28; decisions taken the same day (below); being built: bolts 1 and 2 of 8 done.
 
 ## Asked for
 1. Choose the model of the coordinator and of each writer, per brand. An administrator may pick a stronger one.

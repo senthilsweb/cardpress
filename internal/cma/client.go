@@ -148,7 +148,11 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			h = nil
 		}
 		description := contextBlocks(in, []string{kind}, in.Sources, h, i == 0, i == 0 && fresh) + "\n" + text + "\n\n" + o.Description
-		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, o.Rubric, o.MaxIterations) }, kind); err != nil {
+		rounds := o.MaxIterations
+		if in.Studio.Rounds > 0 { // the brand's own number
+			rounds = in.Studio.Rounds
+		}
+		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, o.Rubric, rounds) }, kind); err != nil {
 			break
 		}
 	}
