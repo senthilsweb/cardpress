@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CircleAlert, Download, ExternalLink, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Pencil, Search, Trash2, Upload } from "lucide-react";
+import { CircleAlert, Download, ExternalLink, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Pencil, Search, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -110,7 +110,7 @@ function Page({ data }: { data: LibraryBoot }) {
   const save = async (a: Asset, name: string, tags: string[]) => { await api.updateAsset(a.profileId, a.id, { name, tags }); load(); };
   const remove = async (a: Asset) => {
     try { await api.deleteAsset(a.profileId, a.id); toast.success("Deleted"); }
-    catch (e) { toast.error("Could not delete", { description: message(e) }); }
+    catch (e) { toast.error("Not deleted", { description: message(e), duration: 12_000 }); }
     setDeleting(null); load();
   };
   const download = async (a: Asset) => {
@@ -165,6 +165,12 @@ function Page({ data }: { data: LibraryBoot }) {
               <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" aria-label="Choose files to upload" onChange={(e) => { void upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
             </div>
 
+            {library?.diskPercent && (
+              <Alert role="status" className="border-amber-500/40 bg-amber-500/10">
+                <TriangleAlert aria-hidden />
+                <AlertDescription>The server’s disk is {library.diskPercent}% full. Delete what you no longer need, or ask your administrator for more room.</AlertDescription>
+              </Alert>
+            )}
             {error && <Alert variant="destructive"><CircleAlert aria-hidden /><AlertDescription>{error}</AlertDescription><Button size="sm" variant="outline" onClick={load}>Try again</Button></Alert>}
             {sending && <Alert role="status"><Loader2 aria-hidden className="animate-spin" /><AlertDescription>Adding {sending.name}{sending.of > 1 ? ` (${sending.at} of ${sending.of})` : ""}…</AlertDescription></Alert>}
             {!library && !error && (

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   AlignCenter, BookOpen, FileDown, FileUp, Hash, LayoutPanelLeft, Gift, Plus, Quote, RotateCcw, Search, Shuffle, Trash2, UserRound,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { addGoogleFont, FONT_ROLES, resolveFonts, useFonts, ensureFont } from "@/lib/fonts";
 import { ColorField, Field, ImageField, Section, SliderField, SwitchField, TextField } from "./fields";
 import { MiniBackground } from "./preview";
+import { embedPictures } from "@/lib/assetRefs";
 import { cn } from "@/lib/utils";
 import { downloadBlob } from "@/lib/export";
 import { settingsHref } from "@/lib/nav";
@@ -75,7 +77,7 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
           className="block w-full cursor-pointer overflow-hidden rounded-md border border-border text-left transition-colors hover:border-brand/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <div className="aspect-video w-full">
-            <MiniBackground id={bg.id} palette={palette} seed={design.seed} photos={design.photos} screenshot={design.screenshot} image={design.bgImage} />
+            <MiniBackground id={bg.id} brand={profile.id} palette={palette} seed={design.seed} photos={design.photos} screenshot={design.screenshot} image={design.bgImage} />
           </div>
           <div className="border-t border-border bg-card px-2.5 py-1.5">
             <div className="flex items-center justify-between gap-1 text-[12px] font-medium">
@@ -100,9 +102,10 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
           multiple
           max={12}
           maxPx={700}
+          brand={profile.id}
         />
-        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} />
-        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} />
+        <ImageField label="App screenshot" hint="Shown inside the Browser frame background." values={design.screenshot ? [design.screenshot] : []} onChange={(v) => set({ screenshot: v[0] })} maxPx={1800} brand={profile.id} />
+        <ImageField label="Background image" hint="For the Own image background." values={design.bgImage ? [design.bgImage] : []} onChange={(v) => set({ bgImage: v[0] })} maxPx={2000} brand={profile.id} />
       </Section>
 
       <Section title="Colours">
@@ -237,9 +240,14 @@ export function ProfilePanel(props: {
     up({ palettes: rest });
     props.setPaletteId(rest[0].id);
   };
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify({ kind: "cardpress/profiles", version: 1, profiles: props.profiles }, null, 2)], { type: "application/json" });
-    downloadBlob(blob, "cardpress-profiles.json");
+  const exportJson = async () => {
+    try {
+      // a file that leaves the app holds its pictures itself
+      const profiles = await Promise.all(props.profiles.map((p) => embedPictures(p.id, p)));
+      downloadBlob(new Blob([JSON.stringify({ kind: "cardpress/profiles", version: 1, profiles }, null, 2)], { type: "application/json" }), "cardpress-profiles.json");
+    } catch (e) {
+      toast.error("Not exported", { description: e instanceof Error ? e.message : undefined });
+    }
   };
   const importJson = async (f: File | undefined) => {
     if (!f) return;
@@ -287,9 +295,9 @@ export function ProfilePanel(props: {
           </Select>
         </Field>
         {pr.mark === "image" && (
-          <ImageField label="Logo image" hint="PNG or SVG with transparent background works best." values={pr.logoImage ? [pr.logoImage] : []} onChange={(v) => up({ logoImage: v[0] })} maxPx={600} keepPng />
+          <ImageField label="Logo image" hint="PNG or SVG with transparent background works best." values={pr.logoImage ? [pr.logoImage] : []} onChange={(v) => up({ logoImage: v[0] })} maxPx={600} keepPng brand={pr.id} />
         )}
-        <ImageField label="Headshot" hint="For the Headshot layout and feed preview." values={pr.headshot ? [pr.headshot] : []} onChange={(v) => up({ headshot: v[0] })} maxPx={800} />
+        <ImageField label="Headshot" hint="For the Headshot layout and feed preview." values={pr.headshot ? [pr.headshot] : []} onChange={(v) => up({ headshot: v[0] })} maxPx={800} brand={pr.id} />
       </Section>
 
       <Section title="Fonts">

@@ -1,7 +1,7 @@
 # Media library, per brand
 
-**Status:** part 1 built (storage, API, the Media page), not deployed. Part 2 (choosing from the library, `asset:`
-references) is not built. Asked for by the owner on 2026-11-26.
+**Status:** part 1 (storage, API, the Media page) released in `v0.2.1`; part 2 (choosing from the library, `asset:`
+references, in-use protection, disk warning) built, not deployed. Asked for by the owner on 2026-11-26.
 
 ## Why
 Pictures are uploaded again for every card and stored inside each card's design. A brand needs one place for its logos,
@@ -49,6 +49,17 @@ SVG files are refused for now: they can carry scripts. Lists load thumbnails onl
 - A brand holds a file once; adding it again names the entry that has it.
 - A file's type is read from its bytes. Files are sent as downloads, with nothing in them allowed to run.
 - The page is **Library → Media**. The allowance is `CARDPRESS_MEDIA_BRAND_MB`, 200 by default.
+
+## Part 2, as built
+- Card photos, screenshot, background, logo and headshot offer **Upload** and **From library**. An upload goes into
+  the brand's library and the card points at it. A drawing (SVG) or animation (GIF) has no place in the library and
+  stays inside the card, as before.
+- A post's own images or PDF can be taken **From library**; the post keeps its own copy. A WebP picture is sent as PNG.
+- An image of a card is made only when its library pictures have loaded; otherwise it says one could not be.
+- A **duplicated brand** gets the pictures into its own library. An exported brand file holds them itself.
+- A file cannot be deleted while a card, the brand's logo or headshot, or a **saved version** names it. So a picture
+  once saved in a version stays until that item is deleted.
+- The article editor's pictures and a post's video address do not use the library.
 
 ## Consequences
 The database file and its backups grow with the files. If a brand library outgrows the disk, the disk is enlarged;

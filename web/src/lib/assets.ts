@@ -1,9 +1,10 @@
 /** A brand's media library: what an entry is, and what the browser does to a file before sending it. */
+import { api } from "./api";
 
 export type AssetKind = "image" | "pdf" | "video";
 export interface Asset { id: string; profileId: string; kind: AssetKind; name: string; tags: string[]; mime?: string; size?: number; width?: number; height?: number; link?: string; hasThumb: boolean; createdBy?: string; createdAt: string }
 /** One page of a library, with what is true of the whole: how many entries, every tag, how full. */
-export interface Assets { items: Asset[]; total: number; page: number; pages: number; pageSize: number; count: number; tags: string[]; usedBytes: number; limitBytes: number }
+export interface Assets { items: Asset[]; total: number; page: number; pages: number; pageSize: number; count: number; tags: string[]; usedBytes: number; limitBytes: number; /** How full the server's disk is, told when worth a warning. */ diskPercent?: number }
 export interface AssetQuery { text: string; kind: "" | AssetKind; tag: string; page: number; pageSize: number }
 export const ASSET_PAGE_SIZES = [12, 24, 48] as const;
 
@@ -92,4 +93,28 @@ export async function prepareUpload(file: File): Promise<{ file: Blob; thumb?: B
   // a PNG or WebP may be see-through, which JPEG would paint black
   const thumb = await draw(img, THUMB_SIDE, file.type === "image/jpeg" ? "image/jpeg" : "image/png", 0.82);
   return { file: out, thumb };
+}
+
+/** Put a chosen file into a brand's library and give back its entry; a file the brand has already is used as it is. */
+export async function addToLibrary(brand: string, file: File): Promise<Asset> {
+  const problem = fileProblem(file);
+  if (problem) throw new Error(problem);
+  const ready = await prepareUpload(file);
+  const form = new FormData();
+  form.set("name", nameFromFile(file.name));
+  form.set("reuse", "1");
+  form.set("file", ready.file, file.name);
+  if (ready.thumb) form.set("thumb", ready.thumb, "thumb");
+  return api.addAsset(brand, form);
+}
+
+/** What the library keeps; other pictures (a drawing, an animation) are held by the card itself, as before. */
+export const libraryTakes = (type: string) => PICTURES.includes(type);
+
+/** A library file as a post's own attachment. A post takes JPEG, PNG and PDF: a WebP picture is sent as PNG. */
+export async function postFile(a: Pick<Asset, "profileId" | "id" | "name">): Promise<File> {
+  let blob = await api.assetBlob(a.profileId, a.id, "file");
+  if (blob.type === "image/webp") blob = await draw(await open(blob), MAX_SIDE, "image/png");
+  const ext = blob.type === "application/pdf" ? "pdf" : blob.type === "image/jpeg" ? "jpg" : "png";
+  return new File([blob], `${a.name}.${ext}`, { type: blob.type });
 }

@@ -200,3 +200,75 @@ func TestMediaPages(t *testing.T) {
 		}
 	}
 }
+
+func TestMediaInUse(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, "file:"+filepath.Join(t.TempDir(), "u.db"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	run := func(q string, args ...any) {
+		t.Helper()
+		if _, err := db.ExecContext(ctx, q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(`INSERT INTO profiles (id, position, data, updated_at) VALUES ('a', 0, '{}', '')`)
+	m := NewMedia(db.DB, 0)
+	pic := mediaPNG(t, 20, 20)
+	a, err := m.Add(ctx, "a", NewAsset{Name: "Photo", Data: pic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again, err := m.Add(ctx, "a", NewAsset{Name: "Other name", Data: pic, Reuse: true}); err != nil || again.ID != a.ID || again.Name != "Photo" {
+		t.Errorf("the entry there is: %+v %v", again, err)
+	}
+	ref := `{"bgImage":"` + AssetRef(a.ID) + `"}`
+	doc := `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Year in review"}]}]}`
+	draft := func(id, title, design string) {
+		run(`INSERT INTO drafts (id, profile_id, kind, status, title, doc, design, created_at, updated_at) VALUES (?, 'a', 'post', 'draft', ?, ?, ?, '', '')`, id, title, doc, design)
+	}
+	refused := func(want ...string) {
+		t.Helper()
+		err := m.Delete(ctx, "a", a.ID)
+		if !errors.Is(err, ErrConflict) {
+			t.Fatalf("deleted although used: %v", err)
+		}
+		for _, w := range want {
+			if !strings.Contains(err.Error(), w) {
+				t.Errorf("%q does not say %q", err, w)
+			}
+		}
+	}
+	run(`UPDATE profiles SET data = ? WHERE id = 'a'`, `{"logoImage":"`+AssetRef(a.ID)+`"}`)
+	refused("logo or headshot")
+	run(`UPDATE profiles SET data = '{}'`)
+	run(`INSERT INTO designs (profile_id, data, updated_at) VALUES ('a', ?, '')`, ref)
+	refused("the brand's own card")
+	run(`DELETE FROM designs`)
+	draft("d1", "Greeting", ref)
+	draft("d2", "", "{}")
+	run(`INSERT INTO draft_versions (id, draft_id, seq, label, kind, doc, design, created_at) VALUES ('v1', 'd2', 1, 'v1', 'post', ?, ?, '')`, doc, ref)
+	refused("the card of “Greeting”", "a saved version of “Year in review”")
+	run(`DELETE FROM drafts`)
+	// a version whose item is gone no longer counts
+	if err := m.Delete(ctx, "a", a.ID); err != nil {
+		t.Errorf("free to go: %v", err)
+	}
+
+	m.Disk = func() (int, bool) { return 69, true }
+	if got, _ := m.List(ctx, "a", AssetQuery{}); got.DiskPercent != 0 {
+		t.Errorf("no warning yet: %d", got.DiskPercent)
+	}
+	m.Disk = func() (int, bool) { return 70, true }
+	if got, _ := m.List(ctx, "a", AssetQuery{}); got.DiskPercent != 70 {
+		t.Errorf("a warning: %d", got.DiskPercent)
+	}
+	if p, ok := DiskPercent(t.TempDir()); ok && (p < 0 || p > 100) {
+		t.Errorf("disk: %d", p)
+	}
+}

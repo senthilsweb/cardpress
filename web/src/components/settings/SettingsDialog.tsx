@@ -11,6 +11,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { BrandLook } from "./BrandLook";
 import { UsersSettings } from "./UsersSettings";
 import { Guard } from "./guard";
+import { copyPictures } from "@/lib/assetRefs";
 import { api, type ApiInfo } from "@/lib/api";
 import { blankDesign, brandColor, move, pickActive } from "@/lib/brands";
 import { Holds } from "@/lib/holds";
@@ -230,7 +231,13 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
     if (details) await api.saveBrandDetails(p.id, details).catch((e) => toast.error("The brand is made; its details were not saved", { description: e instanceof Error ? e.message : undefined }));
     // a copy starts from the other brand's card, a blank one from the default card without footer text
     const copied = from && brands.designs[from.id];
-    const base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
+    let base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
+    if (from) {
+      // its pictures go into its own library
+      await copyPictures(from.id, p.id, { profile: p, design: base })
+        .then(async (own) => { await api.saveProfile(own.profile); base = own.design; })
+        .catch((e) => { base = { ...base, photos: [], screenshot: undefined, bgImage: undefined }; toast.error("The brand is made; its pictures were not copied", { description: e instanceof Error ? e.message : undefined }); });
+    }
     await api.putDesigns({ ...brands.designs, [p.id]: base });
     await setActive(p.id);
     done();

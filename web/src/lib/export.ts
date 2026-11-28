@@ -1,11 +1,17 @@
 import { toBlob, getFontEmbedCSS } from "html-to-image";
 import { fontsSettled, loadedKey } from "./fonts";
+import { assetsSettled } from "./assetRefs";
 
 let fontCss: string | undefined;
 let fontCssKey = "";
 
 /** Render a card element (already in the DOM at native size) to a PNG blob. */
 export async function cardToBlob(node: HTMLElement, w: number, h: number): Promise<Blob> {
+  // pictures from the media library must be in the card before it is drawn: wait, then let the screen catch up
+  await assetsSettled();
+  await new Promise((r) => setTimeout(r, 60));
+  if (node.hasAttribute("data-asset-missing")) throw new Error("A picture from the media library could not be loaded. Choose it again, or try once more.");
+  await Promise.all([...node.querySelectorAll("img")].map((i) => i.decode().catch(() => undefined)));
   await fontsSettled();
   if (document.fonts?.ready) await document.fonts.ready;
   const key = loadedKey();

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -13,7 +14,8 @@ const CardDesignVersion = 1
 
 // CardDesign is what a card looks like: the same object the editor draws and the library draws again, so a design is
 // never described twice. It is the strongly typed form of the editor's Design; the server refuses anything it could not
-// render. Images are data URLs, so a stored design is complete in itself.
+// render. An image is a data URL, or "asset:<id>" for a file of the brand's media
+// library, which cannot be deleted while a design names it.
 type CardDesign struct {
 	SizeID      string `json:"sizeId"`
 	Layout      string `json:"layout"`
@@ -53,6 +55,7 @@ var (
 	cardLayouts = map[string]bool{"hero": true, "center": true, "quote": true, "stat": true, "split": true, "cover": true, "greeting": true}
 	fontRoles   = map[string]bool{"title": true, "body": true, "label": true, "logo": true, "stat": true, "script": true}
 	idRe        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+	assetRefRe  = regexp.MustCompile(`^asset:[0-9a-f]{16}$`)
 )
 
 const (
@@ -123,6 +126,9 @@ func (d CardDesign) validate() error {
 	for _, p := range append(append([]string{}, d.Photos...), d.Screenshot, d.BgImage) {
 		if len(p) > maxDesignImage {
 			return invalid("design: an image is larger than %d MB", maxDesignImage>>20)
+		}
+		if strings.HasPrefix(p, "asset:") && !assetRefRe.MatchString(p) {
+			return invalid("design: %q does not name a library picture", cut(p, 40))
 		}
 	}
 	for role, family := range d.Fonts {

@@ -54,6 +54,7 @@ func (s *server) listAssets(w http.ResponseWriter, r *http.Request) {
 }
 
 // addAsset takes a multipart form: "name", "tags" (comma separated), and either "file" with its "thumb", or "link".
+// With "reuse" = 1, a file the brand already has is answered with that entry.
 func (s *server) addAsset(w http.ResponseWriter, r *http.Request) {
 	if !s.media(w, r) {
 		return
@@ -75,7 +76,7 @@ func (s *server) addAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.MultipartForm.RemoveAll() //nolint:errcheck
-	in := service.NewAsset{Name: r.FormValue("name"), Tags: strings.Split(r.FormValue("tags"), ","), Link: r.FormValue("link")}
+	in := service.NewAsset{Name: r.FormValue("name"), Tags: strings.Split(r.FormValue("tags"), ","), Link: r.FormValue("link"), Reuse: r.FormValue("reuse") == "1"}
 	for field, into := range map[string]*[]byte{"file": &in.Data, "thumb": &in.Thumb} {
 		f, _, err := r.FormFile(field)
 		if errors.Is(err, http.ErrMissingFile) {
