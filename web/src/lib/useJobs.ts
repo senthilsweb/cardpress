@@ -36,9 +36,9 @@ export function useJobs(profileId: string) {
   // what each job's status was at the last look: a change from running to finished is told once, as a toast
   const seen = useRef(new Map<string, JobStatus>());
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (background = false) => {
     try {
-      const list = await api.listJobs(profileId, scope);
+      const list = await api.listJobs(profileId, scope, background);
       for (const j of list) {
         const before = seen.current.get(j.id);
         if (before === "publishing" || before === "scheduled") announce(j);
@@ -55,11 +55,11 @@ export function useJobs(profileId: string) {
   const active = jobs.some(isActive);
   useEffect(() => {
     if (!active) return;
-    const t = window.setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
+    const t = window.setInterval(() => { if (!document.hidden) void refresh(true); }, 5000);
     return () => window.clearInterval(t);
   }, [active, refresh]);
   useEffect(() => {
-    const onFocus = () => void refresh();
+    const onFocus = () => void refresh(true);
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);

@@ -152,7 +152,7 @@ func main() {
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
 	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
-	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail})
+	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax})
 	opts := api.Options{
 		Build:              buildInfo(),
 		Events:             events,

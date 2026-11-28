@@ -156,7 +156,7 @@ func TestTheAppNeedsAnAdminAccountBeforeAnythingElse(t *testing.T) {
 	h := r.browser(t)
 	h.extra["X-Forwarded-Proto"] = "https"
 	h.login("ada@example.com", "correct horse battery")
-	if ck := h.cookies[cookieName]; ck == nil || !ck.Secure {
+	if ck := h.cookies[secureCookieName]; ck == nil || !ck.Secure || !ck.HttpOnly || ck.Path != "/" || ck.Domain != "" {
 		t.Fatalf("%+v", ck)
 	}
 }

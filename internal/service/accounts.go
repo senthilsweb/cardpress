@@ -33,8 +33,6 @@ const (
 	maxPassword     = 200
 	maxName         = 60
 	maxPhone        = 30
-	sessionLife     = 14 * 24 * time.Hour
-	sessionRenewAt  = 24 * time.Hour // a session is extended when it is used and has not been seen for this long
 	failuresAllowed = 5
 	lockFor         = 15 * time.Minute
 )
@@ -47,6 +45,9 @@ type AccountsOptions struct {
 	SignupClosed bool
 	// AdminEmail, if set, is the only email that may create the first (admin) account.
 	AdminEmail string
+	// SessionIdle ends a sign-in not used for this long (20 minutes if unset); SessionMax ends it however much it is
+	// used (12 hours if unset).
+	SessionIdle, SessionMax time.Duration
 }
 
 // Accounts manages people, their roles and their sign-ins.
@@ -69,6 +70,15 @@ type failure struct {
 func NewAccounts(db *sql.DB, o AccountsOptions) *Accounts {
 	if !ValidRole(o.DefaultRole) || o.DefaultRole == RoleAdmin {
 		o.DefaultRole = RoleEditor
+	}
+	if o.SessionIdle <= 0 {
+		o.SessionIdle = DefaultSessionIdle
+	}
+	if o.SessionMax <= 0 {
+		o.SessionMax = DefaultSessionMax
+	}
+	if o.SessionMax < o.SessionIdle {
+		o.SessionMax = o.SessionIdle
 	}
 	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}}
 }
@@ -575,56 +585,6 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 	}
 	_, _ = a.db.ExecContext(ctx, `UPDATE users SET last_login_at = ? WHERE id = ?`, a.stamp(), u.ID)
 	return u, token, nil
-}
-
-// StartSession signs a person in without a password (used after sign-up).
-func (a *Accounts) StartSession(ctx context.Context, userID string) (string, error) {
-	return a.startSession(ctx, userID)
-}
-
-func (a *Accounts) startSession(ctx context.Context, userID string) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	token := base64.RawURLEncoding.EncodeToString(b)
-	now := a.now().UTC()
-	_, err := a.db.ExecContext(ctx, `INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
-		tokenHash(token), userID, now.Format(time.RFC3339), now.Format(time.RFC3339), now.Add(sessionLife).Format(time.RFC3339))
-	if err != nil {
-		return "", err
-	}
-	_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, now.Format(time.RFC3339)) // tidy up
-	return token, nil
-}
-
-// Authenticate returns the person a session token belongs to, extending the session while it is in use.
-func (a *Accounts) Authenticate(ctx context.Context, token string) (User, error) {
-	if token == "" {
-		return User{}, ErrUnauthorized
-	}
-	var uid, seen, expires string
-	err := a.db.QueryRowContext(ctx, `SELECT user_id, last_seen_at, expires_at FROM sessions WHERE token_hash = ?`, tokenHash(token)).Scan(&uid, &seen, &expires)
-	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, ErrUnauthorized
-	}
-	if err != nil {
-		return User{}, err
-	}
-	now := a.now().UTC()
-	if exp, err := time.Parse(time.RFC3339, expires); err != nil || now.After(exp) {
-		_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
-		return User{}, ErrUnauthorized
-	}
-	u, _, err := a.loadUser(ctx, `id = ?`, uid)
-	if err != nil || u.Status != "active" {
-		return User{}, ErrUnauthorized
-	}
-	if last, err := time.Parse(time.RFC3339, seen); err != nil || now.Sub(last) > sessionRenewAt {
-		_, _ = a.db.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?`,
-			now.Format(time.RFC3339), now.Add(sessionLife).Format(time.RFC3339), tokenHash(token))
-	}
-	return u, nil
 }
 
 // Logout ends one session.

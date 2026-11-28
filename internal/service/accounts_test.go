@@ -216,9 +216,9 @@ func TestSessionsAuthenticateExpireAndEndWhenAPersonIsDisabledOrChangesPassword(
 	if _, _, err := a.Login(ctx, "ada@example.com", "another long passphrase", "d"); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal("and cannot sign in")
 	}
-	// a session ends after its lifetime
+	// a session ends after its longest time
 	_, t3, _ := a.Login(ctx, "admin@example.com", "correct horse battery", "e")
-	a.now = func() time.Time { return time.Now().Add(sessionLife + time.Hour) }
+	a.now = func() time.Time { return time.Now().Add(DefaultSessionMax + time.Hour) }
 	if _, err := a.Authenticate(ctx, t3); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal("expired")
 	}

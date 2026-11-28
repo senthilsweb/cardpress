@@ -206,6 +206,8 @@ func (s *server) table() []routeDef {
 		{"GET", "/auth/me", any, s.meOrNotConfigured},
 		{"PUT", "/auth/me", any, s.updateMeOrNotConfigured},
 		{"PUT", "/auth/password", any, s.changePasswordOrNotConfigured},
+		{"GET", "/auth/session", any, s.sessionTimes},
+		{"POST", "/auth/session", any, s.sessionTimes},
 		{"GET", "/api-keys", any, s.listKeysOrOff},
 		{"POST", "/api-keys", any, s.createKeyOrOff},
 		{"DELETE", "/api-keys/{id}", any, s.revokeKeyOrOff},
@@ -338,7 +340,7 @@ func (s *server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Expose-Headers", "X-Request-Id")
 			if r.Method == http.MethodOptions {
 				h.Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-CardPress-Background")
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -1105,6 +1107,12 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-beat.C:
+			// a stream opened with a sign-in ends when the sign-in does
+			if p, ok := principalOf(r); ok && s.Accounts != nil && p.User != nil && p.Key == "" {
+				if _, _, err := s.Accounts.Session(r.Context(), sessionToken(r), false); err != nil {
+					return
+				}
+			}
 			fmt.Fprint(w, ": still here\n\n")
 		case e, open := <-events:
 			if !open {

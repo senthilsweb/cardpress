@@ -107,7 +107,7 @@ function Login({ info }: { info: ApiInfo }) {
     catch (err) { setError(err instanceof Error ? err.message : "Could not sign in"); setBusy(false); }
   };
   return (
-    <Card title="Sign in">
+    <Card title="Sign in" lead={new URLSearchParams(window.location.search).has("ended") ? "You were signed out. Sign in to carry on." : undefined}>
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>

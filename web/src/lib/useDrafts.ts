@@ -94,13 +94,13 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
     const look = async (id: string, revision?: number) => {
       const local = ref.current.find((d) => d.id === id);
       if (local && revision !== undefined && revision <= local.revision) return;
-      const server = await api.getDraft(id);
+      const server = await api.getDraft(id, true);
       if (stop.signal.aborted || server.profileId !== profileId) return;
       flushPendingEdits(); // what is being typed reaches the store first, so it is kept
       receive(server);
     };
     const catchUp = async () => {
-      for (const d of await api.listDrafts(profileId)) {
+      for (const d of await api.listDrafts(profileId, true)) {
         const local = ref.current.find((x) => x.id === d.id);
         if (!local || d.revision > local.revision) await look(d.id);
       }
@@ -250,7 +250,7 @@ export function useDrafts(profileId: string, initial: Draft[], designFor?: () =>
   const refreshStatus = useCallback(async () => {
     const id = idRef.current;
     if (!id) return;
-    try { const saved = await api.getDraft(id); commit(ref.current.map((x) => (x.id === saved.id && dirty.current !== x.id ? meta(x, saved) : x))); } catch { /* the next look will do */ }
+    try { const saved = await api.getDraft(id, true); commit(ref.current.map((x) => (x.id === saved.id && dirty.current !== x.id ? meta(x, saved) : x))); } catch { /* the next look will do */ }
   }, []);
 
   /** Put an old version back as the open draft's text. */

@@ -5,10 +5,10 @@
 - [x] Tests
 
 ## Bolt 2: sessions end
-- [ ] Idle and longest times in the configuration; the server enforces them; cookie hardening
-- [ ] Background requests and the event stream do not extend a session; `/auth/session`
-- [ ] The app counts use, warns one minute before and goes to sign-in at the end
-- [ ] Tests, browser check
+- [x] Idle and longest times in the configuration; the server enforces them; cookie hardening
+- [x] Background requests and the event stream do not extend a session; `/auth/session`
+- [x] The app counts use, warns one minute before and goes to sign-in at the end
+- [x] Tests, browser check
 
 ## Bolt 3: nothing in browser storage
 - [ ] View choices saved on the server; the colours cookie
