@@ -8,6 +8,7 @@ import { bgById, categoryOf } from "@/card/backgrounds";
 import { BackgroundPicker } from "./BackgroundPicker";
 import { LAYOUTS } from "@/card/Card";
 import { Ornament, ornamentOf, ornamentsFor } from "@/card/ornaments";
+import { DEFAULT_SHADE, fillsCard } from "@/card/shade";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,8 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
     toast(`Background changed to ${bgById(id).name}`, { id: SWITCHED, action: { label: "Undo", onClick: undo } });
   };
   const addPictures = (patch: Partial<Design>) => {
+    // a new background picture starts shaded enough to read the words; a shade already chosen is kept
+    if (patch.bgImage && now.current.design.shade === undefined) patch = { ...patch, shade: DEFAULT_SHADE };
     const id = backgroundFor(now.current.design, patch, now.current.headshot);
     if (id) switchTo(id, patch);
     else now.current.set(patch);
@@ -89,9 +92,11 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
       <Section
         title="Background"
         action={
-          <Button variant="ghost" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}>
-            <Shuffle /> Shuffle
-          </Button>
+          fillsCard(design) ? undefined : (
+            <Button variant="ghost" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}>
+              <Shuffle /> Shuffle
+            </Button>
+          )
         }
       >
         <button
@@ -114,6 +119,9 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
         <Button variant="outline" size="sm" className="w-full" onClick={() => setBrowsing(true)}>
           <Search /> Browse backgrounds
         </Button>
+        {fillsCard(design) && (
+          <SliderField label="Shading" value={design.shade ?? DEFAULT_SHADE} min={0} max={1} step={0.05} onChange={(v) => set({ shade: v })} format={() => (design.shade === undefined ? "As before" : `${Math.round(design.shade * 100)}%`)} />
+        )}
         <BackgroundPicker open={browsing} onOpenChange={setBrowsing} design={design} profile={profile} onUse={set} />
       </Section>
 
@@ -183,8 +191,12 @@ export function DesignPanel({ design, set, profile, palette }: { design: Design;
 
       <Section title="Fine tune">
         <SliderField label="Title size" value={design.titleScale} min={0.6} max={1.5} step={0.05} onChange={(v) => set({ titleScale: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
+        {!fillsCard(design) && (
+          <>
+            <SliderField label="Background strength" value={design.intensity} min={0} max={1} step={0.05} onChange={(v) => set({ intensity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            <SliderField label="Bottom fade" value={design.bottomFade} min={0} max={1} step={0.05} onChange={(v) => set({ bottomFade: v })} format={(v) => `${Math.round(v * 100)}%`} />
+          </>
+        )}
         <SwitchField id="logo" label="Show logo" checked={design.showLogo} onChange={(v) => set({ showLogo: v })} />
         <SwitchField id="foot" label="Show footer" checked={design.showFooter} onChange={(v) => set({ showFooter: v })} />
       </Section>

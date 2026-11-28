@@ -39,8 +39,10 @@ type CardDesign struct {
 	TitleScale float64 `json:"titleScale"`
 	Intensity  float64 `json:"intensity"`
 	BottomFade float64 `json:"bottomFade"`
-	ShowLogo   bool    `json:"showLogo"`
-	ShowFooter bool    `json:"showFooter"`
+	// Shade is how much one's own background picture is shaded behind the words. Nil keeps the older fades; 0 is none.
+	Shade      *float64 `json:"shade,omitempty"`
+	ShowLogo   bool     `json:"showLogo"`
+	ShowFooter bool     `json:"showFooter"`
 	// An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose.
 	NoFooter     bool              `json:"noFooter,omitempty"`
 	NoFooterLeft bool              `json:"noFooterLeft,omitempty"`
@@ -124,6 +126,9 @@ func (d CardDesign) validate() error {
 		if v < 0 || v > 1 {
 			return invalid("design: %s must be between 0 and 1", name)
 		}
+	}
+	if d.Shade != nil && (*d.Shade < 0 || *d.Shade > 1) {
+		return invalid("design: shade must be between 0 and 1")
 	}
 	if len(d.Photos) > maxDesignPhotos {
 		return invalid("design: at most %d photos", maxDesignPhotos)

@@ -19,5 +19,15 @@ card with another background changed nothing, and nothing said why.
 - **Photos for the mosaic** is now **Photos**, and each field says in one line where it appears.
 - Public-domain pictures for trying this are kept in `testdata/media/`.
 
+## Shading one's own picture
+The older shading covered a square or tall card most where it has no words, and no setting showed the picture as it is.
+
+- With a background picture, one **Shading** slider (0 to 100%) takes the place of **Background strength** and
+  **Bottom fade**, and **Shuffle**, which changed nothing, is hidden.
+- The shade lies behind the words wherever the layout puts them, and lightly behind the logo and footer. At 0% there is
+  none.
+- A newly added picture starts at 70%. A card made before keeps its look until the slider is moved.
+- The card design gains `shade` (0 to 1). No database migration; the assistant cannot change it.
+
 ## Out of scope
 Drawing two kinds of picture at once.

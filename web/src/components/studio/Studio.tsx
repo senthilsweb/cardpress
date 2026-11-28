@@ -25,6 +25,7 @@ import { lockReason } from "@/lib/lock";
 import { FeedFrame, ScaledCard } from "./preview";
 import { DEFAULT_DESIGN, DEFAULT_PROFILES } from "@/lib/profiles";
 import { fullDesign, withFooterFlags } from "@/lib/cardDesign";
+import { fillsCard } from "@/card/shade";
 import { brandColor } from "@/lib/brands";
 import { NETWORKS, SIZES, sizeById, type Network, type Size } from "@/lib/sizes";
 import type { Design, Profile } from "@/lib/types";
@@ -512,7 +513,7 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
               <div className="flex-1" />
               {note && <span className="flex items-center gap-1 text-xs text-brand"><Check className="h-3.5 w-3.5" />{note}</span>}
               {saveError && <span className="text-xs text-destructive">Could not save to the server – will retry on your next change</span>}
-              <Button variant="outline" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}><Shuffle /> Shuffle</Button>
+              {!fillsCard(design) && <Button variant="outline" size="sm" onClick={() => set({ seed: 1 + Math.floor(Math.random() * 99999) })}><Shuffle /> Shuffle</Button>}
               <Button variant="outline" size="sm" onClick={doCopy} disabled={!!busy || !one}>{busy === "copy" ? <Loader2 className="animate-spin" /> : <Copy />} Copy</Button>
               <Button variant="outline" size="sm" onClick={doZip} disabled={!!busy}>{busy === "zip" ? <Loader2 className="animate-spin" /> : <PackageOpen />} All sizes .zip</Button>
               <Button variant="brand" size="sm" onClick={doDownload} disabled={!!busy || !one}>{busy === "download" ? <Loader2 className="animate-spin" /> : <Download />} Download PNG</Button>

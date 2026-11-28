@@ -65,6 +65,8 @@ export interface Design {
   titleScale: number;
   intensity: number; // art strength 0..1
   bottomFade: number; // 0..1
+  /** Shading behind the words on one's own background picture, 0..1. Without it, the card keeps the older fades. */
+  shade?: number;
   showLogo: boolean;
   showFooter: boolean;
   /** An empty footer shows the brand's handle (right) or website (left), unless it was emptied on purpose. */

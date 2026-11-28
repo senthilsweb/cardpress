@@ -53,7 +53,7 @@ try {
     titleScale: 1, intensity: 0.85, bottomFade: 0.3, showLogo: true, showFooter: true, photos: [], ...pictures,
   });
   const examples = [
-    ["Example: background image", card("hero", "image", "Your own picture", "Background image on Own image.", { bgImage: ref("mountain-lake") })],
+    ["Example: background image", card("hero", "image", "Your own picture", "Background image on Own image.", { bgImage: ref("mountain-lake"), shade: 0.7 })],
     ["Example: app screenshot", card("hero", "browser", "See the new screen", "App screenshot in a Browser frame.", { screenshot: ref("cardpress-dashboard") })],
     ["Example: photo mosaic", card("hero", "mosaic", "A week in pictures", "Photos as a mosaic.", { photos: FILES.photos.map(ref) })],
     ["Example: headshot", card("split", "dots", "Meet the team", "The first photo as the headshot.", { photos: [ref("blue-cup")] })],

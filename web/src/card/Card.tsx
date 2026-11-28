@@ -7,6 +7,7 @@ import { cssFamily, ensureFont, resolveFonts } from "@/lib/fonts";
 import { fillPictures, picturesOf, usePictures } from "@/lib/assetRefs";
 import { bgById, type Area, type MaskKind } from "./backgrounds";
 import { Ornament, ornamentOf } from "./ornaments";
+import { shadeLayers } from "./shade";
 
 export interface LayoutDef {
   id: LayoutId;
@@ -318,8 +319,12 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
     );
   }
 
-  const bf = design.bottomFade;
-  const imgOverlay = fullBleedImage
+  // With a shade set, it alone shades one's own picture. Cards made before it keep their two fades.
+  const shaded = fullBleedImage && design.shade !== undefined;
+  const textTop = (L === "split" && !land ? H * 0.1 + W * 0.46 + 3 * u : art.area.y + art.area.h + 3 * u) / H;
+  const shades = shaded ? shadeLayers(pal.base, design.shade!, { layout: L, land, textTop, logo: !!logo, footer: !!footer }) : [];
+  const bf = shaded ? 0 : design.bottomFade;
+  const imgOverlay = fullBleedImage && !shaded
     ? `linear-gradient(${land ? "90deg" : "180deg"}, ${rgba(pal.base, 0.94)} 0%, ${rgba(pal.base, L === "center" || L === "quote" ? 0.8 : 0.82)} ${land ? 40 : 45}%, ${rgba(pal.base, L === "center" || L === "quote" ? 0.7 : 1 - design.intensity * 0.85)} 100%)`
     : null;
 
@@ -337,6 +342,7 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
         </g>
       </svg>
       {imgOverlay && <div style={{ position: "absolute", inset: 0, background: imgOverlay }} />}
+      {shades.map((background, i) => <div key={i} data-shade style={{ position: "absolute", inset: 0, background }} />)}
       {!fullBleedImage && (L === "center" || L === "quote") && design.background !== "plain" && (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}

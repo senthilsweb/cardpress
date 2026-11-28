@@ -22,6 +22,11 @@ describe("card words", () => {
     expect(fullDesign(DEFAULT_DESIGN, { background: "dots" }).ornament).toBeUndefined();
   });
 
+  it("keeps a shade of 0 through a save", () => {
+    expect(toCardDesign({ ...DEFAULT_DESIGN, shade: 0 }).shade).toBe(0);
+    expect("shade" in toCardDesign(DEFAULT_DESIGN)).toBe(false);
+  });
+
   it("clears the flag when text is written or the brand's is asked for", () => {
     expect(withFooterFlags({ footer: "x" }).noFooter).toBe(false);
     expect(withFooterFlags({ footer: "", noFooter: false }).noFooter).toBe(false);
