@@ -26,3 +26,11 @@ These are the changes recorded so far, in the order they were built. Later work 
 | Assistant | Chat that drafts content from an article, with proposals you approve | [chat-content-agent](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/chat-content-agent) |
 | Integration | MCP server for outside agents, with an audit trail | [mcp-server](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/mcp-server) |
 | Real agent | Claude Managed Agent adapter behind the same port | [agent-cma-adapter](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/agent-cma-adapter) |
+
+## Later units of work
+Recorded as each bolt completes, from 2026-11-27. The changes between the table above and this one are listed in
+[openspec/README.md](https://github.com/senthilsweb/cardpress/blob/main/openspec/README.md) and are not yet recorded here.
+
+| Unit of work | Bolt | OpenSpec change |
+|---|---|---|
+| Greeting cards | The words fit: the greeting block is made smaller when too tall | [greeting-readability](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-03-greeting-readability) |

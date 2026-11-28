@@ -66,6 +66,7 @@ Not agreed yet; suggested order:
 | [`2026-12-31-controls-and-media-pages`](changes/2026-12-31-controls-and-media-pages/proposal.md) | Consistent controls, Add user at the top, Media in pages | `v0.2.1` |  |
 | [`2027-01-01-settings-forms`](changes/2027-01-01-settings-forms/proposal.md) | A first brand of one's own, and settings forms that save the same way | `v0.3.0` |  |
 | [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
+| [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | Bolt 1 of 3 built | 6 |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -194,3 +195,11 @@ Older items include checks against real accounts that cost money or post publicl
 
 ### `2026-12-28-versions`
 - Look at the version in About CardPress on a deployed app
+
+### `2027-01-03-greeting-readability`
+- Lighter wash behind the words when `shade` is set; unchanged without it
+- Shading slider for greeting cards; 70% when the layout or its background is chosen
+- Tests, user guide, browser check
+- Ornament directly under Background
+- Browser check
+- Deploy
