@@ -475,7 +475,7 @@ func (s *Studio) ImportLegacy(ctx context.Context, l Legacy) error {
 // so it is dropped, and the first letter is capitalised.
 func UserMessage(err error) string {
 	m := err.Error()
-	for _, sentinel := range []error{ErrInvalid, ErrConflict} {
+	for _, sentinel := range []error{ErrInvalid, ErrConflict, ErrBudget} {
 		m = strings.TrimPrefix(m, sentinel.Error()+": ")
 	}
 	if m == "" {

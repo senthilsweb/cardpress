@@ -32,6 +32,11 @@ type fake struct {
 	scripts    []func(f *fake)
 	sent       []string // the text of what was sent: a message, or an outcome's description
 	rubrics    []string
+	rounds     []int
+	started    []string // the agent and version of each session started
+	used       int      // what the session has cost
+	limit      int      // its spending limit
+	limits     []int    // each limit set
 	gone       bool
 	interrupts int
 	drop       bool // the first stream ends after what was sent
@@ -86,12 +91,16 @@ func (f *fake) deliver(kind, text string) (string, error) {
 	return id, nil
 }
 
-func (f *fake) newSession(context.Context, string) (string, error) { return "sesn_1", nil }
+func (f *fake) newSession(_ context.Context, _, agentID, version string) (string, error) {
+	f.started = append(f.started, agentID+"@"+version)
+	return "sesn_1", nil
+}
 func (f *fake) sendMessage(_ context.Context, _ string, text string) (string, error) {
 	return f.deliver("user.message", text)
 }
-func (f *fake) sendOutcome(_ context.Context, _ string, d, rubric string, _ int) (string, error) {
+func (f *fake) sendOutcome(_ context.Context, _ string, d, rubric string, rounds int) (string, error) {
 	f.rubrics = append(f.rubrics, rubric)
+	f.rounds = append(f.rounds, rounds)
 	return f.deliver("user.define_outcome", d)
 }
 func (f *fake) interrupt(context.Context, string) error {
@@ -102,6 +111,14 @@ func (f *fake) interrupt(context.Context, string) error {
 }
 func (f *fake) usage(context.Context, string) (agent.Usage, error) {
 	return agent.Usage{TotalCents: 7, ActiveSeconds: 4}, nil
+}
+func (f *fake) budget(context.Context, string) (int, int, error) { return f.used, f.limit, nil }
+func (f *fake) setBudget(_ context.Context, _ string, cents int) error {
+	f.limit, f.limits = cents, append(f.limits, cents)
+	return nil
+}
+func (f *fake) checkGuide(context.Context, string, string) (bool, string, error) {
+	return true, "", nil
 }
 func (f *fake) history(context.Context, string) ([]wireEvent, error) {
 	f.mu.Lock()
@@ -233,6 +250,15 @@ func TestFirstDraftsAreGradedOneAfterTheOtherWithEverySource(t *testing.T) {
 	if strings.Join(f.rubrics, ",") != "POST RUBRIC,ARTICLE RUBRIC" {
 		t.Fatal(f.rubrics)
 	}
+	if !slices.Equal(f.rounds, []int{3, 3}) {
+		t.Fatalf("the manifest's rounds: %v", f.rounds)
+	}
+	// a brand with its own number of rounds
+	own, five := &fake{scripts: []func(*fake){grade("Post saved.", "satisfied")}}, studio()
+	five.Write, five.Grade, five.Rounds = []string{"post"}, []string{"post"}, 5
+	if _, _, err := ask(t, own, agent.Input{Studio: five}); err != nil || !slices.Equal(own.rounds, []int{5}) {
+		t.Fatalf("the brand's rounds: %v %v", err, own.rounds)
+	}
 	for i, kind := range []string{"post", "article"} {
 		if !strings.Contains(f.sent[i], "write: "+kind+"\n") || !strings.Contains(f.sent[i], "THE SOURCE") || !strings.Contains(f.sent[i], "Write a") {
 			t.Errorf("outcome %d:\n%s", i, f.sent[i])
@@ -313,7 +339,7 @@ func TestTheManifest(t *testing.T) {
 	for want, from := range map[string]string{
 		"CARDPRESS_AGENT_MANIFEST": "", "could not read": "/no/such/file", "not valid JSON": "{nope",
 		"version 4":                       strings.Replace(string(b), `"version":5`, `"version":4`, 1),
-		"version 7":                       strings.Replace(string(b), `"version":5`, `"version":7`, 1),
+		"version 8":                       strings.Replace(string(b), `"version":5`, `"version":8`, 1),
 		"has no schema":                   strings.Replace(string(b), `"version":5`, `"version":6`, 1),
 		"carries version":                 strings.Replace(string(b), `{"version":5`, `{"schema":`+string(content.Schema)+`,"schema_version":1,"version":5`, 1),
 		"vault_id":                        strings.Replace(string(b), `"vlt_1"`, `""`, 1),
@@ -341,7 +367,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 		case r.Method == "POST":
 			_, _ = w.Write([]byte(`{"data":[{"id":"sevt_1","type":"user.message"}]}`))
 		case r.URL.Path == "/v1/sessions/sesn_1":
-			_, _ = w.Write([]byte(`{"id":"sesn_1","usage":{"list_cost":{"amount":"144","currency":"USD"},"active_seconds":352.1}}`))
+			_, _ = w.Write([]byte(`{"id":"sesn_1","usage":{"list_cost":{"amount":"144","currency":"USD"},"active_seconds":352.1,"input_tokens":100,"cache_read_input_tokens":800,"cache_creation":{"ephemeral_5m_input_tokens":60,"ephemeral_1h_input_tokens":40}}}`))
 		default:
 			w.WriteHeader(404)
 			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"not_found_error","message":"no"}}`))
@@ -350,7 +376,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 	defer srv.Close()
 	a := newSDKAPI(Config{Manifest: manifest, BudgetCents: 250, APIKey: "k", WorkspaceID: "wrkspc_1", BaseURL: srv.URL})
 	ctx := context.Background()
-	if sid, err := a.newSession(ctx, "T"); err != nil || sid != "sesn_1" {
+	if sid, err := a.newSession(ctx, "T", "agent_1", "3"); err != nil || sid != "sesn_1" {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"id":"agent_1"`, `"version":3`, `"environment_id":"env_1"`, `"vault_ids":["vlt_1"]`, `"amount":"250"`} {
@@ -369,7 +395,7 @@ func TestSDKCallsHaveTheRightShape(t *testing.T) {
 			t.Errorf("outcome lacks %s: %s", want, got[1].body)
 		}
 	}
-	if u, err := a.usage(ctx, "sesn_1"); err != nil || u.TotalCents != 144 || u.ActiveSeconds < 352 {
+	if u, err := a.usage(ctx, "sesn_1"); err != nil || u.TotalCents != 144 || u.ActiveSeconds < 352 || u.InputTokens != 1000 || u.CachedTokens != 800 {
 		t.Fatalf("%v %+v", err, u)
 	}
 	if _, err := a.history(ctx, "nope"); !errors.Is(err, errSessionGone) {
@@ -436,5 +462,111 @@ func TestWithoutAReportTheLastWordsAreShownCutShort(t *testing.T) {
 	out, _, err := ask(t, f, agent.Input{Studio: studio()})
 	if err != nil || len(out.Reports) != 1 || out.Reports[0].Outcome != "" || !strings.HasSuffix(out.Reply, "…") || len([]rune(out.Reply)) > 401 {
 		t.Fatalf("%v %+v", err, out)
+	}
+}
+
+// What is left of a brand's amount becomes the session's limit for the reply, never above the conversation's own, and
+// a reply that stops there says which limit it was.
+func TestAnAllowanceBecomesTheSessionsLimit(t *testing.T) {
+	cents := func(n int) *int { return &n }
+	say := func(f *fake) { f.say("Done."); f.idle("end_turn") }
+	stop := func(f *fake) { f.idle("budget_reached") }
+	run := func(f *fake, budget int, allowance *int) error {
+		c := &Client{api: f, m: manifest, timeout: 5 * time.Second, budget: budget}
+		_, err := c.Respond(context.Background(), agent.Input{SessionID: "sesn_1", Allowance: allowance, Messages: []agent.Message{{Role: "user", Content: "Go on."}}}, func(agent.Event) {})
+		return err
+	}
+
+	// 40 used, 30 left for the brand: the limit goes from the conversation's 200 down to 70
+	f := &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, cents(30)); err != nil || !slices.Equal(f.limits, []int{70}) {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	// plenty left: the conversation's limit stays, and is put back if an earlier reply lowered it
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 70}
+	if err := run(f, 200, cents(5000)); err != nil || !slices.Equal(f.limits, []int{200}) {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, cents(5000)); err != nil || len(f.limits) != 0 {
+		t.Fatalf("nothing to change: %v %v", err, f.limits)
+	}
+	// no allowance given: the session is left alone
+	f = &fake{scripts: []func(*fake){say}, used: 40, limit: 200}
+	if err := run(f, 200, nil); err != nil || len(f.limits) != 0 {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+	// nothing left: nothing is sent
+	f = &fake{used: 40, limit: 200}
+	if err := run(f, 200, cents(0)); !errors.Is(err, agent.ErrBudget) || len(f.sent) != 0 {
+		t.Fatalf("%v %v", err, f.sent)
+	}
+	// the conversation's own limit is reached first
+	f = &fake{used: 200, limit: 200}
+	if err := run(f, 200, cents(5000)); err == nil || errors.Is(err, agent.ErrBudget) || !strings.Contains(err.Error(), "this conversation") {
+		t.Fatalf("%v", err)
+	}
+	// stopped during the reply: by the allowance, or by the conversation's limit
+	f = &fake{scripts: []func(*fake){stop}, used: 40, limit: 200}
+	if err := run(f, 200, cents(30)); !errors.Is(err, agent.ErrBudget) {
+		t.Fatalf("%v", err)
+	}
+	f = &fake{scripts: []func(*fake){stop}, used: 40, limit: 200}
+	if err := run(f, 200, cents(5000)); err == nil || errors.Is(err, agent.ErrBudget) {
+		t.Fatalf("%v", err)
+	}
+	// a session made without a limit cannot be given one
+	f = &fake{scripts: []func(*fake){say}, used: 40}
+	if err := run(f, 0, cents(30)); err != nil || len(f.limits) != 0 {
+		t.Fatalf("%v %v", err, f.limits)
+	}
+}
+
+// From version 7 the manifest lists tiers: a session is started on the agents of the tier asked for, and on the first
+// tier when the one asked for is not on offer. A manifest without tiers has one, made from its agent_id.
+func TestTiers(t *testing.T) {
+	ctx := context.Background()
+	if tiers := (&Client{m: manifest}).Tiers(); len(tiers) != 1 || tiers[0].ID != "standard" || tiers[0].Name != "Standard" {
+		t.Fatalf("without tiers: %+v", tiers)
+	}
+	m := manifest
+	m.Version, m.Schema = 7, content.Schema
+	m.Tiers = []Tier{
+		{ID: "standard", Name: "Standard", AgentID: "agent_1", AgentVersion: "3", Models: []TierModel{{Role: "Coordinator", Model: "Haiku 5.5"}}},
+		{ID: "strong", Name: "Strong", AgentID: "agent_2", AgentVersion: "1"},
+		{ID: "best", Name: "Best", AgentID: "agent_3"},
+	}
+	b, _ := json.Marshal(m)
+	loaded, err := LoadManifest(ctx, string(b))
+	if err != nil || len(loaded.Tiers) != 3 {
+		t.Fatalf("%v %+v", err, loaded.Tiers)
+	}
+	f := &fake{}
+	c := &Client{api: f, m: loaded}
+	tiers := c.Tiers()
+	if len(tiers) != 3 || tiers[1].ID != "strong" || tiers[0].Models[0].Model != "Haiku 5.5" {
+		t.Fatalf("%+v", tiers)
+	}
+	for _, id := range []string{"strong", "best", "", "gone"} {
+		if _, err := c.CreateSessionOn(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := c.CreateSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(f.started, " "); got != "agent_2@1 agent_3@ agent_1@3 agent_1@3 agent_1@3" {
+		t.Fatalf("the agents started: %s", got)
+	}
+	for want, change := range map[string][2]string{
+		"short lower-case name": {`"id":"strong"`, `"id":"Strong one"`},
+		"twice":                 {`"id":"strong"`, `"id":"standard"`},
+		"needs a name":          {`"name":"Best"`, `"name":" "`},
+		"needs a name and":      {`"agent_id":"agent_3"`, `"agent_id":""`},
+		"not a version number":  {`"agent_version":"1"`, `"agent_version":"newest"`},
+	} {
+		if _, err := LoadManifest(ctx, strings.Replace(string(b), change[0], change[1], 1)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v", want, err)
+		}
 	}
 }

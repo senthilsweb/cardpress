@@ -15,13 +15,18 @@ import (
 
 // sessionAPI is the part of the Managed Agents API the client uses. The real one wraps the SDK; tests use a scripted fake.
 type sessionAPI interface {
-	newSession(ctx context.Context, title string) (string, error)
+	// newSession starts a session on an agent; version pins it when it is a number.
+	newSession(ctx context.Context, title, agentID, version string) (string, error)
 	sendMessage(ctx context.Context, sessionID, text string) (eventID string, err error)
 	sendOutcome(ctx context.Context, sessionID, description, rubric string, iterations int) (eventID string, err error)
 	interrupt(ctx context.Context, sessionID string) error
 	history(ctx context.Context, sessionID string) ([]wireEvent, error)
 	stream(ctx context.Context, sessionID string) (eventStream, error)
 	usage(ctx context.Context, sessionID string) (agent.Usage, error)
+	// budget is what the session has cost and its spending limit, both in cents; a limit of 0 is none.
+	budget(ctx context.Context, sessionID string) (used, limit int, err error)
+	setBudget(ctx context.Context, sessionID string, cents int) error
+	checkGuide(ctx context.Context, kind, body string) (ok bool, reason string, err error)
 }
 
 // eventStream is a live event stream, already open (and so already buffering) when stream returns.
@@ -74,17 +79,17 @@ func gone(err error) error {
 	return err
 }
 
-func (a *sdkAPI) newSession(ctx context.Context, title string) (string, error) {
+func (a *sdkAPI) newSession(ctx context.Context, title, agentID, version string) (string, error) {
 	m := a.cfg.Manifest
 	p := anthropic.BetaSessionNewParams{
-		Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(m.AgentID)},
+		Agent:         anthropic.BetaSessionNewParamsAgentUnion{OfString: anthropic.String(agentID)},
 		EnvironmentID: m.EnvironmentID,
 		VaultIDs:      []string{m.VaultID},
 		Title:         anthropic.String(title),
 		Metadata:      map[string]string{"app": "cardpress"},
 	}
-	if v, err := strconv.Atoi(m.AgentVersion); err == nil {
-		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: m.AgentID, Version: anthropic.Int(int64(v))}}
+	if v, err := strconv.Atoi(version); err == nil {
+		p.Agent = anthropic.BetaSessionNewParamsAgentUnion{OfBetaManagedAgentsAgents: &anthropic.BetaManagedAgentsAgentParams{ID: agentID, Version: anthropic.Int(int64(v))}}
 	}
 	if a.cfg.BudgetCents > 0 {
 		p.Budget = anthropic.BetaManagedAgentsBudgetLimitParam{MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: strconv.Itoa(a.cfg.BudgetCents), Currency: "USD"}}
@@ -138,7 +143,33 @@ func (a *sdkAPI) usage(ctx context.Context, sid string) (agent.Usage, error) {
 	if err != nil {
 		return agent.Usage{}, errors.New("the session reports no cost")
 	}
-	return agent.Usage{TotalCents: cents, ActiveSeconds: s.Usage.ActiveSeconds}, nil
+	// the service counts new input, what was written to the cache and what was read from it apart
+	u := s.Usage
+	return agent.Usage{
+		TotalCents: cents, ActiveSeconds: u.ActiveSeconds, CachedTokens: u.CacheReadInputTokens,
+		InputTokens: u.InputTokens + u.CacheCreation.Ephemeral5mInputTokens + u.CacheCreation.Ephemeral1hInputTokens + u.CacheReadInputTokens,
+	}, nil
+}
+
+func (a *sdkAPI) budget(ctx context.Context, sid string) (int, int, error) {
+	s, err := a.c.Beta.Sessions.Get(ctx, sid, anthropic.BetaSessionGetParams{})
+	if err != nil {
+		return 0, 0, gone(err)
+	}
+	used, err := strconv.Atoi(s.Usage.ListCost.Amount)
+	if err != nil {
+		used = 0 // a session that has done nothing yet reports no cost
+	}
+	limit, _ := strconv.Atoi(s.Budget.MaxListCost.Amount)
+	return used, limit, nil
+}
+
+// setBudget changes the limit of a session that was created with one.
+func (a *sdkAPI) setBudget(ctx context.Context, sid string, cents int) error {
+	_, err := a.c.Beta.Sessions.Update(ctx, sid, anthropic.BetaSessionUpdateParams{
+		Budget: anthropic.BetaManagedAgentsBudgetLimitParam{MaxListCost: anthropic.BetaMonetaryAmountParam{Amount: strconv.Itoa(cents), Currency: "USD"}},
+	})
+	return gone(err)
 }
 
 func (a *sdkAPI) history(ctx context.Context, sid string) ([]wireEvent, error) {

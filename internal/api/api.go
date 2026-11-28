@@ -101,6 +101,16 @@ type Chatting interface {
 	Older(ctx context.Context, profileID, afterID string) ([]service.Conversation, error)
 	Agent() service.AgentInfo
 	AgentDetails() service.AgentInfo
+	BrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
+	SetBrandAssistant(ctx context.Context, profileID string, in service.BrandAssistant) (service.BrandAssistantView, error)
+	ResetBrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
+	Assistant(ctx context.Context) (service.AssistantView, error)
+	Guides(ctx context.Context, profileID string) (service.GuidesView, error)
+	SaveGuide(ctx context.Context, profileID, kind, body string) (service.GuidesView, error)
+	GuideVersions(ctx context.Context, profileID, kind string) ([]service.GuideVersion, error)
+	RestoreGuide(ctx context.Context, profileID, kind string, version int) (service.GuidesView, error)
+	SetAssistant(ctx context.Context, in service.AssistantSettings) (service.AssistantView, error)
+	ResetAssistant(ctx context.Context) (service.AssistantView, error)
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
 	List(ctx context.Context, profileID string) ([]service.Conversation, error)
 	Get(ctx context.Context, id string) (service.Conversation, error)
@@ -229,6 +239,13 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/profiles/{id}", write(scopeBrandPath), s.deleteProfile},
 		{"GET", "/profiles/{id}/details", write(scopeBrandPath), s.getBrandDetails},
 		{"PUT", "/profiles/{id}/details", write(scopeBrandPath), s.putBrandDetails},
+		{"GET", "/profiles/{id}/assistant", write(scopeBrandPath), s.getBrandAssistant},
+		{"PUT", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putBrandAssistant},
+		{"DELETE", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetBrandAssistant},
+		{"GET", "/profiles/{id}/guides", write(scopeBrandPath), s.getGuides},
+		{"PUT", "/profiles/{id}/guides/{kind}", write(scopeBrandPath), s.putGuide},
+		{"GET", "/profiles/{id}/guides/{kind}/versions", write(scopeBrandPath), s.guideVersions},
+		{"POST", "/profiles/{id}/guides/{kind}/versions/{version}/restore", write(scopeBrandPath), s.restoreGuide},
 		{"GET", "/profiles/{id}/assets", write(scopeBrandPath), s.listAssets},
 		{"POST", "/profiles/{id}/assets", write(scopeBrandPath), s.addAsset},
 		{"PUT", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.updateAsset},
@@ -307,6 +324,9 @@ func (s *server) table() []routeDef {
 		{"DELETE", "/security", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetSecurity},
 		{"GET", "/security/log", rule{scope: scopeAdmin, perm: service.PermUsers}, s.securityLog},
 		{"POST", "/security/sign-out-everyone", rule{scope: scopeAdmin, perm: service.PermUsers}, s.signOutEveryone},
+		{"GET", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.getAssistant},
+		{"PUT", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putAssistant},
+		{"DELETE", "/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetAssistant},
 		{"GET", "/mcp/audit", rule{scope: scopeAdmin, perm: service.PermUsers}, s.mcpAudit},
 	}
 }
@@ -1615,6 +1635,8 @@ func fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusConflict, "stale", service.UserMessage(err))
 	case errors.Is(err, service.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", service.UserMessage(err))
+	case errors.Is(err, service.ErrBudget):
+		writeError(w, r, http.StatusPaymentRequired, "budget_used", service.UserMessage(err))
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, r, http.StatusForbidden, "forbidden", service.UserMessage(err))
 	case errors.Is(err, service.ErrUnauthorized):

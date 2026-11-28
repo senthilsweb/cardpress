@@ -61,7 +61,7 @@ func newRig(t *testing.T, f service.SourceFetcher) *rig {
 	chat := service.NewChat(db.DB, &agenttest.Mock{}, f)
 	audit := NewAuditor(db.DB)
 	r := &rig{studio: studio, chat: chat, audit: audit, db: db.DB}
-	r.deps = Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: service.NewSettings(db.DB, nil, func(string) string { return "" }), Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {
+	r.deps = Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Guides: chat, Connections: service.NewSettings(db.DB, nil, func(string) string { return "" }), Proposals: chat, Jobs: stubJobs{}, Fetcher: f.(interface {
 		Fetch(context.Context, string) (source.Source, error)
 	}), Audit: audit, Transport: "stdio", Version: "test"}
 	return r
@@ -133,7 +133,7 @@ func TestTheToolListHasNothingThatPublishesSchedulesOrTouchesCredentials(t *test
 		}
 	}
 	sort.Strings(names)
-	want := []string{"create_draft", "delete_memory", "fetch_source", "get_design", "get_draft", "get_job", "get_proposal", "list_connections", "list_design_presets",
+	want := []string{"create_draft", "delete_memory", "fetch_source", "get_design", "get_draft", "get_job", "get_proposal", "get_writing_guide", "list_connections", "list_design_presets",
 		"list_drafts", "list_jobs", "list_memories", "list_profiles", "offer_choices", "propose_content", "report_reply", "save_memory", "set_attachment", "update_card_text", "update_draft"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools = %v\nwant    %v\nadding a tool must be a deliberate, reviewed change", names, want)
@@ -159,7 +159,7 @@ func TestTheToolsCanOnlyCallTheListedMethods(t *testing.T) {
 	// Access.BrandOwner, Proposals.ProposalBrand and Proposals.ConversationBrand only read who owns a brand, to keep a key to its own person's work.
 	// Connections.View never carries a secret.
 	// Writer.JoinReply ties a new item to the reply being written; Writer.OfferChoices keeps options and changes no draft.
-	want := []string{"Access.BrandOwner", "Connections.View", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Jobs.Get", "Jobs.List",
+	want := []string{"Access.BrandOwner", "Connections.View", "Drafts.GetDraft", "Drafts.ListDrafts", "Fetcher.Fetch", "Guides.WritingGuide", "Jobs.Get", "Jobs.List",
 		"Notes.DeleteMemory", "Notes.ListMemories", "Notes.SaveMemory", "Profiles.Profiles", "Proposals.ConversationBrand", "Proposals.Proposal", "Proposals.ProposalBrand", "Proposals.Propose",
 		"Writer.Card", "Writer.ClearAttachment", "Writer.JoinReply", "Writer.NewAssistantDraft", "Writer.OfferChoices", "Writer.PatchCardText", "Writer.PatchDraft", "Writer.SetAttachmentTitle", "Writer.SetVideo"}
 	if !reflect.DeepEqual(reachable, want) {
@@ -546,5 +546,40 @@ func TestAKeyReachesOnlyItsPersonsBrandsOverHTTP(t *testing.T) {
 	defer shut(plain)
 	if _, o := call(t, connectTo(plain.URL), "list_profiles", nil); len(o["profiles"].([]any)) != 2 {
 		t.Fatalf("%v", o)
+	}
+}
+
+// A writer reads the guide of the draft's brand and no other; a greeting guide is asked for by kind.
+func TestTheWritingGuideIsTheDraftsBrands(t *testing.T) {
+	r := newRig(t, stubFetcher{})
+	ctx := context.Background()
+	if _, err := r.db.Exec(`INSERT INTO profiles (id, owner_id, data, position, updated_at) VALUES ('p', '', '{}', 0, '')`); err != nil {
+		t.Fatal(err)
+	}
+	d, err := r.studio.CreateDraft(ctx, service.DraftInput{ProfileID: "p", Kind: "post", Doc: json.RawMessage(`{"type":"doc","content":[]}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs := connect(t, r.deps)
+	_, out := call(t, cs, "get_writing_guide", map[string]any{"id": d.ID})
+	if out["guide"] != "" || out["kind"] != "post" || !strings.Contains(out["use"].(string), "house style") {
+		t.Fatalf("no guide: %v", out)
+	}
+	if _, err := r.chat.SaveGuide(ctx, d.ProfileID, "post", "Plain words."); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.chat.SaveGuide(ctx, d.ProfileID, "greeting", "Warm words."); err != nil {
+		t.Fatal(err)
+	}
+	if _, out = call(t, cs, "get_writing_guide", map[string]any{"id": d.ID}); out["guide"] != "Plain words." || !strings.Contains(out["use"].(string), "cannot change") {
+		t.Fatalf("%v", out)
+	}
+	if _, out = call(t, cs, "get_writing_guide", map[string]any{"id": d.ID, "kind": "greeting"}); out["guide"] != "Warm words." {
+		t.Fatalf("%v", out)
+	}
+	for _, args := range []map[string]any{{"id": d.ID, "kind": "article"}, {"id": "missing"}} {
+		if res, _ := call(t, cs, "get_writing_guide", args); !res.IsError {
+			t.Errorf("%v was answered", args)
+		}
 	}
 }

@@ -55,13 +55,63 @@ type Versioned interface {
 	Versions() (agent string, schema int)
 }
 
+// Tier is one set of agents an assistant offers, for a brand to be given: the same work on other models.
+type Tier struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Models says which model does what, for the screen: "Coordinator" and each writer.
+	Models []TierModel `json:"models,omitempty"`
+}
+
+// TierModel is one line of a tier: a role and the model's name.
+type TierModel struct {
+	Role  string `json:"role"`
+	Model string `json:"model"`
+}
+
+// Tiered is an assistant that offers tiers. The first is the one used when nothing is chosen.
+type Tiered interface {
+	Tiers() []Tier
+	// CreateSessionOn is CreateSession on the agents of one tier.
+	CreateSessionOn(ctx context.Context, tier string) (string, error)
+}
+
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
 var ErrSessionGone = errors.New("the session cannot be continued")
+
+// GuideBase is what an assistant's writers come with for one kind of writing: our house style, which a brand's own guide
+// replaces, and the rules that stay whatever a guide says. For showing only.
+type GuideBase struct {
+	Ours  string
+	Fixed string
+}
+
+// Guided is an assistant that can say what its writers come with, by kind ("post", "article", "greeting").
+type Guided interface {
+	GuideBases() map[string]GuideBase
+}
+
+// GuideChecker is an assistant that can judge whether a brand's guide only describes how to write.
+type GuideChecker interface {
+	// CheckGuide says whether the guide is accepted and, when not, why, in words for its author.
+	CheckGuide(ctx context.Context, kind, body string) (ok bool, reason string, err error)
+}
+
+// ErrBudget is an agent saying it stopped because the allowance of the reply was used up.
+var ErrBudget = errors.New("the budget is used up")
+
+// Metered is an assistant that can say what a session has cost, for a reply that ended without saying so.
+type Metered interface {
+	SessionUsage(ctx context.Context, sessionID string) (Usage, error)
+}
 
 // Usage is the running total of a session: its cost at list price in cents, and the seconds it has been working.
 type Usage struct {
 	TotalCents    int
 	ActiveSeconds float64
+	// InputTokens is all the input the session has used, CachedTokens the part read from the prompt cache.
+	InputTokens  int64
+	CachedTokens int64
 }
 
 // Studio is what an assistant that works in the studio is told with a message.
@@ -73,9 +123,16 @@ type Studio struct {
 	ArticleID      string
 	Write          []string // the kinds the person ticked for this message
 	Grade          []string // those of Write that are first drafts, to be written as graded outcomes, in this order
-	Cards          []Card   // items the assistant has not seen yet
-	Changes        []Change // what the person changed since it last saw an item
-	Notes          []string // the brand's notes as "key: content", for a session's first message
+	// Rounds is how often the grader may send a draft back; 0 leaves it to the agent.
+	Rounds int
+	// Guides are the brand's own writing guides that the grader of this message's first drafts must know, by kind
+	// ("post", "article", "greeting").
+	Guides map[string]string
+	// Unchecked are first drafts that are not graded, because the brand's checks are off.
+	Unchecked []string
+	Cards     []Card   // items the assistant has not seen yet
+	Changes   []Change // what the person changed since it last saw an item
+	Notes     []string // the brand's notes as "key: content", for a session's first message
 }
 
 // Card is a draft's card as the assistant first sees it; Design is JSON with pictures as present or absent.
@@ -101,6 +158,9 @@ type Input struct {
 	Sources   []Source  // everything the conversation draws on, oldest first
 	// Restarted is true when an earlier session could not be continued: this one is new and has been given nothing.
 	Restarted bool
+	// Allowance is the most this reply may add to what the session has cost, in cents: what is left of the brand's and
+	// the server's monthly amounts. Nil is no limit but the conversation's own.
+	Allowance *int
 }
 
 // Event is progress while a reply is being written.

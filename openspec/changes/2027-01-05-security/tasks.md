@@ -33,4 +33,4 @@
 - [x] User guide, configuration, deployment and data model docs
 
 ## Release
-- [ ] Deploy (ask first)
+- [x] Deploy (ask first)

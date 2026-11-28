@@ -105,12 +105,12 @@ func (c *Chat) close(ctx context.Context, r *recorder) (ChatDetail, error) {
 
 // keepUnfinished stores the reply that did not finish: what happened and why it ended. Text the assistant had written is
 // not kept, since a reply that failed its checks must not be stored.
-func (c *Chat) keepUnfinished(ctx context.Context, convID string, seq int, r *recorder, cause error) error {
+func (c *Chat) keepUnfinished(ctx context.Context, convID string, seq int, r *recorder, cause error) (string, error) {
 	stopped := errors.Is(ctx.Err(), context.Canceled)
 	ctx = context.WithoutCancel(ctx) // the person is gone or has stopped; the record is still written
 	d, err := c.close(ctx, r)
 	if err != nil {
-		return err
+		return "", err
 	}
 	status, content := ReplyStopped, stoppedReply
 	if !stopped {
@@ -123,7 +123,7 @@ func (c *Chat) keepUnfinished(ctx context.Context, convID string, seq int, r *re
 	}
 	m, err := c.addReply(ctx, convID, seq, content, status, d)
 	if err != nil || r.convID == "" {
-		return err
+		return m.ID, err
 	}
-	return c.settle(ctx, convID, m.ID)
+	return m.ID, c.settle(ctx, convID, m.ID)
 }

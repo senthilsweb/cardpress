@@ -83,7 +83,7 @@ func (t *turn) isOurEcho(e wireEvent) bool {
 
 // progressFor says in a few words what a studio tool call is doing.
 var progressFor = map[string]string{
-	"get_draft": "Reading the draft", "get_design": "Reading the card", "list_drafts": "Looking at the drafts",
+	"get_draft": "Reading the draft", "get_writing_guide": "Reading the writing guide", "get_design": "Reading the card", "list_drafts": "Looking at the drafts",
 	"update_draft": "Saving the draft", "update_card_text": "Changing the words on the card", "create_draft": "Starting a draft",
 	"set_attachment": "Changing what the post carries", "fetch_source": "Reading a page", "list_memories": "Reading your notes",
 	"save_memory": "Keeping a note", "delete_memory": "Removing a note", "list_connections": "Checking connections",
@@ -167,7 +167,7 @@ func (t *turn) handle(e wireEvent) error {
 		case "retries_exhausted":
 			return fmt.Errorf("the agent kept failing and gave up%s", t.errSuffix())
 		case "budget_reached":
-			return errors.New("this conversation reached its spending limit, so the agent stopped. Start a new conversation")
+			return errBudgetReached
 		default: // end_turn, or anything that means "finished"
 			t.done = !t.graded || t.verdict != nil
 		}

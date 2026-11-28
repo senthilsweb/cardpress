@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SecuritySettings } from "./SecuritySettings";
-import { Bot, CircleUser, KeyRound, Loader2, Paintbrush, Palette, Plug, ShieldCheck, SwatchBook, Users } from "lucide-react";
+import { Bot, BotMessageSquare, CircleUser, NotebookPen, KeyRound, Loader2, Paintbrush, Palette, Plug, ShieldCheck, SwatchBook, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PanelDialog } from "@/components/ui/panel-dialog";
 import { Pane } from "@/components/ui/pane";
@@ -9,11 +9,14 @@ import { AccountSettings } from "@/components/studio/AccountSettings";
 import { ManageBrands, NewBrand } from "@/components/studio/Brands";
 import { SocialSettings } from "@/components/studio/SocialSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { AssistantSettings } from "./AssistantSettings";
+import { BrandAssistant } from "./BrandAssistant";
 import { BrandLook } from "./BrandLook";
 import { UsersSettings } from "./UsersSettings";
+import { WritingGuides } from "./WritingGuides";
 import { Guard } from "./guard";
 import { copyPictures } from "@/lib/assetRefs";
-import { api, type ApiInfo } from "@/lib/api";
+import { api } from "@/lib/api";
 import { blankDesign, brandColor, move, pickActive } from "@/lib/brands";
 import { Holds } from "@/lib/holds";
 import type { BrandDetails } from "@/lib/brandDetails";
@@ -25,7 +28,7 @@ import type { Design, Profile } from "@/lib/types";
 
 const ICONS: Record<SettingsSection, React.ReactNode> = {
   account: <CircleUser aria-hidden />, appearance: <SwatchBook aria-hidden />, "api-keys": <KeyRound aria-hidden />, brands: <Palette aria-hidden />,
-  look: <Paintbrush aria-hidden />, social: <Plug aria-hidden />, users: <Users aria-hidden />, security: <ShieldCheck aria-hidden />, assistant: <Bot aria-hidden />,
+  look: <Paintbrush aria-hidden />, social: <Plug aria-hidden />, "brand-assistant": <BotMessageSquare aria-hidden />, guides: <NotebookPen aria-hidden />, users: <Users aria-hidden />, security: <ShieldCheck aria-hidden />, assistant: <Bot aria-hidden />,
 };
 
 /** Where the dialog is: a page, and what its address asked for (a new brand, or whose look). */
@@ -161,12 +164,12 @@ export function SettingsHost({ onLeave }: { onLeave?: () => void }) {
           {shown.id === "account" && <AccountSettings parts={["profile", "password"]} />}
           {shown.id === "appearance" && <AppearanceSettings />}
           {shown.id === "api-keys" && <AccountSettings parts={["keys"]} />}
-          {(shown.id === "brands" || shown.id === "look" || shown.id === "social") && (
+          {(shown.id === "brands" || shown.id === "look" || shown.id === "social" || shown.id === "brand-assistant" || shown.id === "guides") && (
             <BrandPages section={shown.id} at={at} go={go} onChanged={() => { changed.current = true; }} />
           )}
           {shown.id === "users" && <UsersSettings />}
           {shown.id === "security" && <SecuritySettings />}
-          {shown.id === "assistant" && <AssistantPage />}
+          {shown.id === "assistant" && <AssistantSettings />}
         </div>
       </Guard.Provider>
     </PanelDialog>
@@ -187,7 +190,7 @@ async function readBrands(): Promise<Brands> {
 }
 
 /** The pages about brands. They read the brands from the server, and again after each change. */
-function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look" | "social"; at: At; go: (next: At, query?: string) => void; onChanged: () => void }) {
+function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look" | "social" | "brand-assistant" | "guides"; at: At; go: (next: At, query?: string) => void; onChanged: () => void }) {
   const [brands, setBrands] = useState<Brands | null>(null);
   const [error, setError] = useState<string | null>(null);
   // a copy started from the list
@@ -219,6 +222,8 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
   const current = brands.profiles.find((p) => p.id === brands.activeId) ?? brands.profiles[0];
 
   if (section === "social") return <SocialSettings profileId={current.id} brandName={current.name} onChanged={onChanged} />;
+  if (section === "brand-assistant") return <BrandAssistant key={current.id} profileId={current.id} brandName={current.name} />;
+  if (section === "guides") return <WritingGuides key={current.id} profileId={current.id} brandName={current.name} />;
   if (section === "look") {
     const id = brands.profiles.some((p) => p.id === at.look) ? at.look! : current.id;
     return <BrandLook key={id} profiles={brands.profiles} id={id} design={brands.designs[id]} onBack={() => go({ section: "brands" })} onChanged={() => { onChanged(); void sync(); }} />;
@@ -269,30 +274,5 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
       onRestore={(id) => changing(() => api.restoreProfile(id))}
       onDelete={(id) => changing(() => api.deleteProfile(id))}
       onNew={() => { setCopyOf(undefined); setAdding(true); }} />
-  );
-}
-
-/** Whether the assistant is connected. Read only: it is set up on the server (see the docs). */
-function AssistantPage() {
-  const [info, setInfo] = useState<ApiInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api.info().then(setInfo).catch((e) => setError(e instanceof Error ? e.message : "Could not load")); }, []);
-  const agent = info?.agent;
-  return (
-    <Pane>
-      <div className="space-y-3 text-sm">
-        {error && <p role="alert" className="text-destructive">{error}</p>}
-        {!info && !error && <p className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
-        {info && (
-          <dl className="grid grid-cols-[8rem_1fr] gap-y-2">
-            <dt className="text-muted-foreground">Status</dt>
-            <dd>{agent?.ready ? <span className="font-medium text-brand">Connected</span> : "Not set up"}</dd>
-            <dt className="text-muted-foreground">Name</dt><dd>{agent?.name ?? "None"}</dd>
-            <dt className="text-muted-foreground">Server</dt><dd>{info.name} {info.version}</dd>
-          </dl>
-        )}
-        <p className="text-xs text-muted-foreground">The assistant is set up on the server. It works for administrators, in their own brands.</p>
-      </div>
-    </Pane>
   );
 }

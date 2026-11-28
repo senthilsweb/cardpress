@@ -129,3 +129,53 @@ func TestAnAssistantsNewDraftHasAnEmptyCard(t *testing.T) {
 		t.Fatalf("%v %+v", err, card)
 	}
 }
+
+// A brand's checks decide whether a first draft is graded and how often it may be sent back. A first draft written
+// without a check is still the first: turning checks on later does not grade a second one.
+func TestABrandsChecks(t *testing.T) {
+	spy := &spyAgent{out: agent.Output{Reply: "Done."}}
+	c, ctx := newChat(t, spy, &fakeFetcher{}), context.Background()
+	c.Studio = New(c.db)
+	for _, id := range []string{"on", "off"} {
+		if _, err := c.db.Exec(`INSERT INTO profiles (id, owner_id, data, position, updated_at) VALUES (?, '', '{}', 0, '')`, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, emit := collect()
+	send := func(convID string, kinds ...string) *agent.Studio {
+		t.Helper()
+		if err := c.SendWith(ctx, convID, "Write it", ChatRequest{Write: kinds}, emit); err != nil {
+			t.Fatal(err)
+		}
+		return spy.inputs[len(spy.inputs)-1].Studio
+	}
+	set := func(id string, checks bool, rounds int) {
+		t.Helper()
+		if _, err := c.SetBrandAssistant(ctx, id, BrandAssistant{Tier: StandardTier, Checks: checks, Rounds: rounds, AlertPercent: 80}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// nothing saved: graded, three rounds
+	on, _ := c.Start(ctx, "on", "", "")
+	if st := send(on.ID, "post"); strings.Join(st.Grade, ",") != "post" || st.Rounds != 3 || len(st.Unchecked) != 0 {
+		t.Fatalf("the defaults: %+v", st)
+	}
+	set("on", true, 5)
+	if st := send(on.ID, "article"); strings.Join(st.Grade, ",") != "article" || st.Rounds != 5 {
+		t.Fatalf("the brand's rounds: %+v", st)
+	}
+
+	set("off", false, 3)
+	off, _ := c.Start(ctx, "off", "", "")
+	if st := send(off.ID, "post"); len(st.Grade) != 0 || strings.Join(st.Unchecked, ",") != "post" || strings.Join(st.Write, ",") != "post" {
+		t.Fatalf("checks off: %+v", st)
+	}
+	set("off", true, 3)
+	if st := send(off.ID, "post"); len(st.Grade) != 0 || len(st.Unchecked) != 0 {
+		t.Fatalf("a second draft is not graded once checks are on: %+v", st)
+	}
+	if st := send(off.ID, "article"); strings.Join(st.Grade, ",") != "article" {
+		t.Fatalf("a kind not yet written is graded: %+v", st)
+	}
+}

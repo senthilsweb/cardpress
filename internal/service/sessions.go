@@ -26,7 +26,12 @@ type SessionTimes struct {
 
 // SessionLimits are the longest a sign-in may go unused, and last in all.
 func (a *Accounts) SessionLimits(ctx context.Context) (idle, max time.Duration) {
+	now, mark := a.now(), a.cache.mark()
+	if idle, max, ok := a.cache.limits(now); ok {
+		return idle, max
+	}
 	s, _ := a.Security(ctx)
+	a.cache.keepLimits(mark, s.idle(), s.max(), now)
 	return s.idle(), s.max()
 }
 
@@ -67,29 +72,50 @@ func (a *Accounts) Session(ctx context.Context, token string, use bool) (User, S
 	if token == "" {
 		return User{}, none, ErrUnauthorized
 	}
-	var uid, created, seen string
-	err := a.db.QueryRowContext(ctx, `SELECT user_id, created_at, last_seen_at FROM sessions WHERE token_hash = ?`, tokenHash(token)).Scan(&uid, &created, &seen)
-	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, none, ErrUnauthorized
-	}
-	if err != nil {
-		return User{}, none, err
-	}
 	now := a.now().UTC()
 	idle, max := a.SessionLimits(ctx)
-	began, err1 := time.Parse(time.RFC3339, created)
-	last, err2 := time.Parse(time.RFC3339, seen)
-	if err1 != nil || err2 != nil || !now.Before(began.Add(max)) || !now.Before(last.Add(idle)) {
-		_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
-		return User{}, none, ErrUnauthorized
+	key := string(tokenHash(token))
+	over := func(began, last time.Time) bool { return !now.Before(began.Add(max)) || !now.Before(last.Add(idle)) }
+	e, kept := a.cache.get(key, now)
+	if kept && over(e.began, e.last) {
+		// what is kept says it has ended: look again before ending it, as another server may have seen it used
+		a.cache.drop(key)
+		kept = false
 	}
-	u, _, err := a.loadUser(ctx, `id = ?`, uid)
-	if err != nil || u.Status != "active" {
-		return User{}, none, ErrUnauthorized
+	if !kept {
+		mark := a.cache.mark()
+		var uid, created, seen string
+		err := a.db.QueryRowContext(ctx, `SELECT user_id, created_at, last_seen_at FROM sessions WHERE token_hash = ?`, tokenHash(token)).Scan(&uid, &created, &seen)
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, none, ErrUnauthorized
+		}
+		if err != nil {
+			return User{}, none, err
+		}
+		began, err1 := time.Parse(time.RFC3339, created)
+		last, err2 := time.Parse(time.RFC3339, seen)
+		if err1 != nil || err2 != nil || over(began, last) {
+			_, _ = a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash(token))
+			return User{}, none, ErrUnauthorized
+		}
+		u, _, err := a.loadUser(ctx, `id = ?`, uid)
+		if err != nil || u.Status != "active" {
+			return User{}, none, ErrUnauthorized
+		}
+		e = cachedSession{user: u, began: began, last: last}
+		a.cache.put(mark, key, e, now)
 	}
+	u, began, last := e.user, e.began, e.last
 	if use && now.Sub(last) >= useRecorded {
-		if _, err := a.db.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`, now.Format(time.RFC3339), tokenHash(token)); err == nil {
+		res, err := a.db.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?`, now.Format(time.RFC3339), tokenHash(token))
+		if err == nil {
+			if n, nerr := res.RowsAffected(); nerr == nil && n == 0 { // ended by someone else since it was read
+				a.cache.drop(key)
+				return User{}, none, ErrUnauthorized
+			}
 			last = now
+			// kept to the second, as the database has it
+			a.cache.used(key, now.Truncate(time.Second))
 		}
 	}
 	t := SessionTimes{Remaining: last.Add(idle).Sub(now), Limit: "idle"}

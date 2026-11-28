@@ -50,6 +50,8 @@ type AccountsOptions struct {
 	// SessionIdle ends a sign-in not used for this long (20 minutes if unset); SessionMax ends it however much it is
 	// used (12 hours if unset).
 	SessionIdle, SessionMax time.Duration
+	// SessionCache keeps a signed-in person in memory for this long (see sessioncache.go); 0 reads every request.
+	SessionCache time.Duration
 }
 
 // Accounts manages people, their roles and their sign-ins.
@@ -61,6 +63,8 @@ type Accounts struct {
 	mu       sync.Mutex
 	failures map[string]*failure // keyed by "email|address", and by the address alone
 	signups  map[string][]time.Time
+
+	cache sessionCache
 }
 
 type failure struct {
@@ -83,7 +87,7 @@ func NewAccounts(db *sql.DB, o AccountsOptions) *Accounts {
 	if o.SessionMax < o.SessionIdle {
 		o.SessionMax = o.SessionIdle
 	}
-	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}, signups: map[string][]time.Time{}}
+	return &Accounts{db: db, now: time.Now, opts: o, failures: map[string]*failure{}, signups: map[string][]time.Time{}, cache: sessionCache{ttl: o.SessionCache}}
 }
 
 func (a *Accounts) stamp() string { return a.now().UTC().Format(time.RFC3339) }
@@ -380,6 +384,7 @@ type ProfileInput struct {
 
 // UpdateProfile changes a person's own details.
 func (a *Accounts) UpdateProfile(ctx context.Context, id string, in ProfileInput) (User, error) {
+	defer a.cache.forget()
 	cur, err := a.Get(ctx, id)
 	if err != nil {
 		return User{}, err
@@ -397,6 +402,7 @@ func (a *Accounts) UpdateProfile(ctx context.Context, id string, in ProfileInput
 // SetRole gives a person one role in place of their others. The data model allows several; the screens use one. The last
 // administrator cannot lose the role.
 func (a *Accounts) SetRole(ctx context.Context, id, role string) (User, error) {
+	defer a.cache.forget()
 	if !ValidRole(role) {
 		return User{}, invalid("role must be admin, editor or writer")
 	}
@@ -435,6 +441,7 @@ func (a *Accounts) activeAdmins(ctx context.Context) (int, error) {
 
 // SetStatus disables or re-enables an account. A disabled person is signed out everywhere and cannot sign in.
 func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, error) {
+	defer a.cache.forget()
 	if status != "active" && status != "disabled" {
 		return User{}, invalid("status must be active or disabled")
 	}
@@ -461,6 +468,7 @@ func (a *Accounts) SetStatus(ctx context.Context, id, status string) (User, erro
 
 // SetPassword sets a new password for someone (an administrator's action, or the command line) and signs them out everywhere.
 func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
+	defer a.cache.forget()
 	u, err := a.Get(ctx, id)
 	if err != nil {
 		return err
@@ -486,6 +494,7 @@ func (a *Accounts) SetPassword(ctx context.Context, id, password string) error {
 
 // ChangePassword changes your own password. It needs the current one, and signs you out on every other device.
 func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepToken string) error {
+	defer a.cache.forget()
 	u, hash, err := a.loadUser(ctx, `id = ?`, id)
 	if err != nil {
 		return err
@@ -510,6 +519,7 @@ func (a *Accounts) ChangePassword(ctx context.Context, id, current, next, keepTo
 
 // ResetPasswordByEmail sets a random password for the person with this email and returns it, for the command line.
 func (a *Accounts) ResetPasswordByEmail(ctx context.Context, email string) (string, error) {
+	defer a.cache.forget()
 	u, _, err := a.loadUser(ctx, `email = ?`, strings.ToLower(strings.TrimSpace(email)))
 	if err != nil {
 		return "", err
@@ -651,6 +661,7 @@ func (a *Accounts) Login(ctx context.Context, email, password, addr string) (Use
 
 // Logout ends one session.
 func (a *Accounts) Logout(ctx context.Context, token string) error {
+	defer a.cache.forget()
 	var email string
 	if a.db.QueryRowContext(ctx, `SELECT u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, tokenHash(token)).Scan(&email) == nil {
 		a.record(ctx, EventSignOut, email, "")
@@ -661,6 +672,7 @@ func (a *Accounts) Logout(ctx context.Context, token string) error {
 
 // LogoutEverywhere ends every session of a person.
 func (a *Accounts) LogoutEverywhere(ctx context.Context, userID string) error {
+	defer a.cache.forget()
 	_, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
 	return err
 }

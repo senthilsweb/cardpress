@@ -11,11 +11,11 @@ describe("settings sections", () => {
 
   it("shows a person only the pages they may open", () => {
     const editor = visibleSections(true, (p) => p !== "users").map((s) => s.id);
-    expect(editor).toEqual(["account", "appearance", "api-keys", "brands", "look", "social"]);
+    expect(editor).toEqual(["account", "appearance", "api-keys", "brands", "look", "social", "guides"]);
     const admin = visibleSections(true, () => true).map((s) => s.id);
-    expect(admin).toEqual(["account", "appearance", "api-keys", "brands", "look", "social", "users", "security", "assistant"]);
+    expect(admin).toEqual(["account", "appearance", "api-keys", "brands", "look", "social", "brand-assistant", "guides", "users", "security", "assistant"]);
     // without accounts there is no person: no account, keys or users pages
-    expect(visibleSections(false, (p) => p !== "users").map((s) => s.id)).toEqual(["appearance", "brands", "look", "social"]);
+    expect(visibleSections(false, (p) => p !== "users").map((s) => s.id)).toEqual(["appearance", "brands", "look", "social", "guides"]);
   });
 
   it("sends the old drawer addresses to their pages", () => {

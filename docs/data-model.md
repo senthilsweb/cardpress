@@ -82,14 +82,18 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 
 | Table | Migration | Columns |
 |---|---|---|
-| `conversations` | 0005, 0011, 0017, 0022 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `graded` (kinds whose first draft was checked), `seen` (each item as the assistant last saw it), `created_at`, `updated_at` |
+| `conversations` | 0005, 0011, 0017, 0022 | `id` (PK), `user_id`, `profile_id`, `title`, `session_id`, `source_kind`, `source_url`, `source_title`, `source_text`, `source_truncated`, `post_draft_id`, `article_draft_id`, `graded` (kinds whose first draft was checked), `seen` (each item as the assistant last saw it), `tier` (0031), `created_at`, `updated_at` |
 | `agent_memories` | 0019 | `profile_id`, `key` (PK together), `content`, `created_by`, `created_at`, `updated_at` |
 | `draft_versions.revision` | 0021 | the state of the draft a version holds |
-| `chat_usage` | 0020 | `id` (PK), `conversation_id`, `message_id`, `session_id`, `total_cents` (the session's running total), `added_cents`, `active_seconds`, `created_at` |
+| `chat_usage` | 0020 | `id` (PK), `conversation_id`, `message_id`, `session_id`, `total_cents` (the session's running total), `added_cents`, `active_seconds`, `created_at`, `total_input`, `total_cached`, `added_input`, `added_cached` (0033: input tokens, and those read from the prompt cache) |
 | `conversation_sources` | 0018 | `id` (PK), `conversation_id`, `message_id`, `kind` (`url`, `text`, `md`, `docx`, `pdf`), `name`, `url`, `chars`, `truncated`, `text`, `data` (a PDF as attached), `delivered`, `created_at` |
 | `chat_messages` | 0005 | `id` (PK), `conversation_id`, `seq`, `role` (`user` or `assistant`), `content`, `created_at`, `status` (`done`, `failed` or `stopped`), `detail` (JSON: steps, items changed, check results, error). Unique `(conversation_id, seq)` |
 | `chat_changes` | 0025 | `id` (PK), `conversation_id`, `message_id`, `draft_id`, `before` (JSON, held while it can be undone), `before_revision`, `after_revision`, `status` (`open`, `pending`, `saved`, `undone`, `passed`), `version`, `created_at` |
 | `choices` | 0025 | `id` (PK), `conversation_id`, `message_id`, `draft_id`, `field`, `options` (JSON, recommended first), `status` (`pending`, `chosen`, `dismissed`, `superseded`), `chosen`, `created_at`, `decided_at` |
+| `brand_assistant` | 0029 | `profile_id` (PK), `data` (JSON: tier, checks, rounds, monthly amount, alert), `updated_by`, `updated_at` |
+| `assistant_spend` | 0030 | `profile_id`, `month` (PK together), `cents`: the month's cost at list price. Kept when conversations or brands are deleted |
+| `budget_alerts` | 0030 | `scope` (a brand, or `*` for the server), `month`, `level` (`alert` or `used`) (PK together), `at` |
+| `brand_guides` | 0032 | `profile_id`, `kind` (`post`, `article`, `greeting`), `version` (PK together), `body` (empty: our house style), `created_by`, `created_at` |
 | `proposals` | 0005 | `id` (PK), `conversation_id`, `message_id`, `kind`, `title`, `body`, `hashtags`, `alt_text`, `rationale`, `status` (`pending`, `approved`, `rejected`), `edited`, `original`, `draft_id`, `created_at`, `decided_at` |
 
 ### Outside agents
@@ -130,6 +134,11 @@ A job is a snapshot: its `body`, `hashtags`, `alt_text` and `image` are copied w
 | 0026 | `brand_details` |
 | 0027 | `assets`, `asset_blobs` |
 | 0028 | `security_events` |
+| 0029 | `brand_assistant` |
+| 0030 | `assistant_spend`, `budget_alerts` |
+| 0031 | `conversations.tier` |
+| 0032 | `brand_guides` |
+| 0033 | `chat_usage`: input and cached input tokens |
 
 ## A post's own file
 

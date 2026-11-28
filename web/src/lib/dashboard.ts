@@ -1,14 +1,15 @@
+import type { BudgetStatus } from "./brandAssistant";
 /** The dashboard's figures, as `GET /dashboard` gives them, and how they are written. */
 
 export interface Counts { total: number; draft: number; approved: number; scheduled: number; published: number; attention: number; pages: number }
 export interface DashboardItem { type: "job" | "draft"; id: string; draftId?: string; profileId: string; kind: "post" | "article"; status: string; title: string; at: string }
 export interface Spend { start: string; costCents: number; replies: number }
-export interface SessionSpend { conversationId: string; profileId: string; title: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
-export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
+export interface SessionSpend { conversationId: string; profileId: string; title: string; /** The tier the conversation runs on, when it has one. */ tier?: string; costCents: number; replies: number; activeSeconds: number; lastAt: string }
+export interface Usage { costCents: number; sessions: number; replies: number; activeSeconds: number; /** All input, and the part read from the prompt cache. */ inputTokens?: number; cachedTokens?: number; bucket: "day" | "week"; series: Spend[]; largest: SessionSpend[] }
 export interface BrandSummary { id: string; posts: Counts; articles: Counts; costCents: number; sessions: number }
 /** The person's figures over everything they may open. `users` is told to an admin only. */
 export interface Totals { brands: number; users?: number; disabledUsers?: number; costCents: number }
-export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage }
+export interface Dashboard { totals: Totals; /** The days covered; empty for all time. */ period: { from?: string; to?: string }; brands: BrandSummary[]; posts: Counts; articles: Counts; next: DashboardItem[]; recent: DashboardItem[]; usage: Usage; /** Where the brand's monthly amount for the assistant stands, when it has one. */ budget?: BudgetStatus }
 
 /** `short` is for a phone, where the periods share one line. */
 export const PERIODS = [{ days: 7, label: "7 days", short: "7d" }, { days: 30, label: "30 days", short: "30d" }, { days: 90, label: "90 days", short: "90d" }, { days: 0, label: "All", short: "All" }] as const;
@@ -98,3 +99,9 @@ export function statusRows(kind: "post" | "article", c: Counts): { label: string
     ...(c.attention ? [{ label: "Needs a look", count: c.attention }] : []),
   ];
 }
+
+/** A tier's id as a name: "strong" is "Strong". */
+export const tierLabel = (id?: string) => (id ? id[0].toUpperCase() + id.slice(1) : "–");
+
+/** How much of the input came from the prompt cache, or null when nothing says. */
+export const cachedShare = (u: { inputTokens?: number; cachedTokens?: number }) => (u.inputTokens ? `${Math.round(((u.cachedTokens ?? 0) * 100) / u.inputTokens)}%` : null);

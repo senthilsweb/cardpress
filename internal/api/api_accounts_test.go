@@ -766,3 +766,195 @@ func TestMediaLibraryAccess(t *testing.T) {
 		t.Fatalf("files left behind: %d %v", n, err)
 	}
 }
+
+// How the assistant works for a brand is read by whoever may see the brand and changed by an administrator signed in to
+// the app: not by the brand's owner, and not by a key.
+func TestBrandAssistant(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, other := r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	other.mustSignup("other@example.com", "Other")
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatalf("a brand: %d", code)
+	}
+	const path = "/api/v1/profiles/acme/assistant"
+	var got service.BrandAssistantView
+	want := service.BrandAssistant{Tier: "standard", Checks: true, Rounds: 3, AlertPercent: 80}
+	if code := ed.json("GET", path, "", &got); code != 200 || got.Saved || got.Settings != want || got.Defaults != want || len(got.Tiers) != 1 {
+		t.Fatalf("a new brand is on the defaults: %d %+v", code, got)
+	}
+	in := `{"tier":"standard","checks":false,"rounds":5,"monthCents":2500,"alertPercent":70}`
+	if code := ed.do("PUT", path, in).Code; code != 403 {
+		t.Errorf("the owner changes: %d", code)
+	}
+	if code := other.do("GET", path, "").Code; code != 404 {
+		t.Errorf("another person reads: %d", code)
+	}
+	if code := r.browser(t).do("GET", path, "").Code; code != 401 {
+		t.Errorf("nobody signed in reads: %d", code)
+	}
+	var made struct{ Secret string }
+	if code := admin.json("POST", "/api/v1/api-keys", `{"name":"k"}`, &made); code != 201 {
+		t.Fatal(code)
+	}
+	if code := r.bearer(t, made.Secret).do("PUT", path, in).Code; code != 403 {
+		t.Errorf("an administrator's key changes: %d", code)
+	}
+	if code := admin.json("PUT", path, in, &got); code != 200 || !got.Saved || got.Settings != (service.BrandAssistant{Tier: "standard", Rounds: 5, MonthCents: 2500, AlertPercent: 70}) {
+		t.Fatalf("saved: %d %+v", code, got)
+	}
+	if code := ed.json("GET", path, "", &got); code != 200 || got.Settings.MonthCents != 2500 {
+		t.Errorf("the owner reads what was saved: %d %+v", code, got)
+	}
+	for _, bad := range []string{
+		`{"tier":"best","checks":true,"rounds":3,"alertPercent":80}`, `{"tier":"standard","rounds":0,"alertPercent":80}`,
+		`{"tier":"standard","rounds":6,"alertPercent":80}`, `{"tier":"standard","rounds":3,"alertPercent":40}`,
+		`{"tier":"standard","rounds":3,"alertPercent":80,"monthCents":-1}`, `{"tier":"standard","rounds":3,"alertPercent":80,"monthCents":100001}`,
+	} {
+		if code := admin.do("PUT", path, bad).Code; code != 400 {
+			t.Errorf("%s: %d", bad, code)
+		}
+	}
+	if code := admin.do("PUT", "/api/v1/profiles/nothing/assistant", in).Code; code != 404 {
+		t.Errorf("a brand that is not there: %d", code)
+	}
+	var log struct{ Events []service.SecurityEvent }
+	if code := admin.json("GET", "/api/v1/security/log", "", &log); code != 200 || len(log.Events) == 0 ||
+		log.Events[0].Event != service.EventAssistant || log.Events[0].Subject != "Acme" || !strings.Contains(log.Events[0].Detail, "25.00 a month, alert 70%") {
+		t.Errorf("the log: %d %+v", code, log.Events)
+	}
+	if code := admin.json("DELETE", path, "", &got); code != 200 || got.Saved || got.Settings != want {
+		t.Fatalf("defaults again: %d %+v", code, got)
+	}
+	// gone with the brand
+	admin.do("PUT", path, in)
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"keep","name":"Keep"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	ed.do("POST", "/api/v1/profiles/acme/archive", "")
+	if code := ed.do("DELETE", "/api/v1/profiles/acme", "").Code; code >= 300 {
+		t.Fatalf("delete: %d", code)
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM brand_assistant`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("settings left behind: %d %v", n, err)
+	}
+}
+
+// The server's amount for the assistant is an administrator's, signed in to the app; a brand out of budget answers 402
+// before anything is sent, and the dashboard shows where the brand stands.
+func TestAssistantBudget(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed := r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	var got service.AssistantView
+	if code := admin.json("GET", "/api/v1/assistant", "", &got); code != 200 || got.Saved || got.Settings.MonthCents != 0 {
+		t.Fatalf("as started: %d %+v", code, got)
+	}
+	if code := ed.do("GET", "/api/v1/assistant", "").Code; code != 403 {
+		t.Errorf("an editor reads: %d", code)
+	}
+	if code := ed.do("PUT", "/api/v1/assistant", `{"monthCents":5}`).Code; code != 403 {
+		t.Errorf("an editor changes: %d", code)
+	}
+	var made struct{ Secret string }
+	if code := admin.json("POST", "/api/v1/api-keys", `{"name":"k"}`, &made); code != 201 {
+		t.Fatal(code)
+	}
+	if code := r.bearer(t, made.Secret).do("PUT", "/api/v1/assistant", `{"monthCents":5}`).Code; code != 403 {
+		t.Errorf("a key changes: %d", code)
+	}
+	if code := admin.do("PUT", "/api/v1/assistant", `{"monthCents":-1}`).Code; code != 400 {
+		t.Errorf("a negative amount: %d", code)
+	}
+	if code := admin.json("PUT", "/api/v1/assistant", `{"monthCents":5000}`, &got); code != 200 || !got.Saved || got.Budget.MonthCents != 5000 {
+		t.Fatalf("saved: %d %+v", code, got)
+	}
+	if code := admin.json("DELETE", "/api/v1/assistant", "", &got); code != 200 || got.Saved {
+		t.Fatalf("defaults: %d %+v", code, got)
+	}
+
+	// a brand whose amount is spent
+	if code := admin.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	if code := admin.do("PUT", "/api/v1/profiles/acme/assistant", `{"tier":"standard","checks":true,"rounds":3,"monthCents":100,"alertPercent":80}`).Code; code != 200 {
+		t.Fatal(code)
+	}
+	if _, err := r.db.Exec(`INSERT INTO assistant_spend (profile_id, month, cents) VALUES ('acme', ?, 100)`, time.Now().UTC().Format("2006-01")); err != nil {
+		t.Fatal(err)
+	}
+	var conv service.Conversation
+	if code := admin.json("POST", "/api/v1/chat/conversations", `{"profileId":"acme","text":"`+strings.Repeat("An article about budgets. ", 8)+`"}`, &conv); code != 201 {
+		t.Fatalf("start %d", code)
+	}
+	res := admin.do("POST", "/api/v1/chat/conversations/"+conv.ID+"/messages", `{"content":"Write it"}`)
+	if res.Code != 402 || !strings.Contains(res.Body.String(), "budget_used") || !strings.Contains(res.Body.String(), "This brand's assistant budget") {
+		t.Fatalf("out of budget: %d %s", res.Code, res.Body)
+	}
+	var dash service.Dashboard
+	if code := admin.json("GET", "/api/v1/dashboard?profileId=acme&days=7", "", &dash); code != 200 || dash.Budget == nil || dash.Budget.Level != service.BudgetUsed || dash.Budget.SpentCents != 100 {
+		t.Fatalf("the dashboard: %d %+v", code, dash.Budget)
+	}
+}
+
+// A brand's writing guides belong to its owner and the administrators, signed in to the app.
+func TestBrandGuides(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, other := r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	other.mustSignup("other@example.com", "Other")
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	const path = "/api/v1/profiles/acme/guides"
+	var v service.GuidesView
+	if code := ed.json("PUT", path+"/post", `{"body":"Plain words."}`, &v); code != 200 || v.Guides[0].Body != "Plain words." || v.Guides[0].UpdatedBy != "ed@example.com" {
+		t.Fatalf("the owner saves: %d %+v", code, v)
+	}
+	if code := admin.json("PUT", path+"/post", `{"body":"Plainer words."}`, &v); code != 200 || v.Guides[0].Version != 2 {
+		t.Fatalf("an administrator saves: %d", code)
+	}
+	if code := ed.json("POST", path+"/post/versions/1/restore", "", &v); code != 200 || v.Guides[0].Body != "Plain words." {
+		t.Fatalf("restore: %d %+v", code, v)
+	}
+	for name, c := range map[string]int{
+		"another reads":    other.do("GET", path, "").Code,
+		"another saves":    other.do("PUT", path+"/post", `{"body":"x"}`).Code,
+		"another restores": other.do("POST", path+"/post/versions/1/restore", "").Code,
+		"another history":  other.do("GET", path+"/post/versions", "").Code,
+	} {
+		if c != 404 {
+			t.Errorf("%s: %d", name, c)
+		}
+	}
+	var made struct{ Secret string }
+	if code := ed.json("POST", "/api/v1/api-keys", `{"name":"k"}`, &made); code != 201 {
+		t.Fatal(code)
+	}
+	if code := r.bearer(t, made.Secret).do("PUT", path+"/post", `{"body":"x"}`).Code; code != 403 {
+		t.Errorf("the owner's key saves: %d", code)
+	}
+	if code := ed.do("PUT", path+"/post", `{"body":"<studio>"}`).Code; code != 400 {
+		t.Errorf("tags: %d", code)
+	}
+	var hist struct{ Versions []service.GuideVersion }
+	if code := ed.json("GET", path+"/post/versions", "", &hist); code != 200 || len(hist.Versions) != 3 {
+		t.Fatalf("history: %d %+v", code, hist)
+	}
+	// gone with the brand
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"keep","name":"Keep"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	ed.do("POST", "/api/v1/profiles/acme/archive", "")
+	if code := ed.do("DELETE", "/api/v1/profiles/acme", "").Code; code >= 300 {
+		t.Fatalf("delete: %d", code)
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM brand_guides`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("guides left behind: %d %v", n, err)
+	}
+}

@@ -45,24 +45,29 @@ type Spend struct {
 
 // SessionSpend is what one assistant session cost in the period.
 type SessionSpend struct {
-	ConversationID string  `json:"conversationId"`
-	ProfileID      string  `json:"profileId"`
-	Title          string  `json:"title"`
-	CostCents      int     `json:"costCents"`
-	Replies        int     `json:"replies"`
-	ActiveSeconds  float64 `json:"activeSeconds"`
-	LastAt         string  `json:"lastAt"`
+	ConversationID string `json:"conversationId"`
+	ProfileID      string `json:"profileId"`
+	Title          string `json:"title"`
+	// Tier is the tier the conversation runs on; empty when it has none.
+	Tier          string  `json:"tier,omitempty"`
+	CostCents     int     `json:"costCents"`
+	Replies       int     `json:"replies"`
+	ActiveSeconds float64 `json:"activeSeconds"`
+	LastAt        string  `json:"lastAt"`
 }
 
 // Usage is the assistant's cost and work in the period. Cost is the list price the agent service reports.
 type Usage struct {
-	CostCents     int            `json:"costCents"`
-	Sessions      int            `json:"sessions"`
-	Replies       int            `json:"replies"`
-	ActiveSeconds float64        `json:"activeSeconds"`
-	Bucket        string         `json:"bucket"` // "day" or "week"
-	Series        []Spend        `json:"series"`
-	Largest       []SessionSpend `json:"largest"`
+	CostCents     int     `json:"costCents"`
+	Sessions      int     `json:"sessions"`
+	Replies       int     `json:"replies"`
+	ActiveSeconds float64 `json:"activeSeconds"`
+	// InputTokens is the input of the replies that say it, CachedTokens the part that came from the prompt cache.
+	InputTokens  int64          `json:"inputTokens"`
+	CachedTokens int64          `json:"cachedTokens"`
+	Bucket       string         `json:"bucket"` // "day" or "week"
+	Series       []Spend        `json:"series"`
+	Largest      []SessionSpend `json:"largest"`
 }
 
 // BrandSummary is one brand's line.
@@ -99,6 +104,8 @@ type Dashboard struct {
 	Next     []DashboardItem `json:"next"`
 	Recent   []DashboardItem `json:"recent"`
 	Usage    Usage           `json:"usage"`
+	// Budget is where the brand's monthly amount for the assistant stands, for one brand that has an amount.
+	Budget *BudgetStatus `json:"budget,omitempty"`
 }
 
 // DashboardQuery says whose figures and for how long: the last Days days (0: all), or From to To. Items are counted by
@@ -151,6 +158,13 @@ func (l *Library) Dashboard(ctx context.Context, q DashboardQuery, now time.Time
 			return out, err
 		}
 		ids = []string{q.ProfileID}
+		b, err := brandBudget(ctx, l.db, q.ProfileID, now)
+		if err != nil {
+			return out, err
+		}
+		if b.MonthCents > 0 {
+			out.Budget = &b
+		}
 	}
 
 	for _, id := range ids {
@@ -322,7 +336,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 	for i, id := range ids {
 		args[i] = id
 	}
-	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, u.session_id, u.added_cents, u.active_seconds, u.created_at
+	rs, err := l.db.QueryContext(ctx, `SELECT c.profile_id, c.id, c.title, c.tier, u.session_id, u.added_cents, u.active_seconds, u.created_at, u.added_input, u.added_cached
 		FROM chat_usage u JOIN conversations c ON c.id = u.conversation_id
 		WHERE c.profile_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")+`) ORDER BY u.created_at, u.rowid`, args...)
 	if err != nil {
@@ -339,10 +353,11 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 	brandCost, brandSessions := map[string]int{}, map[string]map[string]bool{}
 	first := time.Time{}
 	for rs.Next() {
-		var pid, conv, title, sid, created string
+		var pid, conv, title, tier, sid, created string
 		var cents int
 		var seconds float64
-		if err := rs.Scan(&pid, &conv, &title, &sid, &cents, &seconds, &created); err != nil {
+		var input, cached int64
+		if err := rs.Scan(&pid, &conv, &title, &tier, &sid, &cents, &seconds, &created, &input, &cached); err != nil {
 			return err
 		}
 		at, err := time.Parse(time.RFC3339, created)
@@ -359,7 +374,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 		}
 		s := sessions[key]
 		if s == nil {
-			s = &session{SessionSpend: SessionSpend{ConversationID: conv, ProfileID: pid, Title: title}, before: before[key]}
+			s = &session{SessionSpend: SessionSpend{ConversationID: conv, ProfileID: pid, Title: title, Tier: tier}, before: before[key]}
 			sessions[key] = s
 			order = append(order, key)
 		}
@@ -368,6 +383,7 @@ func (l *Library) usage(ctx context.Context, out *Dashboard, ids []string, perio
 		s.upTo = max(s.upTo, seconds)
 		s.LastAt = at.UTC().Format(time.RFC3339)
 		u.CostCents += cents
+		u.InputTokens, u.CachedTokens = u.InputTokens+input, u.CachedTokens+cached
 		u.Replies++
 		brandCost[pid] += cents
 		if brandSessions[pid] == nil {

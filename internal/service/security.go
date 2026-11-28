@@ -100,6 +100,7 @@ func (a *Accounts) SecurityDefaults() SecuritySettings { return a.securityDefaul
 
 // SetSecurity saves new settings. They apply at once, to open sessions too.
 func (a *Accounts) SetSecurity(ctx context.Context, s SecuritySettings) error {
+	defer a.cache.forget()
 	if err := s.check(); err != nil {
 		return err
 	}
@@ -125,6 +126,7 @@ func openOrClosed(open bool) string {
 
 // ResetSecurity removes the saved settings, so the server's starting values apply.
 func (a *Accounts) ResetSecurity(ctx context.Context) error {
+	defer a.cache.forget()
 	_, err := a.db.ExecContext(ctx, `DELETE FROM preferences WHERE key = ?`, prefSecurity)
 	if err == nil {
 		a.record(ctx, EventSettingsReset, "", "")
@@ -145,6 +147,7 @@ func (a *Accounts) ActiveSessions(ctx context.Context) (int, error) {
 // SignOutEveryone ends every session but the one with keepToken, and says how many ended. API keys are not sessions and
 // keep working.
 func (a *Accounts) SignOutEveryone(ctx context.Context, keepToken string) (int, error) {
+	defer a.cache.forget()
 	res, err := a.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash <> ?`, tokenHash(keepToken))
 	if err != nil {
 		return 0, err

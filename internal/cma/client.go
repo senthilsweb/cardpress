@@ -17,7 +17,13 @@ type Client struct {
 	api     sessionAPI
 	m       Manifest
 	timeout time.Duration
+	budget  int // spend cap per conversation in cents; 0 = none
 }
+
+// errBudgetReached is the session stopping at its spending limit.
+var errBudgetReached = errors.New("the session reached its spending limit")
+
+const conversationLimit = "this conversation reached its spending limit, so the agent stopped. Start a new conversation"
 
 // DefaultTimeout bounds one reply. A graded article takes several minutes.
 const DefaultTimeout = 12 * time.Minute
@@ -32,7 +38,7 @@ func New(cfg Config, timeout time.Duration) (*Client, error) {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	return &Client{api: newSDKAPI(cfg), m: cfg.Manifest, timeout: timeout}, nil
+	return &Client{api: newSDKAPI(cfg), m: cfg.Manifest, timeout: timeout, budget: cfg.BudgetCents}, nil
 }
 
 // Name and IsAI let the screen say what is answering, and that the conversation goes to Anthropic.
@@ -43,9 +49,49 @@ func (c *Client) Ready() bool  { return true }
 // Versions are the coordinator's version and the content schema's, as the manifest gives them.
 func (c *Client) Versions() (string, int) { return c.m.AgentVersion, c.m.SchemaVersion }
 
-// CreateSession starts a managed session for one conversation.
+// SessionUsage is what a session has cost so far.
+func (c *Client) SessionUsage(ctx context.Context, sessionID string) (agent.Usage, error) {
+	return c.api.usage(ctx, sessionID)
+}
+
+// CreateSession starts a managed session for one conversation, on the default tier.
 func (c *Client) CreateSession(ctx context.Context) (string, error) {
-	return c.api.newSession(ctx, "CardPress conversation")
+	return c.CreateSessionOn(ctx, "")
+}
+
+// CreateSessionOn starts a managed session on a tier's agents; the default tier for one that is not on offer.
+func (c *Client) CreateSessionOn(ctx context.Context, tier string) (string, error) {
+	t := c.m.tier(tier)
+	return c.api.newSession(ctx, "CardPress conversation", t.AgentID, t.AgentVersion)
+}
+
+// Tiers are the sets of agents the manifest offers, the default first.
+func (c *Client) Tiers() []agent.Tier {
+	var out []agent.Tier
+	for _, t := range c.m.tiers() {
+		tier := agent.Tier{ID: t.ID, Name: t.Name}
+		for _, m := range t.Models {
+			tier.Models = append(tier.Models, agent.TierModel{Role: m.Role, Model: m.Model})
+		}
+		out = append(out, tier)
+	}
+	return out
+}
+
+// GuideBases are our house styles and fixed rules, as the manifest gives them.
+func (c *Client) GuideBases() map[string]agent.GuideBase {
+	out := map[string]agent.GuideBase{}
+	for kind, g := range c.m.Guides {
+		out[kind] = agent.GuideBase{Ours: g.Ours, Fixed: g.Fixed}
+	}
+	return out
+}
+
+// CheckGuide asks a small model whether a brand's guide only describes how to write.
+func (c *Client) CheckGuide(ctx context.Context, kind, body string) (bool, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, guideCheckTimeout)
+	defer cancel()
+	return c.api.checkGuide(ctx, kind, body)
 }
 
 // Respond sends the person's newest message with its context and follows the session until the agent has finished. Each
@@ -84,6 +130,34 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return agent.Output{}, agent.ErrSessionGone
 		}
 		return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
+	}
+	// what is left of the brand's or the server's amount becomes the session's limit for this reply, under the
+	// conversation's own. The service stops the session there; the request that crosses it still completes.
+	allowed := false // true when it is the allowance, not the conversation's limit, that this reply would stop at
+	if in.Allowance != nil {
+		used, limit, err := c.api.budget(ctx, sid)
+		if err != nil {
+			if errors.Is(err, errSessionGone) {
+				return agent.Output{}, agent.ErrSessionGone
+			}
+			return agent.Output{}, fmt.Errorf("could not read the session: %w", err)
+		}
+		target := used + *in.Allowance
+		if c.budget > 0 && c.budget <= target {
+			target = c.budget
+		} else {
+			allowed = true
+		}
+		switch {
+		case target <= used && allowed:
+			return agent.Output{}, agent.ErrBudget
+		case target <= used:
+			return agent.Output{}, errors.New(conversationLimit)
+		case limit > 0 && limit != target: // a session made without a limit cannot be given one
+			if err := c.api.setBudget(ctx, sid, target); err != nil {
+				return agent.Output{}, fmt.Errorf("could not set the session's spending limit: %w", err)
+			}
+		}
 	}
 	fresh := !slices.ContainsFunc(hist, func(e wireEvent) bool { return e.Type == "user.message" || e.Type == "user.define_outcome" })
 	var earlier []agent.Message
@@ -148,7 +222,12 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			h = nil
 		}
 		description := contextBlocks(in, []string{kind}, in.Sources, h, i == 0, i == 0 && fresh) + "\n" + text + "\n\n" + o.Description
-		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, o.Rubric, o.MaxIterations) }, kind); err != nil {
+		rounds := o.MaxIterations
+		if in.Studio.Rounds > 0 { // the brand's own number
+			rounds = in.Studio.Rounds
+		}
+		rubric := withGuides(o.Rubric, kind, in.Studio.Guides)
+		if err = run(func() (string, error) { return c.api.sendOutcome(ctx, sid, description, rubric, rounds) }, kind); err != nil {
 			break
 		}
 	}
@@ -162,6 +241,12 @@ func (c *Client) Respond(ctx context.Context, in agent.Input, emit func(agent.Ev
 			return agent.Output{}, fmt.Errorf("the agent took longer than %s and was stopped", c.timeout.Round(time.Second))
 		}
 		return agent.Output{}, ctx.Err()
+	}
+	if errors.Is(err, errBudgetReached) {
+		if allowed {
+			return agent.Output{}, agent.ErrBudget
+		}
+		return agent.Output{}, errors.New(conversationLimit)
 	}
 	if err != nil {
 		return agent.Output{}, err

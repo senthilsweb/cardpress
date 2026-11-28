@@ -30,6 +30,7 @@ Settings come from environment variables, with a few command-line flags. With Do
 | `CARDPRESS_MEDIA_BRAND_MB` | How many MB of files each brand's media library may hold. Default `200` |
 | `CARDPRESS_SIGNUP` | `closed` stops self sign-up once the first account exists (admins add people). Default `open` |
 | `CARDPRESS_SESSION_IDLE` | A sign-in ends after this long without use (`5m` to `24h`). Default `20m` |
+| `CARDPRESS_SESSION_CACHE` | `on` (default) keeps a signed-in person and their role in memory for up to 30 seconds, so each request does not read them; a change made in the app takes effect at once. `off` when more than one server uses the database |
 | `CARDPRESS_SESSION_MAX` | A sign-in ends after this long however much it is used (`15m` to `720h`). Default `12h` |
 | `CARDPRESS_CLIENT_IP_HEADER` | Behind a proxy, the header it sets with the visitor's address, used to count failed sign-ins (Fly: `Fly-Client-IP`). Set it only when a proxy always overwrites that header |
 | `CARDPRESS_ADMIN_EMAIL` | If set, only this email can create the first (admin) account. Set it on a server reachable from the internet |
@@ -60,6 +61,7 @@ Credentials can also come from environment variables instead of the app; see [So
 | `CARDPRESS_AGENT` | `off` | `off` or `cma` ([Claude Managed Agent](cma-agent.md)) |
 | `CARDPRESS_AGENT_MANIFEST` | | The agent manifest: a file, an https address or the JSON |
 | `CARDPRESS_AGENT_BUDGET_CENTS` | `200` | Spend cap per conversation, in US cents; `0` = none |
+| `CARDPRESS_AGENT_MONTH_CENTS` | | Spend cap for every brand together in a calendar month, in US cents. A saved amount under Settings → Assistant replaces it |
 | `CARDPRESS_AGENT_TIMEOUT` | `12m` | Longest wait for one reply (10s to 30m) |
 | `ANTHROPIC_API_KEY` | | Used to reach the agents |
 | `ANTHROPIC_WORKSPACE_ID` | | For a key that covers several workspaces |

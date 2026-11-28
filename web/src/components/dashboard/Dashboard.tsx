@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { BudgetBar } from "@/components/settings/BudgetBar";
 import { readPref, savePref } from "@/lib/prefs";
 import { CircleAlert, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +16,7 @@ import { BootScreen } from "@/components/studio/BootScreen";
 import { SessionProvider } from "@/components/studio/SessionProvider";
 import { CostChart } from "./CostChart";
 import { api } from "@/lib/api";
-import { duration, money, periodLabel, PERIODS, readPeriod, statusRows, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
+import { cachedShare, duration, money, periodLabel, PERIODS, readPeriod, statusRows, tierLabel, toDay, writePeriod, type Counts, type Dashboard as Figures, type DashboardItem, type Period } from "@/lib/dashboard";
 import { defaultTimezone, formatInZone } from "@/lib/jobs";
 import { libraryHref, studioHref } from "@/lib/nav";
 import { useLibraryBoot, type LibraryBoot } from "@/lib/useLibraryBoot";
@@ -138,6 +139,8 @@ function Page({ data }: { data: LibraryBoot }) {
     </Card>
   );
   const u = figures?.usage;
+  // a tier is shown once a conversation has one
+  const tiers = !!u?.largest.some((s) => s.tier);
   const group = "rounded-lg border border-border bg-card p-0.5";
 
   return (
@@ -185,11 +188,12 @@ function Page({ data }: { data: LibraryBoot }) {
                 <div className="grid gap-4 md:grid-cols-2">{counts("post", figures.posts)}{counts("article", figures.articles)}</div>
 
                 <Block title={`Assistant · ${periodLabel(period)}`}>
-                  <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                    {([["Cost", money(u.costCents)], ["Sessions", String(u.sessions)], ["Replies", String(u.replies)], ["Working time", duration(u.activeSeconds)], ["Average session", u.sessions ? money(Math.round(u.costCents / u.sessions)) : "–"]] as const).map(([name, value]) => (
+                  <dl className={cn("grid grid-cols-2 gap-3", cachedShare(u) ? "sm:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-5")}>
+                    {([["Cost", money(u.costCents)], ["Sessions", String(u.sessions)], ["Replies", String(u.replies)], ["Working time", duration(u.activeSeconds)], ["Average session", u.sessions ? money(Math.round(u.costCents / u.sessions)) : "–"], ...(cachedShare(u) ? [["Cached input", cachedShare(u)!] as const] : [])] as const).map(([name, value]) => (
                       <div key={name}><dt className="text-xs text-muted-foreground">{name}</dt><dd className="mt-0.5 text-2xl font-semibold tracking-tight">{value}</dd></div>
                     ))}
                   </dl>
+                  {figures.budget && <BudgetBar budget={figures.budget} className="mt-4 max-w-sm" />}
                   <div className="mt-4">{u.replies === 0 ? <p className="text-sm text-muted-foreground">No assistant cost is recorded in this period.</p> : <CostChart series={u.series} bucket={u.bucket} />}</div>
                   <p className="mt-3 text-xs text-muted-foreground">List price of replies in the chat, in US dollars; not an invoice. Sessions started outside CardPress and deleted conversations are not counted.</p>
                 </Block>
@@ -197,11 +201,12 @@ function Page({ data }: { data: LibraryBoot }) {
                 {u.largest.length > 0 && (
                   <Block title="Largest sessions">
                     <Table className="min-w-[32rem]">
-                      <TableHeader><TableRow><TableHead>Conversation</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Replies</TableHead><TableHead className="text-right">Working time</TableHead><TableHead className="text-right">Last reply</TableHead></TableRow></TableHeader>
+                      <TableHeader><TableRow><TableHead>Conversation</TableHead>{tiers && <TableHead>Tier</TableHead>}<TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Replies</TableHead><TableHead className="text-right">Working time</TableHead><TableHead className="text-right">Last reply</TableHead></TableRow></TableHeader>
                       <TableBody className="tabular-nums">
                         {u.largest.map((s) => (
                           <TableRow key={`${s.conversationId}-${s.lastAt}`}>
                             <TableCell className="max-w-0 truncate">{link(s.profileId, studioHref(`?conversation=${encodeURIComponent(s.conversationId)}`), s.title || "Conversation", "font-medium text-brand underline-offset-4 hover:underline")}{all && <span className="text-xs text-muted-foreground"> · {nameOf(s.profileId)}</span>}</TableCell>
+                            {tiers && <TableCell className="text-xs text-muted-foreground">{tierLabel(s.tier)}</TableCell>}
                             <TableCell className="text-right">{money(s.costCents)}</TableCell>
                             <TableCell className="text-right">{s.replies}</TableCell>
                             <TableCell className="text-right">{duration(s.activeSeconds)}</TableCell>

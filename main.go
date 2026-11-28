@@ -152,8 +152,12 @@ func main() {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
-	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
-	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax})
+	chat.Studio, chat.OwnBrandsOnly, chat.MonthCents = studio, cfg.Agent == "cma", cfg.AgentMonth
+	var keep time.Duration
+	if cfg.SessionCache {
+		keep = service.DefaultSessionCache
+	}
+	accounts := service.NewAccounts(db.DB, service.AccountsOptions{DefaultRole: cfg.DefaultRole, SignupClosed: cfg.SignupClosed, AdminEmail: cfg.AdminEmail, SessionIdle: cfg.SessionIdle, SessionMax: cfg.SessionMax, SessionCache: keep})
 	opts := api.Options{
 		Build:              buildInfo(),
 		Events:             events,
@@ -165,7 +169,7 @@ func main() {
 	if cfg.MCPEnabled {
 		audit := mcpserver.NewAuditor(db.DB)
 		opts.Audit = audit
-		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
+		mcpSrv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Guides: chat, Connections: settings, Proposals: chat, Jobs: publisher, Access: studio, Fetcher: fetcher, Audit: audit, Transport: "http", Version: version})
 		// the same access rules as the JSON API: token, localhost-only host names, and no cross-site browser requests
 		mcpHandler := api.Protect(api.ProtectOptions{Token: cfg.APIToken, LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, TrustedOrigins: cfg.CORSOrigins}, mcpserver.HTTPHandler(mcpSrv))
 		// MCP acts as the system, outside any one person's workspace. Once anyone has an account it needs the token, so a
@@ -360,12 +364,12 @@ func runMCP(args []string) {
 		log.Fatal(err)
 	}
 	chat := service.NewChat(db.DB, chatAgent, fetcher)
-	chat.Studio, chat.OwnBrandsOnly = studio, cfg.Agent == "cma"
+	chat.Studio, chat.OwnBrandsOnly, chat.MonthCents = studio, cfg.Agent == "cma", cfg.AgentMonth
 	// the publisher is only handed to the tools as a reader of jobs; it is never started here
 	jobs := service.NewPublisher(db.DB, nil, nil, 0)
 	studio.Videos = source.NewVideos(cfg.VideoMaxBytes)
 	connections := service.NewSettings(db.DB, nil, os.Getenv) // only says what is filled in; reads no secret
-	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
+	srv := mcpserver.New(mcpserver.Deps{Profiles: studio, Drafts: studio, Writer: studio, Notes: studio, Guides: chat, Connections: connections, Proposals: chat, Jobs: jobs, Fetcher: fetcher, Audit: mcpserver.NewAuditor(db.DB), Transport: "stdio", Version: version})
 	log.Printf("cardpress MCP over stdio is ready (%s database)", db.Driver)
 	if err := mcpserver.RunStdio(ctx, srv); err != nil && ctx.Err() == nil {
 		log.Fatal(err)

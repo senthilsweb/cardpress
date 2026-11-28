@@ -211,6 +211,36 @@ func (c *Chat) prepare(ctx context.Context, conv Conversation, req ChatRequest) 
 			st.Grade = append(st.Grade, kind)
 		}
 	}
+	// the brand says whether first drafts are graded, and how often one may be sent back
+	plan, _, _, err := c.assistantFor(ctx, conv.ProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Checks {
+		st.Rounds = plan.Rounds
+	} else {
+		st.Unchecked, st.Grade = st.Grade, nil
+	}
+	for _, kind := range st.Grade {
+		// a post may turn out to be a greeting, so the grader of a post is told both
+		kinds := []string{kind}
+		if kind == "post" {
+			kinds = append(kinds, "greeting")
+		}
+		for _, k := range kinds {
+			body, err := c.WritingGuide(ctx, conv.ProfileID, k)
+			if err != nil {
+				return nil, err
+			}
+			if body == "" {
+				continue
+			}
+			if st.Guides == nil {
+				st.Guides = map[string]string{}
+			}
+			st.Guides[k] = body
+		}
+	}
 	seen := map[string]sight{}
 	_ = json.Unmarshal([]byte(rawSeen), &seen)
 	for _, id := range []string{st.PostID, st.ArticleID} {
@@ -260,7 +290,8 @@ func (c *Chat) remember(ctx context.Context, convID string, st *agent.Studio) er
 		}
 		seen[id] = now
 	}
-	done := kinds(append(strings.Split(graded, ","), st.Grade...))
+	// a first draft written without a check has still been written: turning checks on later does not grade a second one
+	done := kinds(append(append(strings.Split(graded, ","), st.Grade...), st.Unchecked...))
 	b, err := json.Marshal(seen)
 	if err != nil {
 		return err
