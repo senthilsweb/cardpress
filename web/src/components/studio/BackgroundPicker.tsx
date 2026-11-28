@@ -82,7 +82,7 @@ export function BackgroundPicker({ open, onOpenChange, design, profile, onUse }:
             {suggested ? <SwitchField id="match-colours" label={`Use matching colours (${suggested.name})`} checked={match} onChange={setMatch} /> : <span className="text-xs text-muted-foreground">{bgById(picked).name}</span>}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="cancel" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={() => use()}>Use</Button>
           </div>
         </>

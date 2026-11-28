@@ -2,7 +2,8 @@ import { hydrateAppearance } from "./appearance";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, clearToken, getToken, setToken } from "./api";
 import { DEFAULT_PROFILES, completeProfiles, upgradePlaceholderText, withStandardPalettes } from "./profiles";
-import { newBrandId, pickActive } from "./brands";
+import { pickActive } from "./brands";
+import { createFirstBrand } from "./firstBrand";
 import { docFromPlainText, EMPTY_DOC, type Draft } from "./draft";
 import type { Design, Profile } from "./types";
 import type { FontDef } from "./fonts";
@@ -106,14 +107,8 @@ export function useBoot() {
       if (!state.profiles.length) {
         const legacy = readLegacy();
         if (legacy) return setBoot({ status: "legacy", legacy });
-        // A fresh install: save the starting brand now, so the server knows it (accounts and posts are kept per brand).
-        // Another person may already hold the id "personal", so a second person's first brand gets an id of its own.
-        try {
-          await api.putProfiles(DEFAULT_PROFILES);
-        } catch (e) {
-          if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 409)) throw e;
-          await api.putProfiles([{ ...DEFAULT_PROFILES[0], id: newBrandId(DEFAULT_PROFILES[0].name, []) }]);
-        }
+        // someone new: their first brand is saved now, so the server knows it (accounts and posts are kept per brand)
+        await createFirstBrand(session.user);
         state = await api.state();
       }
       // another page (the library) can open a given brand: /studio/?brand=<id>

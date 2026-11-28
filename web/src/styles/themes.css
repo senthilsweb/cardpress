@@ -17,6 +17,8 @@
   --head-bg: #0b2a24; --head-fg: #ffffff; --head-muted: #8fd3c2; --head-line: rgba(255, 255, 255, 0.14); --head-hover: rgba(255, 255, 255, 0.09); --head-accent: #f5b301; --head-on-accent: #0b2a24;
   --side-bg: #0b2a24; --side-panel: #06201b; --side-fg: #ffffff; --side-muted: #8fd3c2; --side-hover: rgba(255, 255, 255, 0.07); --side-on: rgba(255, 255, 255, 0.13);
   --frame-pad: 6px;
+  /* buttons: yellow adds something new (--gold), dark grey cancels */
+  --on-gold: #231a00; --cancel: #4b5057; --on-cancel: #ffffff;
 }
 [data-theme="dark"], .theme-preview[data-theme="dark"] {
   --paper: #0c1f1c; --card-bg: #112a26; --ink: #f4ead0; --ink-2: #cfd8c8; --muted-ink: #8fa89f;
@@ -24,6 +26,7 @@
   --header-from: #14302b; --header-to: #0f2431;
   --canvas-bg: #1e1e1e; --canvas-grid-minor: rgba(255, 255, 255, 0.05); --canvas-grid-major: rgba(255, 255, 255, 0.1);
   --head-bg: #061713; --side-bg: #061713; --side-panel: #030f0c;
+  --cancel: #565c63;
 }
 
 /* Aubergine: a deep purple frame around a light page */

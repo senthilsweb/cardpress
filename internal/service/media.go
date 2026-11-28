@@ -31,6 +31,8 @@ type Media struct {
 	db *sql.DB
 	// BrandLimit is how many bytes of files one brand may hold.
 	BrandLimit int64
+	// Disk says how full the disk holding the database is, in percent; nil when that is not known.
+	Disk func() (int, bool)
 }
 
 // Limits on what is taken in.
@@ -45,6 +47,8 @@ const (
 	maxTagLength   = 30
 	maxLinkLength  = 2000
 	defaultBrandMB = 200
+	// from this share of the disk in use, the library says so
+	diskWarnPercent = 70
 )
 
 // NewMedia returns the library over db; limitMB is each brand's allowance (0 for the usual 200).
@@ -84,6 +88,8 @@ type Assets struct {
 	Tags       []string `json:"tags"`
 	UsedBytes  int64    `json:"usedBytes"`
 	LimitBytes int64    `json:"limitBytes"`
+	// DiskPercent is how full the server's disk is, told only when that is worth a warning.
+	DiskPercent int `json:"diskPercent,omitempty"`
 }
 
 // AssetQuery says which entries to list: those of a kind ("" for all), with a tag, whose name or tags hold every word.
@@ -104,6 +110,8 @@ type NewAsset struct {
 	Data  []byte
 	Thumb []byte
 	Link  string
+	// Reuse gives back the entry the brand already has for the same file or link, instead of refusing it.
+	Reuse bool
 }
 
 // AssetFile is a stored file.
@@ -290,6 +298,11 @@ func (m *Media) List(ctx context.Context, profileID string, q AssetQuery) (Asset
 	out.Pages = max(1, (len(found)+size-1)/size)
 	out.Page = min(max(1, q.Page), out.Pages) // a page past the end (after a delete, say) shows the last one
 	out.Items = append(out.Items, found[(out.Page-1)*size:min(len(found), out.Page*size)]...)
+	if m.Disk != nil {
+		if p, ok := m.Disk(); ok && p >= diskWarnPercent {
+			out.DiskPercent = p
+		}
+	}
 	out.UsedBytes, err = m.used(ctx, m.db, profileID)
 	return out, err
 }
@@ -366,8 +379,14 @@ func (m *Media) Add(ctx context.Context, profileID string, in NewAsset) (Asset, 
 	}
 	defer tx.Rollback() //nolint:errcheck
 	var there string
-	err = tx.QueryRowContext(ctx, `SELECT name FROM assets WHERE profile_id = ? AND hash = ? AND link = ?`, profileID, hash, a.Link).Scan(&there)
+	var thereID string
+	err = tx.QueryRowContext(ctx, `SELECT id, name FROM assets WHERE profile_id = ? AND hash = ? AND link = ?`, profileID, hash, a.Link).Scan(&thereID, &there)
 	switch {
+	case err == nil && in.Reuse:
+		if err := tx.Rollback(); err != nil { // one connection: let it go before reading again
+			return none, err
+		}
+		return m.get(ctx, profileID, thereID)
 	case err == nil:
 		return none, fmt.Errorf("%w: this is already in the library, as %q", ErrConflict, there)
 	case !errors.Is(err, sql.ErrNoRows):
@@ -444,6 +463,13 @@ func (m *Media) Delete(ctx context.Context, profileID, id string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
+	uses, err := assetUses(ctx, tx, profileID, id)
+	if err != nil {
+		return err
+	}
+	if len(uses) > 0 {
+		return fmt.Errorf("%w: it is used by %s. Take it off there first", ErrConflict, listed(uses))
+	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM assets WHERE id = ? AND profile_id = ?`, id, profileID)
 	if err != nil {
 		return err
@@ -455,6 +481,61 @@ func (m *Media) Delete(ctx context.Context, profileID, id string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// AssetRef is how a card or a brand points at a library file instead of holding a copy of it.
+func AssetRef(id string) string { return "asset:" + id }
+
+// assetUses names what points at a library file: the brand's logo or headshot, its own card, the cards of its items
+// and of their saved versions. A post waiting or sent has the picture of its card already, so it holds no reference.
+func assetUses(ctx context.Context, tx *sql.Tx, profileID, id string) ([]string, error) {
+	ref := `"` + AssetRef(id) + `"` // a whole string in the stored JSON
+	var uses []string
+	for _, q := range []struct{ name, query string }{
+		{"the brand's logo or headshot", `SELECT '' , '' FROM profiles WHERE id = ? AND instr(data, ?) > 0`},
+		{"the brand's own card", `SELECT '', '' FROM designs WHERE profile_id = ? AND instr(data, ?) > 0`},
+		{"the card of", `SELECT title, doc FROM drafts WHERE profile_id = ? AND instr(design, ?) > 0 ORDER BY updated_at DESC`},
+		{"a saved version of", `SELECT d.title, d.doc FROM drafts d WHERE d.profile_id = ?1 AND instr(d.design, ?2) = 0
+			AND EXISTS (SELECT 1 FROM draft_versions v WHERE v.draft_id = d.id AND instr(v.design, ?2) > 0) ORDER BY d.updated_at DESC`},
+	} {
+		rs, err := tx.QueryContext(ctx, q.query, profileID, ref)
+		if err != nil {
+			return nil, err
+		}
+		for rs.Next() {
+			var title, doc string
+			if err := rs.Scan(&title, &doc); err != nil {
+				rs.Close()
+				return nil, err
+			}
+			if !strings.HasSuffix(q.name, " of") {
+				uses = append(uses, q.name)
+				continue
+			}
+			if title = draftTitle(title, doc); title == "" {
+				title = "an untitled item"
+			} else {
+				title = "“" + cut(title, 40) + "”"
+			}
+			uses = append(uses, q.name+" "+title)
+		}
+		if err := closeRows(rs); err != nil {
+			return nil, err
+		}
+	}
+	return uses, nil
+}
+
+// listed writes a few uses out, and says how many more there are.
+func listed(uses []string) string {
+	const most = 3
+	if len(uses) > most {
+		return strings.Join(uses[:most], ", ") + fmt.Sprintf(" and %d more", len(uses)-most)
+	}
+	if len(uses) == 1 {
+		return uses[0]
+	}
+	return strings.Join(uses[:len(uses)-1], ", ") + " and " + uses[len(uses)-1]
 }
 
 // File is an entry's file; a video has none.

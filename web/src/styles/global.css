@@ -64,6 +64,9 @@
   --color-side-hover: var(--side-hover);
   --color-side-on: var(--side-on);
   --color-gold: var(--gold);
+  --color-on-gold: var(--on-gold);
+  --color-cancel: var(--cancel);
+  --color-on-cancel: var(--on-cancel);
   --color-ink2: var(--ink-2);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

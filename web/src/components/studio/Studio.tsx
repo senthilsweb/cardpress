@@ -290,11 +290,14 @@ function Workspace({ initial, openBrand }: { initial: Loaded; openBrand: (id: st
     flushSync(() => setStage(sizes));
     await nextFrame();
     const out: { size: Size; blob: Blob }[] = [];
-    for (const s of sizes) {
-      const node = stageRefs.current[s.id];
-      if (node) out.push({ size: s, blob: await cardToBlob(node, s.w, s.h) });
+    try {
+      for (const s of sizes) {
+        const node = stageRefs.current[s.id];
+        if (node) out.push({ size: s, blob: await cardToBlob(node, s.w, s.h) });
+      }
+    } finally {
+      setStage([]); // a failed export must leave nothing behind
     }
-    setStage([]);
     return out;
   };
   const fileBase = slugify(design.title || design.statValue || "card");

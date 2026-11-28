@@ -4,6 +4,7 @@ import type { Size } from "@/lib/sizes";
 import { mulberry32 } from "@/lib/rng";
 import { isDark, mix, rgba } from "@/lib/color";
 import { cssFamily, ensureFont, resolveFonts } from "@/lib/fonts";
+import { fillPictures, picturesOf, usePictures } from "@/lib/assetRefs";
 import { bgById, type Area, type MaskKind } from "./backgrounds";
 
 export interface LayoutDef {
@@ -150,7 +151,10 @@ const lines = (t: string) => t.split("\n").map((l, i, a) => (
   </span>
 ));
 
-export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, profile, palette: pal, size, style }, ref) {
+export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: stored, profile: brand, palette: pal, size, style }, ref) {
+  // pictures kept in the brand's media library are fetched and put in before drawing
+  const pictures = usePictures(brand.id, picturesOf(stored, brand));
+  const { design, profile } = fillPictures(stored, brand, pictures.show);
   const rawId = useId();
   const uid = rawId.replace(/[^a-zA-Z0-9]/g, "");
   const W = size.w, H = size.h;
@@ -332,6 +336,8 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design, pr
   return (
     <div
       ref={ref}
+      // an image of the card is not made while this is set (lib/export.ts)
+      data-asset-missing={pictures.waiting || undefined}
       style={{ width: W, height: H, position: "relative", overflow: "hidden", background: pal.base, color: pal.text, fontFamily: body, ...style }}
     >
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: "absolute", inset: 0, display: "block" }}>

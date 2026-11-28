@@ -286,7 +286,7 @@ function ScheduleDialog({ at, ready, names, onClose, onDone }: {
         </div>
         <DialogFooter>
           {pick && <Button variant="ghost" size="sm" className="mr-auto" onClick={() => setPick(null)}><ChevronLeft /> Back</Button>}
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="cancel" size="sm" onClick={onClose}>Cancel</Button>
           {pick?.kind === "article" && <Button variant="brand" size="sm" disabled={busy || !!sched.problem || !sched.at || !can("approve")} onClick={() => void plan()}>{busy ? <Loader2 className="animate-spin" /> : <CalendarClock />} Save date</Button>}
           {pick?.kind === "post" && <Button asChild variant="brand" size="sm"><a href={studio(pick)}><CalendarClock /> Open preview</a></Button>}
         </DialogFooter>

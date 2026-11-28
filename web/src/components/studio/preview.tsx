@@ -5,6 +5,7 @@ import { bgById } from "@/card/backgrounds";
 import type { Design, Palette, Profile, BackgroundId } from "@/lib/types";
 import type { Size } from "@/lib/sizes";
 import { mulberry32 } from "@/lib/rng";
+import { usePictures } from "@/lib/assetRefs";
 import { foldAt } from "@/lib/linkedin";
 
 interface CardProps {
@@ -28,7 +29,9 @@ export function ScaledCard({ maxW, maxH, rounded = true, ...p }: CardProps & { m
 }
 
 /** Small live thumbnail of one background, for the picker. */
-export function MiniBackground({ id, palette, seed, photos, screenshot, image }: { id: BackgroundId; palette: Palette; seed: number; photos: string[]; screenshot?: string; image?: string }) {
+export function MiniBackground({ id, palette, seed, brand, photos: stored, screenshot: shot, image: back }: { id: BackgroundId; palette: Palette; seed: number; /** Whose library the pictures may be in. */ brand: string; photos: string[]; screenshot?: string; image?: string }) {
+  const pictures = usePictures(brand, [...stored, shot, back]);
+  const photos = stored.map(pictures.show).filter((v): v is string => !!v), screenshot = pictures.show(shot), image = pictures.show(back);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const W = 320, H = 180, u = 1.8;
   const node = bgById(id).render({
@@ -43,7 +46,8 @@ export function MiniBackground({ id, palette, seed, photos, screenshot, image }:
 }
 
 function Avatar({ profile, palette }: { profile: Profile; palette: Palette }) {
-  const img = profile.headshot || (profile.mark === "image" ? profile.logoImage : undefined);
+  const pictures = usePictures(profile.id, [profile.headshot, profile.logoImage]);
+  const img = pictures.show(profile.headshot) || (profile.mark === "image" ? pictures.show(profile.logoImage) : undefined);
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white" style={{ background: palette.accent }}>
       {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : (profile.displayName || "A").charAt(0).toUpperCase()}

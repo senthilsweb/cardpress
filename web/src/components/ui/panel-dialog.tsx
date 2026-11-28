@@ -133,7 +133,7 @@ export function PanelDialog({ open, onOpenChange, title, description, search, gr
               <div role="alertdialog" aria-label="Unsaved changes" className="m-5 max-w-md rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
                 <p className="text-sm">{asking.question}</p>
                 <div className="mt-3 flex justify-end gap-2">
-                  <Button autoFocus size="sm" variant="outline" onClick={asking.onKeep}>Keep editing</Button>
+                  <Button autoFocus size="sm" variant="cancel" onClick={asking.onKeep}>Keep editing</Button>
                   <Button size="sm" variant="destructive" onClick={asking.onDiscard}>Discard</Button>
                 </div>
               </div>

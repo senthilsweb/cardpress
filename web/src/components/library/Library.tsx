@@ -317,7 +317,7 @@ function Page({ data }: { data: LibraryBoot }) {
             <DialogDescription>{asking ? deleteSummary(asking).text : ""}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" size="sm" disabled={deleting} onClick={() => setAsking(null)}>Cancel</Button>
+            <Button variant="cancel" size="sm" disabled={deleting} onClick={() => setAsking(null)}>Cancel</Button>
             <Button variant="destructive" size="sm" disabled={deleting || !can("write")} onClick={() => void confirmDelete()}>{deleting ? <Loader2 className="animate-spin" /> : <Trash2 />} Delete</Button>
           </DialogFooter>
         </DialogContent>

@@ -11,12 +11,13 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { BrandLook } from "./BrandLook";
 import { UsersSettings } from "./UsersSettings";
 import { Guard } from "./guard";
+import { copyPictures } from "@/lib/assetRefs";
 import { api, type ApiInfo } from "@/lib/api";
 import { blankDesign, brandColor, move, pickActive } from "@/lib/brands";
 import { Holds } from "@/lib/holds";
 import type { BrandDetails } from "@/lib/brandDetails";
 import { findSections, SETTINGS_GROUPS, settingsHref, settingsPlace, studioHref, visibleSections, type SettingsSection } from "@/lib/nav";
-import { completeProfiles, DEFAULT_DESIGN, DEFAULT_PROFILES, withStandardPalettes } from "@/lib/profiles";
+import { completeProfiles, DEFAULT_DESIGN, withStandardPalettes } from "@/lib/profiles";
 import { fullDesign } from "@/lib/cardDesign";
 import { useSession } from "@/lib/session";
 import type { Design, Profile } from "@/lib/types";
@@ -174,7 +175,7 @@ interface Brands { profiles: Profile[]; archived: Profile[]; designs: Record<str
 
 async function readBrands(): Promise<Brands> {
   const st = await api.state();
-  const profiles = (st.profiles as Profile[]).length ? withStandardPalettes(st.profiles as Profile[]) : DEFAULT_PROFILES;
+  const profiles = withStandardPalettes(st.profiles as Profile[]);
   return {
     profiles,
     archived: Array.isArray(st.archived) ? completeProfiles(st.archived as Profile[]) : [],
@@ -218,7 +219,7 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
   if (section === "social") return <SocialSettings profileId={current.id} brandName={current.name} onChanged={onChanged} />;
   if (section === "look") {
     const id = brands.profiles.some((p) => p.id === at.look) ? at.look! : current.id;
-    return <BrandLook key={id} profiles={brands.profiles} id={id} design={brands.designs[id]} onBack={() => go({ section: "brands" })} onChanged={onChanged} />;
+    return <BrandLook key={id} profiles={brands.profiles} id={id} design={brands.designs[id]} onBack={() => go({ section: "brands" })} onChanged={() => { onChanged(); void sync(); }} />;
   }
 
   const changing = async (work: () => Promise<unknown>) => { await work(); onChanged(); await sync(); };
@@ -230,7 +231,13 @@ function BrandPages({ section, at, go, onChanged }: { section: "brands" | "look"
     if (details) await api.saveBrandDetails(p.id, details).catch((e) => toast.error("The brand is made; its details were not saved", { description: e instanceof Error ? e.message : undefined }));
     // a copy starts from the other brand's card, a blank one from the default card without footer text
     const copied = from && brands.designs[from.id];
-    const base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
+    let base = from ? (copied ? fullDesign(DEFAULT_DESIGN, copied) : DEFAULT_DESIGN) : blankDesign(DEFAULT_DESIGN);
+    if (from) {
+      // its pictures go into its own library
+      await copyPictures(from.id, p.id, { profile: p, design: base })
+        .then(async (own) => { await api.saveProfile(own.profile); base = own.design; })
+        .catch((e) => { base = { ...base, photos: [], screenshot: undefined, bgImage: undefined }; toast.error("The brand is made; its pictures were not copied", { description: e instanceof Error ? e.message : undefined }); });
+    }
     await api.putDesigns({ ...brands.designs, [p.id]: base });
     await setActive(p.id);
     done();

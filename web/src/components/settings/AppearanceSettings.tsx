@@ -1,6 +1,11 @@
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { useState } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { Pane } from "@/components/ui/pane";
-import { setMode, setTheme, THEMES, useAppearance, type Mode } from "@/lib/appearance";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { attempt, FormSection, SaveBar } from "./form";
+import { useUnsaved } from "./guard";
+import { resolveMode, saveAppearance, THEMES, useAppearance, type Appearance, type Mode, type ThemeId } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const MODES: { id: Mode; name: string; icon: React.ReactNode }[] = [
@@ -30,37 +35,44 @@ function Preview({ theme, mode }: { theme: string; mode: "light" | "dark" }) {
   );
 }
 
-/** The person's own colours for the application: a theme, and light, dark or the system's. */
+/** The person's own colours for the application: a theme, and light, dark or the system's. Applied on Save. */
 export function AppearanceSettings() {
-  const { theme, mode, shown } = useAppearance();
+  const saved = useAppearance();
+  const [picked, setPicked] = useState<Partial<Appearance>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const theme = picked.theme ?? saved.theme, mode = picked.mode ?? saved.mode;
+  const dirty = theme !== saved.theme || mode !== saved.mode;
+  useUnsaved(dirty);
+  const systemDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const shown = resolveMode(mode, systemDark); // the pictures show the choice before it is saved
+
+  const save = async () => {
+    setBusy(true);
+    const failed = await attempt(() => saveAppearance({ theme, mode }), "Appearance saved", "Appearance not saved");
+    if (!failed) setPicked({});
+    setError(failed ?? null); setBusy(false);
+  };
+
   return (
-    <Pane>
-      <div className="space-y-6">
-        <fieldset>
-          <legend className="mb-2 text-sm font-medium">Theme</legend>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <Pane footer={<SaveBar dirty={dirty} busy={busy} problem={error} onSave={() => void save()} onCancel={() => { setPicked({}); setError(null); }} />}>
+      <div className="space-y-4">
+        <FormSection title="Theme" about="Card colours come from the brand, not from the theme.">
+          <RadioGroup aria-label="Theme" value={theme} onValueChange={(v) => setPicked((p) => ({ ...p, theme: v as ThemeId }))} className="grid-cols-2 gap-3 sm:grid-cols-4">
             {THEMES.map((t) => (
-              <button key={t.id} type="button" aria-pressed={theme === t.id} onClick={() => setTheme(t.id)}
-                className={cn("cursor-pointer rounded-lg border p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", theme === t.id ? "border-brand ring-1 ring-brand" : "border-border hover:border-brand/50")}>
+              <label key={t.id} className={cn("cursor-pointer rounded-lg border p-2", theme === t.id ? "border-brand ring-1 ring-brand" : "border-border hover:border-brand/50")}>
                 <Preview theme={t.id} mode={shown} />
-                <span className="mt-2 flex items-center justify-between text-[13px] font-medium">{t.name}{theme === t.id && <Check className="h-4 w-4 text-brand" />}</span>
+                <span className="mt-2 flex items-center gap-1.5 text-[13px] font-medium"><RadioGroupItem value={t.id} aria-label={t.name} />{t.name}</span>
                 <span className="block text-[11px] text-muted-foreground">{t.hint}</span>
-              </button>
+              </label>
             ))}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend className="mb-2 text-sm font-medium">Light or dark</legend>
-          <div className="inline-flex rounded-md border border-border bg-card p-0.5">
-            {MODES.map((m) => (
-              <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => setMode(m.id)}
-                className={cn("flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium [&_svg]:h-4 [&_svg]:w-4", mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {m.icon}{m.name}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <p className="text-xs text-muted-foreground">Card colours come from the brand, not from the theme.</p>
+          </RadioGroup>
+        </FormSection>
+        <FormSection title="Light or dark">
+          <ToggleGroup type="single" aria-label="Light or dark" className="w-fit rounded-md border border-border bg-card p-0.5" value={mode} onValueChange={(v) => { if (v) setPicked((p) => ({ ...p, mode: v as Mode })); }}>
+            {MODES.map((m) => <ToggleGroupItem key={m.id} value={m.id}>{m.icon}{m.name}</ToggleGroupItem>)}
+          </ToggleGroup>
+        </FormSection>
       </div>
     </Pane>
   );

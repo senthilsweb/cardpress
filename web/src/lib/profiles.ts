@@ -63,14 +63,15 @@ function blend(a: string, b: string, t: number) {
   return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
 }
 
+/** What a new brand looks like before anyone has written on it. It names nobody. */
 export const DEFAULT_PROFILES: Profile[] = [
   {
     id: "personal",
-    name: "Personal",
-    displayName: "Senthilnathan",
-    handle: "@senthilsweb",
-    website: "www.senthilsweb.com",
-    logoText: "SENTHILSWEB",
+    name: "My brand",
+    displayName: "My brand",
+    handle: "",
+    website: "",
+    logoText: "MY BRAND",
     logoSub: "",
     mark: "diamond",
     displayFont: "Space Grotesk Variable",
@@ -79,18 +80,14 @@ export const DEFAULT_PROFILES: Profile[] = [
   },
 ];
 
-/**
- * The sample card a new design starts with. It is the text of a real post ("Many Questions. One SQL Row.", from the
- * author's LinkedIn series), so a fresh card looks like a finished one and shows every part: eyebrow, title, subtitle,
- * and a footer with a left and a right link.
- */
+/** The sample card a new design starts with: every part in its place, and nobody's links in the footer. */
 export const SAMPLE_TEXT = {
-  eyebrow: "Adaptive Data Gov · AI System One",
-  title: "Many Questions.\nOne SQL Row.",
-  subtitle: "An AI function that works row by row",
-  footerLeft: "senthilsweb.com/jev-pii",
-  footer: "github.com/senthilsweb/jev-pii",
-  tag: "AI System One",
+  eyebrow: "Your topic",
+  title: "One idea,\nsaid clearly.",
+  subtitle: "A short line that supports it",
+  footerLeft: "",
+  footer: "",
+  tag: "Series",
   statValue: "1",
 } as const;
 
@@ -134,7 +131,10 @@ export function withStandardPalettes(saved: Profile[]): Profile[] {
 export function completeProfiles(saved: Profile[]): Profile[] {
   return saved.map((one) => {
     // a profile saved by something other than the studio (the API, a script) may lack fields: fill them from the default
-    const pr: Profile = { ...DEFAULT_PROFILES[0], ...one, palettes: Array.isArray(one.palettes) ? one.palettes : [] };
+    const name = one.name || DEFAULT_PROFILES[0].name;
+    // the display name and logo text it never had come from its own name
+    const own = { displayName: one.displayName ?? name, logoText: one.logoText ?? name.toUpperCase() };
+    const pr: Profile = { ...DEFAULT_PROFILES[0], ...one, ...own, palettes: Array.isArray(one.palettes) ? one.palettes : [] };
     const have = new Set(pr.palettes.map((pal) => pal.id));
     const missing = standardPalettes.filter((pal) => !have.has(pal.id));
     return missing.length ? { ...pr, palettes: [...pr.palettes, ...missing] } : pr;

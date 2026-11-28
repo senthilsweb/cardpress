@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"errors"
 	"flag"
@@ -157,7 +158,7 @@ func main() {
 		Events:             events,
 		Notes:              studio,
 		AssistantAdminOnly: cfg.Agent == "cma", // its tools act as one account, so only the admin may use it
-		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Media: service.NewMedia(db.DB, cfg.MediaBrandMB), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
+		Accounts:           accounts, Studio: studio, Settings: settings, Publishing: publisher, Library: service.NewLibrary(db.DB), Media: newMedia(db.DB, cfg), Chat: chat, Token: cfg.APIToken, CORSOrigins: cfg.CORSOrigins,
 		LocalGuard: cfg.APIToken == "", AllowedHosts: cfg.AllowedHosts, Version: version, DBDriver: db.Driver,
 	}
 	if cfg.MCPEnabled {
@@ -447,4 +448,15 @@ func runUser(args []string) int {
 	}
 	fmt.Printf("New password for %s: %s\nThey were signed out everywhere. Ask them to change it from Account settings.\n", args[1], pw)
 	return 0
+}
+
+// newMedia is the media library, which warns when the disk holding a local database fills up.
+func newMedia(db *sql.DB, cfg config.Config) *service.Media {
+	m := service.NewMedia(db, cfg.MediaBrandMB)
+	if path, ok := strings.CutPrefix(cfg.DBURL, "file:"); ok {
+		path, _, _ = strings.Cut(path, "?")
+		dir := filepath.Dir(path)
+		m.Disk = func() (int, bool) { return service.DiskPercent(dir) }
+	}
+	return m
 }

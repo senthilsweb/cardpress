@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, KeyRound, Loader2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { attempt, FormSection, SaveBar } from "@/components/settings/form";
 import { Button } from "@/components/ui/button";
 import { Pane } from "@/components/ui/pane";
 import { useUnsaved } from "@/components/settings/guard";
@@ -42,23 +42,22 @@ export function AccountSettings({ parts }: { parts: Part[] }) {
 
   const saveProfile = async () => {
     setBusy(true); setError(null);
-    try {
-      const r = await api.updateMe({ ...f, birthDate: joinDate(dob.y, dob.m, dob.d) });
-      setUser(r.user);
-      toast.success("Saved");
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not save"); } finally { setBusy(false); }
+    const failed = await attempt(async () => setUser((await api.updateMe({ ...f, birthDate: joinDate(dob.y, dob.m, dob.d) })).user), "Profile saved", "Profile not saved");
+    setError(failed ?? null); setBusy(false);
   };
   const changePassword = async () => {
-    if (pw.next !== pw.again) return setError("The two new passwords are not the same.");
     setBusy(true); setError(null);
-    try {
+    const failed = await attempt(async () => {
       await api.changePassword(pw.current, pw.next);
       setPw({ current: "", next: "", again: "" });
-      toast.success("Password changed", { description: "You were signed out on your other devices." });
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not change the password"); } finally { setBusy(false); }
+    }, "Password changed. You were signed out on your other devices.", "Password not changed");
+    setError(failed ?? null); setBusy(false);
   };
-  const profileReady = f.firstName.trim() !== "" && f.lastName.trim() !== "";
-  const pwReady = pw.current !== "" && pw.next.length >= 10 && pw.again !== "";
+  const resetProfile = () => { setF({ firstName: user.firstName, lastName: user.lastName, phone: user.phone ?? "" }); setDob(splitDate(user.birthDate)); setError(null); };
+  const pwTyped = !!(pw.current || pw.next || pw.again);
+  // what stands in the way of saving, said once something has been typed
+  const profileProblem = profileChanged && !(f.firstName.trim() && f.lastName.trim()) ? "Enter your first and last name." : null;
+  const pwProblem = !pwTyped ? null : !pw.current ? "Enter your current password." : pw.next.length < 10 ? "The new password needs at least 10 characters." : pw.next !== pw.again ? "The two new passwords are not the same." : null;
 
   return (
     <Pane
@@ -69,29 +68,32 @@ export function AccountSettings({ parts }: { parts: Part[] }) {
           </TabsList>
         </Tabs>
       )}
-      footer={tab !== "keys" && (
-        <div className="flex items-center justify-end gap-2">
-          {error && <p role="alert" className="mr-auto text-xs text-destructive">{error}</p>}
-          {tab === "profile" && <Button variant="brand" size="sm" onClick={() => void saveProfile()} disabled={busy || !profileReady}>{busy && <Loader2 className="animate-spin" />} Save</Button>}
-          {tab === "password" && <Button variant="brand" size="sm" onClick={() => void changePassword()} disabled={busy || !pwReady}>{busy && <Loader2 className="animate-spin" />} Change password</Button>}
-        </div>
-      )}
+      footer={tab === "profile"
+        ? <SaveBar dirty={profileChanged} busy={busy} problem={profileProblem ?? error} onSave={() => { if (!profileProblem) void saveProfile(); }} onCancel={resetProfile} />
+        : tab === "password"
+          ? <SaveBar label="Save password" dirty={pwTyped} busy={busy} problem={pwProblem ?? error} onSave={() => { if (!pwProblem) void changePassword(); }} onCancel={() => { setPw({ current: "", next: "", again: "" }); setError(null); }} />
+          : null}
     >
-      <Tabs value={tab} className="space-y-4">
+      <Tabs value={tab}>
         <TabsContent value="profile" className="mt-0 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label htmlFor="as-first">First name</Label><Input id="as-first" value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label htmlFor="as-last">Last name</Label><Input id="as-last" value={f.lastName} onChange={(e) => setF({ ...f, lastName: e.target.value })} /></div>
-          </div>
-          <div className="space-y-1.5"><Label htmlFor="as-email">Email</Label><Input id="as-email" value={user.email} readOnly disabled /></div>
-          <div className="space-y-1.5"><Label htmlFor="as-phone">Phone</Label><Input id="as-phone" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="Optional" /></div>
-          <div className="space-y-1.5"><Label htmlFor="as-dob-day">Date of birth</Label><DatePicker idPrefix="as-dob" {...dob} onChange={setDob} /></div>
-          <p className="text-xs text-muted-foreground">Role: {roleLabel(user)}. An administrator can change your email or role.</p>
+          <FormSection title="Name" about={`Role: ${roleLabel(user)}. An administrator can change your email or role.`}>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label htmlFor="as-first">First name</Label><Input id="as-first" required value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label htmlFor="as-last">Last name</Label><Input id="as-last" required value={f.lastName} onChange={(e) => setF({ ...f, lastName: e.target.value })} /></div>
+            </div>
+            <div className="space-y-1.5"><Label htmlFor="as-email">Email</Label><Input id="as-email" value={user.email} readOnly disabled /></div>
+          </FormSection>
+          <FormSection title="About you" optional>
+            <div className="space-y-1.5"><Label htmlFor="as-phone">Phone</Label><Input id="as-phone" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="as-dob-day">Date of birth</Label><DatePicker idPrefix="as-dob" {...dob} onChange={setDob} /></div>
+          </FormSection>
         </TabsContent>
-        <TabsContent value="password" className="mt-0 space-y-4">
-          <div className="space-y-1.5"><Label htmlFor="as-cur">Current password</Label><Input id="as-cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label htmlFor="as-new">New password</Label><Input id="as-new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /><p className="text-xs text-muted-foreground">At least 10 characters.</p></div>
-          <div className="space-y-1.5"><Label htmlFor="as-again">New password again</Label><Input id="as-again" type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></div>
+        <TabsContent value="password" className="mt-0">
+          <FormSection title="Change password" about="At least 10 characters.">
+            <div className="space-y-1.5"><Label htmlFor="as-cur">Current password</Label><Input id="as-cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="as-new">New password</Label><Input id="as-new" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="as-again">New password again</Label><Input id="as-again" type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></div>
+          </FormSection>
         </TabsContent>
         <TabsContent value="keys" className="mt-0"><KeysPanel open={tab === "keys"} /></TabsContent>
       </Tabs>
@@ -115,27 +117,28 @@ function KeysPanel({ open }: { open: boolean }) {
 
   const create = async () => {
     setBusy(true); setError(null);
-    try { const r = await api.createApiKey(name); setFresh(r); setName(""); setCopied(false); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Could not make the key"); } finally { setBusy(false); }
+    setError((await attempt(async () => { setFresh(await api.createApiKey(name)); setName(""); setCopied(false); await load(); }, "Key created. Copy it now.", "Key not created")) ?? null);
+    setBusy(false);
   };
   const revoke = async (k: ApiKey) => {
     if (confirm !== k.id) return setConfirm(k.id);
     setBusy(true); setError(null);
-    try { await api.revokeApiKey(k.id); setConfirm(null); if (fresh?.key.id === k.id) setFresh(null); await load(); toast.success("Key revoked"); }
-    catch (e) { setError(e instanceof Error ? e.message : "Could not revoke"); } finally { setBusy(false); }
+    setError((await attempt(async () => { await api.revokeApiKey(k.id); setConfirm(null); if (fresh?.key.id === k.id) setFresh(null); await load(); }, "Key revoked", "Key not revoked")) ?? null);
+    setBusy(false);
   };
   const copy = async () => { if (!fresh) return; try { await navigator.clipboard.writeText(fresh.secret); setCopied(true); } catch { setError("Could not copy. Select the key and copy it by hand."); } };
 
   return (
     <div className="space-y-4">
-      <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void create(); }}>
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <Label htmlFor="key-name">New key</Label>
-          <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, such as My agent" maxLength={60} />
-        </div>
-        <Button type="submit" variant="brand" size="sm" className="mb-0.5" disabled={busy || !name.trim()}>{busy ? <Loader2 className="animate-spin" /> : <KeyRound />} Create</Button>
-      </form>
-      <p className="text-xs text-muted-foreground">Scope: Editor. A key acts as you, on your own work.</p>
+      <FormSection title="New key" about="Scope: Editor. A key acts as you, on your own work.">
+        <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void create(); }}>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Label htmlFor="key-name">Name</Label>
+            <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Such as My agent" maxLength={60} />
+          </div>
+          <Button type="submit" variant="gold" size="sm" className="mb-0.5" disabled={busy || !name.trim()}>{busy ? <Loader2 className="animate-spin" /> : <KeyRound />} Create key</Button>
+        </form>
+      </FormSection>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       {fresh && (
         <div className="space-y-2 rounded-md border border-brand/40 bg-brand/5 p-3" role="status">

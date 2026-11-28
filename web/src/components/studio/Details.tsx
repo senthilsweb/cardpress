@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, ImageUp, Loader2, Maximize2, Minimize2, Send, Trash2, Undo2, X } from "lucide-react";
+import { AssetPicker } from "@/components/media/AssetPicker";
+import { postFile, type Asset } from "@/lib/assets";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Check, Copy, Eye, FileText, Film, ImageUp, Images, Loader2, Maximize2, Minimize2, Send, Trash2, Undo2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -155,6 +157,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   // the video's address, as typed; the field is open for a new video or a change of address
   const [video, setVideo] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [choosing, setChoosing] = useState(false); // the media library is open
   useEffect(() => { setVideo(null); setConfirmDelete(false); }, [draft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const ser = useMemo(() => {
     if (!draft) return null;
@@ -200,9 +203,8 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
   const page = (key: "slug" | "summary") => async (v: string) => {
     try { await store.setPageFields(d.id, { [key]: v }); } catch (e) { toast.error("Not saved", { description: (e as Error).message }); throw e; }
   };
-  const pickFile = guard(async () => {
-    const files = Array.from(fileRef.current?.files ?? []);
-    if (fileRef.current) fileRef.current.value = "";
+  /** Files for the post, chosen on this computer or taken from the library. */
+  const takeFiles = async (files: File[]) => {
     if (!files.length) return;
     const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
     const pdfs = files.filter(isPdf), images = files.filter((f) => !isPdf(f));
@@ -223,7 +225,17 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
     if (pics.length + images.length > MAX_POST_IMAGES) throw new Error(`A post can carry at most ${MAX_POST_IMAGES} images.`);
     for (const f of images) await store.addImage(f); // one after another, so they keep the order they were chosen in
     toast.success(`${pics.length + images.length} images replace the card`, { description: "Approve the post again before publishing." });
+  };
+  const pickFile = guard(async () => {
+    const files = Array.from(fileRef.current?.files ?? []);
+    if (fileRef.current) fileRef.current.value = "";
+    await takeFiles(files);
   });
+  const pickAssets = (assets: Asset[]) => guard(async () => {
+    const files: File[] = [];
+    for (const a of assets) files.push(await postFile(a));
+    await takeFiles(files);
+  })();
   const movePic = (i: number, by: 1 | -1) => guard(async () => {
     const ids = pics.map((p) => p.id);
     [ids[i], ids[i + by]] = [ids[i + by], ids[i]];
@@ -400,6 +412,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
                   </ol>
                   <div className="flex flex-wrap gap-1.5">
                     <Button variant="outline" size="sm" disabled={locked || pics.length >= MAX_POST_IMAGES} onClick={() => fileRef.current?.click()}><ImageUp /> Add images</Button>
+                    <Button variant="outline" size="sm" disabled={locked || pics.length >= MAX_POST_IMAGES} onClick={() => setChoosing(true)}><Images /> From library</Button>
                     <Button variant="outline" size="sm" disabled={locked} onClick={useCard}>Use the card</Button>
                   </div>
                 </>
@@ -424,6 +437,7 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
                     <p className="text-xs text-muted-foreground">{own === "document" ? "Your PDF goes out, not the card." : "Your image goes out, not the card."}</p>
                     <div className="flex flex-wrap gap-1.5">
                       <Button variant="outline" size="sm" disabled={locked} onClick={() => fileRef.current?.click()}><ImageUp /> Change</Button>
+                      <Button variant="outline" size="sm" disabled={locked} onClick={() => setChoosing(true)}><Images /> From library</Button>
                       <Button variant="outline" size="sm" disabled={locked} onClick={useCard}>Use the card</Button>
                     </div>
                   </div>
@@ -432,9 +446,11 @@ export function Details({ media, changed, onSeen, setCard, onCardFocus, versions
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-full text-xs text-muted-foreground">The card goes out with the post.</span>
                   <Button variant="outline" size="sm" disabled={locked} onClick={() => fileRef.current?.click()}><ImageUp /> Use images or a PDF</Button>
+                  <Button variant="outline" size="sm" disabled={locked} onClick={() => setChoosing(true)}><Images /> From library</Button>
                   <Button variant="outline" size="sm" disabled={locked || video !== null} onClick={() => setVideo("")}><Film /> Use a video</Button>
                 </div>
               )}
+              <AssetPicker brand={draft.profileId} open={choosing} onOpenChange={setChoosing} kinds={["image", "pdf"]} max={own === "images" ? Math.max(1, MAX_POST_IMAGES - pics.length) : MAX_POST_IMAGES} onPick={(a) => void pickAssets(a)} />
               {video !== null && !locked && (
                 <form className="flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); void saveVideo(); }}>
                   <Input autoFocus type="url" value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://…/video.mp4" aria-label="Video address" disabled={checking} className="h-8 min-w-0 flex-1 text-xs" />

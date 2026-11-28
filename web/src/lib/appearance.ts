@@ -54,9 +54,14 @@ function set(a: Appearance) {
 export const hydrateAppearance = (preferences: Record<string, unknown>) => set(readAppearance(preferences));
 
 // a failed save only means the choice is not remembered
-const save = (key: "theme" | "palette", value: string) => { api.putPreference(key, value).catch(() => undefined); };
-export function setTheme(theme: ThemeId) { set({ ...get(), theme }); save("palette", theme); }
-export function setMode(mode: Mode) { set({ ...get(), mode }); save("theme", mode); }
+export function setMode(mode: Mode) { set({ ...get(), mode }); api.putPreference("theme", mode).catch(() => undefined); }
+
+/** Save a theme and a mode, and show them once the server has them. */
+export async function saveAppearance(a: Appearance): Promise<void> {
+  await api.putPreference("palette", a.theme);
+  await api.putPreference("theme", a.mode);
+  set(a);
+}
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

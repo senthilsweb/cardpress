@@ -1,5 +1,9 @@
-import { useId, useRef, type ReactNode } from "react";
-import { ChevronDown, ImagePlus, Trash2 } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, ImagePlus, Images, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { AssetPicker } from "@/components/media/AssetPicker";
+import { addToLibrary, libraryTakes } from "@/lib/assets";
+import { assetRef, usePictures } from "@/lib/assetRefs";
 import { sectionOpen, useLayout } from "@/lib/layout";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -109,7 +113,11 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
   );
 }
 
-/** Upload one image (or several when `multiple`). Shows thumbnails with remove buttons. */
+/**
+ * Pictures of a card or a brand, with thumbnails to remove. With `brand`, each comes from that brand's media library:
+ * an uploaded one is put there first, and the card only points at it. Without a library home (a drawing, an
+ * animation), a picture is held by the card itself.
+ */
 export function ImageField(props: {
   label: string;
   hint?: string;
@@ -119,51 +127,57 @@ export function ImageField(props: {
   max?: number;
   maxPx?: number;
   keepPng?: boolean;
+  /** Whose library to use. */
+  brand?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const pictures = usePictures(props.brand ?? "", props.values);
+  const most = props.multiple ? props.max ?? 12 : 1;
+  const room = props.multiple ? most - props.values.length : 1;
+  const take = (more: string[]) => { if (more.length) props.onChange(props.multiple ? [...new Set([...props.values, ...more])].slice(0, most) : more.slice(0, 1)); };
   const add = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const list = Array.from(files).slice(0, props.max ?? 12);
-    const urls = await Promise.all(list.map((f) => fileToDataUrl(f, props.maxPx ?? 1600, props.keepPng).catch(() => null)));
-    const ok = urls.filter(Boolean) as string[];
-    props.onChange(props.multiple ? [...props.values, ...ok].slice(0, props.max ?? 12) : ok.slice(0, 1));
+    if (!files?.length || busy) return;
+    const list = Array.from(files).slice(0, most);
     if (ref.current) ref.current.value = "";
+    setBusy(true);
+    const got: string[] = [];
+    for (const f of list) {
+      try {
+        got.push(props.brand && libraryTakes(f.type) ? assetRef((await addToLibrary(props.brand, f)).id) : await fileToDataUrl(f, props.maxPx ?? 1600, props.keepPng));
+      } catch (e) {
+        toast.error(`${f.name} was not added`, { description: e instanceof Error ? e.message : undefined });
+      }
+    }
+    setBusy(false);
+    take(got);
   };
   return (
     <Field label={props.label} hint={props.hint}>
-      <div
-        className="flex flex-wrap gap-2"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); add(e.dataTransfer.files); }}
-      >
-        {props.values.map((v, i) => (
-          <div key={i} className="group relative h-14 w-14 overflow-hidden rounded-md border border-border checker">
-            <img src={v} alt="" className="h-full w-full object-cover" />
-            <button
-              type="button"
-              className="absolute inset-0 hidden cursor-pointer items-center justify-center bg-black/55 text-white group-hover:flex"
-              onClick={() => props.onChange(props.values.filter((_, j) => j !== i))}
-              aria-label="Remove image"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+      <div role="group" aria-label={props.label} className="space-y-2" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void add(e.dataTransfer.files); }}>
+        {props.values.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {props.values.map((v, i) => (
+              <div key={`${i} ${v.slice(0, 40)}`} className="group relative h-14 w-14 overflow-hidden rounded-md border border-border checker">
+                {pictures.show(v) ? <img src={pictures.show(v)} alt="" className="h-full w-full object-cover" /> : <span className="block h-full w-full animate-pulse bg-muted" aria-label="Loading the picture" />}
+                <button type="button" className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/55 text-white opacity-0 focus-visible:opacity-100 group-hover:opacity-100" onClick={() => props.onChange(props.values.filter((_, j) => j !== i))} aria-label="Remove image">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-        {(props.multiple || props.values.length === 0) && (
-          <button
-            type="button"
-            onClick={() => ref.current?.click()}
-            className={cn("flex h-14 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input px-3 text-xs text-muted-foreground hover:border-brand hover:text-brand", props.values.length ? "w-14 px-0" : "")}
-          >
-            <ImagePlus className="h-4 w-4" />
-            {!props.values.length && <span>Add or drop</span>}
-          </button>
         )}
-        {!props.multiple && props.values.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => ref.current?.click()}>Replace</Button>
-        )}
+        {pictures.failed && <p role="alert" className="text-xs text-destructive">A library picture could not be loaded.</p>}
+        <div className="flex flex-wrap gap-1.5">
+          <Button type="button" variant="outline" size="sm" disabled={busy || room < 1} onClick={() => ref.current?.click()}>
+            {busy ? <Loader2 className="animate-spin" /> : <ImagePlus />} {!props.multiple && props.values.length ? "Replace" : "Upload"}
+          </Button>
+          {props.brand && <Button type="button" variant="outline" size="sm" disabled={busy || room < 1} onClick={() => setChoosing(true)}><Images /> From library</Button>}
+        </div>
       </div>
-      <input ref={ref} type="file" accept="image/*" multiple={props.multiple} className="hidden" onChange={(e) => add(e.target.files)} />
+      <input ref={ref} type="file" accept="image/*" multiple={props.multiple} className="hidden" aria-label={`Upload: ${props.label}`} onChange={(e) => void add(e.target.files)} />
+      {props.brand && <AssetPicker brand={props.brand} open={choosing} onOpenChange={setChoosing} max={room} onPick={(assets) => take(assets.map((a) => assetRef(a.id)))} />}
     </Field>
   );
 }

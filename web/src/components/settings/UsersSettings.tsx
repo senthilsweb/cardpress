@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CircleAlert, KeyRound, Loader2, Plus, UserCheck, UserX } from "lucide-react";
-import { toast } from "sonner";
+import { attempt } from "@/components/settings/form";
 import { Button } from "@/components/ui/button";
 import { Pane } from "@/components/ui/pane";
 import { useUnsaved } from "@/components/settings/guard";
@@ -24,6 +24,7 @@ export function UsersSettings() {
   const [adding, setAdding] = useState(false);
   const [pwFor, setPwFor] = useState<string | null>(null);
   const [pw, setPw] = useState("");
+  const [roles, setRoles] = useState<Record<string, string>>({}); // roles chosen and not yet saved
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [discard, setDiscard] = useState(false); // closing would lose what was typed
@@ -31,24 +32,27 @@ export function UsersSettings() {
   const load = useCallback(() => api.users().then(setUsers).catch((e) => setError(message(e))), []);
   useEffect(() => { void load(); }, [load]);
   const typed = !!(form.firstName || form.lastName || form.email || form.password);
-  useUnsaved((adding && typed) || !!pw);
+  useUnsaved((adding && typed) || !!pw || Object.keys(roles).length > 0);
 
-  const act = async (key: string, fn: () => Promise<unknown>, done?: string) => {
+  const act = async (key: string, fn: () => Promise<unknown>, done: string, failed: string) => {
     setBusy(key); setError(null);
-    try { await fn(); if (done) toast.success(done); await load(); } catch (e) { setError(message(e)); } finally { setBusy(null); }
+    const why = await attempt(fn, done, failed);
+    if (why) setError(why); else await load();
+    setBusy(null);
   };
+  const dropRole = (id: string) => setRoles((r) => { const { [id]: _gone, ...rest } = r; return rest; });
 
   const openForm = () => { setError(null); setForm(EMPTY); setDiscard(false); setAdding(true); };
   /** Esc, the cross or a press outside: asks first when something was typed. */
   const closeForm = () => { if (typed && !discard) setDiscard(true); else { setAdding(false); setForm(EMPTY); setDiscard(false); } };
-  const add = () => act("add", async () => { await api.addUser(form); setForm(EMPTY); setAdding(false); }, "User added");
+  const add = () => act("add", async () => { await api.addUser(form); setForm(EMPTY); setAdding(false); }, "User added", "User not added");
 
   return (
     <Pane>
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{users ? `${users.length} ${users.length === 1 ? "person" : "people"}` : ""}</p>
-          <Button size="sm" variant="brand" onClick={openForm}><Plus /> Add user</Button>
+          <Button size="sm" variant="gold" onClick={openForm}><Plus /> Add user</Button>
         </div>
         {error && !adding && <Alert variant="destructive"><CircleAlert aria-hidden /><AlertDescription>{error}</AlertDescription></Alert>}
         <Dialog open={adding} onOpenChange={(o) => { if (!o) closeForm(); }}>
@@ -76,10 +80,10 @@ export function UsersSettings() {
               </div>
               <DialogFooter>
                 {discard && <p role="alert" className="mr-auto text-xs text-destructive">Discard what you typed?</p>}
-                <Button type="button" size="sm" variant={discard ? "destructive" : "ghost"} onClick={closeForm}>{discard ? "Discard" : "Cancel"}</Button>
+                <Button type="button" size="sm" variant={discard ? "destructive" : "cancel"} onClick={closeForm}>{discard ? "Discard" : "Cancel"}</Button>
                 {discard
-                  ? <Button type="button" size="sm" variant="outline" onClick={() => setDiscard(false)}>Keep editing</Button>
-                  : <Button type="submit" size="sm" variant="brand" disabled={busy === "add" || form.password.length < 10}>{busy === "add" && <Loader2 className="animate-spin" />} Add user</Button>}
+                  ? <Button type="button" size="sm" variant="cancel" onClick={() => setDiscard(false)}>Keep editing</Button>
+                  : <Button type="submit" size="sm" variant="gold" disabled={busy === "add" || form.password.length < 10}>{busy === "add" && <Loader2 className="animate-spin" />} Add user</Button>}
               </DialogFooter>
             </form>
           </DialogContent>
@@ -95,21 +99,29 @@ export function UsersSettings() {
                       <p className="truncate text-sm font-medium">{u.fullName}{self && <span className="ml-1.5 text-xs font-normal text-muted-foreground">you</span>}{u.status === "disabled" && <span className="ml-1.5 text-xs font-normal text-destructive">disabled</span>}</p>
                       <p className="truncate text-xs text-muted-foreground">{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
                     </div>
-                    <Select value={u.roles[0] ?? "editor"} disabled={busy === u.id} onValueChange={(role) => void act(u.id, () => api.updateUser(u.id, { role }))}>
+                    <Select value={roles[u.id] ?? u.roles[0] ?? "editor"} disabled={busy === u.id} onValueChange={(role) => (role === (u.roles[0] ?? "editor") ? dropRole(u.id) : setRoles((r) => ({ ...r, [u.id]: role })))}>
                       <SelectTrigger aria-label={`Role of ${u.fullName}`} title={roleLabel(u)} className="h-8 w-32 shrink-0 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>{roleOptions}</SelectContent>
                     </Select>
                   </div>
+                  {roles[u.id] && (
+                    <div role="group" aria-label={`Save the role of ${u.fullName}`} className="flex items-center justify-end gap-2">
+                      <span className="mr-auto text-xs text-muted-foreground">Role not saved yet</span>
+                      <Button size="sm" variant="cancel" disabled={busy === u.id} onClick={() => dropRole(u.id)}>Cancel</Button>
+                      <Button size="sm" variant="brand" disabled={busy === u.id} onClick={() => void act(u.id, async () => { await api.updateUser(u.id, { role: roles[u.id] }); dropRole(u.id); }, "Role saved", "Role not saved")}>{busy === u.id && <Loader2 className="animate-spin" />} Save</Button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Button size="sm" variant="outline" onClick={() => { setPwFor(pwFor === u.id ? null : u.id); setPw(""); }}><KeyRound /> New password</Button>
                     {!self && (u.status === "active"
-                      ? <Button size="sm" variant="ghost" disabled={busy === u.id} onClick={() => void act(u.id, () => api.updateUser(u.id, { status: "disabled" }), "Disabled")}><UserX /> Disable</Button>
-                      : <Button size="sm" variant="ghost" disabled={busy === u.id} onClick={() => void act(u.id, () => api.updateUser(u.id, { status: "active" }), "Enabled")}><UserCheck /> Enable</Button>)}
+                      ? <Button size="sm" variant="ghost" disabled={busy === u.id} onClick={() => void act(u.id, () => api.updateUser(u.id, { status: "disabled" }), "Disabled", "Not disabled")}><UserX /> Disable</Button>
+                      : <Button size="sm" variant="ghost" disabled={busy === u.id} onClick={() => void act(u.id, () => api.updateUser(u.id, { status: "active" }), "Enabled", "Not enabled")}><UserCheck /> Enable</Button>)}
                   </div>
                   {pwFor === u.id && (
-                    <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); void act(u.id, async () => { await api.setUserPassword(u.id, pw); setPwFor(null); setPw(""); }, "Password set"); }}>
+                    <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); void act(u.id, async () => { await api.setUserPassword(u.id, pw); setPwFor(null); setPw(""); }, "Password saved", "Password not saved"); }}>
                       <Input aria-label="New password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder="At least 10 characters" className="h-8" />
-                      <Button type="submit" size="sm" variant="brand" disabled={pw.length < 10 || busy === u.id}>Set</Button>
+                      <Button type="button" size="sm" variant="cancel" onClick={() => { setPwFor(null); setPw(""); }}>Cancel</Button>
+                      <Button type="submit" size="sm" variant="brand" disabled={pw.length < 10 || busy === u.id}>Save</Button>
                     </form>
                   )}
                 </li>
