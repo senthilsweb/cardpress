@@ -2,24 +2,23 @@
 
 ## ADDED Requirements
 
-### Requirement: Models per brand
-An administrator SHALL be able to choose, per brand, the model of the coordinator and of each writer from the models
-the server allows.
+### Requirement: A tier per brand
+An administrator SHALL be able to choose, per brand, one of the tiers the manifest offers.
 
-#### Scenario: A stronger article writer
-- **WHEN** an administrator sets a brand's article writer to another allowed model and saves
-- **THEN** new conversations of that brand write articles with it, and other brands are unchanged
+#### Scenario: A stronger tier
+- **WHEN** an administrator sets a brand's tier and saves
+- **THEN** new conversations of that brand use that tier's agents, and other brands are unchanged
 
 #### Scenario: An open conversation
-- **WHEN** the models change while a conversation is open
-- **THEN** that conversation keeps the models it started with
+- **WHEN** the tier changes while a conversation is open
+- **THEN** that conversation keeps the tier it started with
 
-#### Scenario: A model that is no longer allowed
-- **WHEN** a saved model is removed from the allowed list
-- **THEN** our model is used and the settings page says so
+#### Scenario: A tier that is no longer offered
+- **WHEN** a saved tier is not in the manifest
+- **THEN** the default tier is used and the settings page says so
 
 #### Scenario: Not an administrator
-- **WHEN** a person who is not an administrator, or an API key, changes models, checks or budget
+- **WHEN** a person who is not an administrator, or an API key, changes the tier, checks or budget
 - **THEN** it is refused
 
 ### Requirement: Checks per brand

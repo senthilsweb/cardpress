@@ -1,10 +1,10 @@
 # Tasks
 
-Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 also change the agent repository.
+Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repository.
 
 ## Bolt 1: the settings and their page
 - [ ] Migration; stored settings per brand and for the server; API for administrators; security log entries
-- [ ] Settings → Brand → Assistant: models, checks and budget fields, Save / Cancel, Use defaults
+- [ ] Settings → Brand → Assistant: tier, checks and budget fields, Save / Cancel, Use defaults
 - [ ] Tests, browser check
 
 ## Bolt 2: checks
@@ -16,16 +16,14 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 also change the agent repo
 - [ ] Alerts at the percentage and at the amount: recorded once, a line in the chat, the bar on the dashboard and in settings
 - [ ] Tests, browser check
 
-## Bolt 4: the coordinator's model
-- [ ] The session is created with the brand's model; the models used are recorded with the conversation
-- [ ] The dashboard shows the model
+## Bolt 4: tiers in the app
+- [ ] Manifest versions 6 and 7; the brand's tier chooses the coordinator when a session is created; the tier is recorded with the conversation
+- [ ] The dashboard shows the tier
 - [ ] Tests
 
-## Bolt 5: the writers' models
-- [ ] Agent repository: manifest version 7 with the writers' ids, versions and models
-- [ ] CardPress reads versions 6 and 7; copies of agents made on save, recorded and reused; a command that lists them
-- [ ] Tests with the stand-in API
-- [ ] One real session on a copy (ask first: it costs money)
+## Bolt 5: tiers in the agent repository
+- [ ] Strong and Best agents generated from the Standard ones; manifest version 7
+- [ ] One real session on a stronger tier (ask first: it costs money)
 
 ## Bolt 6: writing guides in the app
 - [ ] Migration; guides with versions; the fixed rules for a guide's text; API

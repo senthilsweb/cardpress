@@ -1,6 +1,6 @@
 # Assistant settings for each brand: models, checks, writing guides and a budget
 
-**Status:** proposed by the owner on 2026-11-28; waiting for the owner's go-ahead on the decisions below.
+**Status:** proposed by the owner on 2026-11-28; decisions taken the same day (below); being built.
 
 ## Asked for
 1. Choose the model of the coordinator and of each writer, per brand. An administrator may pick a stronger one.
@@ -33,10 +33,14 @@ writer agent.
 
 ## What changes
 - **Settings → Brand → Assistant**, for administrators: models, checks, budget, and the writing guides.
-- **Models.** One choice each for the coordinator, the post writer, the article writer and the greetings writer, from
-  a list the server allows (Haiku 5.5, Sonnet 5.5, Opus 5.5; more by configuration). The coordinator's choice is sent
-  with the session. For a writer, the app makes a copy of our writer agent with the chosen model, once per choice,
-  and reuses it for every brand that chooses the same.
+- **Models, as tiers.** Three sets of agents are built in the agent repository: Standard (today's), Strong and
+  Best. An administrator picks one set per brand. The app makes no agents of its own.
+
+  | Tier | Coordinator | Post and greetings writers | Article writer |
+  |---|---|---|---|
+  | Standard | Haiku 5.5 | Haiku 5.5 | Sonnet 5.5 |
+  | Strong | Sonnet 5.5 | Sonnet 5.5 | Opus 5.5 |
+  | Best | Opus 5.5 | Opus 5.5 | Opus 5.5 |
 - **Checks.** On or off, and 1 to 5 rounds. Off: the first draft is not graded.
 - **Writing guides.** One per kind (posts, articles, greetings), in Markdown, with a preview and a history. A brand's
   guide replaces our house style for that kind in full. Our fixed part (the record format, limits, tools and safety
@@ -45,21 +49,20 @@ writer agent.
 - **Budget.** A monthly amount per brand and an alert percentage (80 by default). At the alert the chat and the
   dashboard say so. At the amount the chat refuses new requests until the month ends or the amount is raised; a
   request in progress is stopped by the session's own cap. A monthly amount for the whole server works the same way.
-- **Also** (item 7): the settings in use are recorded with each conversation and cost is shown by model; every change
-  to these settings goes in the security log; "Use defaults" on every part; a model that is no longer allowed falls
-  back to ours; the coordinator's "Posting" instructions are corrected in the same agent release.
+- **Also** (item 7): the tier in use is recorded with each conversation and cost is shown by tier; every change
+  to these settings goes in the security log; "Use defaults" on every part; a tier that is no longer offered falls
+  back to Standard; the coordinator's "Posting" instructions are corrected in the same agent release.
 
-## Decisions for the owner
-1. **Writer models through copies of our agents**, made by the app. The other way is a fixed set of tiers built in
-   the agent repository, which cannot give a choice per writer.
-2. **Guides are read as data through a tool**, not uploaded as real skills. It needs no agent per brand, a saved guide
-   is used by the next conversation, and the text has less authority than an instruction. Real skills and zip upload
-   come later, on the same copies as decision 1.
-3. **Who edits:** administrators for everything; the brand's owner may also edit the guides.
-4. **A model check of a guide when it is saved** (Haiku, a fraction of a cent, not counted against the brand), on top
-   of the fixed rules. Recommended; it can be left out.
-5. **Budget month:** the calendar month in UTC. A brand with no amount has no limit of its own.
+## Decisions (owner, 2026-11-28)
+1. **Tiers**, all three, built in the agent repository. Not a choice per writer.
+2. **Who edits:** administrators for everything; the brand's owner may also edit the guides.
+3. **A model check of a guide when it is saved**, on top of the fixed rules.
+4. A plan, later, is per brand; a person on their own makes a brand for themselves.
+
+Open: how a guide reaches the writers. Proposed: read as data through a tool, not uploaded as a real skill per brand.
+Budget month, unless the owner says otherwise: the calendar month in UTC; a brand with no amount has no limit of its
+own.
 
 ## Not in this change
-Zip upload and real skills per brand; effort levels; the grader's own model (the platform chooses it); e-mail alerts
+Zip upload and real skills per brand; a model per writer; effort levels; the grader's own model (the platform chooses it); e-mail alerts
 (there is no mail); chat for people who are not administrators; payments.

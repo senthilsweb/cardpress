@@ -15,6 +15,9 @@ with a markup.
 - The app's headers forbid the payment feature today (`Permissions-Policy: payment=()`); the content policy must
   allow Stripe's pages.
 
+## Decided
+A plan is per brand (owner, 2026-11-28). A person on their own makes a brand for themselves.
+
 ## A simple price
 One formula, shown to the owner only:
 
@@ -42,20 +45,19 @@ The person sees money left as a bar, not tokens. Cost is counted at list price, 
 ## How it would work
 - Stripe Checkout for the first payment and Stripe's customer portal for card, invoices and cancelling: no card data
   touches CardPress.
-- A webhook, checked by its signature, sets the plan: the brand's monthly amount and the allowed models. A missed or
+- A webhook, checked by its signature, sets the plan: the brand's monthly amount and its tier. A missed or
   repeated webhook must not change the result.
 - The profile menu shows the plan and "Upgrade"; Settings → Me → Plan shows the amount left, invoices and "Manage".
 - A cancelled or unpaid plan goes back to Free at the period's end. Nothing is deleted.
 - Self-hosted servers have no plans: with no Stripe keys configured the feature does not appear.
 
 ## Questions for the owner
-1. Is a plan per person or per brand? (The budget is per brand.)
-2. Does an unused allowance carry over? (Simplest: no.)
-3. One currency (USD) to start?
-4. Which countries at first? It decides the tax registration needed.
-5. Is the stronger model a plan feature, or simply paid from the allowance at its higher cost?
-6. Who is the seller on the invoice, and what is the refund rule?
-7. What does Free allow: design and publishing without the assistant?
+1. Does an unused allowance carry over? (Simplest: no.)
+2. One currency (USD) to start?
+3. Which countries at first? It decides the tax registration needed.
+4. Is the stronger model a plan feature, or simply paid from the allowance at its higher cost?
+5. Who is the seller on the invoice, and what is the refund rule?
+6. What does Free allow: design and publishing without the assistant?
 
 ## Not decided here
 Annual prices, teams and seats, coupons, a trial period.

@@ -3,39 +3,32 @@
 ## Where the settings live
 | What | Where |
 |---|---|
-| A brand's models, checks and budget | Table `brand_assistant` (`profile_id`, `data` JSON, `updated_by`, `updated_at`) |
+| A brand's tier, checks and budget | Table `brand_assistant` (`profile_id`, `data` JSON, `updated_by`, `updated_at`) |
 | A brand's guides | Table `brand_guides` (`profile_id`, `kind`, `version`, `body`, `created_by`, `created_at`); the highest version is in use; an empty body means "our house style" |
-| Server-wide values | `preferences` under `assistant`: allowed models, the server's monthly amount. The environment gives the starting values, as with Security |
-| Copies of agents | Table `agent_variants` (`key`, `role`, `base_id`, `base_version`, `model`, `agent_id`, `agent_version`) |
+| Server-wide values | `preferences` under `assistant`: the server's monthly amount. The environment gives the starting value, as with Security |
+| Tiers | The manifest |
 | Alerts already given | Table `budget_alerts` (`scope`, `month`, `level`), so each is given once |
 
-Nothing saved for a brand means today's behaviour. Only an administrator signed in to the app may change models,
+Nothing saved for a brand means today's behaviour. Only an administrator signed in to the app may change the tier,
 checks and budgets: not an API key.
 
 | Setting | Default | Range | Environment |
 |---|---|---|---|
-| Allowed models | Haiku 5.5, Sonnet 5.5, Opus 5.5 | ids the API lists | `CARDPRESS_AGENT_MODELS` |
+| Tier | Standard | the manifest's tiers | |
 | Checks | on, 3 rounds | 1 to 5 | |
 | Brand's monthly amount | none | 1 to 100000 cents | |
 | Alert | 80 % | 50 to 95 | |
 | Server's monthly amount | none | | `CARDPRESS_AGENT_MONTH_CENTS` |
 | Per conversation | 200 cents | | `CARDPRESS_AGENT_BUDGET_CENTS` (as now) |
 
-## Models
-- The settings are read when a conversation's session is created and stay with it. A change applies to new
-  conversations; the page says so. `conversations` records the models used.
-- **Coordinator:** the session is created with `agent_with_overrides` and the chosen `model`. No new agent.
-- **Writers:** a writer on another model is a copy. The app reads our writer (id and version from the manifest),
-  creates an agent with the same configuration and the chosen model, and records it under a key made from the base
-  id, base version and model. A coordinator copy is made the same way, with the copies in its list of writers, keyed
-  by that list. Copies are made when settings are saved, never while a person waits for a reply, and are reused by
-  every brand with the same choices.
-- A new agent release changes the base versions, so the keys change and new copies are made on the next save or
-  first use. Old copies stay; a command lists them so they can be archived by hand.
-- If a copy cannot be made, the save fails with the reason and the brand keeps what it had. If a saved model is no
-  longer allowed, ours is used and the page shows it.
-- Manifest version 7 adds the writers' ids, versions and models. Version 6 is still read: then only the coordinator's
-  model can be chosen.
+## Tiers
+- Manifest version 7 lists the tiers: for each an id, a name, the coordinator's agent id and version, and the models
+  for display. The first is the default. Version 6 is still read, as one tier, Standard.
+- In the agent repository each tier is its own coordinator and writers, made from the same instructions and skills
+  with only the models different, so the tiers cannot drift apart.
+- The tier is read when a conversation's session is created and stays with it. A change applies to new
+  conversations; the page says so. `conversations` records the tier used.
+- A saved tier that the manifest no longer has falls back to the default, and the page shows it.
 
 ## Checks
 The app already builds the graded request. Off: it sends an ordinary message instead. On: `max_iterations` is the
@@ -80,10 +73,11 @@ every form. The preview renders Markdown without raw HTML.
 - The check of a guide on save is not charged to a brand.
 
 ## The dashboard
-The usage table gains the model of each conversation, and a brand's tile shows spent against the amount.
+The usage table gains the tier of each conversation, and a brand's tile shows spent against the amount.
 
 ## Agent repository (contract version 7)
-- `build-manifest.sh`: the writers' ids, versions and models; the rubrics in two parts.
+- Agents for the Strong and Best tiers, generated from the Standard ones; `build-manifest.sh` lists the tiers and
+  gives the rubrics in two parts.
 - Skills: the first step reads the guide; `house-style.md` becomes the fallback.
 - Writers: `get_writing_guide` allowed.
 - Coordinator: the "Posting" section no longer names `publish_post`.
