@@ -7,7 +7,8 @@ import { cssFamily, ensureFont, resolveFonts } from "@/lib/fonts";
 import { fillPictures, picturesOf, usePictures } from "@/lib/assetRefs";
 import { bgById, type Area, type MaskKind } from "./backgrounds";
 import { Ornament, ornamentOf } from "./ornaments";
-import { shadeLayers } from "./shade";
+import { greetingWash, shadeLayers, washesArt } from "./shade";
+import { fitScale } from "./fit";
 
 export interface LayoutDef {
   id: LayoutId;
@@ -131,6 +132,35 @@ function FitText({ text, size, width, style }: { text: string; size: number; wid
   return (
     <div style={{ width, display: "flex", justifyContent: "center", ...style }}>
       <span ref={ref} style={{ display: "inline-block", flexShrink: 0, textAlign: "center", fontSize: size }}>{text}</span>
+    </div>
+  );
+}
+
+/**
+ * The greeting's lines, centred between the logo and the footer. Each keeps its own shape; when together they are taller
+ * than the space, the whole block is made smaller until it fits.
+ */
+function FitBlock({ children, style }: { children: ReactNode; style: CSSProperties }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const fit = useCallback(() => {
+    const room = outer.current, block = inner.current;
+    if (!room || !block) return;
+    // sizes before any scaling, so fitting again starts from the same place
+    const k = fitScale(room.clientHeight, block.offsetHeight);
+    block.style.transform = k < 1 ? `scale(${k})` : "";
+  }, []);
+  useLayoutEffect(fit);
+  // a headline that is resized, or a font that arrives, changes the height after the first drawing
+  useEffect(() => {
+    if (!inner.current || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(fit);
+    watch.observe(inner.current);
+    return () => watch.disconnect();
+  }, [fit]);
+  return (
+    <div ref={outer} style={{ ...style, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      <div ref={inner} data-fit style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>{children}</div>
     </div>
   );
 }
@@ -273,7 +303,7 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
     const message = design.subtitle.length > 200 ? 2.7 : design.subtitle.length > 110 ? 3.1 : 3.6;
     const rule = <span style={{ width: 9 * u, height: 0.35 * u, background: pal.accent, flexShrink: 0 }} />;
     content = (
-      <div style={{ position: "absolute", left: pad, right: pad, top: 10 * u, bottom: 9 * u, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+      <FitBlock style={{ position: "absolute", left: pad, right: pad, top: 10 * u, bottom: 9 * u }}>
         {design.eyebrow && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2.6 * u, fontFamily: body, fontSize: 4.2 * u, fontWeight: 600, letterSpacing: "0.34em", textTransform: "uppercase", color: pal.text }}>
             {rule}<span style={{ marginRight: "-0.34em" }}>{design.eyebrow}</span>{rule}
@@ -291,7 +321,7 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
             <div style={{ width: 18 * u, height: 0.35 * u, background: pal.sub, margin: `${1.2 * u}px auto 0` }} />
           </div>
         )}
-      </div>
+      </FitBlock>
     );
   } else if (L === "split") {
     const photo = profile.headshot || design.photos[0];
@@ -346,8 +376,11 @@ export const Card = forwardRef<HTMLDivElement, Props>(function Card({ design: st
       {!fullBleedImage && (L === "center" || L === "quote") && design.background !== "plain" && (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 55% 45% at 50% 50%, ${rgba(pal.base, 0.92)} 0%, ${rgba(pal.base, 0.6)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
-      {!fullBleedImage && greeting && !bg.frames && design.background !== "plain" && (
-        // a greeting's words fill more of the card, so the wash behind them is wider and stronger
+      {washesArt(design, bg.frames) && design.shade !== undefined && greetingWash(pal.base, design.shade) && (
+        <div data-wash style={{ position: "absolute", inset: 0, background: greetingWash(pal.base, design.shade)! }} />
+      )}
+      {washesArt(design, bg.frames) && design.shade === undefined && (
+        // cards made before the Shading setting keep their wider, stronger wash
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 72% 62% at 50% 50%, ${rgba(pal.base, 0.95)} 0%, ${rgba(pal.base, 0.86)} 55%, ${rgba(pal.base, 0)} 100%)` }} />
       )}
       {bf > 0 && <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(pal.fade, 0)} 45%, ${rgba(pal.fade, bf)} 100%)` }} />}

@@ -1,6 +1,6 @@
 # Changes: where things stand
 
-As of 2026-11-27. Latest release: **`v0.3.0`**. "Released" means in a release or in the code deployed before versions
+As of 2026-11-27. Latest release, deployed: **`v0.4.0`**. "Released" means in a release or in the code deployed before versions
 began (`v0.2.0`). Each change's `tasks.md` is the record; this page repeats what is open there.
 
 ## Next
@@ -53,7 +53,7 @@ Not agreed yet; suggested order:
 | [`2026-12-15-user-guide`](changes/2026-12-15-user-guide/proposal.md) | User guide | Released |  |
 | [`2026-12-16-chat-answer-buttons`](changes/2026-12-16-chat-answer-buttons/proposal.md) | Answer buttons for the assistant's questions | Proposed | 6 |
 | [`2026-12-19-greeting-layouts`](changes/2026-12-19-greeting-layouts/proposal.md) | Greeting layouts | Part released | 4 |
-| [`2026-12-20-pluggable-ornaments`](changes/2026-12-20-pluggable-ornaments/proposal.md) | Pluggable ornaments | Built, next release | 1 |
+| [`2026-12-20-pluggable-ornaments`](changes/2026-12-20-pluggable-ornaments/proposal.md) | Pluggable ornaments | `v0.4.0` |  |
 | [`2026-12-21-media-library`](changes/2026-12-21-media-library/proposal.md) | Media library, per brand | `v0.2.1`, `v0.3.0` |  |
 | [`2026-12-22-dialogs-and-settings`](changes/2026-12-22-dialogs-and-settings/proposal.md) | One dialog design, and settings in a dialog | Released |  |
 | [`2026-12-23-shell-and-themes`](changes/2026-12-23-shell-and-themes/proposal.md) | A header, a labelled side bar, and colour themes | Released | 1 |
@@ -65,7 +65,8 @@ Not agreed yet; suggested order:
 | [`2026-12-30-dashboard-controls`](changes/2026-12-30-dashboard-controls/proposal.md) | Dashboard controls: shadcn throughout, the date range in a pop-up | `v0.2.1` |  |
 | [`2026-12-31-controls-and-media-pages`](changes/2026-12-31-controls-and-media-pages/proposal.md) | Consistent controls, Add user at the top, Media in pages | `v0.2.1` |  |
 | [`2027-01-01-settings-forms`](changes/2027-01-01-settings-forms/proposal.md) | A first brand of one's own, and settings forms that save the same way | `v0.3.0` |  |
-| [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | Built, next release | 1 |
+| [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
+| [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | Built, next release | 1 |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -189,14 +190,11 @@ Older items include checks against real accounts that cost money or post publicl
 - Templates in the picker
 - Tests, browser check at every size, deploy
 
-### `2026-12-20-pluggable-ornaments`
-- Deploy
-
 ### `2026-12-23-shell-and-themes`
 - New guide pictures
 
 ### `2026-12-28-versions`
 - Look at the version in About CardPress on a deployed app
 
-### `2027-01-02-pictures-shown`
+### `2027-01-03-greeting-readability`
 - Deploy

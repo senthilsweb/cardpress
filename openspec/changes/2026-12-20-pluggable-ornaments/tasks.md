@@ -4,4 +4,4 @@
 - [x] Picker in Design
 - [x] Tests, `docs/adding-ornaments.md`, user guide
 - [x] Browser check and PNG export
-- [ ] Deploy
+- [x] Deploy (`v0.4.0`)
