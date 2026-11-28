@@ -286,13 +286,13 @@ export const Outline = memo(function Outline({ editor, collapsed, onToggle }: { 
   };
   if (collapsed) {
     return (
-      <div className="flex w-9 shrink-0 flex-col items-center border-r border-border py-2">
+      <div className="flex w-9 shrink-0 flex-col items-center border-r border-border py-2 max-md:hidden">
         <Button type="button" variant="ghost" size="icon-sm" title="Show the outline" aria-label="Show the outline" aria-expanded={false} onClick={onToggle}><ListTree /></Button>
       </div>
     );
   }
   return (
-    <nav aria-label="Outline" className="flex w-56 shrink-0 flex-col border-r border-border">
+    <nav aria-label="Outline" className="flex w-56 shrink-0 flex-col border-r border-border max-md:hidden">
       <div className="flex items-center justify-between px-3 py-2">
         <span className="eyebrow">Outline</span>
         <Button type="button" variant="ghost" size="icon-sm" title="Hide the outline" aria-label="Hide the outline" aria-expanded onClick={onToggle}><PanelLeftClose /></Button>

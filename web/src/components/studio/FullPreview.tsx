@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,19 @@ import type { Design, Palette, Profile } from "@/lib/types";
 /** The LinkedIn size to show: the current one when it is a LinkedIn size, otherwise the standard post image. */
 export function linkedinSize(current: Size): Size {
   return current.net === "LinkedIn" ? current : SIZES.find((s) => s.net === "LinkedIn") ?? sizeById("li-post");
+}
+
+/** The width there is for the preview, up to `most`: the dialog is narrow on a phone. */
+function useRoom(most: number) {
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(most);
+  useEffect(() => {
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    watch.observe(box);
+    return () => watch.disconnect();
+  }, [box]);
+  return { ref: setBox, fit: (wanted: number) => Math.min(wanted, width || wanted) };
 }
 
 /**
@@ -41,6 +54,7 @@ export function FullPreview(props: {
   const isPost = draft.kind === "post";
   const empty = !s.text.trim();
   const noAlt = (draft.images ?? []).filter((im) => !im.altText.trim()).length;
+  const room = useRoom(576); // the widest the preview column is used, max-w-xl
 
   const copy = async () => {
     try {
@@ -59,16 +73,16 @@ export function FullPreview(props: {
           <DialogDescription>{isPost ? draft.attachment === "document" ? "This is exactly the text and document that would be sent." : draft.attachment === "images" ? "This is exactly the text and images that would be sent." : draft.attachment === "video" ? "This is the text that would be sent. The video is read from its address at that time." : "This is exactly the text and image that would be sent." : "The card and the article as they are saved. Articles are pasted into LinkedIn's article editor or your blog; they are not sent."}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
-          <div className="flex justify-center">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_240px]">
+          <div ref={room.ref} className="flex min-w-0 justify-center">
             {isPost ? (
-              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={460} caption={s.text} expandable {...props.media} />
+              <FeedFrame design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} width={room.fit(460)} caption={s.text} expandable {...props.media} />
             ) : (
-              <div className="w-full max-w-xl space-y-4">
+              <div className="w-full min-w-0 max-w-xl space-y-4">
                 <div className="flex justify-center">
-                  <ScaledCard design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} maxW={560} maxH={320} />
+                  <ScaledCard design={props.design} profile={props.profile} palette={props.palette} size={linkedinSize(props.size)} maxW={room.fit(560)} maxH={320} />
                 </div>
-                <article className="article-html w-full rounded-lg border border-border bg-card p-5" dangerouslySetInnerHTML={{ __html: props.articleHtml || "<p>Nothing written yet.</p>" }} />
+                <article className="article-html w-full break-words rounded-lg border border-border bg-card p-5" dangerouslySetInnerHTML={{ __html: props.articleHtml || "<p>Nothing written yet.</p>" }} />
               </div>
             )}
           </div>

@@ -67,6 +67,7 @@ Not agreed yet; suggested order:
 | [`2027-01-01-settings-forms`](changes/2027-01-01-settings-forms/proposal.md) | A first brand of one's own, and settings forms that save the same way | `v0.3.0` |  |
 | [`2027-01-02-pictures-shown`](changes/2027-01-02-pictures-shown/proposal.md) | An added picture is seen | `v0.4.0` |  |
 | [`2027-01-03-greeting-readability`](changes/2027-01-03-greeting-readability/proposal.md) | Greeting cards: words that fit, art that shows | `v0.4.1` |  |
+| [`2027-01-04-screen-fixes`](changes/2027-01-04-screen-fixes/proposal.md) | Screen fixes: phones, unsaved settings, greeting footers | Being built | 6 |
 
 ## Open tasks
 Older items include checks against real accounts that cost money or post publicly: ask before running them.
@@ -189,3 +190,11 @@ Older items include checks against real accounts that cost money or post publicl
 
 ### `2026-12-28-versions`
 - Look at the version in About CardPress on a deployed app
+
+### `2027-01-04-screen-fixes`
+- Reloading or closing the tab asks while a settings form has unsaved changes
+- Discarding in the app's own question is not asked twice
+- Test and browser check
+- A greeting card's footer is a little larger and stronger
+- Browser check on a pale background
+- Deploy

@@ -39,3 +39,4 @@ Recorded as each bolt completes, from 2026-11-27. The changes between the table 
 | Chat | Answer buttons in the studio: a question's fixed answers are pressed | [chat-answer-buttons](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2026-12-16-chat-answer-buttons) |
 | Chat | The coordinator sends the fixed answers (agent repository) | [chat-answer-buttons](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2026-12-16-chat-answer-buttons) |
 | Chat | Change lines: what a reply changed, with Undo and View | [chat-workspace](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2026-12-03-chat-workspace) |
+| Screens | Phone screens: the full preview fits the width of the screen | [screen-fixes](https://github.com/senthilsweb/cardpress/tree/main/openspec/changes/2027-01-04-screen-fixes) |
