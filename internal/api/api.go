@@ -105,6 +105,10 @@ type Chatting interface {
 	SetBrandAssistant(ctx context.Context, profileID string, in service.BrandAssistant) (service.BrandAssistantView, error)
 	ResetBrandAssistant(ctx context.Context, profileID string) (service.BrandAssistantView, error)
 	Assistant(ctx context.Context) (service.AssistantView, error)
+	Guides(ctx context.Context, profileID string) (service.GuidesView, error)
+	SaveGuide(ctx context.Context, profileID, kind, body string) (service.GuidesView, error)
+	GuideVersions(ctx context.Context, profileID, kind string) ([]service.GuideVersion, error)
+	RestoreGuide(ctx context.Context, profileID, kind string, version int) (service.GuidesView, error)
 	SetAssistant(ctx context.Context, in service.AssistantSettings) (service.AssistantView, error)
 	ResetAssistant(ctx context.Context) (service.AssistantView, error)
 	Start(ctx context.Context, profileID, url, text string) (service.Conversation, error)
@@ -238,6 +242,10 @@ func (s *server) table() []routeDef {
 		{"GET", "/profiles/{id}/assistant", write(scopeBrandPath), s.getBrandAssistant},
 		{"PUT", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.putBrandAssistant},
 		{"DELETE", "/profiles/{id}/assistant", rule{scope: scopeAdmin, perm: service.PermUsers}, s.resetBrandAssistant},
+		{"GET", "/profiles/{id}/guides", write(scopeBrandPath), s.getGuides},
+		{"PUT", "/profiles/{id}/guides/{kind}", write(scopeBrandPath), s.putGuide},
+		{"GET", "/profiles/{id}/guides/{kind}/versions", write(scopeBrandPath), s.guideVersions},
+		{"POST", "/profiles/{id}/guides/{kind}/versions/{version}/restore", write(scopeBrandPath), s.restoreGuide},
 		{"GET", "/profiles/{id}/assets", write(scopeBrandPath), s.listAssets},
 		{"POST", "/profiles/{id}/assets", write(scopeBrandPath), s.addAsset},
 		{"PUT", "/profiles/{id}/assets/{asset}", write(scopeBrandPath), s.updateAsset},

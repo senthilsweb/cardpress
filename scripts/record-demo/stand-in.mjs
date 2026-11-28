@@ -113,6 +113,11 @@ export function startStandIn({ app, key, port }) {
       sessions.set(id, { id, events: [], listeners: new Set(), n: 0, cents: 0, budget: cap });
       return reply({ id, type: "session" });
     }
+    if (req.method === "POST" && path === "/v1/messages") { // the check of a writing guide: one with REFUSE in it is refused
+      const refused = raw.includes("REFUSE");
+      return reply({ id: "msg_1", type: "message", role: "assistant", model: "stand-in", stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 },
+        content: [{ type: "text", text: JSON.stringify({ accepted: !refused, reason: refused ? "A line asks for work other than writing." : "" }) }] });
+    }
     const s = sessions.get(/^\/v1\/sessions\/([^/]+)/.exec(path)?.[1]);
     if (!s) return reply({ type: "error", error: { type: "not_found_error", message: "no session" } }, 404);
     const about = (x) => ({ id: x.id, usage: { list_cost: { amount: String(x.cents), currency: "USD" }, active_seconds: 5 }, budget: x.budget ? { type: "limit", max_list_cost: { amount: String(x.budget), currency: "USD" } } : null });

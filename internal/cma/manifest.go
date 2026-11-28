@@ -62,6 +62,14 @@ type Manifest struct {
 	SchemaVersion int             `json:"schema_version,omitempty"`
 	// Tiers are the sets of agents on offer, the default first. A manifest without them has one: its agent_id.
 	Tiers []Tier `json:"tiers,omitempty"`
+	// Guides are what the writers come with, by kind: shown to someone writing a brand's own guide.
+	Guides map[string]GuideBase `json:"guides,omitempty"`
+}
+
+// GuideBase is our house style for one kind of writing and the rules that stay whatever a brand's guide says.
+type GuideBase struct {
+	Ours  string `json:"ours"`
+	Fixed string `json:"fixed"`
 }
 
 var tierID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)

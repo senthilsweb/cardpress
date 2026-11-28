@@ -19,6 +19,7 @@ export async function setup({ width, height, scale = 2, addInitScript } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cardpress-demo-"));
   fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({
     version: 5, agent_id: "agent_demo", environment_id: "env_demo", vault_id: "vlt_demo", mcp_server_url: `${BASE}/mcp`,
+    guides: { post: { ours: "## Voice\n- Simple English.\n- No hype.", fixed: "Save the post to its draft. Keep to the limits." } },
     outcomes: { post: { description: "Write the post.", rubric: "- good", max_iterations: 3 }, article: { description: "Write the article.", rubric: "- good", max_iterations: 3 } },
   }));
   const bin = path.resolve(import.meta.dirname, process.env.CARDPRESS_BIN || "../../bin/cardpress");

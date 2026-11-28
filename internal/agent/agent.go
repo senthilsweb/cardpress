@@ -79,6 +79,24 @@ type Tiered interface {
 // ErrSessionGone is an agent saying it no longer has the session it was asked to continue.
 var ErrSessionGone = errors.New("the session cannot be continued")
 
+// GuideBase is what an assistant's writers come with for one kind of writing: our house style, which a brand's own guide
+// replaces, and the rules that stay whatever a guide says. For showing only.
+type GuideBase struct {
+	Ours  string
+	Fixed string
+}
+
+// Guided is an assistant that can say what its writers come with, by kind ("post", "article", "greeting").
+type Guided interface {
+	GuideBases() map[string]GuideBase
+}
+
+// GuideChecker is an assistant that can judge whether a brand's guide only describes how to write.
+type GuideChecker interface {
+	// CheckGuide says whether the guide is accepted and, when not, why, in words for its author.
+	CheckGuide(ctx context.Context, kind, body string) (ok bool, reason string, err error)
+}
+
 // ErrBudget is an agent saying it stopped because the allowance of the reply was used up.
 var ErrBudget = errors.New("the budget is used up")
 

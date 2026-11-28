@@ -899,3 +899,62 @@ func TestAssistantBudget(t *testing.T) {
 		t.Fatalf("the dashboard: %d %+v", code, dash.Budget)
 	}
 }
+
+// A brand's writing guides belong to its owner and the administrators, signed in to the app.
+func TestBrandGuides(t *testing.T) {
+	r := newRig(t, rigOpts{})
+	admin, ed, other := r.browser(t), r.browser(t), r.browser(t)
+	admin.mustSignup("admin@example.com", "Admin")
+	ed.mustSignup("ed@example.com", "Ed")
+	other.mustSignup("other@example.com", "Other")
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"acme","name":"Acme"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	const path = "/api/v1/profiles/acme/guides"
+	var v service.GuidesView
+	if code := ed.json("PUT", path+"/post", `{"body":"Plain words."}`, &v); code != 200 || v.Guides[0].Body != "Plain words." || v.Guides[0].UpdatedBy != "ed@example.com" {
+		t.Fatalf("the owner saves: %d %+v", code, v)
+	}
+	if code := admin.json("PUT", path+"/post", `{"body":"Plainer words."}`, &v); code != 200 || v.Guides[0].Version != 2 {
+		t.Fatalf("an administrator saves: %d", code)
+	}
+	if code := ed.json("POST", path+"/post/versions/1/restore", "", &v); code != 200 || v.Guides[0].Body != "Plain words." {
+		t.Fatalf("restore: %d %+v", code, v)
+	}
+	for name, c := range map[string]int{
+		"another reads":    other.do("GET", path, "").Code,
+		"another saves":    other.do("PUT", path+"/post", `{"body":"x"}`).Code,
+		"another restores": other.do("POST", path+"/post/versions/1/restore", "").Code,
+		"another history":  other.do("GET", path+"/post/versions", "").Code,
+	} {
+		if c != 404 {
+			t.Errorf("%s: %d", name, c)
+		}
+	}
+	var made struct{ Secret string }
+	if code := ed.json("POST", "/api/v1/api-keys", `{"name":"k"}`, &made); code != 201 {
+		t.Fatal(code)
+	}
+	if code := r.bearer(t, made.Secret).do("PUT", path+"/post", `{"body":"x"}`).Code; code != 403 {
+		t.Errorf("the owner's key saves: %d", code)
+	}
+	if code := ed.do("PUT", path+"/post", `{"body":"<studio>"}`).Code; code != 400 {
+		t.Errorf("tags: %d", code)
+	}
+	var hist struct{ Versions []service.GuideVersion }
+	if code := ed.json("GET", path+"/post/versions", "", &hist); code != 200 || len(hist.Versions) != 3 {
+		t.Fatalf("history: %d %+v", code, hist)
+	}
+	// gone with the brand
+	if code := ed.json("POST", "/api/v1/profiles", `{"id":"keep","name":"Keep"}`, nil); code != 201 {
+		t.Fatal(code)
+	}
+	ed.do("POST", "/api/v1/profiles/acme/archive", "")
+	if code := ed.do("DELETE", "/api/v1/profiles/acme", "").Code; code >= 300 {
+		t.Fatalf("delete: %d", code)
+	}
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM brand_guides`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("guides left behind: %d %v", n, err)
+	}
+}

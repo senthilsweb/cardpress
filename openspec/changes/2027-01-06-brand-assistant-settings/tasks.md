@@ -29,10 +29,11 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [ ] One real session on a stronger tier, after the apply (ask first: it costs money)
 
 ## Bolt 6: writing guides in the app
-- [ ] Migration; guides with versions; the fixed rules for a guide's text; API
-- [ ] The editor with preview, Start from ours, History and Restore
-- [ ] The model check on save (ask first before the first real call)
-- [ ] Tests, browser check
+- [x] Migration; guides with versions (the newest 50); the fixed rules for a guide's text; API for the brand's owner and administrators
+- [x] The editor with preview, Start from ours, History and Restore, Use our style
+- [x] The model check on save, tested against a fake service
+- [x] Tests, browser check (`scripts/record-demo/check-guides.mjs`)
+- [ ] One real check of a good and a bad guide (ask first: a fraction of a cent each)
 
 ## Bolt 7: the writers use the guide
 - [ ] `get_writing_guide` on the MCP server; the rubric built from the fixed lines and the guide

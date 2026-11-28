@@ -117,6 +117,9 @@ func (f *fake) setBudget(_ context.Context, _ string, cents int) error {
 	f.limit, f.limits = cents, append(f.limits, cents)
 	return nil
 }
+func (f *fake) checkGuide(context.Context, string, string) (bool, string, error) {
+	return true, "", nil
+}
 func (f *fake) history(context.Context, string) ([]wireEvent, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

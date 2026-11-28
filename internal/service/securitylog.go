@@ -27,6 +27,8 @@ const (
 	// a monthly amount passed its alert, or was used up: the subject is the brand, or the server
 	EventBudgetAlert = "budget_alert"
 	EventBudgetUsed  = "budget_used"
+	// a brand's writing guide was saved or restored: the subject is the brand
+	EventGuide = "guide_changed"
 )
 
 const (

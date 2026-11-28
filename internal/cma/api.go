@@ -26,6 +26,7 @@ type sessionAPI interface {
 	// budget is what the session has cost and its spending limit, both in cents; a limit of 0 is none.
 	budget(ctx context.Context, sessionID string) (used, limit int, err error)
 	setBudget(ctx context.Context, sessionID string, cents int) error
+	checkGuide(ctx context.Context, kind, body string) (ok bool, reason string, err error)
 }
 
 // eventStream is a live event stream, already open (and so already buffering) when stream returns.

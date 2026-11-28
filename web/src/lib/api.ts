@@ -54,6 +54,7 @@ async function call<T>(method: string, path: string, body?: unknown, background 
 
 import type { Draft, DraftInput } from "./draft";
 import type { Perm, User } from "./session";
+import type { GuidesView, GuideVersion } from "./guides";
 import type { AssistantSettings, AssistantView, BrandAssistant, BrandAssistantView } from "./brandAssistant";
 import type { Security, SecurityEvent, SecuritySettings } from "./security";
 import type { Attempt, Job, NewJob } from "./jobs";
@@ -237,6 +238,11 @@ export const api = {
   assistant: () => call<AssistantView>("GET", "/assistant"),
   saveAssistant: (s: AssistantSettings) => call<AssistantView>("PUT", "/assistant", s),
   resetAssistant: () => call<AssistantView>("DELETE", "/assistant"),
+  /** A brand's own writing guides, which replace our house style. */
+  guides: (id: string) => call<GuidesView>("GET", `/profiles/${encodeURIComponent(id)}/guides`),
+  saveGuide: (id: string, kind: string, body: string) => call<GuidesView>("PUT", `/profiles/${encodeURIComponent(id)}/guides/${kind}`, { body }),
+  guideVersions: (id: string, kind: string) => call<{ versions: GuideVersion[] }>("GET", `/profiles/${encodeURIComponent(id)}/guides/${kind}/versions`).then((r) => r.versions),
+  restoreGuide: (id: string, kind: string, version: number) => call<GuidesView>("POST", `/profiles/${encodeURIComponent(id)}/guides/${kind}/versions/${version}/restore`),
   /** A brand's media library. */
   assets: (brand: string, q: AssetQuery) => call<Assets>("GET", `/profiles/${encodeURIComponent(brand)}/assets?${assetParams(q)}`),
   addAsset: (brand: string, form: FormData) => call<Asset>("POST", `/profiles/${encodeURIComponent(brand)}/assets`, form),

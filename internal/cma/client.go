@@ -78,6 +78,22 @@ func (c *Client) Tiers() []agent.Tier {
 	return out
 }
 
+// GuideBases are our house styles and fixed rules, as the manifest gives them.
+func (c *Client) GuideBases() map[string]agent.GuideBase {
+	out := map[string]agent.GuideBase{}
+	for kind, g := range c.m.Guides {
+		out[kind] = agent.GuideBase{Ours: g.Ours, Fixed: g.Fixed}
+	}
+	return out
+}
+
+// CheckGuide asks a small model whether a brand's guide only describes how to write.
+func (c *Client) CheckGuide(ctx context.Context, kind, body string) (bool, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, guideCheckTimeout)
+	defer cancel()
+	return c.api.checkGuide(ctx, kind, body)
+}
+
 // Respond sends the person's newest message with its context and follows the session until the agent has finished. Each
 // kind to be graded is sent as an outcome, one after the other; otherwise it is an ordinary message. The agents write to
 // the studio themselves, so the answer is what they say and what it cost.
