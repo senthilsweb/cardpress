@@ -60,6 +60,7 @@ Credentials can also come from environment variables instead of the app; see [So
 | `CARDPRESS_AGENT` | `off` | `off` or `cma` ([Claude Managed Agent](cma-agent.md)) |
 | `CARDPRESS_AGENT_MANIFEST` | | The agent manifest: a file, an https address or the JSON |
 | `CARDPRESS_AGENT_BUDGET_CENTS` | `200` | Spend cap per conversation, in US cents; `0` = none |
+| `CARDPRESS_AGENT_MONTH_CENTS` | | Spend cap for every brand together in a calendar month, in US cents. A saved amount under Settings → Assistant replaces it |
 | `CARDPRESS_AGENT_TIMEOUT` | `12m` | Longest wait for one reply (10s to 30m) |
 | `ANTHROPIC_API_KEY` | | Used to reach the agents |
 | `ANTHROPIC_WORKSPACE_ID` | | For a key that covers several workspaces |

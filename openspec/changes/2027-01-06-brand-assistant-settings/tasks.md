@@ -42,7 +42,7 @@ Bolts 1 to 4 and 6 need only CardPress. Bolts 5 and 7 change the agent repositor
 - [ ] One real post with a guide, after the deploy and apply (ask first)
 
 ## Bolt 8: docs
-- [ ] User guide, configuration, data model, the contract (version 7), `docs/cma-agent.md`
+- [x] User guide, configuration, data model, MCP, the contract (version 7), `docs/cma-agent.md`
 
 ## Release
 - [ ] Deploy CardPress (ask first)

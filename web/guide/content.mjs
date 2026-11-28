@@ -3,7 +3,7 @@
 /** The pages in reading order, under their headings. A page is `pages/<slug>.html`: its contents only. */
 export const GROUPS = [
   { name: "Basics", pages: [["start", "Getting started"], ["brands", "Brands and multiple accounts"], ["social", "Connect social accounts"]] },
-  { name: "Create", pages: [["posts", "LinkedIn posts"], ["articles", "LinkedIn articles"], ["together", "Posts and articles together"], ["greetings", "Seasonal greetings"], ["chat", "Design with chat"], ["card", "The card"], ["backgrounds", "Backgrounds"]] },
+  { name: "Create", pages: [["posts", "LinkedIn posts"], ["articles", "LinkedIn articles"], ["together", "Posts and articles together"], ["greetings", "Seasonal greetings"], ["chat", "Design with chat"], ["assistant", "Your brand's assistant"], ["card", "The card"], ["backgrounds", "Backgrounds"]] },
   { name: "Publish and manage", pages: [["publish", "Publish and schedule"], ["library", "Library"], ["calendar", "Calendar"]] },
   { name: "Reference", pages: [["accounts", "Sign in and roles"], ["problems", "Common problems"]] },
 ];

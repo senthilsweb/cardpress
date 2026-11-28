@@ -36,7 +36,7 @@ try {
 
   // the log names it
   await page.goto(`${BASE}/settings/security/`);
-  await page.getByText("Brand assistant changed").first().waitFor();
+  await page.getByText("Assistant changed").first().waitFor();
 
   // phone width
   await page.setViewportSize({ width: 390, height: 800 });
